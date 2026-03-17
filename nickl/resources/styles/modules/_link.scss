@@ -1,0 +1,41 @@
+@import '../base/common';
+/**
+ * GENERAL
+ */
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.module-link .btn-wrapper {
+    margin-top: 0;
+    @include flex(center, flex-start, wrap);
+    gap: rem(9px) rem(19px);
+    &.btn_align_left {
+        justify-content: flex-start;
+    }
+    &.btn_align_right {
+        justify-content: flex-end;
+    }
+}
+
+
+
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 600px) {
+    .module-link .btn-wrapper {
+        flex-direction: column;
+        align-items: center;
+        &.btn_align_left {
+            align-items: flex-start;
+        }
+        &.btn_align_right {
+            align-items: flex-end;
+        }
+    }
+}

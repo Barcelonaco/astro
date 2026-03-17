@@ -1,0 +1,57 @@
+---
+/**
+ * Module Banner — Reproduit banner.blade.php
+ * En-tête de page avec image de fond, titre H1 ou P.
+ * Hauteurs : small, medium, large, none.
+ */
+import { resolveImageUrl, optimizedImageUrl } from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const number = (data.id_bloc as string) || 'section_0';
+const heightBanner = (data.banner_height as string) || 'small';
+const titleInHeader = data.title_in_header !== 'hideTitle' ? 'showTitle' : 'hideTitle';
+const h1InHeader = (data.h1_in_header as string) || 'yes';
+const title = (data.title as string) || '';
+const titleSize = (data.title_size as string) || '';
+const imgBanner = data.image as any;
+const imgUrl = resolveImageUrl(imgBanner, apiOrigin);
+
+const hideTitleClass = titleInHeader === 'hideTitle' ? ' hide_banner_title' : '';
+const heightClass = heightBanner ? ` ${heightBanner}` : ' small';
+const titleSizeClass = titleSize ? ` h1-${titleSize}` : '';
+---
+
+<div
+  id={number}
+  class={`module module-banner-page${hideTitleClass}${heightClass}${titleSizeClass}`}
+>
+  {heightBanner !== 'none' && imgUrl && (
+    <div class="background">
+      <img src={optimizedImageUrl(imgUrl, 1920, 80)} fetchpriority="high" loading="eager" decoding="sync" alt="" class="illus" />
+    </div>
+  )}
+
+  <div class="container-large">
+    <div class="desc">
+      {titleInHeader !== 'hideTitle' && (
+        h1InHeader === 'yes' ? (
+          <h1 class="title title-section-1">
+            <Fragment set:html={title} />
+          </h1>
+        ) : (
+          <p class="title title-section-1">
+            <Fragment set:html={title} />
+          </p>
+        )
+      )}
+    </div>
+  </div>
+</div>

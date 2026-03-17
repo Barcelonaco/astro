@@ -1,0 +1,74 @@
+---
+import { buildModuleClasses, cleanHtml } from '../../lib/module-classes';
+
+interface NicklTextProps {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props as NicklTextProps;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const id = (data.id as string) ?? (data.id_bloc as string) ?? '';
+const isVisible = (data.is_visible as string) ?? 'yes';
+const classes = buildModuleClasses(data);
+
+const bgImg = (data.bg_img as any) ?? null;
+const rawBgOpacity = data.bg_opacity as number | string | undefined;
+const opacityPercent =
+  rawBgOpacity === undefined || rawBgOpacity === null || rawBgOpacity === ''
+    ? 10
+    : Number(rawBgOpacity);
+const bgOpacity = Number.isNaN(opacityPercent) ? 10 : opacityPercent;
+
+const backgroundImage = bgImg
+  ? {
+      url: typeof bgImg.url === 'string' && bgImg.url.startsWith('http')
+        ? bgImg.url
+        : apiOrigin + String(bgImg.url || ''),
+      opacity: bgOpacity
+    }
+  : null;
+
+const text = cleanHtml(data.text as string);
+const rawCta = data.cta as any;
+const linkAlign = (data.link_align as string) ?? 'left';
+const linkStyle = (data.link_style as string) ?? 'tertiary';
+
+const cta = rawCta
+  ? typeof rawCta === 'string'
+    ? { url: rawCta, title: rawCta, target: '_self' }
+    : rawCta
+  : null;
+---
+
+{isVisible !== 'no' && (
+  <div id={id} class={`module module-text ${classes}`}>
+    {backgroundImage && backgroundImage.url && (
+      <div
+        class="background"
+        style={`background-image: url(${backgroundImage.url}); opacity: ${Number(backgroundImage.opacity ?? 10) / 100}; background-size: cover; background-position: center; position:absolute; inset:0`}
+      />
+    )}
+
+    <div class="container">
+      <div class="txt editor">
+        {text && <Fragment set:html={text} />}
+      </div>
+
+      {cta && cta.url && (
+        <div class={`btn-wrapper align-${linkAlign || 'left'}`}>
+          <a
+            href={cta.url}
+            class={`btn btn-${linkStyle || 'tertiary'} color-primary`}
+            target={cta.target ?? '_self'}
+          >
+            {cta.title || 'En savoir plus'}
+          </a>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+

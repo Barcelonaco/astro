@@ -1,0 +1,117 @@
+@import '../base/common';
+/**
+ * GENERAL
+ * MEDIA QUERIES
+ */
+
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.module-logos-slider {
+    .slider-wrapper {
+        position: relative;
+        height: auto;
+        align-items: stretch;
+    }
+    .swiper-wrapper {
+        height: auto;
+        align-items: stretch;
+    }
+    .js_logos-slider:not(.swiper-initialized) {
+        .swiper-wrapper {
+            justify-content: center;
+        }
+        .item {
+            width: calc(100% / 6);
+        }
+    }
+    .item {
+        height: auto;
+        @include flex(center, center);
+    }
+    .link {
+        display: block;
+        max-width: 70%;
+        margin: 0 auto;
+        @include hover {
+            .illus {
+                filter: grayscale(0);
+            }
+        }
+    }
+    .illus {
+        display: block;
+        max-height: rem(120px);
+        filter: grayscale(10);
+        transition: $transition-default;
+        width: 100%;
+        object-fit: contain;
+    }
+    .slider-navigation {
+        &.prev {
+            left: rem(-120px);
+        }
+        &.next {
+            right: rem(-120px);
+        }
+    }
+    &.module-in-column {
+        .slider-navigation {
+            &.prev {
+                left: -1%;
+            }
+            &.next {
+                right: -1%;
+            }
+        }
+    }
+}
+
+
+
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 1700px) {
+    .module-logos-slider .slider-navigation {
+        &.prev {
+            left: -3.4rem;
+        }
+        &.next {
+            right: -3.4rem;
+        }
+    }
+}
+
+
+
+@media only screen and (max-width: 1200px) {
+    .module-logos-slider .slider-navigation {
+        &.prev {
+            left: calc(#{-$container-padding} / 2);
+            transform: translate(-50%, -50%);
+        }
+        &.next {
+            right: calc(#{-$container-padding} / 2);
+            transform: translate(50%, -50%);
+        }
+    }
+}
+
+
+
+@media only screen and (max-width: 600px) {
+    .module-logos-slider {
+        .link {
+            max-width: 90%;
+        }
+        .slider-navigation {
+            display: none;
+        }
+    }
+}

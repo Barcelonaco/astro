@@ -1,0 +1,43 @@
+---
+/**
+ * Module Quote — Reproduit quote.blade.php
+ * Citation avec photo ronde de l'auteur, nom et fonction.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { resolveImageUrl, resolveImageAlt } from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const quoteText = (data.quote as string) || '';
+const photo = data.photo as any;
+const name = (data.name as string) || '';
+const job = (data.job as string) || '';
+
+const photoUrl = resolveImageUrl(photo, apiOrigin, 'square-large');
+const photoAlt = resolveImageAlt(photo);
+---
+
+<NicklModuleWrapper data={data} moduleName="quote" hideTitle>
+  <p class="txt title-section-2">
+    "<Fragment set:html={quoteText.replace(/\n/g, '<br />')} />"
+  </p>
+
+  {(photo || name || job) && (
+    <div class="author">
+      {photoUrl && (
+        <div class="illus-wrapper">
+          <img src={photoUrl} alt={photoAlt} class="illus" loading="lazy" />
+        </div>
+      )}
+      {name && <p class="name">{name}</p>}
+      {job && <p class="function">{job}</p>}
+    </div>
+  )}
+</NicklModuleWrapper>

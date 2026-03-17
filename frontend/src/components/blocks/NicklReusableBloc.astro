@@ -1,0 +1,20 @@
+---
+/**
+ * Module ReusableBloc — Reproduit reusable-bloc.blade.php
+ * Stub — la résolution récursive des blocs réutilisables
+ * nécessite un mécanisme de stockage côté CMS.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+---
+
+<NicklModuleWrapper data={data} moduleName="reusable-bloc">
+  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+    Les blocs réutilisables ne sont pas disponibles en mode statique.
+  </p>
+</NicklModuleWrapper>

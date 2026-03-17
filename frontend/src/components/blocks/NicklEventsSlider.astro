@@ -1,0 +1,28 @@
+---
+/**
+ * Module EventsSlider — Reproduit events-slider.blade.php
+ * Slider d'événements. Stub — les événements sont un CPT WordPress.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { isTruthy } from '../../lib/module-classes';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const displayArchiveLink = isTruthy(data.display_archive_link);
+const archiveLinkLabel = (data.archive_link_label as string) || 'Voir tous les événements';
+---
+
+<NicklModuleWrapper data={data} moduleName="event-slider">
+  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+    Les événements ne sont pas disponibles en mode statique.
+  </p>
+  {displayArchiveLink && (
+    <div class="btn-more-wrapper">
+      <a href="#" class="btn btn-tertiary">{archiveLinkLabel}</a>
+    </div>
+  )}
+</NicklModuleWrapper>

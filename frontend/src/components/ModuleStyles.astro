@@ -1,0 +1,76 @@
+---
+/**
+ * Unified deferred CSS loader.
+ * Loads app.css + Google Fonts + module CSS + plugin CSS in a single script
+ * after window.load to avoid competing with LCP image bandwidth.
+ */
+
+interface Props {
+  blocks: { type: string }[] | null;
+}
+
+const { blocks } = Astro.props;
+
+/** Correspondance type de bloc → nom du fichier CSS (sans extension) */
+const blockToCss: Record<string, string> = {
+  accordion: 'accordion',
+  banner: 'banner',
+  'clickable-tiles': 'clickable-tiles',
+  'columns-tab': 'columns-tab',
+  contact: 'contact',
+  'events-slider': 'events-slider',
+  featured_products: 'featured_products',
+  files: 'files',
+  form: 'form',
+  gallery: 'gallery',
+  'gallery-nickl': 'gallery',
+  hero: 'hero',
+  'head-text': 'head-text',
+  icons: 'icons',
+  'illus-video': 'illustration-video',
+  'images-slider': 'images-slider',
+  'images-videos-parallax': 'images-videos-parallax',
+  'insta-feed': 'insta-slider',
+  'key-figures': 'key-figures',
+  link: 'link',
+  'link-alone': 'link',
+  'logos-slider': 'logos-slider',
+  map: 'map',
+  'news-slider': 'news-slider',
+  'newsletter-form': 'newsletter-form',
+  ornament: 'ornament',
+  plansite: 'plansite',
+  'free-post': 'free-post',
+  quote: 'quote',
+  review: 'review',
+  separator: 'separator',
+  share: 'share',
+  summary: 'summary',
+  team: 'team',
+  'text-simple': 'text',
+  'text-image': 'text-image',
+  'text-scrolling': 'text-scrolling',
+  'text-video-slider': 'text-video-slider',
+  video: 'video',
+};
+
+const cssFiles = blocks
+  ? [...new Set(
+      blocks
+        .map((b) => blockToCss[b.type])
+        .filter((name): name is string => !!name),
+    )]
+  : [];
+
+/** Plugin blocks: types not in blockToCss → try loading CSS from /plugin-assets/{type}/css/{type}.css */
+const pluginBlockTypes = blocks
+  ? [...new Set(
+      blocks
+        .map((b) => b.type)
+        .filter((type) => !blockToCss[type]),
+    )]
+  : [];
+---
+
+{/* Data for the unified deferred loader (script at end of body) */}
+<meta name="x-deferred-css" content={JSON.stringify({ c: cssFiles, p: pluginBlockTypes })} />

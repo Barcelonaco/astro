@@ -1,0 +1,218 @@
+---
+import { buildModuleClasses, cleanHtml } from '../../lib/module-classes';
+import { optimizedImageUrl } from '../../lib/module-helpers';
+
+interface NicklGalleryProps {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props as NicklGalleryProps;
+
+/* ── Reproduit la logique du View Composer PHP (Gallery.php) ── */
+
+// getId()
+const id = (data.id_bloc as string) || '';
+
+// getClasses() — délégué à buildModuleClasses (même logique)
+const classes = buildModuleClasses(data);
+
+// getBackgroundImage()
+const bgImg = data.bg_img || null;
+const backgroundImage = bgImg
+  ? {
+      url: bgImg?.sizes?.banner || bgImg?.url || '',
+      opacity: data.bg_opacity !== '' && data.bg_opacity != null
+        ? Number(data.bg_opacity) / 100
+        : 1,
+    }
+  : null;
+
+// title_bloc, title_style, title_align
+const titleBloc = (data.title as string) ?? '';
+const titleStyle = (data.title_style as string) ?? '';
+const titleAlign = (data.title_align as string) ?? '';
+
+// indexPopin
+const indexPopin = Math.floor(Math.random() * 1000);
+
+// get_options()
+const width = (data as any)['container-width'] === 'large' ? '-large' : '';
+const nbrColumn = (data.nbr_column as string) || '';
+const typeImg = (data.type_img as string) || '';
+
+// $sizes (image size key)
+function getSizeKey(): string {
+  if (typeImg === 'img-fluid') return 'module-gallery-fluid';
+  if (typeImg === 'img-fixe' && nbrColumn === 'columns-1') return 'banner';
+  if (typeImg === 'img-fixe' && nbrColumn === 'columns-2') return 'half';
+  return 'module-gallery-fixe';
+}
+const sizes = getSizeKey();
+
+const list = (data.list as any[]) ?? [];
+---
+
+<div id={id} class={`module module-gallery ${classes}`}>
+
+  {backgroundImage && backgroundImage.url && (
+    <div
+      class="background"
+      style={`background-image: url(${backgroundImage.url}); opacity: ${backgroundImage.opacity};`}
+    />
+  )}
+
+  <div class={`container${width}`}>
+
+    {titleBloc && (
+      <div class={`bloc-title-module align-${titleAlign}`}>
+        <h2 class={`title-module title-section-${titleStyle}`}>{titleBloc}</h2>
+      </div>
+    )}
+
+    <ul class={`list ${nbrColumn} ${typeImg}`}>
+
+      {list.map((gallery, index) => {
+        const image = gallery.image || {};
+        const imgSizes = image.sizes || {};
+        const imgUrl = imgSizes[sizes] || image.url || '';
+        const link = gallery.link || {};
+        const hasLink = !!(link.url);
+        return (
+          <li class="item">
+            {hasLink ? (
+              <a href={link.url} target={link.target || '_self'} class="link">
+                <div class="illus-wrapper">
+                  {typeImg === 'img-fluid' ? (
+                    <img src={imgUrl} alt={image.alt ?? ''} class="illus" no-lazy />
+                  ) : (
+                    <img src={imgUrl} alt={image.alt ?? ''} class="illus" loading="lazy" />
+                  )}
+                  <div class="overlay">
+                    <span class="icon" aria-hidden="false">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </span>
+                    Agrandir
+                  </div>
+                </div>
+                {(!!(gallery.tag) || !!(gallery.titre)) && (
+                  <div class="desc">
+                    {gallery.tag && <p class="category">{gallery.tag}</p>}
+                    {gallery.titre && (
+                      <h2 class="title title-section-3" data-text={gallery.titre}>{gallery.titre}</h2>
+                    )}
+                    {gallery.desc && (
+                      <div class="txt editor">
+                        <p set:html={cleanHtml(gallery.desc).replace(/\n/g, '<br>')} />
+                      </div>
+                    )}
+                    <span class="btn btn-primary">{link.title || 'En savoir plus'}</span>
+                  </div>
+                )}
+              </a>
+            ) : (
+              <button
+                type="button"
+                class="link js_open-popin"
+                data-popin={`gallery-${indexPopin}`}
+                data-slide={String(index + 1)}
+              >
+                <div class="illus-wrapper">
+                  {typeImg === 'img-fluid' ? (
+                    <img src={imgUrl} alt={image.alt ?? ''} class="illus" no-lazy />
+                  ) : (
+                    <img src={imgUrl} alt={image.alt ?? ''} class="illus" loading="lazy" />
+                  )}
+                  <div class="overlay">
+                    <span class="icon" aria-hidden="false">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </span>
+                    Agrandir
+                  </div>
+                </div>
+                {(!!(gallery.tag) || !!(gallery.titre)) && (
+                  <div class="desc">
+                    {gallery.tag && <p class="category">{gallery.tag}</p>}
+                    {gallery.titre && (
+                      <h2 class="title title-section-3" data-text={gallery.titre}>{gallery.titre}</h2>
+                    )}
+                    {gallery.desc && (
+                      <div class="txt editor">
+                        <p set:html={cleanHtml(gallery.desc).replace(/\n/g, '<br>')} />
+                      </div>
+                    )}
+                    <span class="fake-btn btn btn-tertiary">En savoir plus</span>
+                  </div>
+                )}
+              </button>
+            )}
+          </li>
+        );
+      })}
+
+    </ul>
+
+  </div>
+
+  <div class="popin-wrapper popin-gallery-wrapper" style="display: none;" data-popin={`gallery-${indexPopin}`}>
+    <div class="popin">
+
+      <button type="button" class="btn-close js_close-popin" title="Fermer la popin">
+        <span class="icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </span>
+      </button>
+
+      <div class="module module-images-slider full-width no-padding">
+        <div class="container-large container-1">
+          <div class="slider-wrapper">
+            <div class="swiper slider js_images-slider">
+              <div class="swiper-wrapper">
+
+                {list.map((gallery) => {
+                  const image = gallery.image || {};
+                  const hasDesc = !!(gallery.titre) || !!(gallery.desc) || !!(gallery.link?.url);
+                  return (
+                    <div class={`swiper-slide item ${hasDesc ? 'has-desc' : 'no-desc'}`}>
+                      <div class="illus-wrapper">
+                        <img src={optimizedImageUrl(image.url || '', 800, 80)} alt={image.alt ?? ''} class="illus" loading="lazy" />
+                      </div>
+                      {hasDesc && (
+                        <div class="container-large container-2">
+                          <div class="desc">
+                            {gallery.titre && (
+                              <p class="title title-section-3">{gallery.titre}</p>
+                            )}
+                            {gallery.desc && (
+                              <div class="txt editor">
+                                <p set:html={cleanHtml(gallery.desc).replace(/\n/g, '<br>')} />
+                              </div>
+                            )}
+                            {gallery.link?.url && (
+                              <div class="btn-wrapper">
+                                <a
+                                  href={gallery.link.url}
+                                  class="btn btn-primary"
+                                  target={gallery.link.target || '_self'}
+                                >{gallery.link.title}</a>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+              </div>
+            </div>
+            <button type="button" class="slider-navigation prev js_images-slider-btn-prev" />
+            <button type="button" class="slider-navigation next js_images-slider-btn-next" />
+            <div class="slider-pagination js_images-slider-pagination" />
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>

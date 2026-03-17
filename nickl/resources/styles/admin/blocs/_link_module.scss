@@ -1,0 +1,94 @@
+.link-module {
+  hr {
+    width: 102%;
+    margin-left: -2%;
+  }
+  .wrapper {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    .row {
+      flex-basis: 50%;
+      &.full {
+        flex-basis: 100%;
+      }
+    }
+    .links {
+      display: flex;
+      flex-direction: row;
+      align-items: self-start;
+      flex-wrap: wrap;
+      gap: 5px;
+      a {
+        width: 92px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        text-decoration: none!important;
+        color: $nicklColorPrimaryDark;
+        
+        span {
+          &.icon {
+            width: 75px;
+            position: relative;
+          }
+          font-size: 12px;
+          text-align: left;
+          font-weight: 600;
+          color: var(--color-admin-primary);
+          &:last-child {
+            max-width: 90%;
+          }
+          svg {
+            background-color: var(--color-admin-primary);
+            border-radius: 16px;
+            transition: .2s ease-in-out;
+            & > * {
+              fill: #3ee98d;
+              transition: .2s ease-in-out;
+            }
+          }
+          &.add::before {
+            content: "+";
+            font-size: 32px;
+            color: #fff;
+            position: absolute;
+            top: 0;
+            right: 6px;
+            line-height: 1;
+          }
+        }
+        &:hover {
+          span {
+            svg > * {
+              fill: #ffffff;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+body.bcnco-device-mobile {
+  .link-module {
+    .wrapper {
+      justify-content: space-between;
+      .row {
+        flex-basis: 100%;
+      }
+    }
+  }
+}
+
+
+body.bcnco-device-tablet {
+  .link-module {
+    .wrapper {
+      .row {
+        flex-basis: 300px;
+      }
+    }
+  }
+}

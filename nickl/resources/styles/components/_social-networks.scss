@@ -1,0 +1,32 @@
+/**
+ * GENERAL
+ */
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.social-networks {
+    margin: 0 calc((26px - #{rem(42px)}) / 2);
+    @include flex(flex-start, center);
+    .link {
+        display: flex;
+        width: rem(42px);
+        aspect-ratio: 1;
+        justify-content: center;
+        align-items: center;
+        @include hover {
+            svg * {
+                fill: $color4;
+            }
+        }
+    }
+    .icon {
+        display: block;
+    }
+    svg * {
+        fill: $color3;
+    }
+}

@@ -1,0 +1,102 @@
+---
+/**
+ * ThemeInjector — Server-side version.
+ * Accepts pre-fetched settings as prop to avoid extra API call during component render.
+ * Falls back to fetching if no prop provided (for backward compat).
+ */
+import { getStyleSettings } from '../lib/api';
+
+interface Props {
+  styleSettings?: Record<string, string>;
+}
+
+const THEME_COLORS: Record<string, Record<string, string>> = {
+  default: { accent: '#2337ff', accentDark: '#000d8a', black: '15, 18, 25', gray: '96, 115, 159', grayLight: '229, 233, 240', grayDark: '34, 41, 57' },
+  dark: { accent: '#00d4ff', accentDark: '#0088cc', black: '255, 255, 255', gray: '160, 175, 199', grayLight: '30, 33, 40', grayDark: '220, 225, 232' },
+  minimal: { accent: '#000000', accentDark: '#333333', black: '0, 0, 0', gray: '100, 100, 100', grayLight: '240, 240, 240', grayDark: '50, 50, 50' },
+  colorful: { accent: '#ff6b6b', accentDark: '#ee5a5a', black: '20, 20, 30', gray: '100, 110, 140', grayLight: '240, 242, 250', grayDark: '40, 44, 52' },
+  nature: { accent: '#2ecc71', accentDark: '#27ae60', black: '30, 39, 46', gray: '119, 140, 163', grayLight: '223, 230, 233', grayDark: '45, 52, 54' },
+};
+
+const FONT_TITLES: Record<string, string> = {
+  'anek-odia': 'Anek Odia', 'crimson-pro': 'Crimson Pro', 'dm-serif': 'DM Serif Display',
+  encode: 'Encode Sans Expanded', inter: 'Inter', jakarta: 'Plus Jakarta Sans',
+  jost: 'Jost', kanit: 'Kanit', 'lilita-one': 'Lilita One', lora: 'Lora',
+  montserrat: 'Montserrat', onest: 'Onest', 'open-sans': 'Open Sans', oswald: 'Oswald',
+  'playfair-display': 'Playfair Display', poppins: 'Poppins', prompt: 'Prompt',
+  raleway: 'Raleway', rubik: 'Rubik', ubuntu: 'Ubuntu', 'zilla-slab': 'Zilla Slab',
+};
+
+const FONT_GENERALS: Record<string, string> = {
+  barlow: 'Barlow', bitter: 'Bitter', 'cormorant-garamond': 'Cormorant Garamond',
+  encode: 'Encode Sans Expanded', exo: 'Exo', inter: 'Inter', jakarta: 'Plus Jakarta Sans',
+  jost: 'Jost', kanit: 'Kanit', lora: 'Lora', montserrat: 'Montserrat', onest: 'Onest',
+  'open-sans': 'Open Sans', roboto: 'Roboto', rubik: 'Rubik',
+};
+
+// Use pre-fetched settings or fetch as fallback
+const settings = Astro.props.styleSettings || await getStyleSettings();
+
+// Theme colors
+const useChildTheme = settings.theme_use_child === '1';
+const activeTheme = settings.active_theme || 'default';
+const themeColors = useChildTheme ? THEME_COLORS[activeTheme] : null;
+const isDark = useChildTheme && activeTheme === 'dark';
+
+// Nickl colors
+const colorDefault = settings.text_color || '#001527';
+const colorPrimary = settings.primary_color || '#006a9b';
+const colorPrimaryBis = settings.brand_primary_dark || colorPrimary;
+const colorSecondary = settings.secondary_color || '#ea644e';
+const colorSecondaryBis = settings.brand_secondary_dark || colorSecondary;
+const colorTertiary = settings.tertiary_color || '#d0d0d0';
+const colorBackground = settings.background_color || '#ffffff';
+const colorForm = settings.bg_form_field || '#e3f3fc';
+
+// Fonts
+const fontTitleKey = settings.font_title || 'poppins';
+const fontGeneralKey = settings.font_general || 'jakarta';
+const fontTitle = FONT_TITLES[fontTitleKey] || 'Poppins';
+const fontGeneral = FONT_GENERALS[fontGeneralKey] || 'Plus Jakarta Sans';
+
+// Logo
+const logoHeight = parseInt(settings.logo_height || '100', 10);
+
+// Google Fonts URL
+const fontsToLoad = new Set<string>();
+if (fontTitle) fontsToLoad.add(fontTitle);
+if (fontGeneral) fontsToLoad.add(fontGeneral);
+const googleFontsUrl = fontsToLoad.size > 0
+  ? 'https://fonts.googleapis.com/css2?' +
+    Array.from(fontsToLoad).map(f => `family=${f.replace(/ /g, '+')}:wght@300;400;500;600;700`).join('&') +
+    '&display=swap'
+  : '';
+
+// Build CSS variables string
+const cssVars: string[] = [];
+if (themeColors) {
+  cssVars.push(`--accent:${themeColors.accent}`);
+  cssVars.push(`--accent-dark:${themeColors.accentDark}`);
+  cssVars.push(`--black:${themeColors.black}`);
+  cssVars.push(`--gray:${themeColors.gray}`);
+  cssVars.push(`--gray-light:${themeColors.grayLight}`);
+  cssVars.push(`--gray-dark:${themeColors.grayDark}`);
+}
+cssVars.push(`--color-default:${colorDefault}`);
+cssVars.push(`--color-primary:${colorPrimary}`);
+cssVars.push(`--color-primary-bis:${colorPrimaryBis}`);
+cssVars.push(`--color-secondary:${colorSecondary}`);
+cssVars.push(`--color-secondary-bis:${colorSecondaryBis}`);
+cssVars.push(`--color-tertiary:${colorTertiary}`);
+cssVars.push(`--color-background:${colorBackground}`);
+cssVars.push(`--color-form:${colorForm}`);
+cssVars.push(`--font-title:'${fontTitle}',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif`);
+cssVars.push(`--font-general:'${fontGeneral}',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif`);
+if (!isNaN(logoHeight)) cssVars.push(`--logo-height:${logoHeight}px`);
+---
+
+{/* Inline CSS variables — no client-side fetch needed */}
+<style set:html={`:root{${cssVars.join(';')}}`} />
+
+{/* Google Fonts URL exposed as meta tag for the unified deferred loader */}
+{googleFontsUrl && <meta name="x-google-fonts" content={googleFontsUrl} />}

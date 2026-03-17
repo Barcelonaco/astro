@@ -1,0 +1,37 @@
+{
+  "name": "portfolio",
+  "label": "Portfolio",
+  "version": "1.0.0",
+  "description": "Ajoute un custom post type Portfolio et un module Grille Portfolio.",
+
+  "modules": {
+    "category": {
+      "id": "portfolio",
+      "label": "Portfolio",
+      "icon": "🎨"
+    },
+    "items": [
+      {
+        "name": "PortfolioGrid",
+        "label": "Grille portfolio"
+      }
+    ]
+  },
+
+  "postTypes": [
+    {
+      "slug": "portfolio",
+      "label": "Projet",
+      "labelPlural": "Portfolio",
+      "icon": "🎨",
+      "supports": ["title", "slug", "featured_image", "content", "status"],
+      "fields": [
+        { "name": "client_name", "label": "Nom du client", "type": "Text" },
+        { "name": "project_url", "label": "URL du projet", "type": "Url" },
+        { "name": "year", "label": "Année", "type": "Number" }
+      ],
+      "hasCategories": true,
+      "categoryLabel": "Types de projet"
+    }
+  ]
+}

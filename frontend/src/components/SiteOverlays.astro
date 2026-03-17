@@ -1,0 +1,191 @@
+---
+/**
+ * SiteOverlays — Regroupe Popup/Alert, Bouton flottant et Mode maintenance.
+ * Inclure une seule fois dans les layouts de page (body).
+ */
+interface Props {
+  siteSettings?: Record<string, string>;
+}
+
+const { siteSettings: s = {} } = Astro.props;
+
+// Popup / Alert
+const showAlert = s.show_alert === '1';
+const alertText = s.alert_text || '';
+
+// Floating button
+const showBtn = s.show_btn === '1';
+const floatingBtnLink = s.floating_btn_link || '';
+
+// Maintenance
+const isMaintenance = s.is_maintenance === '1';
+const textMaintenance = s.text_maintenance || '';
+const showInfos = s.show_infos === '1';
+const showRs = s.show_rs === '1';
+const phone = s.phone || '';
+const email = s.email || '';
+const schedule = s.schedule || '';
+
+const socials = [
+  { key: 'instagram', label: 'Instagram' },
+  { key: 'facebook', label: 'Facebook' },
+  { key: 'linkedin', label: 'LinkedIn' },
+  { key: 'twitter', label: 'X' },
+  { key: 'youtube', label: 'YouTube' },
+].filter(item => s[item.key]);
+---
+
+{/* Popup / Alerte */}
+{showAlert && alertText && (
+  <div class="site-alert" id="siteAlert">
+    <div class="alert-content">
+      <div class="alert-text" set:html={alertText.replace(/\n/g, '<br />')} />
+      <button class="alert-close" id="alertClose" aria-label="Fermer">&times;</button>
+    </div>
+  </div>
+)}
+
+{/* Bouton flottant */}
+{showBtn && floatingBtnLink && (
+  <a href={floatingBtnLink} class="floating-btn" target="_blank" rel="noopener noreferrer">
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />
+    </svg>
+  </a>
+)}
+
+{/* Mode maintenance overlay */}
+{isMaintenance && (
+  <div class="maintenance-overlay" id="maintenanceOverlay">
+    <div class="maintenance-content">
+      <h1 class="maintenance-title">Site en maintenance</h1>
+      {textMaintenance && <p class="maintenance-text" set:html={textMaintenance.replace(/\n/g, '<br />')} />}
+      {showInfos && (phone || email || schedule) && (
+        <div class="maintenance-infos">
+          {phone && <p><a href={`tel:${phone.replace(/\s/g, '')}`}>{phone}</a></p>}
+          {email && <p><a href={`mailto:${email}`}>{email}</a></p>}
+          {schedule && <p set:html={schedule.replace(/\n/g, '<br />')} />}
+        </div>
+      )}
+      {showRs && socials.length > 0 && (
+        <div class="maintenance-socials">
+          {socials.map(item => (
+            <a href={s[item.key]} target="_blank" rel="noopener noreferrer">{item.label}</a>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
+{showAlert && alertText && (
+  <script>
+    document.getElementById('alertClose')?.addEventListener('click', function() {
+      const el = document.getElementById('siteAlert');
+      if (el) el.style.display = 'none';
+    });
+  </script>
+)}
+
+<style is:global>
+  /* ── Alert / Popup ── */
+  .site-alert {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    max-width: 600px;
+    width: calc(100% - 2rem);
+  }
+  .alert-content {
+    background: var(--color-primary, #333);
+    color: #fff;
+    padding: 1rem 2.5rem 1rem 1.25rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    position: relative;
+    line-height: 1.5;
+  }
+  .alert-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.5rem;
+    cursor: pointer;
+    opacity: 0.7;
+    line-height: 1;
+  }
+  .alert-close:hover { opacity: 1; }
+
+  /* ── Floating button ── */
+  .floating-btn {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 9998;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--color-primary, var(--accent));
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    text-decoration: none;
+    transition: transform 0.2s;
+  }
+  .floating-btn:hover { transform: scale(1.1); }
+
+  /* ── Maintenance ── */
+  .maintenance-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: var(--color-background, #fff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+  .maintenance-content {
+    text-align: center;
+    max-width: 500px;
+  }
+  .maintenance-title {
+    font-family: var(--font-title, sans-serif);
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    color: var(--color-default, #333);
+  }
+  .maintenance-text {
+    color: var(--color-default, #666);
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+  }
+  .maintenance-infos {
+    margin-bottom: 1.5rem;
+    color: var(--color-default, #666);
+  }
+  .maintenance-infos a {
+    color: var(--color-primary, var(--accent));
+    text-decoration: none;
+  }
+  .maintenance-infos a:hover { text-decoration: underline; }
+  .maintenance-socials {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .maintenance-socials a {
+    color: var(--color-primary, var(--accent));
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+  .maintenance-socials a:hover { text-decoration: underline; }
+</style>

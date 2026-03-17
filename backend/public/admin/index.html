@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Blog CMS</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="nickl-app-admin.css">
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
+</head>
+<body>
+  <div class="admin-container">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="logo">
+        <h2>Astro Builder</h2>
+        <p class="user-info" id="userInfo">Chargement...</p>
+      </div>
+      <nav class="nav">
+        <a href="#" class="nav-item active" data-section="dashboard">Tableau de bord</a>
+        <a href="#" class="nav-item" data-section="posts">Articles</a>
+        <a href="#" class="nav-item" data-section="categories">Catégories</a>
+        <a href="#" class="nav-item" data-section="pages">Pages</a>
+        <a href="#" class="nav-item" data-section="media">Médiathèque</a>
+        <a href="#" class="nav-item" data-section="site-settings">Paramètres du site</a>
+        <a href="#" class="nav-item" data-section="theme">Thème</a>
+        <a href="#" class="nav-item" data-section="users" id="navUsers" style="display:none">Utilisateurs</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button onclick="logout()" class="btn btn-logout">Déconnexion</button>
+      </div>
+    </aside>
+
+    <!-- Sidebar Toggle -->
+    <button class="sidebar-toggle" id="sidebarToggle" title="Replier/Déplier la sidebar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="11 17 6 12 11 7"></polyline>
+        <polyline points="18 17 13 12 18 7"></polyline>
+      </svg>
+    </button>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="content" id="content">
+        <!-- Content will be loaded here -->
+      </div>
+    </main>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Toast Notifications -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

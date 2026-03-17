@@ -1,0 +1,147 @@
+---
+import { buildModuleClasses, cleanHtml, resolveBackgroundImage } from '../../lib/module-classes';
+
+interface NicklAccordionProps {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props as NicklAccordionProps;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const id = (data.id as string) ?? (data.id_bloc as string) ?? '';
+const classes = buildModuleClasses(data);
+const backgroundImage = resolveBackgroundImage(data, apiOrigin);
+const accordions = (data.accordions as any[]) ?? (data.accordions as any[]) ?? [];
+const titleBloc = (data.title_bloc as string) ?? '';
+const titleStyle = (data.title_style as number | string) ?? 2;
+const titleAlign = (data.title_align as string) ?? 'center';
+---
+
+<div id={id} class={`module module-accordion ${classes}`}>
+  {backgroundImage && backgroundImage.url && (
+    <div
+      class="background"
+      style={`background-image: url(${backgroundImage.url}); opacity: ${(backgroundImage.opacity ?? 10) / 100};`}
+    />
+  )}
+
+  {accordions.length > 0 && (
+    <div class="container">
+      {titleBloc && (
+        <div class={`bloc-title-module align-${titleAlign}`}>
+          <h2 class={`title-module title-section-${titleStyle}`}>{titleBloc}</h2>
+        </div>
+      )}
+
+      <div class="accordion">
+        {accordions.map((item) => (
+          <>
+            <button type="button" class="title js_toggle-accordion">
+              <Fragment set:html={cleanHtml(item.title)} />
+              <span class="icon" aria-hidden="true">⌄</span>
+            </button>
+            <div class="txt editor">
+              <Fragment set:html={cleanHtml(item.text)} />
+            </div>
+          </>
+        ))}
+      </div>
+    </div>
+  )}
+</div>
+
+<script is:inline>
+if (!window.__nicklAccordionInit) {
+  window.__nicklAccordionInit = true;
+
+  var slideProp = 'height ' + 400 + 'ms ease, padding ' + 400 + 'ms ease';
+
+  function slideDown(el, duration) {
+    if (!el || !el.classList.contains('txt')) return;
+    if (el._slideTimer) { clearTimeout(el._slideTimer); el._slideTimer = null; }
+    // Sauvegarder le padding original
+    el.style.transition = 'none';
+    el.style.display = 'block';
+    el.style.overflow = 'hidden';
+    el.style.paddingTop = '0px';
+    el.style.paddingBottom = '0px';
+    el.style.height = '0px';
+    el.offsetHeight;
+    // Lire les padding CSS et la hauteur naturelle
+    el.style.paddingTop = '';
+    el.style.paddingBottom = '';
+    el.style.height = '';
+    var cs = getComputedStyle(el);
+    var targetH = el.scrollHeight;
+    var targetPT = cs.paddingTop;
+    var targetPB = cs.paddingBottom;
+    // Remettre à 0 puis animer
+    el.style.height = '0px';
+    el.style.paddingTop = '0px';
+    el.style.paddingBottom = '0px';
+    el.offsetHeight;
+    el.style.transition = slideProp;
+    el.style.height = targetH + 'px';
+    el.style.paddingTop = targetPT;
+    el.style.paddingBottom = targetPB;
+    el._slideTimer = setTimeout(function() {
+      el._slideTimer = null;
+      el.style.height = '';
+      el.style.overflow = '';
+      el.style.transition = '';
+      el.style.paddingTop = '';
+      el.style.paddingBottom = '';
+    }, duration);
+  }
+
+  function slideUp(el, duration) {
+    if (!el || !el.classList.contains('txt')) return;
+    if (el._slideTimer) { clearTimeout(el._slideTimer); el._slideTimer = null; }
+    el.style.transition = 'none';
+    el.style.overflow = 'hidden';
+    el.style.height = el.scrollHeight + 'px';
+    el.offsetHeight;
+    el.style.transition = slideProp;
+    el.style.height = '0px';
+    el.style.paddingTop = '0px';
+    el.style.paddingBottom = '0px';
+    el._slideTimer = setTimeout(function() {
+      el._slideTimer = null;
+      el.style.display = 'none';
+      el.style.height = '';
+      el.style.overflow = '';
+      el.style.transition = '';
+      el.style.paddingTop = '';
+      el.style.paddingBottom = '';
+    }, duration);
+  }
+
+  // ── Accordion toggle (délégué pour éviter les doublons) ──
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.module-accordion .js_toggle-accordion');
+    if (!btn) return;
+    var accordion = btn.closest('.accordion');
+    if (!accordion) return;
+    var speed = 400;
+    var targetTxt = btn.nextElementSibling;
+
+    if (btn.classList.contains('active')) {
+      btn.classList.remove('active');
+      slideUp(targetTxt, speed);
+    } else {
+      // Fermer les autres (pas celui qu'on va ouvrir)
+      accordion.querySelectorAll('.title').forEach(function(t) {
+        if (t === btn) return;
+        t.classList.remove('active');
+        var next = t.nextElementSibling;
+        if (next && next.classList.contains('txt')) slideUp(next, speed);
+      });
+      btn.classList.add('active');
+      slideDown(targetTxt, speed);
+    }
+  });
+
+}
+</script>

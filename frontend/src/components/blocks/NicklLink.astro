@@ -1,0 +1,43 @@
+---
+/**
+ * Module LinkAlone — Reproduit link.blade.php
+ * 1-2 boutons CTA avec alignement.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { resolveLink } from '../../lib/module-classes';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const btnAlign = (data.btn_align as string) || '';
+const cta = resolveLink(data.cta);
+const cta2 = resolveLink(data['cta-2']);
+---
+
+<NicklModuleWrapper data={data} moduleName="link" hideTitle>
+  {(cta || cta2) && (
+    <div class={`btn-wrapper ${btnAlign}`}>
+      {cta && (
+        <a
+          href={cta.url}
+          class="btn btn-primary color-primary"
+          target={cta.target}
+        >
+          <Fragment set:html={cta.title} />
+        </a>
+      )}
+      {cta2 && (
+        <a
+          href={cta2.url}
+          class="btn btn-primary color-secondary"
+          target={cta2.target}
+        >
+          <Fragment set:html={cta2.title} />
+        </a>
+      )}
+    </div>
+  )}
+</NicklModuleWrapper>

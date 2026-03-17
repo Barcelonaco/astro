@@ -1,0 +1,7 @@
+---
+const { size = 'medium' } = Astro.props.data || {};
+const heights = { small: '1rem', medium: '2rem', large: '4rem' };
+const height = heights[size] || heights.medium;
+---
+
+<div class="block-spacer" style={`height: ${height}`} aria-hidden="true" />

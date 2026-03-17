@@ -1,0 +1,19 @@
+---
+/**
+ * Module BlocReferences — Bloc de références
+ * Stub — les références sont un CPT WordPress non disponible.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+---
+
+<NicklModuleWrapper data={data} moduleName="bloc-references" containerLarge>
+  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+    Les références ne sont pas disponibles en mode statique.
+  </p>
+</NicklModuleWrapper>

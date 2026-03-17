@@ -1,0 +1,6 @@
+---
+const { level = 'h2', text } = Astro.props.data || {};
+const Tag = level === 'h3' ? 'h3' : level === 'h4' ? 'h4' : 'h2';
+---
+
+{text && <Tag class="block-heading">{text}</Tag>}

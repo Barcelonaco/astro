@@ -1,0 +1,125 @@
+---
+import { cleanHtml } from '../../lib/module-classes';
+import { optimizedImageUrl } from '../../lib/module-helpers';
+
+interface NicklFreePostProps {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props as NicklFreePostProps;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const id = (data.id_bloc as string) ?? '';
+const blocColor = (data.bloc_color as string) ?? '';
+const paddingTop = (data.padding_top as string) ?? '';
+const paddingBottom = (data.padding_bottom as string) ?? '';
+const isVisible = (data.is_visible as string) ?? 'yes';
+const classes = `${blocColor} ${paddingTop} ${paddingBottom}`.trim();
+
+const bgImg = (data.bg_img as any) ?? null;
+const rawBgOpacity = data.bg_opacity as number | string | undefined;
+const opacityPercent =
+  rawBgOpacity === undefined || rawBgOpacity === null || rawBgOpacity === ''
+    ? 10
+    : Number(rawBgOpacity);
+const bgOpacity = Number.isNaN(opacityPercent) ? 10 : opacityPercent;
+
+const backgroundImage = bgImg
+  ? {
+      url: typeof bgImg.url === 'string' && bgImg.url.startsWith('http')
+        ? bgImg.url
+        : apiOrigin + String(bgImg.url || ''),
+      opacity: bgOpacity
+    }
+  : null;
+
+const imageShadow = data.image_shadow === true || data.image_shadow === 1 || data.image_shadow === '1';
+
+const title = (data.title as string) ?? '';
+const titleStyle = (data.title_style as string) ?? '4';
+const titleAlign = (data.title_align as string) ?? 'center';
+
+const list = Array.isArray(data.list) ? data.list : [];
+
+function resolveUrl(url: string | undefined): string {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  return apiOrigin + url;
+}
+
+function resolveImage(img: any): { url: string; alt: string } | null {
+  if (!img) return null;
+  const url = typeof img === 'string' ? img : img.url || img.sizes?.half || '';
+  const alt = typeof img === 'string' ? '' : img.alt || '';
+  return url ? { url: optimizedImageUrl(resolveUrl(url), 800, 80), alt } : null;
+}
+---
+
+{isVisible !== 'no' && (
+  <div id={id} class={`module module-posts-list ${classes}`}>
+    {backgroundImage && backgroundImage.url && (
+      <div
+        class="background"
+        style={`background-image: url(${backgroundImage.url}); opacity: ${bgOpacity / 100}; background-size: cover; background-position: center; position:absolute; inset:0`}
+      />
+    )}
+
+    <div class="container-large">
+      {title && (
+        <Fragment set:html={`<h${titleStyle} class="title-module title-section-${titleStyle} align-${titleAlign}">${cleanHtml(title)}</h${titleStyle}>`} />
+      )}
+
+      <ul class={`list columns-${list.length}`}>
+        {list.map((post: any) => {
+          const image = resolveImage(post.image);
+          const hasDesc = post.title || post.catchphrase || post.primary_link?.url || post.secondary_link?.url;
+          return (
+            <li class={hasDesc ? 'item has-desc' : 'item no-desc'}>
+              {image && (
+                <div class="background-item">
+                  <img src={image.url} alt={image.alt} class="illus" loading="lazy" />
+                </div>
+              )}
+              {hasDesc && (
+                <div class="desc">
+                  {post.title && (
+                    <h3 class="title title-section-3" set:html={cleanHtml(post.title)} />
+                  )}
+                  {post.catchphrase && (
+                    <div class="editor txt">
+                      <p set:html={cleanHtml(post.catchphrase).replace(/\n/g, '<br>')} />
+                    </div>
+                  )}
+                  {(post.primary_link?.url || post.secondary_link?.url) && (
+                    <div class="btn-wrapper">
+                      {post.primary_link?.url && (
+                        <a
+                          href={post.primary_link.url}
+                          class="btn btn-primary"
+                          target={post.primary_link.target || '_self'}
+                        >
+                          {post.primary_link.title || 'En savoir plus'}
+                        </a>
+                      )}
+                      {post.secondary_link?.url && (
+                        <a
+                          href={post.secondary_link.url}
+                          class="btn btn-secondary"
+                          target={post.secondary_link.target || '_self'}
+                        >
+                          {post.secondary_link.title || 'En savoir plus'}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  </div>
+)}

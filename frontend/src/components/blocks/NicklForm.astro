@@ -1,0 +1,19 @@
+---
+/**
+ * Module Form — Reproduit form.blade.php
+ * Stub — Gravity Forms n'est pas disponible hors WordPress.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+---
+
+<NicklModuleWrapper data={data} moduleName="form">
+  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+    Le formulaire n'est pas disponible en mode statique (Gravity Forms requis).
+  </p>
+</NicklModuleWrapper>

@@ -1,0 +1,74 @@
+---
+/**
+ * Module ColumnsTab — Reproduit columns-tab.blade.php
+ * Module récursif qui imbrique d'autres modules dans des colonnes.
+ * Utilise SubBlockRenderer pour rendre les sous-modules.
+ */
+import SubBlockRenderer from './SubBlockRenderer.astro';
+import {
+  buildModuleClasses,
+  resolveBackgroundImage,
+  resolveBlocTitle,
+  isTruthy,
+} from '../../lib/module-classes';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const id = (data.id_bloc as string) || (data.id as string) || '';
+const classes = buildModuleClasses(data);
+const backgroundImage = resolveBackgroundImage(data, apiOrigin);
+const blocTitle = resolveBlocTitle(data);
+
+const columnsList = (data.columns_list as any[]) || [];
+const columnsCount = columnsList.length;
+const columnsDisplay = (data.columns_display as string) || 'columns-2_2-2';
+const columnsBackground = (data.columns_background as string) || '';
+const containerWidth = isTruthy(data.container_width);
+const colsJustifyCenter = isTruthy(data.cols_justify_items);
+const containerClass = containerWidth ? 'container-large' : 'container';
+const isVisible = (data.is_visible as string) ?? 'yes';
+---
+
+{isVisible !== 'no' && (
+<div id={id || undefined} class={`module module-columns ${classes}`}>
+  {backgroundImage && backgroundImage.url && (
+    <div
+      class="background"
+      style={`background-image: url(${backgroundImage.url}); opacity: ${backgroundImage.opacity / 100}; background-size: cover; background-position: center; position: absolute; inset: 0;`}
+    />
+  )}
+
+  <div class={containerClass}>
+    {blocTitle && (
+      <Fragment set:html={`<h${blocTitle.style} class="title-module title-section-${blocTitle.style} align-${blocTitle.align}">${blocTitle.title}</h${blocTitle.style}>`} />
+    )}
+
+    <div class={`cols-wrapper ${columnsBackground} columns-${columnsCount} ${columnsDisplay}${colsJustifyCenter ? ' cols_justify_center' : ''}`}>
+      {columnsList.map((column) => {
+        const subModules = (column.columns_module as any[]) || [];
+        return (
+          <div class="col">
+            {subModules.map((subModule) => {
+              const layout = subModule.acf_fc_layout || subModule.type || '';
+              if (!layout) return null;
+              return (
+                <SubBlockRenderer
+                  type={layout}
+                  data={subModule}
+                />
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  </div>
+</div>
+)}

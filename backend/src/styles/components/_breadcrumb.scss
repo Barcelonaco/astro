@@ -1,0 +1,16 @@
+.module.module-breadcrumb {
+    & > * {
+        font-family: $font2;
+        a {
+            @include hover {
+                color: $color3;
+            }
+        }
+        .mode-uppercase & {
+            text-transform: uppercase;
+        }
+    }
+    .breadcrumb_last {
+        font-weight: 500;
+    }
+}

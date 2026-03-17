@@ -1,0 +1,64 @@
+/**
+ * GENERAL
+ * MEDIA QUERIES
+ */
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.page-account {
+    // List
+    .woocommerce-Addresses {
+        margin-top: rem(50px);
+        @include flex(flex-start, stretch, wrap, 2, rem(60px));
+        row-gap: rem(50px);
+        &::before, &::after {
+            display: none;
+        }
+        .woocommerce-Address {
+            position: relative;
+            width: auto;
+            padding-bottom: rem(70px);
+            float: none;
+        }
+        .woocommerce-Address-title a {
+            @extend .btn;
+            @extend .btn-primary;
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            min-width: rem(150px);
+            transform: translateX(-50%);
+        }
+        address {
+            font-style: normal;
+        }
+    }
+
+
+    // Detail
+    .woocommerce-address-fields .woocommerce-address-fields__field-wrapper + p {
+        padding-top: rem($form-row-spacing-top);
+        clear: both;
+        text-align: center;
+        .button {
+            @extend .btn;
+            @extend .btn-primary;
+        }
+    }
+}
+
+
+
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 600px) {
+    .page-account .woocommerce-Addresses .woocommerce-Address {
+        flex-basis: 100%;
+    }
+}

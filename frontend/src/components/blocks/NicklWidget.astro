@@ -1,0 +1,25 @@
+---
+/**
+ * Module Widget — Reproduit widget.blade.php
+ * Affiche le contenu HTML brut du champ widget si fourni.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const widget = (data.widget as string) || '';
+---
+
+<NicklModuleWrapper data={data} moduleName="widget">
+  {widget ? (
+    <Fragment set:html={widget} />
+  ) : (
+    <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+      Aucun widget configuré.
+    </p>
+  )}
+</NicklModuleWrapper>

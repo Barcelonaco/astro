@@ -1,0 +1,61 @@
+/* Import du CSS Nickl principal */
+@import url('/nickl-assets/css/app.css');
+
+/* Surcharges spécifiques au back-office pour la prévisualisation des modules Nickl */
+
+/* Contexte du builder : les modules doivent se comporter comme sur le front */
+.builder-canvas-inner .module {
+  position: relative;
+  overflow: hidden;
+  background: transparent !important; /* laisser la couleur de fond Nickl ou l'image de fond s'exprimer */
+}
+
+.builder-canvas-inner .module .background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  display: block !important;
+}
+
+/* Pour les modules avec parallax : laisser top: -25% et height: 125% (depuis app.css) s'appliquer */
+.builder-canvas-inner .module.background-parallax .background {
+  top: -25%;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 125%;
+  will-change: transform;
+}
+
+.builder-canvas-inner .module .container,
+.builder-canvas-inner .module .container-large {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+}
+
+/* Assurer que la couleur de fond du bloc (has-background-*) se voit dans le builder,
+   même si certaines règles Nickl fixent d'autres backgrounds.
+   Fallbacks requis car les variables Nickl peuvent ne pas être définies dans le contexte admin. */
+.builder-canvas-inner .module.has-background-primary {
+  background-color: var(--color-primary, #006a9b) !important;
+}
+
+.builder-canvas-inner .module.has-background-secondary {
+  background-color: var(--color-secondary, #ea644e) !important;
+}
+
+.builder-canvas-inner .module.has-background-tertiary {
+  background-color: var(--color-tertiary, #d0d0d0) !important;
+}
+
+.builder-canvas-inner .module.has-background-dark {
+  background-color: var(--color-default, #001527) !important;
+}
+
+
+

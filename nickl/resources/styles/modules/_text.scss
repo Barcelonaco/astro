@@ -1,0 +1,24 @@
+@import '../base/common';
+/**
+ * GENERAL
+ */
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.module-text .btn-wrapper {
+  margin-top: rem(43px);
+  display: flex;
+  &.align-center {
+    justify-content: center;
+  }
+  &.align-right {
+    justify-content: end;
+  }
+}
+.module-text .slider-image{
+  display: none!important;
+}

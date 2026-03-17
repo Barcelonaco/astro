@@ -1,0 +1,162 @@
+---
+/**
+ * Module Contact — Reproduit contact.blade.php
+ * 2 colonnes : adresses avec infos de contact + carte ou photo.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { isTruthy } from '../../lib/module-classes';
+import { resolveImageUrl, resolveImageAlt } from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const addresses = (data.addresses as any[]) || [];
+const isMap = isTruthy(data.is_map);
+const photoUrl = resolveImageUrl(data.photo, apiOrigin, 'text-image-default');
+const photoAlt = resolveImageAlt(data.photo);
+
+// Calcul du centre pour la carte
+const markers: [number, number][] = [];
+let centerLat = 0;
+let centerLng = 0;
+for (const contact of addresses) {
+  if (contact.address?.lat && contact.address?.lng) {
+    markers.push([contact.address.lng, contact.address.lat]);
+    centerLat += Number(contact.address.lat);
+    centerLng += Number(contact.address.lng);
+  }
+}
+if (markers.length > 0) {
+  centerLat /= markers.length;
+  centerLng /= markers.length;
+}
+
+const socialKeys = ['instagram', 'facebook', 'threads', 'tiktok', 'linkedin', 'twitter', 'tripadvisor', 'pinterest', 'youtube'] as const;
+---
+
+<NicklModuleWrapper data={data} moduleName="contact">
+  <div class="cols-wrapper">
+    <div class="col col-1">
+      {addresses.length > 0 && (
+        <ul class="list">
+          {addresses.map((contact) => {
+            const addr = contact.address || {};
+            const streetNumber = addr.street_number || '';
+            const streetName = addr.street_name || '';
+            const postCode = addr.post_code || '';
+            const city = addr.city || '';
+            const addressName = addr.name || '';
+            const addressStreet = `${streetNumber} ${streetName}`.trim();
+            const addressStreetShort = `${streetNumber} ${addr.street_name_short || ''}`.trim();
+            const placeId = addr.place_id || '';
+            const logoUrl = resolveImageUrl(contact.logo, apiOrigin, 'logo');
+
+            const socials = socialKeys.filter((key) => contact[key]);
+
+            return (
+              <li class="item">
+                {logoUrl && (
+                  <div class="logo-wrapper">
+                    <img src={logoUrl} alt="" class="logo" />
+                  </div>
+                )}
+                {contact.name && (
+                  <p class="title title-section-4">{contact.name}</p>
+                )}
+                {addr.lat && (
+                  <>
+                    <address class="address">
+                      {addressName !== addressStreet && addressName !== addressStreetShort && (
+                        <>{addressName}<br /></>
+                      )}
+                      {streetName && (
+                        <>{addressStreet}<br /></>
+                      )}
+                      {`${postCode} ${city}`.trim()}
+                    </address>
+                    {addresses.length > 1 && placeId && (
+                      <a
+                        href={`https://www.google.com/maps/place/?q=place_id:${placeId}`}
+                        class="btn btn-tertiary"
+                        title="Itinéraire"
+                        target="_blank"
+                      >
+                        Itinéraire
+                      </a>
+                    )}
+                  </>
+                )}
+                {contact.phone && (
+                  <p class="phone-wrapper">
+                    Tel.{' '}
+                    <a href={`tel:${String(contact.phone).replace(/\s/g, '')}`} class="phone">
+                      {contact.phone}
+                    </a>
+                  </p>
+                )}
+                {contact.mail && (
+                  <div class="mail-wrapper">
+                    <a href={`mailto:${contact.mail}`}>{contact.mail}</a>
+                  </div>
+                )}
+                {contact.schedule && (
+                  <div class="editor txt">
+                    <p><b>Horaires d'ouverture</b></p>
+                    <p><Fragment set:html={String(contact.schedule).replace(/\n/g, '<br />')} /></p>
+                  </div>
+                )}
+                {socials.length > 0 && (
+                  <ul class="social-networks">
+                    {socials.map((key) => (
+                      <li class="item-social">
+                        <a href={contact[key]} title={key === 'twitter' ? 'X (Twitter)' : key.charAt(0).toUpperCase() + key.slice(1)} target="_blank" class="link">
+                          <span class="icon" aria-hidden="true">
+                            <img src={`/nickl-assets/images/svg/${key === 'twitter' ? 'x' : key}.svg`} alt={key} />
+                          </span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+
+    <div class="col col-2">
+      {!isMap ? (
+        photoUrl && (
+          <img src={photoUrl} alt={photoAlt} class="illus" loading="lazy" />
+        )
+      ) : (
+        <div class="map-wrapper js_show-content">
+          <div
+            class="map js_load-map"
+            data-markers={JSON.stringify(markers)}
+            data-lng={String(centerLng)}
+            data-lat={String(centerLat)}
+          >
+            {addresses.length === 1 && addresses[0]?.address?.place_id && (
+              <a
+                href={`https://www.google.com/maps/place/?q=place_id:${addresses[0].address.place_id}`}
+                class="btn btn-primary"
+                title="Itinéraire"
+                target="_blank"
+              >
+                Itinéraire
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+</NicklModuleWrapper>

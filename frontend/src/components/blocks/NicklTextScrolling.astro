@@ -1,0 +1,39 @@
+---
+/**
+ * Module TextScrolling — Reproduit text-scrolling.blade.php
+ * Texte défilant infini (marquee CSS).
+ * Items répétés 20x pour effet de boucle.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const texts = (data.texts as any[]) || [];
+const textSize = (data.text_size as string) || 'size-m';
+const textDirection = (data.text_direction as string) || 'left';
+const textSpeed = Number(data.text_speed) || 5;
+
+// Répéter les items 20 fois pour l'animation infinie (comme le @for dans le Blade)
+const repeatedItems: string[] = [];
+for (let i = 0; i < 20; i++) {
+  for (const t of texts) {
+    if (t.text) repeatedItems.push(t.text);
+  }
+}
+---
+
+<NicklModuleWrapper data={data} moduleName="text-scrolling" noContainer hideTitle>
+  {texts.length > 0 && (
+    <div class={`list ${textSize} direction-${textDirection}`}>
+      <div class="list-content" style={`animation-duration: ${textSpeed}s`}>
+        {repeatedItems.map((text) => (
+          <div class="item">{text}</div>
+        ))}
+      </div>
+    </div>
+  )}
+</NicklModuleWrapper>

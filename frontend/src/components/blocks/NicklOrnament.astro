@@ -1,0 +1,55 @@
+---
+/**
+ * Module Ornament — Reproduit ornament.blade.php
+ * Image décorative flottante avec position, opacité et transforms.
+ */
+import { buildModuleClasses } from '../../lib/module-classes';
+import { resolveImageUrl } from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const id = (data.id_bloc as string) || '';
+const isVisible = (data.is_visible as string) ?? 'yes';
+const classes = buildModuleClasses(data);
+
+const image = data.image as any;
+const imageUrl = resolveImageUrl(image, apiOrigin, 'banner');
+
+const imgPlacement = (data.img_placement as string) || 'center';
+const imgOpacity = Number(data.img_opacity ?? 100) / 100;
+const imgWidth = Number(data.img_width) || 0;
+
+// Calcul widthImage comme le Composer PHP :
+// round(img_width * 100 / 1920, 2) ou fallback sur la largeur de l'image
+const widthImage = imgWidth
+  ? Math.round((imgWidth * 100 / 1920) * 100) / 100
+  : 50;
+
+// Transforms
+const transforms: string[] = [];
+const transformX = Number(data.transformX) || 0;
+const transformY = Number(data.transformY) || 0;
+if (transformX) transforms.push(`translateX(${transformX}vw)`);
+if (transformY) transforms.push(`translateY(${transformY}vh)`);
+const transformStyle = transforms.length > 0 ? `transform: ${transforms.join(' ')};` : '';
+---
+
+{isVisible !== 'no' && (
+  <div id={id || undefined} class={`module module-ornament ${classes}`}>
+    {imageUrl && (
+      <div
+        class={`illus-wrapper img-${imgPlacement}`}
+        style={`max-width: ${widthImage}%; opacity: ${imgOpacity}; ${transformStyle}`}
+      >
+        <img src={imageUrl} alt="" class="illus" loading="lazy" />
+      </div>
+    )}
+  </div>
+)}

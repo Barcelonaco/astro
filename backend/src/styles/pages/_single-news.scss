@@ -1,0 +1,89 @@
+/**
+ * GENERAL
+ */
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.page-single-news {
+    padding-bottom: spacing($module-spacing-small);
+    article {    
+        padding-top: spacing($module-spacing-small);
+    }
+    .sub-header ~ article {
+        padding-top: 0;
+    }
+    .head {
+        margin-bottom: rem(37px);
+        .category {
+            margin-bottom: rem(8px);
+            font-size: rem(14px);
+            line-height: $letter-spacing-default;
+            letter-spacing: $letter-spacing-default;
+            text-transform: uppercase;
+        }
+        .title {
+            font-size: rem(60px);
+            color: $color3;
+        }
+        .author {
+            margin-top: rem(25px);
+            font-size: rem(24px);
+            line-height: $letter-spacing-default;
+            letter-spacing: $letter-spacing-default;
+            font-weight: 700;
+        }
+        .date {
+            display: block;
+            margin-top: rem(5px);
+            font-size: rem(16px);
+            line-height: $line-height-default;
+            letter-spacing: $letter-spacing-default;
+        }
+        .illus-wrapper {
+            margin-top: rem(30px);
+        }
+        .illus {
+            display: block;
+            aspect-ratio: 1/.333;
+            width: 100%;
+            object-fit: cover;
+            object-position: center;
+            .border-rounded & {
+                border-radius: $border-radius-default;
+            }
+        }
+    }
+    .btn-wrapper {
+        display: flex;        
+        gap: rem(16px);
+        &.space-between {
+            justify-content: space-between;
+        }
+        &.flex-end {
+            justify-content: flex-end;
+        }
+    }
+}
+
+
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 1024px) {
+    .page-single-news {
+        .btn-wrapper {
+            flex-direction: column;
+            .prev {
+                text-align: left;
+            }
+            .next {
+                text-align: right;
+            }
+        }
+    }
+}

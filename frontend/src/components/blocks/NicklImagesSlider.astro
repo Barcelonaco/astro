@@ -1,0 +1,82 @@
+---
+/**
+ * Module ImagesSlider — Reproduit images-slider.blade.php
+ * Carousel Swiper avec navigation + pagination.
+ * Chaque slide : image + légende optionnelle + texte + liens.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { resolveLink } from '../../lib/module-classes';
+import { resolveImageUrl, resolveImageAlt } from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+// Le Composer transforme data.sliders en $images avec des clés normalisées
+const rawSliders = (data.sliders as any[]) || [];
+const images = rawSliders.map((slide) => ({
+  image_url: resolveImageUrl(slide.image, apiOrigin, 'banner'),
+  image_alt: resolveImageAlt(slide.image),
+  has_desc: !!(slide.legend || slide.text || slide.link?.url),
+  legend: (slide.legend as string) || '',
+  text: (slide.text as string) || '',
+  link: resolveLink(slide.link),
+  link2: resolveLink(slide.link_2),
+}));
+---
+
+<NicklModuleWrapper data={data} moduleName="images-slider" noContainer>
+  {images.length > 0 && (
+    <div class="container-large container-1">
+      {/* Titre géré par le wrapper */}
+
+      <div class="slider-wrapper">
+        <div class="swiper slider js_images-slider">
+          <div class="swiper-wrapper">
+            {images.map((slide) => (
+              <div class={`swiper-slide item ${slide.has_desc ? 'has-desc' : 'no-desc'}`}>
+                <div class="illus-wrapper">
+                  <img src={slide.image_url} alt={slide.image_alt} class="illus" loading="lazy" />
+                </div>
+                {slide.has_desc && (
+                  <div class="container-large container-2">
+                    <div class="desc">
+                      {slide.legend && (
+                        <h3 class="title title-section-3">{slide.legend}</h3>
+                      )}
+                      {slide.text && (
+                        <div class="txt editor">
+                          <p><Fragment set:html={slide.text.replace(/\n/g, '<br />')} /></p>
+                        </div>
+                      )}
+                      {slide.link && (
+                        <div class="btn-wrapper">
+                          <a href={slide.link.url} class="btn btn-primary" target={slide.link.target}>
+                            {slide.link.title}
+                          </a>
+                          {slide.link2 && (
+                            <a href={slide.link2.url} class="btn btn-secondary" target={slide.link2.target}>
+                              {slide.link2.title}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <button type="button" class="slider-navigation prev"></button>
+        <button type="button" class="slider-navigation next"></button>
+        <div class="slider-pagination js_images-slider-pagination"></div>
+      </div>
+    </div>
+  )}
+</NicklModuleWrapper>

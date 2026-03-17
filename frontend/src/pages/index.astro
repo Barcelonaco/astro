@@ -1,0 +1,136 @@
+---
+export const prerender = false;
+
+import BaseHead from '../components/BaseHead.astro';
+import ModuleStyles from '../components/ModuleStyles.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import BlockRenderer from '../components/BlockRenderer.astro';
+import DeferredLoader from '../components/DeferredLoader.astro';
+import SiteOverlays from '../components/SiteOverlays.astro';
+import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+import { formatContent, getFrontendBootstrap } from '../lib/api';
+import { optimizedImageUrl } from '../lib/module-helpers';
+
+function parseBlocks(content: string): unknown[] | null {
+  if (!content || !content.trim()) return null;
+  try {
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed) && parsed.every((b: unknown) => b && typeof (b as { type?: string }).type === 'string')) return parsed;
+  } catch {}
+  return null;
+}
+
+function extractLcpImages(blocks: any[] | null): { desktop: string; mobile: string } {
+  if (!blocks || blocks.length === 0) return { desktop: '', mobile: '' };
+  const first = blocks[0];
+  if (first.type === 'hero' && first.data?.hero_sliders?.[0]?.image?.url) {
+    const slide = first.data.hero_sliders[0];
+    const mobileUrl = slide.image_mobile?.url || slide.image.url;
+    return {
+      desktop: optimizedImageUrl(slide.image.url, 1920, 70),
+      mobile: optimizedImageUrl(mobileUrl, 600, 50),
+    };
+  }
+  if (first.type === 'banner' && first.data?.image?.url) {
+    const url = optimizedImageUrl(first.data.image.url, 1920, 70);
+    return { desktop: url, mobile: url };
+  }
+  return { desktop: '', mobile: '' };
+}
+
+// Single API call for all bootstrap data (site info + navigation + style settings + front page)
+const { siteInfo, styleSettings, siteSettings, navigation: navigationData, frontPage } = await getFrontendBootstrap();
+const siteName = siteInfo.siteName || SITE_TITLE;
+const siteDescription = siteInfo.siteDescription || SITE_DESCRIPTION;
+
+const page = frontPage;
+const hasPage = !!page;
+const blocks = hasPage ? parseBlocks(page.content) : null;
+const isBlockPage = blocks !== null;
+const lcpImages = extractLcpImages(blocks as any[] | null);
+---
+
+<!doctype html>
+<html lang="fr">
+	<head>
+		<BaseHead title={siteName} description={siteDescription} styleSettings={styleSettings} siteSettings={siteSettings} />
+		{lcpImages.mobile && <link rel="preload" as="image" href={lcpImages.mobile} media="(max-width: 600px)" fetchpriority="high" />}
+		{lcpImages.desktop && <link rel="preload" as="image" href={lcpImages.desktop} media="(min-width: 601px)" fetchpriority="high" />}
+		<ModuleStyles blocks={blocks} />
+	</head>
+	<body>
+		<Header siteName={siteName} navigation={navigationData} siteSettings={siteSettings} />
+		<main class={isBlockPage ? 'main-page' : ''}>
+			{hasPage ? (
+				<article>
+					{!isBlockPage && (
+						<div class="hero-image">
+							<div class="page-header">
+								<h1 class="title">{page.title}</h1>
+							</div>
+						</div>
+					)}
+					<div class={isBlockPage ? 'content content-blocks' : 'content'}>
+						{isBlockPage ? (
+							<BlockRenderer blocks={blocks} />
+						) : (
+							<div class="prose" set:html={formatContent(page.content)} />
+						)}
+					</div>
+				</article>
+			) : (
+				<div class="fallback">
+					<h1>{siteName}</h1>
+					<p>{siteDescription}</p>
+				</div>
+			)}
+		</main>
+		<Footer siteSettings={siteSettings} />
+		<SiteOverlays siteSettings={siteSettings} />
+		<DeferredLoader />
+	</body>
+</html>
+
+<style>
+	article {
+		width: 100%;
+		max-width: 100%;
+		margin: 0;
+	}
+
+	.hero-image {
+		width: 100%;
+		background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+	}
+	.page-header {
+		padding: 3em 2em;
+		max-width: 1200px;
+		margin: 0 auto;
+	}
+	.title {
+		color: white;
+		font-size: 3em;
+		margin-bottom: 0;
+	}
+	.content {
+		margin: 0 auto;
+		padding: 3em 2em;
+		max-width: 900px;
+	}
+	.content-blocks {
+		width: 100%;
+		max-width: 100%;
+		padding: 0;
+	}
+	.prose {
+		font-size: 1.1em;
+		line-height: 1.8;
+	}
+	.fallback {
+		max-width: 900px;
+		margin: 0 auto;
+		padding: 4em 2em;
+		text-align: center;
+	}
+</style>

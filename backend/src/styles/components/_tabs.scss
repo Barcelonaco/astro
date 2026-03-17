@@ -1,0 +1,53 @@
+/**
+ * GENERAL
+ * MEDIA QUERIES
+ */
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.tabs {
+    margin-top: rem(70px);
+    margin-bottom: rem(40px);
+    @include flex(flex-start, flex-start, wrap);
+    gap: rem(8px) rem(17px);
+    .link {
+        display: block;
+        padding: rem(3px) rem(6px);
+        border: 0;
+        font-size: rem(20px);
+        line-height: $line-height-default;
+        font-weight: 700;
+        letter-spacing: $letter-spacing-default;
+        text-transform: uppercase;
+        .border-rounded & {
+            border-radius: $border-radius-default;
+            padding: rem(6px) rem(9px);
+        }
+        &.active {
+            background-color: $color3;
+            color: $color1;
+        }
+        @include hover {
+            color: $color3;
+            &.active {
+                color: $color1;
+            }
+        }
+    }
+}
+
+
+
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 600px) {
+    .tabs .link {
+        font-size: 1rem;
+    }
+}

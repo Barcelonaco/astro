@@ -1,0 +1,42 @@
+---
+/**
+ * Module HeadText — Reproduit head-text.blade.php
+ * 2 colonnes : titre (33%) + texte WYSIWYG (62%).
+ * Modes : columns-1 (empilé) ou columns-2 (côte à côte).
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { cleanHtml, isTruthy } from '../../lib/module-classes';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const titleBloc = (data.title_bloc as string) || (data.title as string) || '';
+const text = cleanHtml(data.text as string);
+const nbrColumn = (data.nbr_column as string) || 'columns-2';
+const isH1 = isTruthy(data.is_h1);
+const h1InHeader = isTruthy(data.h1_in_header);
+
+// HeadText n'utilise pas getBlocTitle standard — le titre est dans col-1
+const useH1 = !h1InHeader && isH1;
+---
+
+<NicklModuleWrapper data={data} moduleName="head-text" extraClasses={nbrColumn} hideTitle>
+  <div class="cols-wrapper">
+    <div class="col col-1">
+      {useH1 ? (
+        <h1 class="title title-section-2">{titleBloc}</h1>
+      ) : (
+        <h2 class="title title-section-2">{titleBloc}</h2>
+      )}
+    </div>
+
+    <div class="col col-2">
+      <div class="txt editor">
+        {text && <Fragment set:html={text} />}
+      </div>
+    </div>
+  </div>
+</NicklModuleWrapper>

@@ -1,0 +1,285 @@
+/**
+ * GENERAL
+ * MEDIA QUERIES
+ */
+
+/* GENERAL
+---------------------------------------- */
+#cc-main {
+  .cm {
+    max-width: 806px;
+    width: 800px;
+    min-height: 242px;
+    padding-right: 250px;
+    border-radius: 0;
+    * {
+      font-family: $font1;
+      letter-spacing: $letter-spacing-default;  
+    }
+    
+    &::before {
+      position: absolute;
+      top: 50%;
+      right: 120px;
+      width: 227px;
+      height: 242px;
+      background: url('~@images/svg/cookies-light.svg') no-repeat center;
+      background-size: contain;
+      content: '';
+      transform: translate(50%, -50%);
+    }
+    
+    .border-rounded & {
+      border-radius: var(--cc-border-radius, 8px);
+    }
+    
+    /* TITRES */
+    .cm__title {
+      font-family: $font2;
+      font-size: 22px;
+      font-weight: 400;
+      color: $color3;
+      .mode-uppercase & {
+        text-transform: uppercase;
+      }
+
+      .large {
+        display: block;
+        font-size: 45px;
+        font-weight: 700;
+      }
+    }
+
+    /* DESCRIPTION */
+    .cm__desc {
+      button, .cc-link {
+        @include animation-underline();
+        background-position: 0 100%;
+        background-size: 100% 1px;
+        font-weight: 600;
+        @include hover {
+          background-position: 100% 100%;
+          background-size: 0 1px;
+          color: $color3;
+        }
+      }
+      button {
+        margin-bottom: rem(8px);
+      }
+    }
+    
+    /* BOUTONS */
+    .cm__btns {
+      border-top: unset;
+    }
+    .cm__btn-group{
+      display: flex;
+      justify-content: space-between;
+      column-gap: rem(20px);
+      border-top: unset;
+    }
+    .cm__btn {
+      padding: 10px 15px;
+      transition: var(--cc-transition, 0.3s ease);
+      border-radius: 0;
+      font-size: rem(20px);
+      font-family: $font2;
+      font-weight: 500;
+      width: 100%;
+      .border-rounded & {
+        border-radius: rem(50px);
+      }
+      &:first-child {
+        background-color: $color3;
+        border-color: $color3;
+        color: $color1;
+        @include hover {
+          background-color: $color4;
+          border-color: $color4;
+        }
+      }
+      
+      &:last-child:not(:first-child) {
+        background-color: transparent;
+        color: $color3;
+        border-color: $color3;
+        margin-top: 0;
+        @include hover {
+          color: $color1;
+          background-color: $color3;
+        }
+      }
+    }
+  }
+  .pm-wrapper {
+    .pm__btn-group {
+      display: flex;
+      justify-content: space-between;
+      column-gap: rem(20px);
+      border-top: unset;
+    }
+    .pm__btn {
+      white-space: nowrap;
+      padding: 10px 15px;
+      transition: var(--cc-transition, 0.3s ease);
+      border-radius: 0;
+      font-size: rem(16px);
+      font-weight: 500;
+      .border-rounded & {
+        border-radius: rem(50px);
+      }
+      &:first-child {
+        background-color: $color3;
+        border-color: $color3;
+        color: $color1;
+        @include hover {
+          background-color: $color4;
+          border-color: $color4;
+        }
+      }
+      
+      &:last-child {
+        background-color: transparent;
+        color: $color3;
+        border-color: $color3;
+        margin-top: 0;
+        @include hover {
+          color: $color1;
+          background-color: $color3;
+        }
+      }
+    }
+    /* CONSENT MODAL */
+    .pm--box {
+      border-radius: 0;
+      .border-rounded & {
+        border-radius: $border-radius-default;
+      }
+      .pm__tilte {
+        position: relative;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        flex-grow: 1;
+        font-size: 27px;
+        text-transform: uppercase;
+      }
+      .pm__close-btn, .pm__section--toggle {
+        border-radius: 0;
+        .border-rounded & {
+          border-radius: $border-radius-default;
+        }
+      }
+      .cc-ttl::after {
+        display: block;
+        width: 62px;
+        height: 66px;
+        margin-left: 20px;
+        background: url('~@images/svg/cookies-light.svg') no-repeat center;
+        background-size: contain;
+        content: '';
+      }
+      
+      /* BOUTONS CONSENT MODAL */
+      .cm__btn .cc-btn-title {
+        min-height: 42px;
+        padding: 7px;
+        font-family: var(--cc-font-heading, sans-serif);
+        font-size: 20px;
+        text-transform: uppercase;
+      }
+    }
+  }
+  .section__toggle:checked~.toggle__icon {
+    background: $color4;
+    box-shadow: 0 0 0 1px $color4;
+  }
+
+  /* PREFRENCE MODAL */
+  .cc-preferences-modal {
+    --cc-btn-secondary-bg: #fff;
+    --cc-btn-secondary-hover-bg: rgba(200, 200, 200, 0.85);
+    --cc-cookie-category-block-bg: #fff;
+    --cc-cookie-category-block-bg-hover: rgba(200, 200, 200, 0.1);
+    --cc-toggle-bg-readonly: #f0f0f0;
+    --cc-toggle-bg-on: #28a745;
+    --cc-toggle-bg-off: #dc3545;
+    --cc-text: #333;
+    .cc-hdr {
+      display: flex;
+      align-items: center;
+    }
+    .cc-ttl {
+      position: relative;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      flex-grow: 1;
+      font-size: 27px;
+      text-transform: uppercase;
+      &::after {
+        display: block;
+        width: 62px;
+        height: 66px;
+        margin-left: 20px;
+        background: url('~@images/svg/cookies-light.svg') no-repeat center;
+        background-size: contain;
+        content: '';
+      }
+    }
+    .cm__btn .cc-btn-title {
+      min-height: 42px;
+      padding: 7px;
+      font-family: var(--cc-font-heading, sans-serif);
+      font-size: 20px;
+      text-transform: uppercase;
+    }
+  }  
+  
+  /* BOUTONS PRINCIPAUX */
+  .cc-btn-all {
+    background-color: var(--cc-btn-primary-bg, #007bff);
+    color: var(--cc-btn-primary-color, #fff);
+  }
+  
+  .cc-btn-reset, .cc-btn-save {
+    background-color: var(--cc-btn-secondary-bg, #ccc);
+    color: var(--cc-btn-secondary-color, #333);
+  }
+  
+  /* Masquer le bouton "cookies-button" */
+  .cookies-button {
+    display: none !important;
+  }
+}
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 688px) {
+  #cc-main {
+    .cm {
+      padding-right: 0;
+      &:before {
+        display: none;
+      }
+    }
+    .cc-ttl .large {
+      font-size: 2em;
+    }
+  }
+}
+
+@media only screen and (max-width: 600px) {
+  #cc-main .cm {
+    .cm__title {
+      padding-right: 0;
+      font-size: 1.5rem;
+      &:after {
+        display: none;
+      }
+    }
+    .cc-btn .cc-btn-title {
+      font-size: 1.1rem;
+    }
+  }
+}

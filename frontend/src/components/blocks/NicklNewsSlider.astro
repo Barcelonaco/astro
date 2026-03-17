@@ -1,0 +1,69 @@
+---
+/**
+ * Module NewsSlider — Reproduit news-slider.blade.php
+ * Slider d'actualités. Fetch les posts depuis l'API CMS au build time.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { isTruthy, resolveLink } from '../../lib/module-classes';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+
+const displayPosts = (data.display_posts as string) || '1';
+const isManual = isTruthy(data.is_manual);
+const displayArchiveLink = isTruthy(data.display_archive_link);
+const archiveLinkLabel = (data.archive_link_label as string) || 'Voir toutes les actualités';
+
+// Fetch posts depuis l'API CMS
+let posts: any[] = [];
+try {
+  const res = await fetch(`${API_URL}/posts?status=published&limit=6`);
+  if (res.ok) {
+    const json = await res.json();
+    posts = json.posts || json || [];
+    if (!Array.isArray(posts)) posts = [];
+  }
+} catch {
+  // Silently fail — module sera vide
+}
+---
+
+<NicklModuleWrapper data={data} moduleName="news-slider" containerLarge>
+  <div class="slider-wrapper">
+    <div class={`swiper slider js_news-slider columns-${displayPosts}`}>
+      <div class="swiper-wrapper">
+        {posts.map((post) => (
+          <div class="swiper-slide item">
+            <a href={`/blog/${post.slug}`} class="link">
+              {post.featured_image && (
+                <div class="illus-wrapper">
+                  <img src={post.featured_image} alt={post.title || ''} class="illus" loading="lazy" />
+                </div>
+              )}
+              <div class="desc">
+                {post.published_date && (
+                  <time class="date">{new Date(post.published_date).toLocaleDateString('fr-FR')}</time>
+                )}
+                <h3 class="title">{post.title}</h3>
+                {post.excerpt && <p class="txt">{post.excerpt}</p>}
+              </div>
+            </a>
+          </div>
+        ))}
+      </div>
+    </div>
+    <button type="button" class="slider-navigation prev"></button>
+    <button type="button" class="slider-navigation next"></button>
+  </div>
+
+  {displayArchiveLink && (
+    <div class="btn-more-wrapper">
+      <a href="/blog" class="btn btn-tertiary">{archiveLinkLabel}</a>
+    </div>
+  )}
+</NicklModuleWrapper>

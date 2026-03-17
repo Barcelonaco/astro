@@ -1,0 +1,268 @@
+---
+import { buildModuleClasses } from '../../lib/module-classes';
+import { optimizedImageUrl } from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props as Props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const id = (data.id_bloc as string) ?? '';
+const classes = buildModuleClasses(data);
+const backgroundImage = (data.backgroundImage as any) ?? null;
+const titleBloc = (data.title_bloc as string) ?? (data.title as string) ?? '';
+const titleStyle = (data.title_style as number | string) ?? 2;
+const titleAlign = (data.title_align as string) ?? 'center';
+
+const listItems = (data.list_interlocking as any[]) ?? [];
+const interlockingTiles = data.interlocking_tiles === true || data.interlocking_tiles === 1 || data.interlocking_tiles === '1';
+const orientation = data.orientation === true || data.orientation === 1 || data.orientation === '1';
+const clickableBlock = data.clickable_block === true || data.clickable_block === 1 || data.clickable_block === '1';
+const mainBlocRight = data['main-bloc-position'] === true || data['main-bloc-position'] === 1 || data['main-bloc-position'] === '1';
+const styleChoice = (data.style_choice as string) ?? 'style-1';
+
+const extraClasses = [
+  mainBlocRight ? 'main-bloc-right' : 'main-bloc-left',
+  styleChoice,
+].filter(Boolean).join(' ');
+
+const firstItem = listItems.slice(0, 1);
+const otherItems = listItems.slice(1);
+
+function resolveFileUrl(file: any): string {
+  if (!file) return '';
+  const url = typeof file === 'string' ? file : (file.url || '');
+  if (!url) return '';
+  const fullUrl = url.startsWith('http') ? url : apiOrigin + url;
+  return optimizedImageUrl(fullUrl, 800, 80);
+}
+
+function isVideo(file: any): boolean {
+  if (!file) return false;
+  const mime = file.mime_type || file.type || '';
+  if (mime.startsWith('video/')) return true;
+  const url = typeof file === 'string' ? file : (file.url || '');
+  return /\.(mp4|mov|mpeg|mpg)$/i.test(url);
+}
+
+function hasDesc(item: any): boolean {
+  return !!(item.title || item.catchphrase || (!clickableBlock && (item.primary_link?.url || item.secondary_link?.url)));
+}
+---
+
+{listItems.length > 0 && (
+  <div id={id} class={`module module-clickable ${classes} ${extraClasses}`}>
+    {backgroundImage && backgroundImage.url && (
+      <div
+        class="background"
+        style={`background-image: url(${backgroundImage.url}); opacity: ${backgroundImage.opacity ?? 1};`}
+      />
+    )}
+
+    <div class="container-large">
+      {titleBloc && (
+        <div class={`bloc-title-module align-${titleAlign}`}>
+          <h2 class={`title-module title-section-${titleStyle}`}>{titleBloc}</h2>
+        </div>
+      )}
+
+      {interlockingTiles ? (
+        <div class={`cols-wrapper items-${listItems.length}`}>
+          {/* Colonne 1 */}
+          <div class="items col col-1">
+            {firstItem.map((item) => (
+              <div class={`item ${hasDesc(item) ? 'has-desc' : 'no-desc'} ${!orientation ? 'landscape' : ''}`} role="article">
+                {clickableBlock && item.primary_link?.url ? (
+                  <a href={item.primary_link.url} class="item-content" target={item.primary_link.target || '_self'} rel="bookmark">
+                    {isVideo(item.file) ? (
+                      <div class="video-wrapper">
+                        <video class="background-video" autoplay loop muted playsinline>
+                          <source src={resolveFileUrl(item.file)} type="video/mp4" />
+                        </video>
+                      </div>
+                    ) : (
+                      <div class="illus-wrapper">
+                        <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                      </div>
+                    )}
+                    {hasDesc(item) && (
+                      <div class="desc">
+                        {item.title && <h3 class="title">{item.title}</h3>}
+                        {item.catchphrase && <div class="editor txt"><p>{item.catchphrase}</p></div>}
+                      </div>
+                    )}
+                  </a>
+                ) : (
+                  <div class="item-content">
+                    {isVideo(item.file) ? (
+                      <div class="video-wrapper">
+                        <video class="background-video" autoplay loop muted playsinline>
+                          <source src={resolveFileUrl(item.file)} type="video/mp4" />
+                        </video>
+                      </div>
+                    ) : (
+                      <div class="illus-wrapper">
+                        <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                      </div>
+                    )}
+                    {hasDesc(item) && (
+                      <div class="desc">
+                        {item.title && <h3 class="title">{item.title}</h3>}
+                        {item.catchphrase && <div class="editor txt"><p>{item.catchphrase}</p></div>}
+                        {!clickableBlock && (item.primary_link?.url || item.secondary_link?.url) && (
+                          <div class="btn-wrapper">
+                            {item.primary_link?.url && (
+                              <a href={item.primary_link.url} class="btn btn-primary" target={item.primary_link.target || '_self'}>
+                                {item.primary_link.title}
+                              </a>
+                            )}
+                            {item.secondary_link?.url && (
+                              <a href={item.secondary_link.url} class="btn btn-secondary" target={item.secondary_link.target || '_self'}>
+                                {item.secondary_link.title}
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Colonne 2 */}
+          {otherItems.length > 0 && (
+            <div class="items col col-2">
+              {otherItems.map((item) => (
+                <div class={`item ${hasDesc(item) ? 'has-desc' : 'no-desc'} ${!orientation ? 'landscape' : ''}`} role="article">
+                  {clickableBlock && item.primary_link?.url ? (
+                    <a href={item.primary_link.url} class="item-content" target={item.primary_link.target || '_self'} rel="bookmark">
+                      {isVideo(item.file) ? (
+                        <div class="video-wrapper">
+                          <video class="background-video" autoplay loop muted playsinline>
+                            <source src={resolveFileUrl(item.file)} type="video/mp4" />
+                          </video>
+                        </div>
+                      ) : (
+                        <div class="illus-wrapper">
+                          <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                        </div>
+                      )}
+                      {hasDesc(item) && (
+                        <div class="desc">
+                          {item.title && <h3 class="title">{item.title}</h3>}
+                          {item.catchphrase && <div class="editor txt"><p>{item.catchphrase}</p></div>}
+                        </div>
+                      )}
+                    </a>
+                  ) : (
+                    <div class="item-content">
+                      {isVideo(item.file) ? (
+                        <div class="video-wrapper">
+                          <video class="background-video" autoplay loop muted playsinline>
+                            <source src={resolveFileUrl(item.file)} type="video/mp4" />
+                          </video>
+                        </div>
+                      ) : (
+                        <div class="illus-wrapper">
+                          <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                        </div>
+                      )}
+                      {hasDesc(item) && (
+                        <div class="desc">
+                          {item.title && <h3 class="title">{item.title}</h3>}
+                          {item.catchphrase && <div class="editor txt"><p>{item.catchphrase}</p></div>}
+                          {!clickableBlock && (item.primary_link?.url || item.secondary_link?.url) && (
+                            <div class="btn-wrapper">
+                              {item.primary_link?.url && (
+                                <a href={item.primary_link.url} class="btn btn-primary" target={item.primary_link.target || '_self'}>
+                                  {item.primary_link.title}
+                                </a>
+                              )}
+                              {item.secondary_link?.url && (
+                                <a href={item.secondary_link.url} class="btn btn-secondary" target={item.secondary_link.target || '_self'}>
+                                  {item.secondary_link.title}
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div class={`list items items-${listItems.length}`}>
+          {listItems.map((item) => (
+            <div class={`item ${hasDesc(item) ? 'has-desc' : 'no-desc'} ${!orientation ? 'landscape' : ''}`} role="article">
+              {clickableBlock && item.primary_link?.url ? (
+                <a href={item.primary_link.url} class="item-content" target={item.primary_link.target || '_self'} rel="bookmark">
+                  {isVideo(item.file) ? (
+                    <div class="video-wrapper">
+                      <video class="background-video" autoplay loop muted playsinline>
+                        <source src={resolveFileUrl(item.file)} type="video/mp4" />
+                      </video>
+                    </div>
+                  ) : (
+                    <div class="illus-wrapper">
+                      <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                    </div>
+                  )}
+                  {hasDesc(item) && (
+                    <div class="desc">
+                      {item.title && <h3 class="title">{item.title}</h3>}
+                      {item.catchphrase && <div class="editor txt"><p>{item.catchphrase}</p></div>}
+                    </div>
+                  )}
+                </a>
+              ) : (
+                <div class="item-content">
+                  {isVideo(item.file) ? (
+                    <div class="video-wrapper">
+                      <video class="background-video" autoplay loop muted playsinline>
+                        <source src={resolveFileUrl(item.file)} type="video/mp4" />
+                      </video>
+                    </div>
+                  ) : (
+                    <div class="illus-wrapper">
+                      <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                    </div>
+                  )}
+                  {hasDesc(item) && (
+                    <div class="desc">
+                      {item.title && <h3 class="title">{item.title}</h3>}
+                      {item.catchphrase && <div class="editor txt"><p>{item.catchphrase}</p></div>}
+                      {!clickableBlock && (item.primary_link?.url || item.secondary_link?.url) && (
+                        <div class="btn-wrapper">
+                          {item.primary_link?.url && (
+                            <a href={item.primary_link.url} class="btn btn-primary" target={item.primary_link.target || '_self'}>
+                              {item.primary_link.title}
+                            </a>
+                          )}
+                          {item.secondary_link?.url && (
+                            <a href={item.secondary_link.url} class="btn btn-secondary" target={item.secondary_link.target || '_self'}>
+                              {item.secondary_link.title}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+)}

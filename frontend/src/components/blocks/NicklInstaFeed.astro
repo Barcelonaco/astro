@@ -1,0 +1,19 @@
+---
+/**
+ * Module InstaFeed — Reproduit insta-feed.blade.php
+ * Stub — l'API Instagram nécessite un token d'accès dédié.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+---
+
+<NicklModuleWrapper data={data} moduleName="insta-slider" containerLarge>
+  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+    Le flux Instagram n'est pas disponible en mode statique.
+  </p>
+</NicklModuleWrapper>

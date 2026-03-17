@@ -1,0 +1,57 @@
+---
+/**
+ * Module Map — Reproduit map.blade.php
+ * Carte Mapbox GL JS avec marqueur et lien itinéraire.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { isTruthy } from '../../lib/module-classes';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const address = data.address as any;
+const lat = address?.lat || 0;
+const lng = address?.lng || 0;
+const placeId = address?.place_id || '';
+const markers = lat && lng ? [[lng, lat]] : [];
+---
+
+<NicklModuleWrapper data={data} moduleName="map" noContainer>
+  {address && lat && lng ? (
+    <>
+      {data.title_bloc && (
+        <div class="container">
+          <Fragment set:html={`<h${data.title_style || 4} class="title-module title-section-${data.title_style || 4} align-${data.title_align || 'center'}">${data.title_bloc}</h${data.title_style || 4}>`} />
+        </div>
+      )}
+      <div class="container-large container-1">
+        <div class="map-wrapper js_show-content">
+          <div
+            class="map js_load-map"
+            data-markers={JSON.stringify(markers)}
+            data-lng={String(lng)}
+            data-lat={String(lat)}
+          >
+            {placeId && (
+              <a
+                href={`https://www.google.com/maps/place/?q=place_id:${placeId}`}
+                class="btn btn-primary"
+                title="Itinéraire"
+                target="_blank"
+              >
+                Itinéraire
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  ) : (
+    <div class="container">
+      <p>Aucune adresse configurée.</p>
+    </div>
+  )}
+</NicklModuleWrapper>

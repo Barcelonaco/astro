@@ -1,0 +1,257 @@
+@import '../base/common';
+/**
+ * GENERAL
+ * MEDIA QUERIES
+ */
+
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.module-team {
+    .module-columns.has-background-primary:not(.cols_have_background) &,
+    &.has-background-primary:not(.cols_have_background), 
+    .cols-background-primary &,
+    .module-columns.has-background-secondary:not(.cols_have_background) &,
+    &.has-background-secondary:not(.cols_have_background), 
+    .cols-background-secondary & {
+        .list {
+            .desc > * {
+                color: $color1;
+                .btn {
+                    svg {
+                        fill: #fff;
+                    }
+                    @include hover {
+                        fill: $color5;
+                    }
+                }
+            }
+            .social-networks .link {
+                svg * {
+                    fill: $color1;
+                }            
+                @include hover {
+                    svg * {
+                        fill: $color-default;
+                    }
+                }
+            }
+        }
+    }
+    .module-columns.has-background-secondary:not(.cols_have_background) &,
+    &.has-background-secondary:not(.cols_have_background), 
+    .cols-background-secondary & {
+        .list .illus-wrapper::after {
+            background-color: $color4;
+        }
+    }
+    .module-columns.has-background-tertiary:not(.cols_have_background) &,
+    &.has-background-tertiary:not(.cols_have_background), 
+    .cols-background-tertiary & {
+        .list {
+            .link {
+                @include hover {
+                    .title {
+                        color: inherit;
+                    }
+                }
+            }
+            .desc {
+                color: inherit;
+            }
+            .social-networks .link {
+                svg * {
+                    fill: $color-default;
+                }            
+                @include hover {
+                    svg * {
+                        fill: $color1;
+                    }
+                }
+            }
+        }
+        .list .illus-wrapper::after {
+            background-color: $color-default;
+        }
+    }
+    
+    .list {
+        &.columns {
+            @include flex(flex-start, flex-start, wrap, 5, rem(30px));
+            row-gap: rem(60px);
+            .illus-wrapper {
+                width: 100%;
+            }
+        }
+        .illus {
+            object-fit: cover;
+            aspect-ratio: 1/1;
+            margin: auto;
+            width: 100%;
+        }
+        .illus-wrapper {
+            position: relative;
+            overflow: hidden;
+            &::after {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                opacity: 0;
+                background-color: $color3;
+                content: ''
+            }
+            .border-rounded & {
+                border-radius: $border-radius-default;
+            }
+        }
+        .illus {
+            display: block;
+            margin: 0 auto;
+        }
+        .overlay {
+            position: absolute;
+            top: rem(28px);
+            right: rem(28px);
+            opacity: 0;
+            z-index: 5;
+            text-align: center;
+            font-size: rem(15px);
+            line-height: 1;
+            font-weight: 700;
+            letter-spacing: $letter-spacing-default;
+            color: $color1;
+            transform: translateY(rem(-10px));
+            transition: $transition-default;
+            .icon {
+                display: block;
+                margin-bottom: rem(5px);
+            }
+            svg {
+                margin: 0 auto;
+                * {
+                    fill: $color1;
+                }
+            }
+        }
+        .name {
+            font-size: rem(32px);
+            line-height: $line-height-default;
+            letter-spacing: $letter-spacing-default;
+            font-family: $font2;
+            font-weight: 700;
+            margin-top: rem(24px);
+        }
+        .post {
+            font-size: rem(24px);
+            font-weight: 500;
+            line-height: $line-height-default;
+            letter-spacing: $letter-spacing-default;
+        }
+        .team-desc {
+            margin: rem(8px) 0;
+        }
+        .btn-wrapper {
+            margin: 0;
+        }
+        .btn-tertiary {
+            color: $color3;
+            font-size: 1.125rem;
+            text-align: left;
+        }
+        .social-networks {
+            .icon {
+                max-width: rem(20px);
+            }        
+            .link {
+                width: rem(32px);
+            }
+        }
+        &.columns-1 {    
+            align-items: center;    
+            .name {
+                margin-top: 0;
+            }
+
+        }
+        &.pictures-circle {
+            .illus {
+                border-radius: 50%;
+            }
+        }
+        &.align-right{
+            justify-content: right;
+        }
+        &.align-center {
+            justify-content: center;
+            &:not(.columns-1) {
+                .desc > * {
+                    text-align: center;
+
+                } 
+                .social-networks {
+                    justify-content: center;
+                }  
+                .btn-tertiary {
+                    text-align: center;
+                }
+            }
+        }
+        &.pictures-circle {
+            &:not(.columns-1) {
+                .desc > * {
+                    text-align: center;
+                } 
+                .social-networks {
+                    justify-content: center;
+                }  
+                .btn-tertiary {
+                    text-align: center;
+                }
+            }
+        }
+            &.pictures-portrait {
+            .illus {
+                aspect-ratio: 4/5;
+            }
+        }
+    }
+}
+
+
+
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 1024px) {
+    .module-team .list.columns .item {
+        flex-basis: calc(100% / 4 - rem(30px));
+    }
+}
+@media only screen and (max-width: 900px) {
+    .module-team .list.columns .item {
+        flex-basis: calc(100% / 3 - rem(30px));
+    }
+}
+    @media only screen and (max-width: 600px) {
+    .module-team .list.columns {
+        row-gap: rem(30px);
+        .item {
+            flex-basis: 100%;        
+        }
+            &.columns-1 {
+                .desc > * {
+                    text-align: center;
+                } 
+                .social-networks {
+                    justify-content: center;
+                }  
+            }
+    }
+}

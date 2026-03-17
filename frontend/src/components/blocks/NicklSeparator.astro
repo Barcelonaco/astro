@@ -1,0 +1,69 @@
+---
+/**
+ * Module Separator — Reproduit separator.blade.php
+ * 4 styles : style-0 (aucune), style-1 (3 points), style-2 (trait court), style-3 (trait personnalisé)
+ * Texte optionnel entre deux séparateurs.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const separatorStyle = (data.separator_style as string) || 'style-3';
+const text = (data.text as string) || '';
+const rawWidth = Number(data.width) || 100;
+const width = text ? rawWidth / 2 : rawWidth;
+const height = Number(data.height) || 1;
+
+// Ajouter la classe separator-with-text si texte présent
+const extraClasses = text ? 'separator-with-text' : '';
+---
+
+<NicklModuleWrapper data={data} moduleName="separator" extraClasses={extraClasses} noContainer hideTitle>
+  {separatorStyle === 'style-1' && (
+    <>
+      <span class="points-wrapper">
+        <span class="point point-1"></span>
+        <span class="point point-2"></span>
+        <span class="point point-3"></span>
+      </span>
+      {text && (
+        <>
+          <span class="title title-section-3">{text}</span>
+          <span class="points-wrapper">
+            <span class="point point-1"></span>
+            <span class="point point-2"></span>
+            <span class="point point-3"></span>
+          </span>
+        </>
+      )}
+    </>
+  )}
+
+  {separatorStyle === 'style-2' && (
+    <>
+      <hr class="default" />
+      {text && (
+        <>
+          <span class="title title-section-3">{text}</span>
+          <hr class="default" />
+        </>
+      )}
+    </>
+  )}
+
+  {separatorStyle === 'style-3' && (
+    <>
+      <hr class="custom" style={`width:${width}%;height:${height}px;`} />
+      {text && (
+        <>
+          <span class="title title-section-3">{text}</span>
+          <hr class="custom" style={`width:${width}%;height:${height}px;`} />
+        </>
+      )}
+    </>
+  )}
+</NicklModuleWrapper>

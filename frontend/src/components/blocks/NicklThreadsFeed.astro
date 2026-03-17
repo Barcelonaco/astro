@@ -1,0 +1,19 @@
+---
+/**
+ * Module ThreadsFeed — Flux Threads
+ * Stub — l'API Threads nécessite un endpoint dédié.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+---
+
+<NicklModuleWrapper data={data} moduleName="threads-feed" containerLarge>
+  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+    Le flux Threads n'est pas disponible en mode statique.
+  </p>
+</NicklModuleWrapper>

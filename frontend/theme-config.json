@@ -1,0 +1,77 @@
+{
+  "name": "Mon Blog Astro",
+  "description": "Configuration du thème personnalisable",
+  "themes": {
+    "default": {
+      "name": "Thème par défaut",
+      "colors": {
+        "accent": "#2337ff",
+        "accentDark": "#000d8a",
+        "black": "15, 18, 25",
+        "gray": "96, 115, 159",
+        "grayLight": "229, 233, 240",
+        "grayDark": "34, 41, 57"
+      }
+    },
+    "dark": {
+      "name": "Thème sombre",
+      "colors": {
+        "accent": "#00d4ff",
+        "accentDark": "#0088cc",
+        "black": "255, 255, 255",
+        "gray": "160, 175, 199",
+        "grayLight": "30, 33, 40",
+        "grayDark": "220, 225, 232"
+      }
+    },
+    "minimal": {
+      "name": "Thème minimaliste",
+      "colors": {
+        "accent": "#000000",
+        "accentDark": "#333333",
+        "black": "0, 0, 0",
+        "gray": "100, 100, 100",
+        "grayLight": "240, 240, 240",
+        "grayDark": "50, 50, 50"
+      }
+    },
+    "colorful": {
+      "name": "Thème coloré",
+      "colors": {
+        "accent": "#ff6b6b",
+        "accentDark": "#ee5a5a",
+        "black": "20, 20, 30",
+        "gray": "100, 110, 140",
+        "grayLight": "240, 242, 250",
+        "grayDark": "40, 44, 52"
+      }
+    },
+    "nature": {
+      "name": "Thème nature",
+      "colors": {
+        "accent": "#2ecc71",
+        "accentDark": "#27ae60",
+        "black": "30, 39, 46",
+        "gray": "119, 140, 163",
+        "grayLight": "223, 230, 233",
+        "grayDark": "45, 52, 54"
+      }
+    }
+  },
+  "activeTheme": "default",
+  "customization": {
+    "fonts": {
+      "primary": "Atkinson, sans-serif",
+      "heading": "Atkinson, sans-serif"
+    },
+    "spacing": {
+      "base": "1rem",
+      "large": "2rem"
+    },
+    "borderRadius": {
+      "small": "2px",
+      "medium": "8px",
+      "large": "12px"
+    }
+  }
+}

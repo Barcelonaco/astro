@@ -1,0 +1,41 @@
+/**
+ * GENERAL
+ */
+/* GENERAL
+---------------------------------------- */
+.floating-btn {
+  position: fixed;
+  z-index: 5;
+  right: rem(14px);
+  bottom: rem(14px);
+  display: flex;
+  column-gap: 8px;
+  align-items: center;
+  padding: rem(11px) rem(26px) rem(11px);
+  background-color: $color3;
+  border: rem(2px) solid transparent;
+  font-family: $font2;
+  font-size: rem(20px);
+  line-height: $line-height-default;
+  font-weight: 500;
+  letter-spacing: $letter-spacing-default;
+  color: $color1;
+  text-shadow: none;
+  @include hover {
+    background-color: $color4;
+  }
+  .icon > * {
+    max-height: rem(30px);
+    min-width: rem(30px);
+    width: auto;
+  }
+  svg {
+    fill: $color1;
+  }
+  .border-rounded & {
+    border-radius: 30px;
+  }
+  .mode-uppercase & {
+    text-transform: uppercase;
+  }
+}

@@ -1,0 +1,99 @@
+---
+/**
+ * SubBlockRenderer — Rend un sous-module Nickl dans un contexte colonne.
+ * Utilisé par NicklColumnsTab pour rendre les modules imbriqués.
+ * Le module est rendu sans id, sans background, et sans titre (mode column).
+ */
+import NicklText from './NicklText.astro';
+import NicklAccordion from './NicklAccordion.astro';
+import NicklGallery from './NicklGallery.astro';
+import NicklFreePost from './NicklFreePost.astro';
+import NicklIllusVideo from './NicklIllusVideo.astro';
+import NicklClickableTiles from './NicklClickableTiles.astro';
+import NicklSeparator from './NicklSeparator.astro';
+import NicklQuote from './NicklQuote.astro';
+import NicklLink from './NicklLink.astro';
+import NicklHeadText from './NicklHeadText.astro';
+import NicklTextImage from './NicklTextImage.astro';
+import NicklVideo from './NicklVideo.astro';
+import NicklKeyFigures from './NicklKeyFigures.astro';
+import NicklTextScrolling from './NicklTextScrolling.astro';
+import NicklFiles from './NicklFiles.astro';
+import NicklOrnament from './NicklOrnament.astro';
+import NicklImagesSlider from './NicklImagesSlider.astro';
+import NicklLogosSlider from './NicklLogosSlider.astro';
+import NicklIcons from './NicklIcons.astro';
+import NicklTeam from './NicklTeam.astro';
+import NicklImagesVideosParallax from './NicklImagesVideosParallax.astro';
+import NicklSliderTextVideo from './NicklSliderTextVideo.astro';
+import NicklContact from './NicklContact.astro';
+import NicklShare from './NicklShare.astro';
+import NicklMap from './NicklMap.astro';
+import NicklBanner from './NicklBanner.astro';
+import NicklForm from './NicklForm.astro';
+import NicklNewsletterForm from './NicklNewsletterForm.astro';
+import NicklWidget from './NicklWidget.astro';
+import NicklGoogleReviews from './NicklGoogleReviews.astro';
+import NicklReview from './NicklReview.astro';
+import NicklInstaFeed from './NicklInstaFeed.astro';
+import NicklProduct from './NicklProduct.astro';
+
+interface Props {
+  type: string;
+  data: Record<string, any>;
+}
+
+const { type, data } = Astro.props;
+
+/**
+ * Mapping layout ACF → composant Astro.
+ * Les clés correspondent aux valeurs de acf_fc_layout dans les modules Nickl.
+ */
+const componentMap: Record<string, any> = {
+  'text': NicklText,
+  'text-simple': NicklText,
+  'accordion': NicklAccordion,
+  'gallery': NicklGallery,
+  'free-post': NicklFreePost,
+  'illus-video': NicklIllusVideo,
+  'illustration-video': NicklIllusVideo,
+  'clickable-tiles': NicklClickableTiles,
+  'separator': NicklSeparator,
+  'quote': NicklQuote,
+  'link': NicklLink,
+  'head-text': NicklHeadText,
+  'text-image': NicklTextImage,
+  'video': NicklVideo,
+  'key-figures': NicklKeyFigures,
+  'text-scrolling': NicklTextScrolling,
+  'files': NicklFiles,
+  'ornament': NicklOrnament,
+  'images-slider': NicklImagesSlider,
+  'logos-slider': NicklLogosSlider,
+  'icons': NicklIcons,
+  'team': NicklTeam,
+  'images-videos-parallax': NicklImagesVideosParallax,
+  'text-video-slider': NicklSliderTextVideo,
+  'contact': NicklContact,
+  'share': NicklShare,
+  'map': NicklMap,
+  'banner': NicklBanner,
+  'form': NicklForm,
+  'newsletter-form': NicklNewsletterForm,
+  'widget': NicklWidget,
+  'google-reviews': NicklGoogleReviews,
+  'review': NicklReview,
+  'insta-feed': NicklInstaFeed,
+  'featured_products': NicklProduct,
+};
+
+const Component = componentMap[type];
+---
+
+{Component ? (
+  <Component data={data} />
+) : (
+  <div class={`module module-${type}`} style="padding: 1rem 0;">
+    {/* Module non supporté en mode colonne */}
+  </div>
+)}

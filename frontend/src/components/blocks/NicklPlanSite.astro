@@ -1,0 +1,42 @@
+---
+/**
+ * Module PlanSite — Plan du site
+ * Génère automatiquement la liste des pages depuis l'API CMS.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+
+let pages: any[] = [];
+try {
+  const res = await fetch(`${API_URL}/pages?status=published`);
+  if (res.ok) {
+    const json = await res.json();
+    pages = Array.isArray(json) ? json : json.pages || [];
+  }
+} catch {
+  // Silently fail
+}
+---
+
+<NicklModuleWrapper data={data} moduleName="plan-site">
+  {pages.length > 0 ? (
+    <ul class="plan-site-list">
+      {pages.map((page: any) => (
+        <li>
+          <a href={`/pages/${page.slug}`}>{page.title}</a>
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+      Aucune page disponible pour le plan du site.
+    </p>
+  )}
+</NicklModuleWrapper>

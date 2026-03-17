@@ -1,0 +1,18 @@
+/**
+ * GENERAL
+ */
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.page-account .woocommerce-EditAccountForm > p:last-child {
+    margin-top: rem($form-row-spacing-top);
+    text-align: center;
+    .button {
+        @extend .btn;
+        @extend .btn-primary;
+    }
+}

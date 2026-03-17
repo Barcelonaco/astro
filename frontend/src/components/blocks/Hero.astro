@@ -1,0 +1,174 @@
+---
+import { cleanHtml } from '../../lib/module-classes';
+import { optimizedImageUrl } from '../../lib/module-helpers';
+
+const { data = {} } = Astro.props as { data: Record<string, any> };
+
+const isSlider = data.is_hero_banner_slider !== false
+  && data.is_hero_banner_slider !== 0
+  && data.is_hero_banner_slider !== '0';
+
+const marquise = data.hero_banner_marquise === true || data.hero_banner_marquise === 1 || data.hero_banner_marquise === '1';
+const medium   = data.hero_banner_height   === true || data.hero_banner_height   === 1 || data.hero_banner_height   === '1';
+const align      = (data.hero_banner_align as string) || 'left';
+const h1InHeader = (data.h1_in_header      as string) || 'yes';
+
+const sliders   = (data.hero_sliders as any[]) || [];
+const leftBloc  = (data.left_bloc  as any) || null;
+const rightBloc = (data.right_bloc as any) || null;
+
+/** Normalise un champ CTA (string URL legacy → objet {url, title, target}). */
+function normalizeCta(cta: any): { url: string; title: string; target: string } | null {
+  if (!cta) return null;
+  if (typeof cta === 'string') return cta ? { url: cta, title: '', target: '_self' } : null;
+  if (typeof cta === 'object' && cta.url) return { url: cta.url, title: cta.title || '', target: cta.target || '_self' };
+  return null;
+}
+---
+
+{isSlider ? (
+  <div class:list={['module', 'module-hero', 'mode-slider', { 'hero_banner_marquise': marquise, 'medium': medium }]}>
+    <div class="swiper slider js_slider-hero">
+      <div class="swiper-wrapper">
+        {sliders.map((slide: any, index: number) => {
+          const cta1 = normalizeCta(slide.cta);
+          const cta2 = normalizeCta(slide.cta_2);
+          const hasDesc = slide.logo || slide.title || slide.catchphrase || cta1 || cta2;
+          const isImage = slide.is_image !== false && slide.is_image !== 0 && slide.is_image !== '0';
+          return (
+            <div class={`swiper-slide item ${hasDesc ? 'has-desc' : 'no-desc'}`}>
+              <div class="background">
+                {isImage ? (
+                  <picture>
+                    <source
+                      media="(min-width: 601px)"
+                      srcset={optimizedImageUrl(slide.image?.url ?? '', 1920, 70)}
+                    />
+                    <source
+                      media="(max-width: 600px)"
+                      srcset={optimizedImageUrl(slide.image_mobile?.url ?? slide.image?.url ?? '', 600, 50)}
+                    />
+                    <img
+                      src={optimizedImageUrl(slide.image_mobile?.url ?? slide.image?.url ?? '', 600, 50)}
+                      alt={slide.image?.alt ?? ''}
+                      class="illus"
+                      fetchpriority={index === 0 ? 'high' : 'auto'}
+                      loading={index === 0 ? 'eager' : 'lazy'}
+                      decoding="async"
+                    />
+                  </picture>
+                ) : (
+                  <video class="video" autoplay playsinline muted loop preload="none">
+                    <source src={slide.video?.url ?? ''} type="video/mp4" />
+                  </video>
+                )}
+              </div>
+              <div class="container-large">
+                <div class={`desc align-${align}`}>
+                  {slide.logo?.url && (
+                    <div class={`logo-wrapper ${slide.logo_size ?? 'size-m'}`}>
+                      <img src={slide.logo.url} alt={slide.logo.alt ?? ''} class="logo" />
+                    </div>
+                  )}
+                  {slide.title && <p class="title title-section-1">{slide.title}</p>}
+                  {slide.catchphrase && (
+                    index === 0 && h1InHeader === 'yes'
+                      ? <h1 class="editor txt" set:html={cleanHtml(slide.catchphrase).replace(/\n/g, '<br>')} />
+                      : <div class="editor txt"><p set:html={cleanHtml(slide.catchphrase).replace(/\n/g, '<br>')} /></div>
+                  )}
+                  {(cta1 || cta2) && (
+                    <div class="btn-wrapper">
+                      {cta1 && (
+                        <a href={cta1.url} class="btn btn-primary" target={cta1.target}>
+                          {cta1.title || cta1.url}
+                        </a>
+                      )}
+                      {cta2 && (
+                        <a href={cta2.url} class="btn btn-secondary" target={cta2.target}>
+                          {cta2.title || cta2.url}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {sliders.length > 1 && (
+        <>
+          <button type="button" class="slider-navigation prev js_slider-hero-btn-prev"></button>
+          <button type="button" class="slider-navigation next js_slider-hero-btn-next"></button>
+        </>
+      )}
+    </div>
+    {!medium && (
+      <button type="button" class="btn-scroll btn-scroll-down js_btn-scroll-down">Découvrir</button>
+    )}
+  </div>
+) : (
+  <div class="module module-hero mode-list">
+    <div class="container-large">
+      <ul class="list">
+        {[leftBloc, rightBloc].filter(Boolean).map((bloc: any, index: number) => {
+          const bCta1 = normalizeCta(bloc.cta);
+          const bCta2 = normalizeCta(bloc.cta_2);
+          const hasDesc = bloc.logo || bloc.title || bloc.catchphrase || bCta1 || bCta2;
+          return (
+            <li class={`item ${hasDesc ? 'has-desc' : 'no-desc'}`} role="article">
+              <div class="link">
+                <div class="background">
+                  {bloc.image?.url && (
+                    <img src={optimizedImageUrl(bloc.image.url, 960, 80)} alt={bloc.image.alt ?? ''} class="illus" loading="lazy" />
+                  )}
+                </div>
+                <div class="desc">
+                  {bloc.logo?.url && (
+                    <div class="logo-wrapper">
+                      <img src={bloc.logo.url} alt={bloc.logo.alt ?? ''} class="logo" />
+                    </div>
+                  )}
+                  {bloc.title && <p class="title title-section-2">{bloc.title}</p>}
+                  {bloc.catchphrase && (
+                    index === 0 && h1InHeader === 'yes'
+                      ? <div class="editor txt"><h1 set:html={cleanHtml(bloc.catchphrase).replace(/\n/g, '<br>')} /></div>
+                      : <div class="editor txt"><p set:html={cleanHtml(bloc.catchphrase).replace(/\n/g, '<br>')} /></div>
+                  )}
+                  {(bCta1 || bCta2) && (
+                    <div class="btn-wrapper">
+                      {bCta1 && (
+                        <a href={bCta1.url} class="btn btn-primary" target={bCta1.target}>
+                          {bCta1.title || bCta1.url}
+                        </a>
+                      )}
+                      {bCta2 && (
+                        <a href={bCta2.url} class="btn btn-secondary" target={bCta2.target}>
+                          {bCta2.title || bCta2.url}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  </div>
+)}
+
+<style is:global>
+  /* Critical hero CSS only — full styles loaded via deferred hero.css */
+  .module-hero{padding:0}
+  .module-hero .item{background-color:rgba(0,0,0,.1);color:#fff;overflow:hidden;position:relative}
+  .module-hero .background,.module-hero picture{height:100%;left:0;position:absolute;top:0;width:100%}
+  .module-hero .illus{height:100%;width:100%;object-fit:cover;object-position:center}
+  .module-hero .desc{position:relative;width:100%;z-index:10}
+  .module-hero.mode-slider .container-large{align-items:flex-end;display:flex;justify-content:center}
+  .module-hero.mode-slider .container-large:before{content:"";display:block;flex:0 0 0;height:calc(100vh - 7.5rem);max-width:0;min-width:0;opacity:0;visibility:hidden;width:0}
+  .module-hero.mode-slider.medium .container-large,.module-hero.mode-slider.medium .container-large:before{height:67vh}
+</style>
+
+{/* Swiper init handled by the unified end-of-body script (detects .js_slider-hero) */}

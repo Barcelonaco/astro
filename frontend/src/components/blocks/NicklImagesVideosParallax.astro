@@ -1,0 +1,102 @@
+---
+/**
+ * Module ImagesVideosParallax — Reproduit images-videos-parallax.blade.php
+ * Sections plein écran avec scroll parallaxe GSAP.
+ * Chaque bloc : image ou vidéo avec overlay, surtitre, titre, description, liens.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { resolveLink, isTruthy } from '../../lib/module-classes';
+import { resolveImageUrl, resolveImageAlt } from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const blocs = (data.blocs as any[]) || [];
+---
+
+<NicklModuleWrapper data={data} moduleName="images-videos-parallax" noContainer>
+  <ul class="list">
+    {blocs.map((post) => {
+      const isImage = isTruthy(post.is_image);
+      const overlayOpacity = Number(post.overlay_opacity ?? 50) / 100;
+      const imageUrl = resolveImageUrl(post.image, apiOrigin, 'banner');
+      const imageAlt = resolveImageAlt(post.image);
+      const videoUrl = typeof post.video === 'string' ? post.video : post.video?.url || '';
+      const videoMobileUrl = typeof post['video-mobile'] === 'string' ? post['video-mobile'] : post['video-mobile']?.url || '';
+      const primaryLink = resolveLink(post.primary_link);
+      const secondaryLink = resolveLink(post.secondary_link);
+      const supTitle = post['sup-title'] || '';
+      const title = post.title || '';
+      const desc = post.desc || '';
+      const hasDesc = supTitle || title || desc || primaryLink || secondaryLink;
+
+      return (
+        <li class="item">
+          {isImage ? (
+            <div class="illus-wrapper media-wrapper">
+              <div class="overlay" style={`opacity: ${overlayOpacity}`}></div>
+              <div class="illus-content">
+                <img src={imageUrl} alt={imageAlt} class="illus media" />
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Desktop video */}
+              <div class="video-wrapper media-wrapper desktop">
+                <div class="overlay" style={`opacity: ${overlayOpacity}`}></div>
+                <video class="video media" loop muted playsinline>
+                  <source src={videoUrl} type="video/mp4" />
+                </video>
+              </div>
+              {/* Mobile video */}
+              <div class="video-wrapper media-wrapper mobile">
+                <div class="overlay" style={`opacity: ${overlayOpacity}`}></div>
+                <video class="video media" loop muted playsinline>
+                  <source src={videoMobileUrl || videoUrl} type="video/mp4" />
+                </video>
+              </div>
+            </>
+          )}
+
+          {hasDesc && (
+            <div class="desc">
+              <div class="container-custom">
+                {supTitle && (
+                  <p class="sup-title"><Fragment set:html={supTitle} /></p>
+                )}
+                {title && (
+                  <h3 class="title title-section-1"><Fragment set:html={title} /></h3>
+                )}
+                {desc && (
+                  <div class="editor txt">
+                    <p><Fragment set:html={String(desc).replace(/\n/g, '<br />')} /></p>
+                  </div>
+                )}
+                {(primaryLink || secondaryLink) && (
+                  <div class="btn-wrapper">
+                    {primaryLink && (
+                      <a href={primaryLink.url} class="btn btn-primary" target={primaryLink.target}>
+                        <Fragment set:html={primaryLink.title} />
+                      </a>
+                    )}
+                    {secondaryLink && (
+                      <a href={secondaryLink.url} class="btn btn-secondary" target={secondaryLink.target}>
+                        <Fragment set:html={secondaryLink.title} />
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </li>
+      );
+    })}
+  </ul>
+</NicklModuleWrapper>

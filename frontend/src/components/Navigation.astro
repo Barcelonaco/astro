@@ -1,0 +1,57 @@
+---
+import { getNavigation, type NavigationItem } from '../lib/api';
+import HeaderLink from './HeaderLink.astro';
+
+interface Props {
+  navigation?: NavigationItem[];
+}
+
+const navigation = Astro.props.navigation || await getNavigation();
+---
+
+{navigation.map((item) => (
+  <div class="nav-item-wrapper">
+    <HeaderLink href={`/pages/${item.slug}`}>{item.title}</HeaderLink>
+    {item.children && item.children.length > 0 && (
+      <div class="submenu">
+        {item.children.map((child) => (
+          <HeaderLink href={`/pages/${child.slug}`}>{child.title}</HeaderLink>
+        ))}
+      </div>
+    )}
+  </div>
+))}
+
+<style>
+  .nav-item-wrapper {
+    position: relative;
+    display: inline-block;
+  }
+
+  .submenu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    min-width: 200px;
+    z-index: 1000;
+  }
+
+  .nav-item-wrapper:hover .submenu {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .submenu :global(a) {
+    padding: 0.75em 1em !important;
+    border-bottom: none !important;
+  }
+
+  .submenu :global(a:hover) {
+    background: rgba(var(--accent), 0.1);
+    color: var(--color-primary, var(--accent));
+  }
+</style>

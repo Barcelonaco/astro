@@ -1,0 +1,126 @@
+/* CSS variables defined by ThemeInjector — only structural resets here */
+body {
+	/* Les propriétés typographiques (font-family, font-size, line-height, color)
+	   sont gérées par app.css Nickl via html { ... } et héritées par body.
+	   Ne PAS les redéfinir ici pour éviter tout conflit avec les modules Nickl. */
+	margin: 0;
+	padding: 0;
+	text-align: left;
+	word-wrap: break-word;
+	overflow-wrap: break-word;
+	overflow-x: hidden;
+}
+main:not(.main-page) {
+	width: 720px;
+	max-width: calc(100% - 2em);
+	margin: auto;
+	padding: 3em 1em;
+}
+.main-page {
+	width: 100%;
+	max-width: 100%;
+	margin: 0;
+	padding: 0;
+}
+/* Styles spécifiques au contenu blog/prose (hors modules Nickl) */
+.prose {
+	font-family: "Atkinson", var(--font-general), sans-serif;
+	font-size: 1.25rem;
+	line-height: 1.7;
+	color: rgb(var(--gray-dark));
+}
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+	color: rgb(var(--black));
+	line-height: 1.2;
+	margin: 0 0 0.5rem 0;
+}
+.prose h1 { font-size: 3.052em; }
+.prose h2 { font-size: 2.441em; }
+.prose h3 { font-size: 1.953em; }
+.prose h4 { font-size: 1.563em; }
+.prose h5 { font-size: 1.25em; }
+strong,
+b {
+	font-weight: 700;
+}
+textarea {
+	width: 100%;
+	font-size: 16px;
+}
+input {
+	font-size: 16px;
+}
+a {
+	text-decoration: none;
+	color: inherit;
+}
+img {
+	max-width: 100%;
+	height: auto;
+}
+hr {
+	border: none;
+	border-top: 1px solid rgb(var(--gray-light));
+}
+/* Styles prose (blog, contenu éditorial hors modules Nickl) */
+.prose a {
+	color: var(--accent);
+}
+.prose a:hover {
+	color: var(--accent);
+}
+.prose p {
+	margin-bottom: 2em;
+}
+.prose img {
+	border-radius: 8px;
+}
+.prose table {
+	width: 100%;
+}
+.prose code {
+	padding: 2px 5px;
+	background-color: rgb(var(--gray-light));
+	border-radius: 2px;
+}
+.prose pre {
+	padding: 1.5em;
+	border-radius: 8px;
+}
+.prose pre > code {
+	all: unset;
+}
+.prose blockquote {
+	border-left: 4px solid var(--accent);
+	padding: 0 0 0 20px;
+	margin: 0;
+	font-size: 1.333em;
+}
+@media (max-width: 720px) {
+	main {
+		padding: 1em;
+	}
+}
+
+.sr-only {
+	border: 0;
+	padding: 0;
+	margin: 0;
+	position: absolute !important;
+	height: 1px;
+	width: 1px;
+	overflow: hidden;
+	/* IE6, IE7 - a 0 height clip, off to the bottom right of the visible 1px box */
+	clip: rect(1px 1px 1px 1px);
+	/* maybe deprecated but we need to support legacy browsers */
+	clip: rect(1px, 1px, 1px, 1px);
+	/* modern browsers, clip-path works inwards from each corner */
+	clip-path: inset(50%);
+	/* added line to stop words getting smushed together (as they go onto separate lines and some screen readers do not understand line feeds as a space */
+	white-space: nowrap;
+}

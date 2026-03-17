@@ -1,0 +1,222 @@
+---
+import { getSiteInfo } from '../consts';
+import Navigation from './Navigation.astro';
+import type { NavigationItem } from '../lib/api';
+
+interface Props {
+  siteName?: string;
+  navigation?: NavigationItem[];
+  siteSettings?: Record<string, string>;
+}
+
+const { siteName: propSiteName, navigation, siteSettings: s = {} } = Astro.props;
+const siteName = propSiteName || (await getSiteInfo()).siteName;
+
+// Header & menu settings
+const menuSeamless = s.menu_seamless === '1';
+const menuStyle = s.menu_style || 'default'; // default | center | burger
+const rounded = s.rounded === '1';
+const uppercase = s.uppercase === '1';
+
+// Secondary menu / contact
+const showPhone = s.show_phone === '1';
+const showSocials = s.show_socials === '1';
+const phone = s.phone || '';
+const phone2 = s.phone_2 || '';
+const email = s.email || '';
+
+// Social links
+const socials = [
+  { key: 'instagram', icon: 'instagram', label: 'Instagram' },
+  { key: 'facebook', icon: 'facebook', label: 'Facebook' },
+  { key: 'threads', icon: 'threads', label: 'Threads' },
+  { key: 'tiktok', icon: 'tiktok', label: 'TikTok' },
+  { key: 'linkedin', icon: 'linkedin', label: 'LinkedIn' },
+  { key: 'twitter', icon: 'twitter', label: 'X' },
+  { key: 'tripadvisor', icon: 'tripadvisor', label: 'Tripadvisor' },
+  { key: 'pinterest', icon: 'pinterest', label: 'Pinterest' },
+  { key: 'youtube', icon: 'youtube', label: 'YouTube' },
+].filter(item => s[item.key]);
+
+const headerClasses = [
+  menuSeamless ? 'header-seamless' : '',
+  `menu-${menuStyle}`,
+  rounded ? 'rounded' : '',
+  uppercase ? 'uppercase' : '',
+].filter(Boolean).join(' ');
+
+const hasSecondaryMenu = showPhone || showSocials || email;
+---
+
+{hasSecondaryMenu && (
+  <div class="secondary-menu">
+    <div class="secondary-menu-inner">
+      {showPhone && phone && (
+        <a href={`tel:${phone.replace(/\s/g, '')}`} class="secondary-link phone-link">{phone}</a>
+      )}
+      {showPhone && phone2 && (
+        <a href={`tel:${phone2.replace(/\s/g, '')}`} class="secondary-link phone-link">{phone2}</a>
+      )}
+      {email && (
+        <a href={`mailto:${email}`} class="secondary-link email-link">{email}</a>
+      )}
+      {showSocials && socials.length > 0 && (
+        <div class="secondary-socials">
+          {socials.map(item => (
+            <a href={s[item.key]} target="_blank" rel="noopener noreferrer" class="social-icon" title={item.label}>
+              <span class="sr-only">{item.label}</span>
+              <span class={`icon-${item.icon}`} />
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
+<header class={headerClasses}>
+	<nav>
+		<h2 class="site-logo"><a href="/">{siteName}</a></h2>
+		<div class="internal-links">
+			<Navigation navigation={navigation} />
+		</div>
+		{showSocials && socials.length > 0 && (
+			<div class="header-socials">
+				{socials.map(item => (
+					<a href={s[item.key]} target="_blank" rel="noopener noreferrer" class="social-icon" title={item.label}>
+						<span class="sr-only">{item.label}</span>
+						<span class={`icon-${item.icon}`} />
+					</a>
+				))}
+			</div>
+		)}
+	</nav>
+</header>
+
+<style>
+	/* ── Secondary menu ── */
+	.secondary-menu {
+		background: var(--color-primary, var(--accent));
+		color: #fff;
+		font-size: 0.8125rem;
+		padding: 0.375rem 1em;
+	}
+	.secondary-menu-inner {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 1rem;
+		max-width: 120rem;
+		margin: 0 auto;
+	}
+	.secondary-link {
+		color: #fff;
+		text-decoration: none;
+		opacity: 0.9;
+	}
+	.secondary-link:hover { opacity: 1; }
+	.secondary-socials {
+		display: flex;
+		gap: 0.5rem;
+	}
+	.secondary-socials .social-icon {
+		color: #fff;
+		opacity: 0.8;
+		font-size: 0.875rem;
+	}
+	.secondary-socials .social-icon:hover { opacity: 1; }
+
+	/* ── Header ── */
+	header {
+		margin: 0;
+		padding: 0 1em;
+		background: white;
+		box-shadow: 0 2px 8px rgba(var(--black, 15, 18, 25), 5%);
+		position: sticky;
+		top: 0;
+		z-index: 100;
+	}
+	header.header-seamless {
+		background: transparent;
+		box-shadow: none;
+		position: absolute;
+		width: 100%;
+	}
+	header.uppercase nav a,
+	header.uppercase .site-logo a {
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+	.site-logo {
+		margin: 0;
+		font-size: 1em;
+	}
+	.site-logo a,
+	.site-logo a.active {
+		text-decoration: none;
+	}
+	nav {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		height: var(--logo-height, 70px);
+		max-width: 120rem;
+		margin: 0 auto;
+	}
+	/* Center layout : logo centered, nav split */
+	header.menu-center nav {
+		justify-content: center;
+		gap: 2rem;
+	}
+	nav a {
+		padding: 1em 0.5em;
+		color: var(--color-default, var(--black));
+		border-bottom: 4px solid transparent;
+		text-decoration: none;
+	}
+	header.header-seamless nav a {
+		color: #fff;
+	}
+	nav a:hover {
+		color: var(--color-primary, var(--accent));
+	}
+	nav a:global(.active) {
+		text-decoration: none;
+		border-bottom-color: var(--color-primary, var(--accent));
+		color: var(--color-primary, var(--accent));
+	}
+	.internal-links {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+	}
+	.header-socials {
+		display: flex;
+		gap: 0.75rem;
+		align-items: center;
+	}
+	.header-socials .social-icon {
+		color: var(--color-default, inherit);
+		text-decoration: none;
+		opacity: 0.6;
+		transition: opacity 0.2s;
+	}
+	.header-socials .social-icon:hover { opacity: 1; }
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0,0,0,0);
+		white-space: nowrap;
+		border: 0;
+	}
+	@media (max-width: 720px) {
+		.header-socials,
+		.secondary-menu {
+			display: none;
+		}
+	}
+</style>

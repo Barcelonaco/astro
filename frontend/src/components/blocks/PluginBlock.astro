@@ -1,0 +1,32 @@
+---
+/**
+ * Generic plugin block renderer.
+ * Fetches server-rendered HTML from the backend API for plugin modules
+ * that don't have a dedicated Astro component.
+ */
+interface Props {
+  type: string;
+  data: Record<string, any>;
+}
+
+const { type, data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+
+let html = '';
+try {
+  const res = await fetch(`${API_URL}/render-block`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, data })
+  });
+  if (res.ok) {
+    const result = await res.json();
+    html = result.html || '';
+  }
+} catch {
+  // Silently fail — block won't render
+}
+---
+
+{html && <Fragment set:html={html} />}

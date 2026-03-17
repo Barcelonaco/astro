@@ -1,0 +1,11 @@
+---
+/**
+ * Single non-blocking deferred loader placed at end of <body>.
+ * Reads data from <meta> tags set by ModuleStyles and ThemeInjector,
+ * then loads all CSS + Swiper JS well after LCP.
+ * Being at end of body, this script doesn't block any rendering.
+ */
+---
+<script is:inline>
+window.addEventListener('load',function(){var r=window.requestIdleCallback||function(c){setTimeout(c,50)};r(function(){function a(h,f){var l=document.createElement('link');l.rel='stylesheet';l.href=h;if(f)l.onerror=function(){l.remove()};document.head.appendChild(l)}a('/nickl-assets/css/app.css');var g=document.querySelector('meta[name="x-google-fonts"]');if(g)a(g.getAttribute('content'));var m=document.querySelector('meta[name="x-deferred-css"]');if(m){var d=JSON.parse(m.getAttribute('content'));d.c.forEach(function(n){a('/nickl-assets/css/'+n+'.css')});d.p.forEach(function(t){a('/plugin-assets/'+t+'/css/'+t+'.css',1)})}});if(document.querySelector('.js_slider-hero'))setTimeout(function(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js';s.onload=function(){(window.requestIdleCallback||function(c){setTimeout(c,0)})(function(){document.querySelectorAll('.module-hero.mode-slider .js_slider-hero').forEach(function(e){var c=e.querySelectorAll('.swiper-slide').length;if(c<=1)return;var w=e.closest('.mode-slider');new window.Swiper(e,{loop:c>2,speed:1e3,autoplay:{delay:4e3,disableOnInteraction:!1},navigation:{nextEl:w?w.querySelector('.js_slider-hero-btn-next'):'.js_slider-hero-btn-next',prevEl:w?w.querySelector('.js_slider-hero-btn-prev'):'.js_slider-hero-btn-prev'}})})})};document.head.appendChild(s)},3e3)});
+</script>

@@ -1,0 +1,21 @@
+---
+/**
+ * Module Review — Reproduit review.blade.php
+ * Stub — TrustIndex n'est pas disponible hors WordPress.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const reviewsSrc = (data.reviews_src as string) || 'google';
+---
+
+<NicklModuleWrapper data={data} moduleName="review" containerLarge>
+  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+    Les avis ({reviewsSrc}) ne sont pas disponibles en mode statique (TrustIndex requis).
+  </p>
+</NicklModuleWrapper>

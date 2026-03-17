@@ -1,0 +1,66 @@
+---
+/**
+ * Module IconLogo — Reproduit icons.blade.php
+ * Grille d'icônes/logos avec titres, descriptions et liens optionnels.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { resolveLink, isTruthy } from '../../lib/module-classes';
+import { resolveImageUrl } from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const logos = (data.logos as any[]) || [];
+const greyFilter = isTruthy(data.grey_filter);
+const iconType = isTruthy(data.icon_type); // true = SVG/icon, false = JPG thumbnail
+---
+
+<NicklModuleWrapper data={data} moduleName="icons">
+  {logos.length > 0 && (
+    <ul class={`list${greyFilter ? ' grey_filter' : ''}${!iconType ? ' icon_type_jpg' : ''}`}>
+      {logos.map((logo) => {
+        const link = resolveLink(logo.link);
+        // icon_type 0 = jpg (thumbnail), 1 = svg (full url)
+        const imgUrl = !iconType
+          ? resolveImageUrl(logo.logo, apiOrigin, 'thumbnail')
+          : resolveImageUrl(logo.logo, apiOrigin);
+
+        const innerContent = (
+          <>
+            <div class="illus-wrapper">
+              <img src={imgUrl} alt="" class={`illus${!iconType ? ' icon_type_jpg' : ''}`} />
+            </div>
+            {(logo.titre || logo.desc) && (
+              <div class="desc">
+                {logo.titre && <p class="title">{logo.titre}</p>}
+                {logo.desc && (
+                  <div class="txt editor">
+                    <p><Fragment set:html={String(logo.desc).replace(/\n/g, '<br />')} /></p>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        );
+
+        return (
+          <li class="item">
+            {link ? (
+              <a href={link.url} class="link" target={link.target}>
+                {innerContent}
+              </a>
+            ) : (
+              innerContent
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  )}
+</NicklModuleWrapper>

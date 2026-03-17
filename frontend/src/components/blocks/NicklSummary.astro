@@ -1,0 +1,48 @@
+---
+/**
+ * Module Summary — Reproduit summary.blade.php
+ * Mode custom uniquement (pas de menu WordPress).
+ * custom_menu repeater avec sous-menus et liens.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { isTruthy } from '../../lib/module-classes';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const linksType = isTruthy(data.links_type);
+const customMenu = (data.custom_menu as any[]) || [];
+---
+
+<NicklModuleWrapper data={data} moduleName="summary">
+  {linksType ? (
+    /* Mode WordPress menu — non disponible en mode statique */
+    <p class="placeholder-message">Menu WordPress non disponible en mode statique.</p>
+  ) : (
+    /* Mode custom */
+    <ul class="menu">
+      {customMenu.map((menu) => (
+        <li class="menu-item sub">
+          {menu.title && <p class="title">{menu.title}</p>}
+          {menu.links && (
+            <ul class="sub-menu">
+              {(menu.links as any[]).map((linkItem) => {
+                const link = linkItem.link || {};
+                return (
+                  <li class="menu-item">
+                    <a href={link.url || '#'} target={link.target || '_self'}>
+                      <Fragment set:html={link.title || ''} />
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ul>
+  )}
+</NicklModuleWrapper>

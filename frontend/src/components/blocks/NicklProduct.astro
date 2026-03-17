@@ -1,0 +1,19 @@
+---
+/**
+ * Module Product — Produit WooCommerce
+ * Stub — WooCommerce n'est pas disponible hors WordPress.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+---
+
+<NicklModuleWrapper data={data} moduleName="product" containerLarge>
+  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+    Les produits WooCommerce ne sont pas disponibles en mode statique.
+  </p>
+</NicklModuleWrapper>

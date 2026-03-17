@@ -1,0 +1,101 @@
+---
+/**
+ * Module KeyFigures — Reproduit key-figures.blade.php
+ * Compteurs animés avec icône, valeur, titre et description.
+ * Animation GSAP ScrollTrigger sur data-nbr.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { resolveLink } from '../../lib/module-classes';
+import { resolveImageUrl } from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const keyList = (data.key_list as any[]) || [];
+---
+
+<NicklModuleWrapper data={data} moduleName="key-figures">
+  {keyList.length > 0 && (
+    <ul class="list">
+      {keyList.map((key) => {
+        const link = resolveLink(key.link);
+        const iconeUrl = resolveImageUrl(key.icone, apiOrigin);
+
+        const innerContent = (
+          <>
+            {iconeUrl && (
+              <div class="illus-wrapper">
+                <img src={iconeUrl} alt="" class="illus" loading="lazy" />
+              </div>
+            )}
+            <div class="nbr-wrapper">
+              <span class="nbr" data-nbr={key.value}>{key.value || 0}</span>
+            </div>
+            {(key.titre || key.desc) && (
+              <div class="desc">
+                {key.titre && (
+                  <p class="title">
+                    <Fragment set:html={key.titre} />
+                  </p>
+                )}
+                {key.desc && (
+                  <div class="txt editor">
+                    <p>
+                      <Fragment set:html={String(key.desc).replace(/\n/g, '<br />')} />
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        );
+
+        return (
+          <li class="item">
+            {link ? (
+              <a href={link.url} class="link" target={link.target}>
+                {innerContent}
+              </a>
+            ) : (
+              innerContent
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  )}
+</NicklModuleWrapper>
+
+<script>
+{
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      const el = entry.target as HTMLElement;
+      observer.unobserve(el);
+      el.querySelectorAll<HTMLElement>('.nbr[data-nbr]').forEach((nbr) => {
+        const target = parseFloat(nbr.dataset.nbr || '0');
+        if (!target) return;
+        const duration = 1000;
+        const start = performance.now();
+        const isInt = Number.isInteger(target);
+        const step = (now: number) => {
+          const progress = Math.min((now - start) / duration, 1);
+          const value = target * progress;
+          nbr.textContent = isInt ? String(Math.round(value)) : value.toFixed(1);
+          if (progress < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      });
+    });
+  }, { threshold: 0.2 });
+
+  document.querySelectorAll('.module-key-figures').forEach((mod) => observer.observe(mod));
+}
+</script>

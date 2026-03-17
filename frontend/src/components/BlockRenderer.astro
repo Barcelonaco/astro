@@ -1,0 +1,224 @@
+---
+import Heading from './blocks/Heading.astro';
+import Text from './blocks/Text.astro';
+import Image from './blocks/Image.astro';
+import Hero from './blocks/Hero.astro';
+import Cta from './blocks/Cta.astro';
+import Spacer from './blocks/Spacer.astro';
+import Html from './blocks/Html.astro';
+import NicklText from './blocks/NicklText.astro';
+import NicklAccordion from './blocks/NicklAccordion.astro';
+import NicklGallery from './blocks/NicklGallery.astro';
+import NicklFreePost from './blocks/NicklFreePost.astro';
+import NicklIllusVideo from './blocks/NicklIllusVideo.astro';
+import NicklClickableTiles from './blocks/NicklClickableTiles.astro';
+import PluginBlock from './blocks/PluginBlock.astro';
+
+// Modules Nickl — Phase 1 : simples
+import NicklSeparator from './blocks/NicklSeparator.astro';
+import NicklQuote from './blocks/NicklQuote.astro';
+import NicklLink from './blocks/NicklLink.astro';
+import NicklHeadText from './blocks/NicklHeadText.astro';
+import NicklTextImage from './blocks/NicklTextImage.astro';
+import NicklBanner from './blocks/NicklBanner.astro';
+import NicklVideo from './blocks/NicklVideo.astro';
+import NicklKeyFigures from './blocks/NicklKeyFigures.astro';
+import NicklTextScrolling from './blocks/NicklTextScrolling.astro';
+import NicklFiles from './blocks/NicklFiles.astro';
+import NicklOrnament from './blocks/NicklOrnament.astro';
+
+// Modules Nickl — Phase 2 : sliders/listes
+import NicklImagesSlider from './blocks/NicklImagesSlider.astro';
+import NicklLogosSlider from './blocks/NicklLogosSlider.astro';
+import NicklIcons from './blocks/NicklIcons.astro';
+import NicklTeam from './blocks/NicklTeam.astro';
+import NicklImagesVideosParallax from './blocks/NicklImagesVideosParallax.astro';
+import NicklSliderTextVideo from './blocks/NicklSliderTextVideo.astro';
+
+// Modules Nickl — Phase 3 : composites
+import NicklContact from './blocks/NicklContact.astro';
+import NicklSummary from './blocks/NicklSummary.astro';
+import NicklShare from './blocks/NicklShare.astro';
+import NicklColumnsTab from './blocks/NicklColumnsTab.astro';
+
+// Modules Nickl — Phase 4 : services externes + stubs
+import NicklMap from './blocks/NicklMap.astro';
+import NicklNewsSlider from './blocks/NicklNewsSlider.astro';
+import NicklEventsSlider from './blocks/NicklEventsSlider.astro';
+import NicklGoogleReviews from './blocks/NicklGoogleReviews.astro';
+import NicklForm from './blocks/NicklForm.astro';
+import NicklNewsletterForm from './blocks/NicklNewsletterForm.astro';
+import NicklPlanSite from './blocks/NicklPlanSite.astro';
+import NicklReview from './blocks/NicklReview.astro';
+import NicklWidget from './blocks/NicklWidget.astro';
+import NicklReusableBloc from './blocks/NicklReusableBloc.astro';
+import NicklBlocReferences from './blocks/NicklBlocReferences.astro';
+import NicklInstaFeed from './blocks/NicklInstaFeed.astro';
+import NicklThreadsFeed from './blocks/NicklThreadsFeed.astro';
+import NicklProduct from './blocks/NicklProduct.astro';
+import ParallaxInit from './ParallaxInit.astro';
+import ModuleAnimations from './ModuleAnimations.astro';
+
+interface Block {
+  id?: string;
+  type: string;
+  data?: Record<string, unknown>;
+}
+
+const { blocks = [] } = Astro.props as { blocks: Block[] };
+---
+
+<div class="page-blocks">
+  {blocks.map((block) => {
+    const data = block.data || {};
+    switch (block.type) {
+      case 'heading':
+        return <Heading data={data} />;
+      case 'text':
+        return <Text data={data} />;
+      case 'text-simple':
+        return <NicklText data={data} />;
+      case 'image':
+        return <Image data={data} />;
+      case 'hero':
+        return <Hero data={data} />;
+      case 'cta':
+        return <Cta data={data} />;
+      case 'spacer':
+        return <Spacer data={data} />;
+      case 'html':
+        return <Html data={data} />;
+
+      // Modules Nickl – implémentations dédiées
+      case 'accordion':
+        return <NicklAccordion data={data} />;
+      case 'gallery':
+      case 'gallery-nickl':
+        return <NicklGallery data={data} />;
+      case 'free-post':
+        return <NicklFreePost data={data} />;
+      case 'illus-video':
+        return <NicklIllusVideo data={data} />;
+      case 'clickable-tiles':
+        return <NicklClickableTiles data={data} />;
+
+      // Modules simples
+      case 'separator':
+        return <NicklSeparator data={data} />;
+      case 'quote':
+        return <NicklQuote data={data} />;
+      case 'link':
+      case 'link-alone':
+        return <NicklLink data={data} />;
+      case 'head-text':
+        return <NicklHeadText data={data} />;
+      case 'text-image':
+        return <NicklTextImage data={data} />;
+      case 'banner':
+        return <NicklBanner data={data} />;
+      case 'video':
+        return <NicklVideo data={data} />;
+      case 'key-figures':
+        return <NicklKeyFigures data={data} />;
+      case 'text-scrolling':
+        return <NicklTextScrolling data={data} />;
+      case 'files':
+        return <NicklFiles data={data} />;
+      case 'ornament':
+        return <NicklOrnament data={data} />;
+
+      // Modules slider/liste
+      case 'images-slider':
+        return <NicklImagesSlider data={data} />;
+      case 'logos-slider':
+        return <NicklLogosSlider data={data} />;
+      case 'icons':
+        return <NicklIcons data={data} />;
+      case 'team':
+        return <NicklTeam data={data} />;
+      case 'images-videos-parallax':
+        return <NicklImagesVideosParallax data={data} />;
+      case 'text-video-slider':
+        return <NicklSliderTextVideo data={data} />;
+
+      // Modules composites
+      case 'contact':
+        return <NicklContact data={data} />;
+      case 'summary':
+        return <NicklSummary data={data} />;
+      case 'share':
+        return <NicklShare data={data} />;
+      case 'columns-tab':
+        return <NicklColumnsTab data={data} />;
+
+      // Modules services externes
+      case 'map':
+        return <NicklMap data={data} />;
+      case 'news-slider':
+        return <NicklNewsSlider data={data} />;
+      case 'events-slider':
+        return <NicklEventsSlider data={data} />;
+      case 'google-reviews':
+        return <NicklGoogleReviews data={data} />;
+
+      // Stubs
+      case 'form':
+        return <NicklForm data={data} />;
+      case 'newsletter-form':
+        return <NicklNewsletterForm data={data} />;
+      case 'plansite':
+        return <NicklPlanSite data={data} />;
+      case 'review':
+        return <NicklReview data={data} />;
+      case 'widget':
+        return <NicklWidget data={data} />;
+      case 'reusable-bloc':
+        return <NicklReusableBloc data={data} />;
+      case 'bloc-references':
+        return <NicklBlocReferences data={data} />;
+      case 'insta-feed':
+        return <NicklInstaFeed data={data} />;
+      case 'threads-feed':
+        return <NicklThreadsFeed data={data} />;
+      case 'featured_products':
+        return <NicklProduct data={data} />;
+
+      default:
+        // Plugin blocks: rendered server-side via API
+        return <PluginBlock type={block.type} data={data} />;
+    }
+  })}
+</div>
+<ParallaxInit />
+<ModuleAnimations />
+
+<style>
+  .page-blocks {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .page-blocks :global(.block-heading) {
+    margin-top: 2rem;
+    margin-bottom: 0.5rem;
+  }
+  .page-blocks :global(.block-heading:first-child) {
+    margin-top: 0;
+  }
+  .page-blocks :global(.block-text) {
+    margin-bottom: 1.5rem;
+  }
+  .page-blocks :global(.block-image) {
+    margin: 1.5rem 0;
+  }
+  .page-blocks :global(.block-image img) {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+  }
+  .page-blocks :global(.block-image figcaption) {
+    font-size: 0.9rem;
+    color: rgb(var(--gray));
+    margin-top: 0.5rem;
+  }
+</style>

@@ -1,0 +1,161 @@
+---
+/**
+ * Module Video — Reproduit video.blade.php
+ * Image ou vidéo avec ratio. Sources : mp4, YouTube, Vimeo, Dailymotion.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { isTruthy } from '../../lib/module-classes';
+import {
+  resolveImageUrl,
+  resolveImageAlt,
+  extractYouTubeId,
+  extractVimeoId,
+  extractDailymotionId,
+} from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+// Media choice : true/1 = image, false/0 = vidéo
+const mediaChoice = isTruthy(data.media_choice);
+const mediaRatio = (data.media_ratio as string) || 'landscape';
+const videoSrc = (data.video_src as string) || 'mp4';
+const imgParallax = isTruthy(data.img_parallax) && mediaChoice;
+
+// Image
+const imageUrl = resolveImageUrl(data.image, apiOrigin);
+const imageAlt = resolveImageAlt(data.image);
+
+// Vidéo
+const videoFile = data.video as any;
+const videoUrl = typeof videoFile === 'string' ? videoFile : videoFile?.url || '';
+const youtubeLink = (data.youtube_link as string) || '';
+const vimeoLink = (data.vimeo_link as string) || '';
+const dailymotionLink = (data.dailymotion_link as string) || '';
+const youtubeId = extractYouTubeId(youtubeLink);
+const vimeoId = extractVimeoId(vimeoLink);
+const dailymotionId = extractDailymotionId(dailymotionLink);
+
+// Preview
+const preview = data.preview as any;
+const previewUrl = typeof preview === 'string' ? preview : preview?.url || '';
+const previewType = preview?.type || 'image';
+const previewSizeUrl = preview?.sizes?.banner || previewUrl;
+const previewAlt = preview?.alt || '';
+
+const extraClasses = imgParallax ? 'img-parallax' : '';
+---
+
+<NicklModuleWrapper
+  data={data}
+  moduleName="video"
+  extraClasses={extraClasses}
+  containerLarge
+  noContainer
+>
+  {!mediaChoice ? (
+    /* Mode vidéo */
+    <>
+      <div class="container-large js_show-content">
+        {/* Titre du bloc — géré par le wrapper dans les Blades mais ici on le duplique */}
+        {data.title_bloc && (
+          <Fragment set:html={`<h${data.title_style || 4} class="title-module title-section-${data.title_style || 4} align-${data.title_align || 'center'}">${data.title_bloc}</h${data.title_style || 4}>`} />
+        )}
+
+        <div class={`video-wrapper ${mediaRatio}`}>
+          {/* Preview */}
+          {preview && previewType === 'image' && (
+            <img src={previewSizeUrl} alt={previewAlt} class="illus-video" />
+          )}
+          {preview && previewType === 'video' && (
+            <video class="background-video" autoplay loop muted playsinline>
+              <source src={previewUrl} type="video/mp4" />
+            </video>
+          )}
+          {!preview && videoSrc === 'youtube' && youtubeId && (
+            <img
+              src={`https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`}
+              alt=""
+              class="illus-video"
+            />
+          )}
+
+          {/* MP4 */}
+          {videoSrc === 'mp4' && videoUrl && (
+            <video class="background-video" autoplay loop muted playsinline>
+              <source src={videoUrl} type="video/mp4" />
+            </video>
+          )}
+
+          {/* YouTube */}
+          {videoSrc === 'youtube' && youtubeId && (
+            <>
+              <button type="button" class="btn js_btn-video" data-src={youtubeId}>
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="24" height="24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
+                </span>
+                <span class="txt">Lire la vidéo</span>
+              </button>
+              <iframe
+                src={`https://www.youtube.com/embed/${youtubeId}`}
+                frameborder="0"
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowfullscreen
+              />
+            </>
+          )}
+
+          {/* Vimeo */}
+          {videoSrc === 'vimeo' && vimeoId && (
+            <>
+              <button type="button" class="btn js_btn-video" data-src-vimeo={vimeoId}>
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="24" height="24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
+                </span>
+                <span class="txt">Lire la vidéo</span>
+              </button>
+              <iframe
+                src={`https://player.vimeo.com/video/${vimeoId}`}
+                frameborder="0"
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowfullscreen
+              />
+            </>
+          )}
+
+          {/* Dailymotion */}
+          {videoSrc === 'dailymotion' && dailymotionId && (
+            <>
+              <button type="button" class="btn js_btn-video" data-src-dailymotion={dailymotionId}>
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="24" height="24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
+                </span>
+                <span class="txt">Lire la vidéo</span>
+              </button>
+              <iframe
+                src={`https://geo.dailymotion.com/player.html?video=${dailymotionId}`}
+                allowfullscreen
+                allow="encrypted-media; fullscreen; picture-in-picture; web-share;"
+              />
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  ) : (
+    /* Mode image */
+    imageUrl && (
+      <div class="container-large">
+        <div class={`illus-wrapper ${mediaRatio}`}>
+          <img src={imageUrl} alt={imageAlt} class="illus" loading="lazy" />
+        </div>
+      </div>
+    )
+  )}
+</NicklModuleWrapper>

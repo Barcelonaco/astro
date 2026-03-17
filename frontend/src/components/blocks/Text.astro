@@ -1,0 +1,8 @@
+---
+const { title, body } = Astro.props.data || {};
+---
+
+<div class="block-text">
+  {title && <h3 class="block-text-title">{title}</h3>}
+  {body && <div class="block-text-body prose" set:html={body.replace(/\n/g, '<br>')} />}
+</div>

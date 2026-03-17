@@ -1,0 +1,211 @@
+---
+/**
+ * Animations d'entrée au scroll pour tous les modules Nickl.
+ * Reproduit le comportement GSAP ScrollTrigger + animateModule() de
+ * nickl/resources/scripts/modules/*.js en JS pur (IntersectionObserver).
+ *
+ * Toutes les durées : 0.7s — trigger : top 80% viewport (rootMargin -20% bottom).
+ * Stagger entre éléments : 100ms.
+ */
+---
+
+<script>
+(function initModuleAnimations() {
+  if (window.__nicklModuleAnimInit) return;
+  window.__nicklModuleAnimInit = true;
+
+  /**
+   * Config des animations par module.
+   * Chaque entrée = sélecteur du module → liste de steps.
+   * Step : { sel, y, x, stagger?, delay? }
+   *   - sel : sélecteur CSS (relatif au module)
+   *   - y / x : valeur initiale de translateY / translateX en px
+   *   - stagger : si true, chaque élément matchant est décalé de 100ms
+   *   - delay : délai fixe en ms avant l'animation
+   */
+  var ANIM = {
+    'module-text-simple': [
+      { sel: '.txt', y: 75 },
+      { sel: '.btn-wrapper', y: 75, delay: 100 }
+    ],
+    'module-accordion': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.accordion .title', x: 75, stagger: true }
+    ],
+    'module-clickable-tiles': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.item', y: 75, stagger: true }
+    ],
+    'module-contact': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.col-1', y: -75 },
+      { sel: '.col-2', y: 75 }
+    ],
+    'module-events-slider': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.slider-wrapper', y: 75 }
+    ],
+    'module-files': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.item', y: 75, stagger: true }
+    ],
+    'module-form': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.gfield', y: 75, stagger: true },
+      { sel: '.gform_footer', y: 25 }
+    ],
+    'module-gallery': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.tabs', y: 75 },
+      { sel: '.list .item', y: 75, stagger: true }
+    ],
+    'module-google-reviews': [
+      { sel: '.google-reviews-header', y: 30 },
+      { sel: '.reviews-slider-wrapper', y: 50 }
+    ],
+    'module-head-text': [
+      { sel: '.col', y: 75, stagger: true }
+    ],
+    'module-icons': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.list .item', y: 75, stagger: true }
+    ],
+    'module-images-slider': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.slider-wrapper', y: 75 }
+    ],
+    'module-insta-feed': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.tabs', y: 75 },
+      { sel: '.btn-more-wrapper', y: 75 }
+    ],
+    'module-key-figures': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.list .item', y: 75, stagger: true }
+    ],
+    'module-link': [
+      { sel: '.btn-wrapper', y: 75 }
+    ],
+    'module-logos-slider': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.slider-wrapper', y: 75 }
+    ],
+    'module-map': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.map-wrapper', y: 0 }
+    ],
+    'module-news-slider': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.slider-wrapper', y: 75 },
+      { sel: '.btn-more-wrapper', y: 75 }
+    ],
+    'module-free-post': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.item', y: 75, stagger: true }
+    ],
+    'module-quote': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.txt', y: 75 },
+      { sel: '.illus-wrapper', y: 75, delay: 100 },
+      { sel: '.name', y: 75, delay: 100 },
+      { sel: '.function', y: 75, delay: 100 }
+    ],
+    'module-references': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.tabs', y: 75 },
+      { sel: '.list .item', y: 75, stagger: true },
+      { sel: '.btn-more-wrapper', y: 75 }
+    ],
+    'module-team': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.tabs', y: 75 },
+      { sel: '.list .item', y: 75, stagger: true }
+    ],
+    'module-text-image': [
+      { sel: '.img-left .col-1', x: -75 },
+      { sel: '.img-left .col-2', x: 75 },
+      { sel: '.img-right .col-1', x: 75 },
+      { sel: '.img-right .col-2', x: -75 }
+    ],
+    'module-text-video-slider': [
+      { sel: '.slider-wrapper', y: 75 }
+    ],
+    'module-video': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.video', y: 75 },
+      { sel: '.illus-wrapper', y: 75 }
+    ],
+    'module-illus-video': [
+      { sel: '.title-module', y: 25 },
+      { sel: '.illus-wrapper', y: 75 }
+    ]
+  };
+
+  // Cumule le délai pour chaque step (reproduit le timeline sequencing de GSAP)
+  // GSAP position '-=.5'/'-=.6' = overlap ~200ms entre steps successives
+  var OVERLAP = 200;
+
+  // ── Setup : état initial (hidden) ──
+  var modulesToObserve = [];
+
+  Object.keys(ANIM).forEach(function(moduleClass) {
+    var modules = document.querySelectorAll('.module.' + moduleClass);
+    if (modules.length === 0) return;
+
+    modules.forEach(function(mod) {
+      var steps = ANIM[moduleClass];
+      var cumulDelay = 0;
+
+      steps.forEach(function(step) {
+        var els = mod.querySelectorAll(step.sel);
+        if (els.length === 0) return;
+
+        els.forEach(function(el, i) {
+          // Position initiale
+          var tx = step.x ? step.x + 'px' : '0';
+          var ty = step.y ? step.y + 'px' : '0';
+          el.style.opacity = '0';
+          el.style.transform = 'translate(' + tx + ', ' + ty + ')';
+          el.style.willChange = 'opacity, transform';
+
+          // Calcul du délai pour chaque élément
+          var d = cumulDelay + (step.delay || 0) + (step.stagger ? i * 100 : 0);
+          el.setAttribute('data-anim-delay', String(d));
+        });
+
+        // Avance le délai cumulé (avec overlap comme GSAP timeline)
+        var lastStagger = step.stagger ? (els.length - 1) * 100 : 0;
+        cumulDelay += Math.max(0, 700 + lastStagger + (step.delay || 0) - OVERLAP);
+      });
+
+      modulesToObserve.push(mod);
+    });
+  });
+
+  if (modulesToObserve.length === 0) return;
+
+  // ── Observer : déclenche l'animation quand le module entre dans le viewport ──
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (!entry.isIntersecting) return;
+      var mod = entry.target;
+      observer.unobserve(mod);
+
+      // Anime tous les éléments qui ont un data-animDelay
+      var animated = mod.querySelectorAll('[data-anim-delay]');
+      animated.forEach(function(el) {
+        var delay = parseInt(el.getAttribute('data-anim-delay') || '0', 10);
+        setTimeout(function() {
+          el.style.transition = 'opacity 0.7s ease, transform 0.7s ease';
+          el.style.opacity = '1';
+          el.style.transform = 'translate(0, 0)';
+        }, delay);
+      });
+    });
+  }, { threshold: 0, rootMargin: '0px 0px -20% 0px' });
+
+  modulesToObserve.forEach(function(mod) {
+    observer.observe(mod);
+  });
+})();
+</script>

@@ -1,0 +1,56 @@
+---
+/**
+ * Initialise l'effet parallax sur tous les modules avec .background-parallax
+ * et l'effet img-parallax sur les modules TextImage et Video.
+ * Reproduit le comportement GSAP ScrollTrigger de nickl/resources/scripts/routes/modules.js
+ * en JS pur (sans dépendance GSAP).
+ */
+---
+
+<script>
+(function initParallax() {
+  if (window.__nicklParallaxInit) return;
+  window.__nicklParallaxInit = true;
+
+  // ── Background parallax (bg_parallax) ──
+  // Reproduit : gsap.to(.background, { yPercent: 25, scrollTrigger: { scrub: true } })
+  var bgModules = document.querySelectorAll('.module.has-background-image.background-parallax');
+
+  // ── Image parallax (img_parallax) pour TextImage et Video ──
+  // Reproduit : gsap.from(.illus, { y: '200px', scrollTrigger: { start: 'top bottom', end: 'bottom top', scrub: true } })
+  var imgParallaxWrappers = document.querySelectorAll('.module.img-parallax .illus-wrapper');
+
+  if (bgModules.length === 0 && imgParallaxWrappers.length === 0) return;
+
+  function update() {
+    var wh = window.innerHeight;
+
+    // Background parallax
+    bgModules.forEach(function(mod) {
+      var rect = mod.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > wh) return;
+      var bg = mod.querySelector('.background');
+      if (!bg) return;
+      // progress: 0 quand le module entre par le bas, 1 quand il sort par le haut
+      var progress = (wh - rect.top) / (wh + rect.height);
+      bg.style.transform = 'translateY(' + (progress * 25) + '%)';
+    });
+
+    // Image parallax (TextImage, Video)
+    imgParallaxWrappers.forEach(function(wrapper) {
+      var rect = wrapper.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > wh) return;
+      var illus = wrapper.querySelector('.illus');
+      if (!illus) return;
+      // progress: 0 quand top bottom, 1 quand bottom top
+      var progress = (wh - rect.top) / (wh + rect.height);
+      // De y=200px (progress=0) à y=0 (progress=1) — comme gsap.from({ y: '200px' })
+      var y = 200 * (1 - progress);
+      illus.style.transform = 'translateY(' + y + 'px)';
+    });
+
+    requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+})();
+</script>

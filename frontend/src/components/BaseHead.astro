@@ -1,0 +1,95 @@
+---
+// Import the global.css file here so that it is included on
+// all pages through the use of the <BaseHead /> component.
+import '../styles/global.css';
+import '../styles/theme.css';
+
+import type { ImageMetadata } from 'astro';
+import FallbackImage from '../assets/blog-placeholder-1.jpg';
+import ThemeInjector from './ThemeInjector.astro';
+
+interface Props {
+	title: string;
+	description: string;
+	image?: ImageMetadata;
+	styleSettings?: Record<string, string>;
+	siteSettings?: Record<string, string>;
+}
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+
+const { title, description, image = FallbackImage, styleSettings, siteSettings: s = {} } = Astro.props;
+
+// Tracking codes
+const gaCode = s.ga_code || '';
+const awCode = s.aw_code || '';
+const gtmCode = s.gtm_code || '';
+const metaPixelCode = s.meta_pixel_code || '';
+---
+
+<!-- Global Metadata -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" href="/favicon.ico" />
+<link rel="sitemap" href="/sitemap-index.xml" />
+<link
+	rel="alternate"
+	type="application/rss+xml"
+	title={title}
+	href={new URL('rss.xml', Astro.site)}
+/>
+<meta name="generator" content={Astro.generator} />
+
+<!-- app.css + Google Fonts + module CSS all loaded by single deferred script in ModuleStyles -->
+<noscript><link rel="stylesheet" href="/nickl-assets/css/app.css" /></noscript>
+
+<!-- Canonical URL -->
+<link rel="canonical" href={canonicalURL} />
+
+<!-- Primary Meta Tags -->
+<title>{title}</title>
+<meta name="title" content={title} />
+<meta name="description" content={description} />
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content={Astro.url} />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:image" content={new URL(image.src, Astro.url)} />
+
+<!-- Twitter -->
+<meta property="twitter:card" content="summary_large_image" />
+<meta property="twitter:url" content={Astro.url} />
+<meta property="twitter:title" content={title} />
+<meta property="twitter:description" content={description} />
+<meta property="twitter:image" content={new URL(image.src, Astro.url)} />
+
+<ThemeInjector styleSettings={styleSettings} />
+
+{/* Google Tag Manager */}
+{gtmCode && (
+  <script set:html={`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${gtmCode}');`} />
+)}
+
+{/* Google Analytics GA4 */}
+{gaCode && !gtmCode && (
+  <>
+    <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaCode}`} />
+    <script set:html={`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${gaCode}');`} />
+  </>
+)}
+
+{/* Google Ads */}
+{awCode && !gtmCode && (
+  <>
+    <script async src={`https://www.googletagmanager.com/gtag/js?id=${awCode}`} />
+    <script set:html={`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${awCode}');`} />
+  </>
+)}
+
+{/* Meta Pixel */}
+{metaPixelCode && (
+  <script set:html={`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${metaPixelCode}');fbq('track','PageView');`} />
+)}

@@ -1,0 +1,170 @@
+---
+interface Props {
+  siteSettings?: Record<string, string>;
+}
+
+const { siteSettings: s = {} } = Astro.props;
+
+const footerText = s.footer_text || '';
+const schedule = s.schedule || '';
+const opening = s.opening || '';
+const phone = s.phone || '';
+const phone2 = s.phone_2 || '';
+const email = s.email || '';
+
+const showNewsletter = s.newsletter_form === '1';
+const newsletterTitle = s.newsletter_form_title || '';
+const newsletterDesc = s.newsletter_form_desc || '';
+
+const socials = [
+  { key: 'instagram', label: 'Instagram' },
+  { key: 'facebook', label: 'Facebook' },
+  { key: 'threads', label: 'Threads' },
+  { key: 'tiktok', label: 'TikTok' },
+  { key: 'linkedin', label: 'LinkedIn' },
+  { key: 'twitter', label: 'X (Twitter)' },
+  { key: 'tripadvisor', label: 'Tripadvisor' },
+  { key: 'pinterest', label: 'Pinterest' },
+  { key: 'youtube', label: 'YouTube' },
+].filter(item => s[item.key]);
+
+const hasContact = phone || phone2 || email;
+const hasSchedule = schedule || opening;
+const today = new Date();
+---
+
+<footer>
+  <div class="footer-inner">
+    {(hasContact || hasSchedule) && (
+      <div class="footer-col">
+        {hasContact && (
+          <div class="footer-contact">
+            {phone && <a href={`tel:${phone.replace(/\s/g, '')}`} class="footer-link">{phone}</a>}
+            {phone2 && <a href={`tel:${phone2.replace(/\s/g, '')}`} class="footer-link">{phone2}</a>}
+            {email && <a href={`mailto:${email}`} class="footer-link">{email}</a>}
+          </div>
+        )}
+        {hasSchedule && (
+          <div class="footer-schedule">
+            {schedule && <p class="schedule-text" set:html={schedule.replace(/\n/g, '<br />')} />}
+            {opening && !schedule && <p class="schedule-text">{opening}</p>}
+          </div>
+        )}
+      </div>
+    )}
+
+    {footerText && (
+      <div class="footer-col">
+        <div class="footer-text" set:html={footerText.replace(/\n/g, '<br />')} />
+      </div>
+    )}
+
+    {showNewsletter && (
+      <div class="footer-col footer-newsletter">
+        {newsletterTitle && <h3 class="newsletter-title">{newsletterTitle}</h3>}
+        {newsletterDesc && <p class="newsletter-desc">{newsletterDesc}</p>}
+        <form class="newsletter-form" onsubmit="return false;">
+          <input type="email" placeholder="Votre e-mail" class="newsletter-input" />
+          <button type="submit" class="newsletter-btn">S'inscrire</button>
+        </form>
+      </div>
+    )}
+  </div>
+
+  {socials.length > 0 && (
+    <div class="footer-socials">
+      {socials.map(item => (
+        <a href={s[item.key]} target="_blank" rel="noopener noreferrer" title={item.label}>
+          {item.label}
+        </a>
+      ))}
+    </div>
+  )}
+
+  <div class="footer-bottom">
+    &copy; {today.getFullYear()} — Tous droits réservés.
+  </div>
+</footer>
+
+<style>
+  footer {
+    background: var(--color-primary, var(--accent));
+    color: #fff;
+    padding: 3rem 1em 1.5rem;
+  }
+  .footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    max-width: 120rem;
+    margin: 0 auto;
+    padding-bottom: 2rem;
+  }
+  .footer-col { flex: 1 1 250px; }
+  .footer-contact {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+  }
+  .footer-link {
+    color: #fff;
+    text-decoration: none;
+    opacity: 0.9;
+  }
+  .footer-link:hover { opacity: 1; text-decoration: underline; }
+  .footer-text { opacity: 0.9; line-height: 1.6; }
+  .schedule-text { opacity: 0.85; font-size: 0.9rem; line-height: 1.5; margin: 0; }
+  .footer-newsletter { max-width: 400px; }
+  .newsletter-title { font-size: 1.125rem; margin: 0 0 0.25rem; }
+  .newsletter-desc { opacity: 0.85; font-size: 0.9rem; margin: 0 0 0.75rem; }
+  .newsletter-form { display: flex; gap: 0.5rem; }
+  .newsletter-input {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    font-size: 0.9rem;
+  }
+  .newsletter-input::placeholder { color: rgba(255,255,255,0.6); }
+  .newsletter-btn {
+    padding: 0.5rem 1rem;
+    background: #fff;
+    color: var(--color-primary, var(--accent));
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .newsletter-btn:hover { opacity: 0.9; }
+  .footer-socials {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 1.5rem 0;
+    border-top: 1px solid rgba(255,255,255,0.2);
+    max-width: 120rem;
+    margin: 0 auto;
+  }
+  .footer-socials a {
+    color: #fff;
+    text-decoration: none;
+    opacity: 0.8;
+    font-size: 0.875rem;
+  }
+  .footer-socials a:hover { opacity: 1; }
+  .footer-bottom {
+    text-align: center;
+    opacity: 0.7;
+    font-size: 0.8125rem;
+    padding-top: 1rem;
+  }
+  @media (max-width: 600px) {
+    .footer-inner { flex-direction: column; }
+    .newsletter-form { flex-direction: column; }
+  }
+</style>

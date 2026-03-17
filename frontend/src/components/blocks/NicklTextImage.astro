@@ -1,0 +1,196 @@
+---
+/**
+ * Module TextImage — Reproduit text-image.blade.php
+ * 2 colonnes : média (image ou vidéo) + texte avec CTA.
+ * Placement img-left/img-right, ratios, parallaxe optionnelle.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { cleanHtml, resolveLink, isTruthy } from '../../lib/module-classes';
+import {
+  resolveImageUrl,
+  resolveImageAlt,
+  extractYouTubeId,
+  extractVimeoId,
+  extractDailymotionId,
+} from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+// Placement média
+const imgToLeft = isTruthy(data.img_to_left);
+const placement = imgToLeft ? 'img-left' : 'img-right';
+
+// Ratio
+const mediaRatio = (data.media_ratio as string) || 'landscape';
+const ratioImgMap: Record<string, string> = {
+  landscape: 'banner',
+  portrait: 'portrait',
+  square: 'square-large',
+  'full-height': 'full-height',
+};
+const ratioImg = ratioImgMap[mediaRatio] || 'banner';
+
+// Texte
+const text = cleanHtml(data.text as string);
+const textWidth = (data.text_width as string) || 'width-50';
+const textAlign = (data.text_align as string) || '';
+const linkAlign = (data.link_align as string) || 'left';
+const linkStyle = (data.link_style as string) || 'tertiary';
+const cta = resolveLink(data.cta);
+
+// Media choice : true/1 = image, false/0 = vidéo
+const mediaChoice = isTruthy(data.media_choice);
+const videoSrc = (data.video_src as string) || 'mp4';
+const imgParallax = isTruthy(data.img_parallax) && mediaChoice;
+
+// Image
+const imageUrl = resolveImageUrl(data.image, apiOrigin, ratioImg);
+const imageAlt = resolveImageAlt(data.image);
+
+// Vidéo
+const videoFile = data.video as any;
+const videoUrl = typeof videoFile === 'string' ? videoFile : videoFile?.url || '';
+const youtubeLink = (data.youtube_link as string) || '';
+const vimeoLink = (data.vimeo_link as string) || '';
+const dailymotionLink = (data.dailymotion_link as string) || '';
+const youtubeId = extractYouTubeId(youtubeLink);
+const vimeoId = extractVimeoId(vimeoLink);
+const dailymotionId = extractDailymotionId(dailymotionLink);
+
+// Preview (aperçu vidéo)
+const preview = data.preview as any;
+const previewUrl = typeof preview === 'string' ? preview : preview?.url || '';
+const previewType = preview?.type || 'image';
+const previewSizeUrl = preview?.sizes?.banner || previewUrl;
+const previewAlt = preview?.alt || '';
+
+// Classes supplémentaires
+const extraParts: string[] = [];
+if (imgParallax) extraParts.push('img-parallax');
+
+// Classes custom depuis id_bloc (mots commençant par .)
+const idBloc = (data.id_bloc as string) || '';
+const customClasses = idBloc
+  .split(/\s+/)
+  .filter((w) => w.startsWith('.'))
+  .map((w) => w.slice(1))
+  .join(' ');
+if (customClasses) extraParts.push(customClasses);
+
+const extraClasses = extraParts.join(' ');
+---
+
+<NicklModuleWrapper data={data} moduleName="text-image" extraClasses={extraClasses} hideTitle>
+  <div class={`cols-wrapper ${placement} text-${textWidth} ${mediaRatio}`}>
+    <div class="col col-1">
+      {!mediaChoice ? (
+        /* Vidéo */
+        <>
+          <div class={`video-wrapper ${mediaRatio} js_show-content`}>
+            {/* Preview */}
+            {preview && videoSrc !== 'mp4' && previewType === 'image' && (
+              <img src={previewSizeUrl} alt={previewAlt} class="illus-video" />
+            )}
+            {preview && videoSrc !== 'mp4' && previewType === 'video' && (
+              <video class="background-video" autoplay loop muted playsinline>
+                <source src={previewUrl} type="video/mp4" />
+              </video>
+            )}
+            {!preview && videoSrc === 'youtube' && youtubeId && (
+              <img
+                src={`https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`}
+                alt=""
+                class="illus-video"
+              />
+            )}
+
+            {/* Vidéo source */}
+            {videoSrc === 'youtube' && youtubeId && (
+              <>
+                <button type="button" class="btn js_btn-video" data-src={youtubeId}>
+                  <span class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="24" height="24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
+                  </span>
+                  <span class="txt">Lire la vidéo</span>
+                </button>
+                <iframe
+                  src={`https://www.youtube.com/embed/${youtubeId}`}
+                  frameborder="0"
+                  allow="autoplay; fullscreen; picture-in-picture"
+                  allowfullscreen
+                />
+              </>
+            )}
+            {videoSrc === 'mp4' && videoUrl && (
+              <video class="video" autoplay loop muted playsinline>
+                <source src={videoUrl} type="video/mp4" />
+              </video>
+            )}
+            {videoSrc === 'vimeo' && vimeoId && (
+              <>
+                <button type="button" class="btn js_btn-video" data-src-vimeo={vimeoId}>
+                  <span class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="24" height="24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
+                  </span>
+                  <span class="txt">Lire la vidéo</span>
+                </button>
+                <iframe
+                  src={`https://player.vimeo.com/video/${vimeoId}`}
+                  frameborder="0"
+                  allow="autoplay; fullscreen; picture-in-picture"
+                  allowfullscreen
+                />
+              </>
+            )}
+            {videoSrc === 'dailymotion' && dailymotionId && (
+              <>
+                <button type="button" class="btn js_btn-video" data-src-dailymotion={dailymotionId}>
+                  <span class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="24" height="24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
+                  </span>
+                  <span class="txt">Lire la vidéo</span>
+                </button>
+                <iframe
+                  src={`https://geo.dailymotion.com/player.html?video=${dailymotionId}`}
+                  allowfullscreen
+                  allow="encrypted-media; fullscreen; picture-in-picture; web-share;"
+                />
+              </>
+            )}
+          </div>
+        </>
+      ) : (
+        /* Image */
+        imageUrl && (
+          <div class={`illus-wrapper ${mediaRatio}`}>
+            <img src={imageUrl} alt={imageAlt} class="illus" loading="lazy" />
+          </div>
+        )
+      )}
+    </div>
+
+    <div class={`col col-2 ${textAlign ? `text-align-${textAlign}` : ''}`}>
+      <div class="txt editor">
+        {text && <Fragment set:html={text} />}
+      </div>
+      {cta && cta.url && (
+        <div class={`btn-wrapper align-${linkAlign}`}>
+          <a
+            href={cta.url}
+            class={`btn btn-${linkStyle} color-primary`}
+            target={cta.target}
+          >
+            {cta.title}
+          </a>
+        </div>
+      )}
+    </div>
+  </div>
+</NicklModuleWrapper>

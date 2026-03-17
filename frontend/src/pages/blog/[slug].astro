@@ -1,0 +1,136 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import Footer from '../../components/Footer.astro';
+import FormattedDate from '../../components/FormattedDate.astro';
+import Header from '../../components/Header.astro';
+import { getAllPosts, formatContent } from '../../lib/api';
+
+export async function getStaticPaths() {
+  const posts = await getAllPosts();
+  return posts.map((post) => ({
+    params: { slug: post.slug },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const content = formatContent(post.content);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead title={post.title} description={post.excerpt} />
+    <style>
+      main {
+        width: calc(100% - 2em);
+        max-width: 100%;
+        margin: 0;
+      }
+      .hero-image {
+        width: 100%;
+      }
+      .hero-image img {
+        display: block;
+        margin: 0 auto;
+        border-radius: 12px;
+        box-shadow: var(--box-shadow);
+      }
+      .prose {
+        width: 720px;
+        max-width: calc(100% - 2em);
+        margin: auto;
+        padding: 1em;
+        color: rgb(var(--gray-dark));
+      }
+      .title {
+        margin-bottom: 1em;
+        padding: 1em 0;
+        text-align: center;
+        line-height: 1;
+      }
+      .title h1 {
+        margin: 0 0 0.5em 0;
+      }
+      .date {
+        margin-bottom: 0.5em;
+        color: rgb(var(--gray));
+      }
+      .last-updated-on {
+        font-style: italic;
+      }
+      .tags {
+        display: flex;
+        gap: 0.5em;
+        flex-wrap: wrap;
+        margin-top: 1em;
+      }
+      .tag {
+        background: rgb(var(--accent));
+        color: white;
+        padding: 0.25em 0.75em;
+        border-radius: 6px;
+        font-size: 0.875em;
+      }
+      .categories {
+        margin-top: 1em;
+      }
+      .category {
+        display: inline-block;
+        background: rgb(var(--gray-light));
+        padding: 0.25em 0.75em;
+        border-radius: 6px;
+        margin-right: 0.5em;
+      }
+    </style>
+  </head>
+
+  <body>
+    <Header />
+    <main>
+      <article>
+        {post.featured_image && (
+          <div class="hero-image">
+            <img width={1020} height={510} src={post.featured_image} alt={post.title} />
+          </div>
+        )}
+        <div class="prose">
+          <div class="title">
+            <div class="date">
+              <FormattedDate date={new Date(post.published_date)} />
+            </div>
+            <h1>{post.title}</h1>
+            {post.author && <p>Par {post.author.name}</p>}
+            <hr />
+          </div>
+
+          {post.excerpt && (
+            <p><em>{post.excerpt}</em></p>
+          )}
+
+          <div set:html={content} />
+
+          {post.categories && post.categories.length > 0 && (
+            <div class="categories">
+              <strong>Catégories:</strong>
+              {post.categories.map((cat) => (
+                <a href={`/category/${cat.slug}/`} class="category">
+                  {cat.name}
+                </a>
+              ))}
+            </div>
+          )}
+
+          {post.tags && post.tags.length > 0 && (
+            <div class="tags">
+              {post.tags.map((tag) => (
+                <span class="tag">{tag}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      </article>
+    </main>
+    <Footer />
+  </body>
+</html>

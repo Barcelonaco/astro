@@ -1,0 +1,58 @@
+---
+/**
+ * Module Files — Reproduit files.blade.php
+ * Liste de fichiers PDF avec aperçu iframe ou liens de téléchargement.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { isTruthy } from '../../lib/module-classes';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const files = (data.files as any[]) || [];
+const filesPreview = data.files_preview !== false && data.files_preview !== 0 && data.files_preview !== '0';
+const columnsClass = `columns-${files.length}`;
+---
+
+<NicklModuleWrapper data={data} moduleName="files" containerLarge>
+  <ul class={`list ${columnsClass} ${filesPreview ? 'files_preview' : ''}`}>
+    {files.map((file) => {
+      const fileObj = file.file || {};
+      const fileUrl = typeof fileObj === 'string' ? fileObj : fileObj.url || '';
+      const fileName = fileObj.name || '';
+      const fileTitle = file.title || fileName;
+
+      if (!fileUrl) return null;
+
+      return (
+        <li class="item">
+          {filesPreview ? (
+            <div class="module-pdf-viewer__frame">
+              <iframe src={fileUrl} title={fileName} loading="lazy" referrerpolicy="no-referrer" />
+              {files.length > 2 && (
+                <div class="overlay">
+                  <a href={fileUrl} target="_blank" title="Agrandir" class="btn btn-primary">
+                    Agrandir
+                  </a>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <p>{fileTitle}</p>
+              <a href={fileUrl} target="_blank" title={`Visualiser ${fileName}`} class="btn btn-primary">
+                Visualiser
+              </a>
+              <a href={fileUrl} target="_blank" title={`Télécharger ${fileName}`} class="btn btn-secondary color-secondary" download={fileName}>
+                Télécharger
+              </a>
+            </>
+          )}
+        </li>
+      );
+    })}
+  </ul>
+</NicklModuleWrapper>

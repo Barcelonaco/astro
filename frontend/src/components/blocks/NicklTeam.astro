@@ -1,0 +1,104 @@
+---
+/**
+ * Module Team — Reproduit team.blade.php
+ * Grille de membres d'équipe avec photo, nom, poste, description,
+ * lien et réseaux sociaux. Layout spécial quand 1 seul membre.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { resolveLink } from '../../lib/module-classes';
+import { resolveImageUrl, resolveImageAlt } from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const teamMembers = (data.list as any[]) || [];
+const picturesFormat = (data.pictures_format as string) || 'square';
+const align = (data.align as string) || 'left';
+const pictureSize = picturesFormat === 'portrait' ? 'portrait' : 'square-large';
+
+const socialNetworkKeys = ['instagram', 'tiktok', 'linkedin', 'twitter', 'youtube'] as const;
+const isSingle = teamMembers.length === 1;
+---
+
+<NicklModuleWrapper data={data} moduleName="team">
+  <ul class={`list columns columns-${teamMembers.length} pictures-${picturesFormat} align-${align}`}>
+    {teamMembers.map((team) => {
+      const pictureUrl = resolveImageUrl(team.picture, apiOrigin, pictureSize);
+      const pictureAlt = resolveImageAlt(team.picture);
+      const link = resolveLink(team.link);
+      const iconLinkUrl = team.icon_link?.url || '';
+
+      const socials = socialNetworkKeys
+        .filter((key) => team[key])
+        .map((key) => ({
+          platform: key,
+          url: team[key] as string,
+          label: key === 'twitter' ? 'X (Twitter)' : key.charAt(0).toUpperCase() + key.slice(1),
+        }));
+
+      const descBlock = (
+        <div class="desc">
+          {team.name && <p class="name">{team.name}</p>}
+          {team.post && <p class="post">{team.post}</p>}
+          {team.desc && (
+            <p class="team-desc">
+              <Fragment set:html={String(team.desc).replace(/\n/g, '<br />')} />
+            </p>
+          )}
+          {link && (
+            <div class="btn-wrapper">
+              <a href={link.url} class="btn btn-tertiary" target={link.target}>
+                {iconLinkUrl && <img src={iconLinkUrl} alt="" class="illus" loading="lazy" />}
+                {link.title}
+              </a>
+            </div>
+          )}
+          {socials.length > 0 && (
+            <ul class="social-networks">
+              {socials.map((s) => (
+                <li class="item-social">
+                  <a href={s.url} title={s.label} target="_blank" class="link">
+                    <span class="icon" aria-hidden="true">
+                      <img src={`/nickl-assets/images/svg/${s.platform === 'twitter' ? 'x' : s.platform}.svg`} alt={s.label} />
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      );
+
+      // Quand 1 seul membre : image dans un <li>, description dans un autre
+      if (isSingle) {
+        return (
+          <>
+            <li class="item">
+              <div class="illus-wrapper">
+                {pictureUrl && <img src={pictureUrl} alt={pictureAlt} class="illus" loading="lazy" />}
+              </div>
+            </li>
+            <li class="item">
+              {descBlock}
+            </li>
+          </>
+        );
+      }
+
+      return (
+        <li class="item">
+          <div class="illus-wrapper">
+            {pictureUrl && <img src={pictureUrl} alt={pictureAlt} class="illus" loading="lazy" />}
+          </div>
+          {descBlock}
+        </li>
+      );
+    })}
+  </ul>
+</NicklModuleWrapper>

@@ -1,0 +1,132 @@
+@import '../base/common';
+/**
+ * GENERAL
+ * MEDIA QUERIES
+ */
+
+
+
+/* GENERAL
+---------------------------------------- */
+.module-summary {
+  position: relative;
+  padding-bottom: calc(37.5px + 1.95313vw);
+  padding-top: calc(37.5px + 1.95313vw);
+    .module-columns.has-background-primary:not(.cols_have_background) &,
+    &.has-background-primary:not(.cols_have_background), 
+    .cols-background-primary &,
+    .module-columns.has-background-secondary:not(.cols_have_background) &,
+    &.has-background-secondary:not(.cols_have_background), 
+    .cols-background-secondary & {
+    a, .title {
+      color: $color1;
+    }
+
+    .menu {
+      & > .menu-item {
+        color: $color1;
+      }
+      .sub-menu li .sub-menu {
+        &::before {
+          background-color: $color1;
+        }
+  
+        li a {
+          color: $color1;
+        }
+      }
+    }
+  }
+  .module-columns.has-background-primary:not(.cols_have_background) &,
+  &.has-background-primary:not(.cols_have_background), 
+  .cols-background-primary & {
+    border-color: $color4;
+  }
+
+  .menu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: rem(40px);
+
+    & > .menu-item {
+      flex: 0 1 auto;
+      flex-basis: calc(100% / 3 - #{rem(80px)} / 3);
+      font-size: rem(16px);
+      font-weight: 500;
+
+      > a, .title {
+        font-size: rem(30px);
+        font-weight: 700;
+        font-family: $font2;
+
+        .mode-uppercase & {
+          text-transform: uppercase;
+        }
+      }
+
+      &:not(.menu-parent) a {
+        @include animation-underline();
+      }
+
+      .menu-parent:hover > a {
+        cursor: unset;
+      }
+
+      .sub-menu {
+        margin-top: rem(8px);
+
+        li {
+          margin-top: rem(4px);
+
+          > .sub-menu {
+            position: relative;
+            padding: 0 0 0 rem(22px);
+
+            &::before {
+              position: absolute;
+              top: rem(7px);
+              left: 0;
+              bottom: rem(7px);
+              width: rem(1px);
+              background-color: $color1;
+              content: ''
+            }
+
+            li a {
+              font-size: rem(14px);
+              font-weight: 400;
+            }
+          }
+        }
+
+        a {
+          @include animation-underline();
+        }
+      }
+    }
+  }
+}
+
+.footer-before {
+  .module-summary {
+    border-bottom: 2px solid $color3;
+    .module-columns.has-background-primary:not(.cols_have_background) &,
+    &.has-background-primary:not(.cols_have_background), 
+    .cols-background-primary & {
+      border-bottom-color: $color4;
+    }
+  }
+}
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 768px) {
+  .module-summary {
+    .menu {
+      flex-direction: column;
+      .menu-item {
+        flex-basis: 100%;
+      }
+    }
+  }
+}

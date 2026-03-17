@@ -1,0 +1,84 @@
+---
+/**
+ * Wrapper universel pour tous les modules Nickl.
+ * Reproduit exactement le pattern du Blade :
+ * <div id="{{ $id_bloc }}" class="module module-{name} {{ $classes }}">
+ *   @if (backgroundImage) <div class="background" ...> @endif
+ *   @if (title) @include('bloc-title-module') @endif
+ *   <slot />
+ * </div>
+ */
+import {
+  buildModuleClasses,
+  resolveBackgroundImage,
+  resolveBlocTitle,
+} from '../../lib/module-classes';
+
+interface Props {
+  data: Record<string, any>;
+  moduleName: string;
+  /** Classes CSS supplémentaires à ajouter au wrapper */
+  extraClasses?: string;
+  /** Utiliser container-large au lieu de container */
+  containerLarge?: boolean;
+  /** Désactiver le container (le slot gère lui-même) */
+  noContainer?: boolean;
+  /** Afficher le titre du bloc */
+  showTitle?: boolean;
+  /** Forcer le masquage du titre */
+  hideTitle?: boolean;
+}
+
+const {
+  data,
+  moduleName,
+  extraClasses = '',
+  containerLarge = false,
+  noContainer = false,
+  showTitle = true,
+  hideTitle = false,
+} = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const id = (data.id_bloc as string) || '';
+const isVisible = (data.is_visible as string) ?? 'yes';
+const classes = buildModuleClasses(data);
+const backgroundImage = resolveBackgroundImage(data, apiOrigin);
+const blocTitle = resolveBlocTitle(data);
+const containerClass = containerLarge ? 'container-large' : 'container';
+const isParallax = data.bg_parallax === true || data.bg_parallax === 1 || data.bg_parallax === '1';
+---
+
+{isVisible !== 'no' && (
+  <div
+    id={id || undefined}
+    class={`module module-${moduleName} ${classes} ${extraClasses}`.trim()}
+  >
+    {backgroundImage && backgroundImage.url && (
+      <div
+        class="background"
+        style={`background-image: url(${backgroundImage.url}); opacity: ${backgroundImage.opacity / 100};${isParallax ? '' : ' position: absolute; inset: 0; background-size: cover; background-position: center;'}`}
+      />
+    )}
+
+    {noContainer ? (
+      <>
+        {showTitle && !hideTitle && blocTitle && (
+          <div class={containerClass}>
+            <Fragment set:html={`<h${blocTitle.style} class="title-module title-section-${blocTitle.style} align-${blocTitle.align}">${blocTitle.title}</h${blocTitle.style}>`} />
+          </div>
+        )}
+        <slot />
+      </>
+    ) : (
+      <div class={containerClass}>
+        {showTitle && !hideTitle && blocTitle && (
+          <Fragment set:html={`<h${blocTitle.style} class="title-module title-section-${blocTitle.style} align-${blocTitle.align}">${blocTitle.title}</h${blocTitle.style}>`} />
+        )}
+        <slot />
+      </div>
+    )}
+  </div>
+)}

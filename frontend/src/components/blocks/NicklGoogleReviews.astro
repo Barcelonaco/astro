@@ -1,0 +1,33 @@
+---
+/**
+ * Module GoogleReviews — Reproduit google-reviews.blade.php
+ * Stub — nécessite un endpoint proxy Google Places API.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const placeId = (data.place_id as string) || '';
+const displayLink = data.display_google_reviews_link !== false && data.display_google_reviews_link !== '0';
+const buttonText = (data.button_text as string) || 'Voir tous les avis';
+const buttonLink = (data.button_link as string) || '#';
+---
+
+<NicklModuleWrapper data={data} moduleName="google-reviews" containerLarge>
+  {!placeId ? (
+    <p style="text-align: center;">Veuillez configurer un Place ID dans les paramètres du module.</p>
+  ) : (
+    <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+      Les avis Google nécessitent un endpoint API dédié.
+    </p>
+  )}
+  {displayLink && (
+    <div class="btn-more-wrapper" style="text-align:center;margin-top:1rem;">
+      <a href={buttonLink} class="btn btn-tertiary" target="_blank">{buttonText}</a>
+    </div>
+  )}
+</NicklModuleWrapper>

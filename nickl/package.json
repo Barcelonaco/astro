@@ -1,0 +1,59 @@
+{
+  "name": "nickl",
+  "private": true,
+  "browserslist": [
+    "extends @roots/browserslist-config"
+  ],
+  "engines": {
+    "node": ">=24.8.0"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "bud dev",
+    "build": "bud build",
+    "clean": "bud clean",
+    "bud": "bud",
+    "translate": "npm run translate:pot && npm run translate:update",
+    "translate:pot": "wp i18n make-pot . ./resources/lang/sage.pot --include=\"theme.json,patterns,app,resources\"",
+    "translate:update": "for file in ./resources/lang/*.po; do wp i18n update-po ./resources/lang/sage.pot $file; done",
+    "translate:compile": "npm run translate:mo && npm run translate:js",
+    "translate:js": "wp i18n make-json ./resources/lang --pretty-print",
+    "translate:mo": "wp i18n make-mo ./resources/lang ./resources/lang"
+  },
+  "devDependencies": {
+    "@roots/bud": "^6.24.0",
+    "@roots/bud-sass": "^6.24.0",
+    "@roots/bud-tailwindcss": "^6.24.0",
+    "@roots/sage": "6.24.0",
+    "autoprefixer": "^10.4.20",
+    "browser-sync": "^3.0.3",
+    "browser-sync-webpack-plugin": "^2.4.0",
+    "case-sensitive-paths-webpack-plugin": "^2.4.0",
+    "cross-env": "^10.0.0",
+    "eslint": "^9.36.0",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-webpack-plugin": "^5.0.2",
+    "import-glob": "^1.5.0",
+    "sass-loader": "^16.0.5",
+    "stylelint": "^16.24.0",
+    "stylelint-config-standard": "^39.0.0",
+    "stylelint-webpack-plugin": "^5.0.1",
+    "swc-loader": "^0.2.6",
+    "webpack-cli": "^6.0.1",
+    "webpack-manifest-plugin": "^5.0.0"
+  },
+  "dependencies": {
+    "@roots/bud-sass": "^6.24.0",
+    "cookieconsent": "^3.1.0",
+    "gsap": "^3.12.7",
+    "jquery": "^3.7.1",
+    "js-cookie": "^3.0.5",
+    "mapbox-gl": "^3.8.0",
+    "sass": "^1.64.2",
+    "swiper": "^11.2.5",
+    "vanilla-cookieconsent": "^3.1.0"
+  },
+  "overrides": {
+    "webpack": ">=5.101.3 <6.0.0"
+  }
+}

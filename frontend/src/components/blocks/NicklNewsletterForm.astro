@@ -1,0 +1,28 @@
+---
+/**
+ * Module NewsletterForm — Reproduit newsletter-form.blade.php
+ * Stub — AcyMailing n'est pas disponible hors WordPress.
+ * Affiche la description WYSIWYG si fournie.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { cleanHtml } from '../../lib/module-classes';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const desc = cleanHtml(data.desc as string);
+---
+
+<NicklModuleWrapper data={data} moduleName="newsletter-form">
+  {desc && (
+    <div class="txt editor">
+      <Fragment set:html={desc} />
+    </div>
+  )}
+  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+    Le formulaire d'inscription à la newsletter n'est pas disponible en mode statique (AcyMailing requis).
+  </p>
+</NicklModuleWrapper>

@@ -1,0 +1,135 @@
+---
+/**
+ * Module SliderTextVideo — Reproduit text-video-slider.blade.php
+ * Slider 2 colonnes : texte + vidéo/image.
+ * Bouton "Découvrir" optionnel, navigation si > 1 slide.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { cleanHtml, resolveLink, isTruthy } from '../../lib/module-classes';
+import { extractYouTubeId, resolveImageUrl } from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const slider = (data.slider as any[]) || [];
+const discoverBtn = data.discover_btn !== false && data.discover_btn !== 0 && data.discover_btn !== '0';
+const h1InHeader = isTruthy(data.h1_in_header);
+const hasMultipleSlides = slider.length > 1;
+---
+
+<NicklModuleWrapper data={data} moduleName="text-video-slider" noContainer hideTitle>
+  <div class="slider-wrapper">
+    <div class="swiper slider js_text-video-slider">
+      <div class="swiper-wrapper">
+        {slider.map((slide) => {
+          const useH1 = !h1InHeader && isTruthy(slide.is_h1);
+          const link1 = resolveLink(slide.link_1);
+          const link2 = resolveLink(slide.link_2);
+          const desc = cleanHtml(slide.desc as string);
+          const videoUrl = (slide.video as string) || '';
+          const youtubeId = extractYouTubeId(videoUrl);
+          const preview = slide.preview as any;
+          const previewUrl = typeof preview === 'string' ? preview : preview?.url || '';
+          const previewType = preview?.type || 'image';
+          const previewAlt = preview?.alt || '';
+          const hasVideo = !!videoUrl;
+
+          return (
+            <div class="swiper-slide item">
+              <div class="container-large">
+                <div class="cols-wrapper">
+
+                  <div class="col col-1">
+                    {useH1 ? (
+                      <h1 class="title title-section-2"><Fragment set:html={slide.title || ''} /></h1>
+                    ) : (
+                      <h2 class="title title-section-2"><Fragment set:html={slide.title || ''} /></h2>
+                    )}
+                    {desc && (
+                      <div class="txt editor">
+                        <Fragment set:html={desc} />
+                      </div>
+                    )}
+                    {(link1 || link2) && (
+                      <div class="btn-wrapper">
+                        {link1 && (
+                          <a href={link1.url} target={link1.target} class="btn btn-primary">
+                            <Fragment set:html={link1.title} />
+                          </a>
+                        )}
+                        {link2 && (
+                          <a href={link2.url} target={link2.target} class="btn btn-secondary color-primary-full">
+                            <Fragment set:html={link2.title} />
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {hasMultipleSlides && (
+                    <div class="slider-navigation-mobile-wrapper">
+                      <button type="button" class="slider-navigation prev js_text-video-slider-btn-prev"></button>
+                      <button type="button" class="slider-navigation next js_text-video-slider-btn-next"></button>
+                    </div>
+                  )}
+
+                  <div class="col col-2">
+                    {hasVideo && youtubeId ? (
+                      <div class="video">
+                        {preview && previewType === 'image' && (
+                          <img src={previewUrl} alt={previewAlt} class="illus" loading="lazy" />
+                        )}
+                        {preview && previewType === 'video' && (
+                          <video class="background-video js-lazy-video" autoplay loop muted playsinline>
+                            <source src={previewUrl} type="video/mp4" />
+                          </video>
+                        )}
+                        <button type="button" class="btn js_btn-video" data-src={youtubeId}>
+                          <span class="icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="24" height="24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
+                          </span>
+                          <span class="txt">Lire la vidéo</span>
+                        </button>
+                        <iframe src="" frameborder="0"></iframe>
+                      </div>
+                    ) : preview ? (
+                      <div class="video">
+                        {previewType === 'image' ? (
+                          <img src={previewUrl} alt={previewAlt} class="illus" loading="lazy" />
+                        ) : (
+                          <video class="background-video js-lazy-video" autoplay loop muted playsinline>
+                            <source src={previewUrl} type="video/mp4" />
+                          </video>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {discoverBtn && (
+                    <button type="button" class="btn-scroll btn-scroll-down js_btn-scroll-down">
+                      Découvrir
+                    </button>
+                  )}
+
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+
+    {hasMultipleSlides && (
+      <>
+        <button type="button" class="slider-navigation prev"></button>
+        <button type="button" class="slider-navigation next"></button>
+      </>
+    )}
+  </div>
+</NicklModuleWrapper>

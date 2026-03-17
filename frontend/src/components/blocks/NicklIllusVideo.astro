@@ -1,0 +1,74 @@
+---
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props as Props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const id = (data.id_bloc as string) ?? '';
+const blocColor = (data.bloc_color as string) ?? '';
+const paddingTop = (data.padding_top as string) ?? '';
+const paddingBottom = (data.padding_bottom as string) ?? '';
+const isVisible = (data.is_visible as string) ?? 'yes';
+const isFullscreen = data.is_fullscreen === true || data.is_fullscreen === 1 || data.is_fullscreen === '1';
+
+const bgImg = (data.bg_img as any) ?? null;
+const rawBgOpacity = data.bg_opacity as number | string | undefined;
+const opacityPercent =
+  rawBgOpacity === undefined || rawBgOpacity === null || rawBgOpacity === ''
+    ? 10
+    : Number(rawBgOpacity);
+const bgOpacity = Number.isNaN(opacityPercent) ? 10 : opacityPercent;
+
+const backgroundImage = bgImg
+  ? {
+      url: typeof bgImg.url === 'string' && bgImg.url.startsWith('http')
+        ? bgImg.url
+        : apiOrigin + String(bgImg.url || ''),
+      opacity: bgOpacity
+    }
+  : null;
+
+const classes = [
+  isFullscreen ? 'full-width' : '',
+  backgroundImage ? 'has-background-image' : '',
+  blocColor,
+  paddingTop,
+  paddingBottom,
+].filter(Boolean).join(' ');
+
+const video = data.video as any;
+const videoUrl = video
+  ? typeof video === 'string'
+    ? (video.startsWith('http') ? video : apiOrigin + video)
+    : typeof video.url === 'string'
+      ? (video.url.startsWith('http') ? video.url : apiOrigin + video.url)
+      : ''
+  : '';
+
+const videoWidth = Number(video?.width) || 0;
+const videoHeight = Number(video?.height) || 0;
+const ratio = videoHeight > 0 ? Math.floor(videoWidth / videoHeight) : 2;
+---
+
+{isVisible !== 'no' && videoUrl && (
+  <div id={id} class={`module module-illustration-video ${classes}`}>
+    {backgroundImage && backgroundImage.url && (
+      <div
+        class="background"
+        style={`background-image: url(${backgroundImage.url}); opacity: ${bgOpacity / 100}; background-size: cover; background-position: center; position:absolute; inset:0`}
+      />
+    )}
+
+    <div class="container-large">
+      <div class="video-wrapper" style={`height: calc(100vh / ${ratio})`}>
+        <video class="video" autoplay loop muted playsinline>
+          <source src={videoUrl} type="video/mp4" />
+        </video>
+      </div>
+    </div>
+  </div>
+)}

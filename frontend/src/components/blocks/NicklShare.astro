@@ -1,0 +1,78 @@
+---
+/**
+ * Module Share — Reproduit share.blade.php
+ * Boutons de partage social pour la page courante.
+ */
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const id = (data.id_bloc as string) || '';
+const shareBtnPosition = (data.share_btn_position as string) || '';
+
+// URL et titre de la page courante
+const pageUrl = Astro.url.href;
+const pageTitle = '';
+const encodedUrl = encodeURIComponent(pageUrl);
+const encodedTitle = encodeURIComponent(pageTitle);
+const mailSubject = encodedTitle;
+const mailBody = encodeURIComponent(`${pageTitle} : ${pageUrl}`);
+
+const socialLinks = [
+  { platform: 'mail', href: `mailto:?subject=${mailSubject}&body=${mailBody}`, title: 'Partager par mail', icon: 'mail' },
+  { platform: 'facebook', href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`, title: 'Partager sur Facebook', icon: 'facebook' },
+  { platform: 'threads', href: `https://www.threads.net/share?url=${encodedUrl}`, title: 'Partager sur Threads', icon: 'threads' },
+  { platform: 'linkedin', href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`, title: 'Partager sur Linkedin', icon: 'linkedin' },
+  { platform: 'twitter', href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`, title: 'Partager sur X', icon: 'x' },
+  { platform: 'pinterest', href: `https://www.pinterest.com/pin/create/button/?url=${encodedUrl}&description=${encodedTitle}`, title: 'Partager sur Pinterest', icon: 'pinterest' },
+  { platform: 'whatsapp', href: `whatsapp://send?text=${encodeURIComponent(`${pageTitle}: ${pageUrl}`)}`, title: 'Partager dans une conversation Whatsapp', icon: 'whatsapp' },
+];
+---
+
+<div
+  id={id || undefined}
+  class={`module module-share padding-top-small padding-bottom-small ${shareBtnPosition}`.trim()}
+>
+  <div class="container">
+    <div class="cols-wrapper">
+      <div class="col col-1">
+        <p class="title-list">
+          <span class="icon" aria-hidden="true">
+            <img src="/nickl-assets/images/svg/share-androidos.svg" alt="" />
+          </span>
+          Partager
+        </p>
+      </div>
+
+      <div class="col col-2">
+        <ul class="social-networks">
+          {socialLinks.map((s) => (
+            <li>
+              <a
+                href={s.href}
+                class="link"
+                title={s.title}
+                target={s.platform === 'mail' ? undefined : '_blank'}
+              >
+                <span class="icon" aria-hidden="true">
+                  <img src={`/nickl-assets/images/svg/${s.icon}.svg`} alt={s.title} />
+                </span>
+              </a>
+            </li>
+          ))}
+          <li>
+            <button class="link js_copy-link" title="Copier le lien dans le presse-papier">
+              <span class="icon" aria-hidden="true">
+                <img src="/nickl-assets/images/svg/link.svg" alt="Copier le lien" />
+              </span>
+              <span>Le lien a bien été copié</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

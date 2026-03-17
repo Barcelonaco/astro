@@ -1,0 +1,52 @@
+---
+/**
+ * Module LogosSlider — Reproduit logos-slider.blade.php
+ * Carousel Swiper de logos avec liens optionnels.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { resolveLink } from '../../lib/module-classes';
+import { resolveImageUrl, resolveImageAlt } from '../../lib/module-helpers';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+const logos = (data.logos as any[]) || [];
+---
+
+<NicklModuleWrapper data={data} moduleName="logos-slider">
+  {logos.length > 0 && (
+    <div class="slider-wrapper">
+      <div class="swiper slider js_logos-slider">
+        <div class="swiper-wrapper">
+          {logos.map((logo) => {
+            const link = resolveLink(logo.link);
+            const logoUrl = resolveImageUrl(logo.logo, apiOrigin, 'module-logo');
+            const logoAlt = resolveImageAlt(logo.logo);
+
+            return (
+              <div class="swiper-slide item">
+                {link ? (
+                  <a href={link.url} class="link" target={link.target}>
+                    <img src={logoUrl} alt={logoAlt} class="illus" loading="lazy" />
+                  </a>
+                ) : (
+                  <div class="link">
+                    <img src={logoUrl} alt={logoAlt} class="illus" loading="lazy" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <button type="button" class="slider-navigation js_logos-slider-btn-prev prev"></button>
+      <button type="button" class="slider-navigation js_logos-slider-btn-next next"></button>
+    </div>
+  )}
+</NicklModuleWrapper>

@@ -1,0 +1,47 @@
+---
+const { title, description, buttonText, buttonUrl } = Astro.props.data || {};
+---
+
+<section class="block-cta">
+  <div class="block-cta-inner">
+    {title && <h2 class="block-cta-title">{title}</h2>}
+    {description && <p class="block-cta-desc">{description}</p>}
+    {buttonText && buttonUrl && (
+      <a href={buttonUrl} class="block-cta-btn">{buttonText}</a>
+    )}
+  </div>
+</section>
+
+<style>
+  .block-cta {
+    padding: 2rem;
+    text-align: center;
+    background: rgb(var(--gray-light));
+    border-radius: 12px;
+    margin: 2rem 0;
+  }
+  .block-cta-inner {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .block-cta-title {
+    margin: 0 0 0.5rem 0;
+    color: rgb(var(--black));
+  }
+  .block-cta-desc {
+    margin: 0 0 1rem 0;
+    color: rgb(var(--gray));
+  }
+  .block-cta-btn {
+    display: inline-block;
+    padding: 0.6rem 1.25rem;
+    background: var(--accent);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+  .block-cta-btn:hover {
+    opacity: 0.95;
+  }
+</style>
