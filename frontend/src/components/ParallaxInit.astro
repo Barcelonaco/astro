@@ -17,6 +17,16 @@
 
   if (bgModules.length === 0 && imgParallaxWrappers.length === 0) return;
 
+  // Promote parallax elements to GPU layer for smoother transforms
+  bgModules.forEach(function(mod) {
+    var bg = mod.querySelector('.background');
+    if (bg) bg.style.willChange = 'transform';
+  });
+  imgParallaxWrappers.forEach(function(wrapper) {
+    var illus = wrapper.querySelector('.illus');
+    if (illus) illus.style.willChange = 'transform';
+  });
+
   var ticking = false;
 
   function update() {

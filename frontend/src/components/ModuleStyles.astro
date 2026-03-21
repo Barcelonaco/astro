@@ -79,12 +79,18 @@ const pluginBlockTypes = blocks
 <link rel="stylesheet" href="/nickl-assets/css/app.css" media="print" onload="this.media='all'" />
 <noscript><link rel="stylesheet" href="/nickl-assets/css/app.css" /></noscript>
 
-{/* Module-specific CSS (only for blocks used on this page) */}
+{/* Module-specific CSS — async load to avoid render-blocking */}
 {cssFiles.map((name) => (
-  <link rel="stylesheet" href={`/nickl-assets/css/${name}.css`} />
+  <>
+    <link rel="stylesheet" href={`/nickl-assets/css/${name}.css`} media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href={`/nickl-assets/css/${name}.css`} /></noscript>
+  </>
 ))}
 
-{/* Plugin CSS */}
+{/* Plugin CSS — async load */}
 {pluginBlockTypes.map((type) => (
-  <link rel="stylesheet" href={`/plugin-assets/${type}/css/${type}.css`} />
+  <>
+    <link rel="stylesheet" href={`/plugin-assets/${type}/css/${type}.css`} media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href={`/plugin-assets/${type}/css/${type}.css`} /></noscript>
+  </>
 ))}

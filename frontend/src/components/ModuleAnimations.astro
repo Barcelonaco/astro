@@ -204,6 +204,8 @@
           el.style.transition = 'opacity 0.7s ease, transform 0.7s ease';
           el.style.opacity = '1';
           el.style.transform = 'translate(0, 0)';
+          // Free GPU memory after animation completes
+          setTimeout(function() { el.style.willChange = 'auto'; }, 750);
         }, delay);
       });
     });
