@@ -35,7 +35,7 @@ const titleSizeClass = titleSize ? ` h1-${titleSize}` : '';
 >
   {heightBanner !== 'none' && imgUrl && (
     <div class="background">
-      <img src={optimizedImageUrl(imgUrl, 1920, 80)} fetchpriority="high" loading="eager" decoding="sync" alt="" class="illus" />
+      <img src={optimizedImageUrl(imgUrl, 1440, 55)} width="1440" height="600" fetchpriority="high" loading="eager" decoding="sync" alt="" class="illus" />
     </div>
   )}
 
@@ -55,3 +55,35 @@ const titleSizeClass = titleSize ? ` h1-${titleSize}` : '';
     </div>
   </div>
 </div>
+
+<script is:inline>
+(function(){
+  var banner = document.querySelector('.module-banner-page');
+  if (!banner) return;
+  var header = document.getElementById('header');
+  if (!header) return;
+  var isTransparent = header.classList.contains('background-transparent');
+  var size = banner.classList.contains('large') ? 'large'
+           : banner.classList.contains('medium') ? 'medium'
+           : banner.classList.contains('small') ? 'small' : null;
+  if (!size) return;
+  var hh = isTransparent ? 0 : header.offsetHeight;
+  var vh = window.innerHeight;
+  var heights = { large: vh - hh, medium: Math.round(vh * 0.7), small: Math.round(vh * 0.5) };
+  banner.style.height = heights[size] + 'px';
+  banner.style.overflow = 'hidden';
+  // Positionner le titre en bas via absolute positioning
+  var container = banner.querySelector('.container-large');
+  if (container) {
+    container.style.position = 'absolute';
+    container.style.bottom = '0';
+    container.style.left = '0';
+    container.style.width = '100%';
+    container.style.zIndex = '10';
+  }
+  // Neutraliser le ::before CSS qui crée une hauteur parasite
+  var s = document.createElement('style');
+  s.textContent = '.module-banner-page .desc::before{padding-top:0!important;min-height:0!important}';
+  document.head.appendChild(s);
+})();
+</script>

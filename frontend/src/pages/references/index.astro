@@ -1,0 +1,339 @@
+---
+export const prerender = false;
+
+import BaseHead from '../../components/BaseHead.astro';
+import ModuleStyles from '../../components/ModuleStyles.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import DeferredLoader from '../../components/DeferredLoader.astro';
+import SiteOverlays from '../../components/SiteOverlays.astro';
+import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
+import { getReferences, getReferenceCategories, getFrontendBootstrap, getCPTOptions, type ReferenceItem } from '../../lib/api';
+import { optimizedImageUrl } from '../../lib/module-helpers';
+
+const REFS_PER_PAGE = 6;
+
+const [{ siteInfo, styleSettings, siteSettings, navigation: navigationData, secondaryNavigation }, categories, cptOptions] = await Promise.all([
+  getFrontendBootstrap(),
+  getReferenceCategories(),
+  getCPTOptions('references'),
+]);
+
+const siteName = siteInfo.siteName || SITE_TITLE;
+const siteDescription = siteInfo.siteDescription || SITE_DESCRIPTION;
+
+// CPT options
+const archiveTitle = cptOptions.archive_title || 'Références';
+const showTitle = cptOptions.title_in_header !== 'hideTitle';
+const useH1 = cptOptions.h1_in_header !== 'no';
+const archiveOrder = cptOptions.randomise_refs === 'random' ? 'random' : undefined;
+
+// Initial load: 6 published references
+const initialResult = await getReferences({ status: 'published', limit: REFS_PER_PAGE, order: archiveOrder });
+const initialRefs = Array.isArray(initialResult) ? initialResult : initialResult.items;
+const totalRefs = Array.isArray(initialResult) ? initialResult.length : initialResult.total;
+const hasMore = totalRefs > REFS_PER_PAGE;
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ');
+
+function getPhotos(ref: ReferenceItem): string[] {
+  const raw = ref.custom_fields?.photos;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+function getMainImage(ref: ReferenceItem): string {
+  const photos = getPhotos(ref);
+  if (photos.length > 0) return photos[0];
+  if (ref.featured_image) {
+    const fi = ref.featured_image as Record<string, any>;
+    return fi.sizes?.half || fi.url || '';
+  }
+  return '';
+}
+
+function getCategoryNames(ref: ReferenceItem): string {
+  if (!ref.categories || ref.categories.length === 0) return '';
+  return ref.categories.map(c => c.name).join(' - ');
+}
+---
+
+<!doctype html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`${archiveTitle} | ${siteName}`} description={siteDescription} styleSettings={styleSettings} siteSettings={siteSettings} />
+    <ModuleStyles blocks={null} />
+    <!-- NB: references.css removed — NicklBlocReferences.astro provides all module styles -->
+    <style is:inline>
+      .page-archive-references { padding-top: 60px; padding-bottom: 60px; }
+      .page-archive-references .archive-top .title { padding-bottom: 2.5rem; }
+      .page-archive-references .tabs { margin-top: 0; }
+      .module-references .list .illus-wrapper {
+        display: block !important;
+        position: relative !important;
+        padding-top: 74.78% !important;
+        overflow: hidden !important;
+        width: 100% !important;
+        border: 0 !important;
+      }
+      .module-references .list .illus-wrapper::before {
+        display: none !important;
+      }
+      .module-references .list .illus {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        object-position: center !important;
+      }
+    </style>
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigationData} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+    <main id="main" class="main-page page-archive-references" role="main">
+      <section>
+        <div class="container-large">
+          {showTitle && (
+            <div class="archive-top">
+              {useH1 ? (
+                <h1 class="title title-section-1">{archiveTitle}</h1>
+              ) : (
+                <p class="title title-section-1">{archiveTitle}</p>
+              )}
+            </div>
+          )}
+
+          <div class="module-references js_refs-container">
+            {/* Category filter tabs */}
+            {categories.length > 0 && (
+              <ul class="tabs">
+                <li class="tab">
+                  <button type="button" class="link active js_change-term" data-value="all">Tout</button>
+                </li>
+                {categories.map((cat) => (
+                  <li class="tab">
+                    <button type="button" class="link js_change-term" data-value={cat.slug}>{cat.name}</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* References grid */}
+            <ul class="list js_list-refs">
+              {initialRefs.map((ref) => {
+                const photos = getPhotos(ref);
+                const mainImage = getMainImage(ref);
+                const categoryNames = getCategoryNames(ref);
+                const customerName = ref.custom_fields?.customer_name || '';
+
+                return (
+                  <li class="item" data-id={ref.id}>
+                    <div class="slider-wrapper">
+                      {photos.length > 1 ? (
+                        <div class="swiper slider js_references-slider">
+                          <div class="swiper-wrapper">
+                            {photos.map((photo, idx) => (
+                              <div class="swiper-slide sub-item">
+                                <a href={`/references/${ref.slug}`} class="link illus-wrapper">
+                                  <img src={optimizedImageUrl(photo, 600, 80)} alt={ref.title} class="illus" loading="lazy" />
+                                  <div class="overlay">
+                                    <span class="icon" aria-hidden="true">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>
+                                    </span>
+                                    <span>Découvrir</span>
+                                  </div>
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                          <button type="button" class="slider-navigation prev"></button>
+                          <button type="button" class="slider-navigation next"></button>
+                          <div class="slider-pagination js_references-slider-pagination"></div>
+                        </div>
+                      ) : (
+                        <a href={`/references/${ref.slug}`} class="illus-wrapper">
+                          {mainImage && <img src={optimizedImageUrl(mainImage, 600, 80)} alt={ref.title} class="illus" loading="lazy" />}
+                          <div class="overlay">
+                            <span class="icon" aria-hidden="true">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>
+                            </span>
+                            <span>Découvrir</span>
+                          </div>
+                        </a>
+                      )}
+                    </div>
+                    <a href={`/references/${ref.slug}`} class="link">
+                      {categoryNames && <p class="category">{categoryNames}</p>}
+                      <h3 class="title title-section-3">{ref.title}</h3>
+                      {customerName && <p class="name">{customerName}</p>}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Load more */}
+            <div class="btn-more-wrapper js_list-pagination">
+              {hasMore && (
+                <button type="button" class="btn btn-tertiary color-primary js_load-more" data-page="2">En voir plus</button>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+  </body>
+</html>
+
+<script is:inline>
+(function() {
+  var API_URL = document.querySelector('meta[name="x-api-url"]')?.getAttribute('content') || '/api';
+  if (API_URL === '/api') API_URL = window.location.origin.replace(':4321', ':3000') + '/api';
+
+  var container = document.querySelector('.js_refs-container');
+  if (!container) return;
+
+  var listEl = container.querySelector('.js_list-refs');
+  var paginationEl = container.querySelector('.js_list-pagination');
+  var currentTerm = 'all';
+
+  // Tab click: filter by category
+  container.querySelectorAll('.js_change-term').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      container.querySelectorAll('.js_change-term').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentTerm = btn.getAttribute('data-value');
+      loadRefs(currentTerm, 0, true);
+    });
+  });
+
+  // Load more click (event delegation)
+  container.addEventListener('click', function(e) {
+    var btn = e.target.closest('.js_load-more');
+    if (!btn) return;
+    var page = parseInt(btn.getAttribute('data-page')) || 2;
+    var offset = (page - 1) * 6;
+    loadRefs(currentTerm, offset, false, page);
+  });
+
+  function loadRefs(term, offset, replace, nextPage) {
+    var url = API_URL + '/cpt/references?status=published&limit=6&offset=' + (offset || 0);
+    if (term && term !== 'all') url += '&category=' + encodeURIComponent(term);
+
+    fetch(url)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var items = data.items || data;
+        var total = data.total || items.length;
+        var html = items.map(function(ref) { return renderRefItem(ref); }).join('');
+
+        if (replace) {
+          listEl.innerHTML = html;
+        } else {
+          listEl.insertAdjacentHTML('beforeend', html);
+        }
+
+        // Update pagination
+        var loaded = listEl.querySelectorAll('.item').length;
+        if (loaded < total) {
+          var np = replace ? 2 : ((nextPage || 2) + 1);
+          paginationEl.innerHTML = '<button type="button" class="btn btn-tertiary color-primary js_load-more" data-page="' + np + '">En voir plus</button>';
+        } else {
+          paginationEl.innerHTML = '';
+        }
+
+        reloadSwipers();
+      })
+      .catch(function(err) { console.error('Refs load error:', err); });
+  }
+
+  function renderRefItem(ref) {
+    var cf = ref.custom_fields || {};
+    var photos = [];
+    try { photos = JSON.parse(cf.photos || '[]'); } catch(e) {}
+    var mainImage = photos[0] || (ref.featured_image ? (ref.featured_image.sizes?.half || ref.featured_image.url || '') : '');
+    var categoryNames = ref.categories ? ref.categories.map(function(c) { return c.name; }).join(' - ') : '';
+    var customerName = cf.customer_name || '';
+    var slug = ref.slug;
+
+    function optImg(url) {
+      if (!url) return '';
+      var m = url.match(/\/uploads\/media\/([^/?#]+)$/);
+      if (m && !/\.(mp4|webm|mov|avi)$/i.test(m[1])) {
+        return '/uploads/media/_optimized/' + m[1] + '?w=600&q=80&f=webp';
+      }
+      return url;
+    }
+
+    var svgEye = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>';
+    var overlayHtml = '<div class="overlay"><span class="icon" aria-hidden="true">' + svgEye + '</span><span>Découvrir</span></div>';
+
+    // Build slider or single image
+    var sliderHtml = '';
+    if (photos.length > 1) {
+      var slides = photos.map(function(photo) {
+        return '<div class="swiper-slide sub-item"><a href="/references/' + slug + '" class="link illus-wrapper"><img src="' + optImg(photo) + '" alt="' + escHtml(ref.title) + '" class="illus" loading="lazy" />' + overlayHtml + '</a></div>';
+      }).join('');
+      sliderHtml = '<div class="swiper slider js_references-slider"><div class="swiper-wrapper">' + slides + '</div><button type="button" class="slider-navigation prev"></button><button type="button" class="slider-navigation next"></button><div class="slider-pagination js_references-slider-pagination"></div></div>';
+    } else if (mainImage) {
+      sliderHtml = '<a href="/references/' + slug + '" class="illus-wrapper"><img src="' + optImg(mainImage) + '" alt="' + escHtml(ref.title) + '" class="illus" loading="lazy" />' + overlayHtml + '</a>';
+    }
+
+    var catHtml = categoryNames ? '<p class="category">' + escHtml(categoryNames) + '</p>' : '';
+    var nameHtml = customerName ? '<p class="name">' + escHtml(customerName) + '</p>' : '';
+
+    return '<li class="item" data-id="' + ref.id + '"><div class="slider-wrapper">' + sliderHtml + '</div><a href="/references/' + slug + '" class="link">' + catHtml + '<h3 class="title title-section-3">' + escHtml(ref.title) + '</h3>' + nameHtml + '</a></li>';
+  }
+
+  function escHtml(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function reloadSwipers() {
+    if (!window.Swiper) return;
+    document.querySelectorAll('.module-references .js_references-slider').forEach(function(el) {
+      if (el.swiper) return;
+      var count = el.querySelectorAll('.sub-item').length;
+      if (count < 2) return;
+      var w = el.closest('.slider-wrapper') || el.parentElement;
+      new window.Swiper(el, {
+        loop: true,
+        speed: 750,
+        allowTouchMove: false,
+        slidesPerView: 1,
+        navigation: { nextEl: w.querySelector('.next'), prevEl: w.querySelector('.prev') },
+        pagination: { el: w.querySelector('.js_references-slider-pagination'), type: 'bullets', clickable: true }
+      });
+    });
+  }
+
+  // Init swipers: wait for Swiper to be loaded by DeferredLoader
+  function waitForSwiper() {
+    if (window.Swiper) {
+      reloadSwipers();
+    } else {
+      var check = setInterval(function() {
+        if (window.Swiper) {
+          clearInterval(check);
+          reloadSwipers();
+        }
+      }, 200);
+      // Stop checking after 10s
+      setTimeout(function() { clearInterval(check); }, 10000);
+    }
+  }
+  waitForSwiper();
+})();
+</script>

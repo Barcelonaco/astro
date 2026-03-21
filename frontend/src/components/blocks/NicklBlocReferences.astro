@@ -1,19 +1,317 @@
 ---
 /**
- * Module BlocReferences — Bloc de références
- * Stub — les références sont un CPT WordPress non disponible.
+ * Module BlocReferences — Reproduit modules/references.blade.php
+ * Affiche 3 références (manuelles ou automatiques) avec slider d'images,
+ * catégorie, titre, nom client. Optionnel : lien vers l'archive.
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { resolveLink } from '../../lib/module-classes';
+import { resolveImageUrl, resolveImageAlt, optimizedImageUrl } from '../../lib/module-helpers';
+import { getReferences, type ReferenceItem } from '../../lib/api';
 
 interface Props {
   data: Record<string, any>;
 }
 
 const { data } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const apiOrigin = new URL(API_URL).origin;
+
+// Fetch references: manual (refs_id) or automatic (3 latest)
+let refs: ReferenceItem[] = [];
+const isManual = data.is_manual === true || data.is_manual === 1 || data.is_manual === '1';
+const refsId = (data.refs_id as number[]) || [];
+
+if (isManual && refsId.length > 0) {
+  // Manual: fetch all published, then filter by IDs
+  const allRefs = await getReferences({ status: 'published' });
+  const allItems = Array.isArray(allRefs) ? allRefs : allRefs.items;
+  refs = refsId
+    .map(id => allItems.find(r => r.id === id))
+    .filter((r): r is ReferenceItem => !!r)
+    .slice(0, 3);
+} else {
+  // Automatic: 3 latest published
+  const result = await getReferences({ status: 'published', limit: 3 });
+  refs = Array.isArray(result) ? result.slice(0, 3) : result.items.slice(0, 3);
+}
+
+const showArchiveLink = data.display_archive_link === true || data.display_archive_link === 1 || data.display_archive_link === '1';
+const archiveLinkLabel = (data.archive_link_label as string) || 'Voir toutes les références';
+
+// Parse photos from custom_fields
+function getPhotos(ref: ReferenceItem): string[] {
+  const raw = ref.custom_fields?.photos;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function getFeaturedImageUrl(ref: ReferenceItem): string {
+  if (ref.featured_image) {
+    return resolveImageUrl(ref.featured_image, apiOrigin, 'half');
+  }
+  return '';
+}
+
+function getCategory(ref: ReferenceItem): string {
+  return ref.categories?.[0]?.name || '';
+}
+
+const indexPopin = Math.floor(Math.random() * 1000);
 ---
 
-<NicklModuleWrapper data={data} moduleName="bloc-references" containerLarge>
-  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
-    Les références ne sont pas disponibles en mode statique.
-  </p>
+<NicklModuleWrapper data={data} moduleName="references" containerLarge>
+  {refs.length > 0 && (
+    <>
+      <ul class="list">
+        {refs.map((ref) => {
+          const photos = getPhotos(ref);
+          const mainImage = photos[0] || getFeaturedImageUrl(ref);
+          const category = getCategory(ref);
+          const customerName = ref.custom_fields?.customer_name || '';
+
+          return (
+            <li class="item">
+              <div class="slider-wrapper">
+                {photos.length > 1 ? (
+                  <div class="swiper slider js_references-slider">
+                    <div class="swiper-wrapper">
+                      {photos.map((photo) => (
+                        <div class="swiper-slide">
+                          <a href={`/references/${ref.slug}`} class="illus-wrapper">
+                            <img src={optimizedImageUrl(photo, 400, 65)} alt={ref.title} class="illus" loading="lazy" />
+                            <div class="overlay">
+                              <span class="icon" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>
+                              </span>
+                              <span>Découvrir</span>
+                            </div>
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                    <button type="button" class="slider-navigation prev"></button>
+                    <button type="button" class="slider-navigation next"></button>
+                    <div class="slider-pagination js_references-slider-pagination"></div>
+                  </div>
+                ) : (
+                  <a href={`/references/${ref.slug}`} class="illus-wrapper">
+                    {mainImage && <img src={optimizedImageUrl(mainImage, 400, 65)} alt={ref.title} class="illus" loading="lazy" />}
+                    <div class="overlay">
+                      <span class="icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>
+                      </span>
+                      <span>Découvrir</span>
+                    </div>
+                  </a>
+                )}
+              </div>
+              <a href={`/references/${ref.slug}`} class="link">
+                {category && <p class="category">{category}</p>}
+                <h3 class="title title-section-3">{ref.title}</h3>
+                {customerName && <p class="name">{customerName}</p>}
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+
+      {showArchiveLink && (
+        <div class="btn-more-wrapper">
+          <a href="/references" class="btn btn-primary">{archiveLinkLabel}</a>
+        </div>
+      )}
+    </>
+  )}
 </NicklModuleWrapper>
+
+<style is:global>
+  .module-references .list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 26px;
+    row-gap: 48px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .module-references .list .item {
+    width: calc(100% / 3 - 18px);
+    transition: none;
+  }
+  .module-references .list .item:hover .overlay {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .module-references .list .item:hover .illus-wrapper::after {
+    opacity: .5;
+  }
+  .module-references .list .item:hover .title {
+    color: var(--color-primary, #333);
+  }
+  .module-references .list .slider-wrapper {
+    overflow: hidden;
+    background-color: rgba(0,0,0,.05);
+    border-radius: var(--border-radius, 0);
+  }
+  .module-references .list .illus-wrapper {
+    display: block;
+    width: 100%;
+    position: relative;
+    border: 0;
+    overflow: hidden;
+  }
+  .module-references .list .illus-wrapper::after {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    background-color: var(--color-primary, #000);
+    content: '';
+    transition: opacity .3s ease;
+    z-index: 2;
+  }
+  .module-references .list .illus {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+  }
+  .module-references .list .overlay {
+    position: absolute;
+    top: 28px;
+    right: 28px;
+    opacity: 0;
+    z-index: 5;
+    text-align: center;
+    font-size: 15px;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: .05em;
+    color: #fff;
+    transform: translateY(-10px);
+    transition: all .3s ease;
+  }
+  .module-references .list .overlay .icon {
+    display: block;
+    margin-bottom: 5px;
+  }
+  .module-references .list .overlay svg * {
+    fill: #fff;
+  }
+  .module-references .list .link {
+    display: block;
+    width: 100%;
+    padding-top: 14px;
+    border: 0;
+    text-decoration: none;
+    color: inherit;
+  }
+  .module-references .list .category {
+    margin-bottom: 2px;
+    font-size: 14px;
+    line-height: 1.4;
+    letter-spacing: .05em;
+    color: var(--color-primary, #666);
+    text-transform: uppercase;
+  }
+  .module-references .list .title {
+    display: inline;
+    margin: 0;
+    text-align: inherit;
+  }
+  .module-references .list .name {
+    margin-top: 12px;
+    font-size: 20px;
+    line-height: 1.4;
+    letter-spacing: .05em;
+    color: #999;
+  }
+  .module-references .list .slider-navigation {
+    padding: 32px;
+    opacity: 0;
+  }
+  .module-references .list .slider:hover .slider-navigation {
+    opacity: 1;
+  }
+  .module-references .list .slider-pagination {
+    bottom: 21px;
+  }
+  .module-references .btn-more-wrapper {
+    margin-top: 60px;
+    text-align: center;
+  }
+
+  /* Background variants */
+  .module-references.has-background-primary .list .category,
+  .module-references.has-background-primary .list .name,
+  .module-references.has-background-secondary .list .category,
+  .module-references.has-background-secondary .list .name {
+    color: #fff;
+  }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .module-references .list .item {
+      width: calc(50% - 13px);
+    }
+    .module-references .list .slider-navigation {
+      opacity: 1;
+    }
+  }
+  @media (max-width: 600px) {
+    .module-references .list .item {
+      width: 100%;
+    }
+  }
+</style>
+
+<script is:inline>
+(function() {
+  // Init Swiper sliders for references module (deferred)
+  function initRefSliders() {
+    if (!window.Swiper) return;
+    document.querySelectorAll('.module-references .js_references-slider').forEach(function(el) {
+      if (el.swiper) return;
+      var count = el.querySelectorAll('.swiper-slide').length;
+      if (count < 2) return;
+      var w = el.closest('.slider-wrapper') || el.parentElement;
+      new window.Swiper(el, {
+        loop: count > 2,
+        speed: 750,
+        slidesPerView: 1,
+        navigation: {
+          nextEl: w.querySelector('.next'),
+          prevEl: w.querySelector('.prev')
+        },
+        pagination: {
+          el: w.querySelector('.js_references-slider-pagination'),
+          type: 'bullets',
+          clickable: true
+        }
+      });
+    });
+  }
+
+  // Wait for Swiper to be loaded (by DeferredLoader)
+  if (window.Swiper) {
+    initRefSliders();
+  } else {
+    var check = setInterval(function() {
+      if (window.Swiper) { clearInterval(check); initRefSliders(); }
+    }, 500);
+    setTimeout(function() { clearInterval(check); }, 15000);
+  }
+})();
+</script>

@@ -1,0 +1,136 @@
+/* Module bloc-references — plugin CSS (loaded via DeferredLoader for pages using this block) */
+/* Most styles are inlined in NicklBlocReferences.astro via <style is:global> */
+/* This file provides additional theme-aware overrides */
+
+.module-references .list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px;
+  row-gap: 48px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.module-references .list .item {
+  width: calc(100% / 3 - 18px);
+}
+.module-references .list .item:hover .overlay {
+  opacity: 1;
+  transform: translateY(0);
+}
+.module-references .list .item:hover .illus-wrapper::after {
+  opacity: .5;
+}
+.module-references .list .item:hover .title {
+  color: var(--color-primary, #333);
+}
+.module-references .list .slider-wrapper {
+  overflow: hidden;
+  background-color: rgba(0,0,0,.05);
+}
+.border-rounded .module-references .list .slider-wrapper {
+  border-radius: var(--border-radius, 8px);
+}
+.module-references .list .illus-wrapper {
+  display: block;
+  width: 100%;
+  position: relative;
+  padding-top: 74.78%;
+  border: 0;
+  overflow: hidden;
+}
+.module-references .list .illus-wrapper::after {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  opacity: 0;
+  background-color: var(--color-primary, #000);
+  content: '';
+  transition: opacity .3s ease;
+  z-index: 2;
+}
+.module-references .list .illus {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.module-references .list .overlay {
+  position: absolute;
+  top: 28px; right: 28px;
+  opacity: 0; z-index: 5;
+  text-align: center;
+  font-size: 15px; line-height: 1;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: #fff;
+  transform: translateY(-10px);
+  transition: all .3s ease;
+}
+.module-references .list .overlay .icon {
+  display: block;
+  margin-bottom: 5px;
+}
+.module-references .list .overlay svg * {
+  fill: #fff;
+}
+.module-references .list .link {
+  display: block;
+  width: 100%;
+  padding-top: 14px;
+  border: 0;
+  text-decoration: none;
+  color: inherit;
+}
+.module-references .list .category {
+  margin-bottom: 2px;
+  font-size: 14px;
+  line-height: 1.4;
+  letter-spacing: .05em;
+  color: var(--color-primary, #666);
+  text-transform: uppercase;
+}
+.module-references .list .title {
+  display: inline;
+  margin: 0;
+  text-align: inherit;
+}
+.module-references .list .name {
+  margin-top: 12px;
+  font-size: 20px;
+  line-height: 1.4;
+  letter-spacing: .05em;
+  color: #999;
+}
+.module-references .btn-more-wrapper {
+  margin-top: 60px;
+  text-align: center;
+}
+
+/* Background color variants */
+.module-references.has-background-primary .list .category,
+.module-references.has-background-primary .list .name,
+.module-references.has-background-secondary .list .category,
+.module-references.has-background-secondary .list .name {
+  color: #fff;
+}
+.module-references.has-background-primary .list .slider-navigation::before,
+.module-references.has-background-secondary .list .slider-navigation::before {
+  border-color: #fff;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .module-references .list .item {
+    width: calc(50% - 13px);
+  }
+  .module-references .list .slider-navigation {
+    opacity: 1;
+  }
+}
+@media (max-width: 600px) {
+  .module-references .list .item {
+    width: 100%;
+  }
+}

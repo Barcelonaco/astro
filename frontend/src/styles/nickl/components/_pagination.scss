@@ -1,0 +1,62 @@
+/**
+ * GENERAL
+ */
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.pagination {
+    margin-top: rem(20px);
+    .nav-links {
+        @include flex(center, center);
+    }
+    .page-numbers {
+        position: relative;
+        width: rem(42px);
+        height: rem(42px);
+        margin: 0 rem(7px);
+        cursor: pointer;
+        @include flex(center, center);
+        font-size: rem(20px);
+        line-height: 1;
+        font-weight: 700;
+        color: $color3;
+        @include hover {
+            color: $color4;
+        }
+        &:not(.prev):not(.next) {
+            &.current {
+                color: $color-default;
+            }
+        }
+        &.prev, &.next, {
+            font-size: 0;
+            line-height: 0;
+            &::before {
+                position: absolute;
+                top: 50%;
+                width: rem(9px);
+                height: rem(9px);
+                border: 2px solid currentColor;
+                border-bottom: 0;
+                border-left: 0;
+                content: '';
+                transform: translate(-50%, -50%) rotate(45deg);
+            }
+        }
+        &.prev::before {
+            left: 53%;
+            transform: translate(-50%, -50%) rotate(-135deg);
+        }
+        &.next::before {
+            left: 47%;
+            transform: translate(-50%, -50%) rotate(45deg);
+        }
+        &:not(:active) {
+            transition: $transition-default;
+        }
+    }
+}

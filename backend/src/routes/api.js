@@ -47,9 +47,19 @@ import {
 import { getPlugins } from '../controllers/pluginController.js';
 import { renderBlock } from '../controllers/renderBlockController.js';
 import {
-  getCPTItems, getCPTItemBySlug, createCPTItem, updateCPTItem, deleteCPTItem,
-  getCPTCategories, createCPTCategory, updateCPTCategory, deleteCPTCategory
+  getCPTItems, getCPTItemBySlug, getCPTItemById, createCPTItem, updateCPTItem, deleteCPTItem,
+  getCPTCategories, createCPTCategory, updateCPTCategory, deleteCPTCategory,
+  getCPTOptions
 } from '../controllers/customPostTypeController.js';
+import {
+  getAllMenus, getMenuById, createMenu, updateMenu, deleteMenu,
+  saveMenuItems, getNavigationByLocation, getAvailablePages,
+  getPageMenus, syncPageMenus, getAllPageMenuInfo
+} from '../controllers/menuController.js';
+import {
+  getAllReusableBlocs, getReusableBlocById,
+  createReusableBloc, updateReusableBloc, deleteReusableBloc
+} from '../controllers/reusableBlocController.js';
 import { authenticateToken, isAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -79,12 +89,23 @@ router.delete('/categories/:id', authenticateToken, deleteCategory);
 // Public pages routes
 router.get('/pages', getAllPages);
 router.get('/pages/navigation', getNavigation);
+// Page ↔ Menu info (admin, must be before :slug)
+router.get('/pages/menu-info', authenticateToken, isAdmin, getAllPageMenuInfo);
 router.get('/pages/:slug', getPageBySlug);
 
 // Protected pages routes
 router.post('/pages', authenticateToken, createPage);
 router.put('/pages/:id', authenticateToken, updatePage);
 router.delete('/pages/:id', authenticateToken, deletePage);
+
+// Reusable blocs (public: list + get by ID for frontend rendering)
+router.get('/reusable-blocs', getAllReusableBlocs);
+router.get('/reusable-blocs/:id', getReusableBlocById);
+
+// Reusable blocs (admin CRUD)
+router.post('/reusable-blocs', authenticateToken, createReusableBloc);
+router.put('/reusable-blocs/:id', authenticateToken, updateReusableBloc);
+router.delete('/reusable-blocs/:id', authenticateToken, deleteReusableBloc);
 
 // Theme settings (public, for frontend)
 router.get('/settings/theme', getThemeSettings);
@@ -129,17 +150,34 @@ router.post('/media/upload', authenticateToken, isAdmin, mediaUpload, uploadMedi
 router.put('/media/:id', authenticateToken, isAdmin, updateMediaItem);
 router.delete('/media/:id', authenticateToken, isAdmin, deleteMediaItem);
 
-// Custom Post Types (dynamic, from plugins)
-router.get('/cpt/:postType', getCPTItems);
-router.get('/cpt/:postType/:slug', getCPTItemBySlug);
-router.post('/cpt/:postType', authenticateToken, createCPTItem);
-router.put('/cpt/:postType/:id', authenticateToken, updateCPTItem);
-router.delete('/cpt/:postType/:id', authenticateToken, deleteCPTItem);
+// Menus — public navigation by location
+router.get('/menus/navigation/:location', getNavigationByLocation);
 
-// CPT Categories
+// Menus — admin CRUD
+router.get('/menus', authenticateToken, isAdmin, getAllMenus);
+router.get('/menus/pages', authenticateToken, isAdmin, getAvailablePages);
+router.get('/menus/:id', authenticateToken, isAdmin, getMenuById);
+router.post('/menus', authenticateToken, isAdmin, createMenu);
+router.put('/menus/:id', authenticateToken, isAdmin, updateMenu);
+router.delete('/menus/:id', authenticateToken, isAdmin, deleteMenu);
+router.put('/menus/:id/items', authenticateToken, isAdmin, saveMenuItems);
+
+// Page ↔ Menu assignments (admin)
+router.get('/pages/:pageId/menus', authenticateToken, isAdmin, getPageMenus);
+router.put('/pages/:pageId/menus', authenticateToken, isAdmin, syncPageMenus);
+
+// Custom Post Types (dynamic, from plugins)
+// NOTE: categories route must come before :slug to avoid conflict
+router.get('/cpt/:postType/options', getCPTOptions);
+router.get('/cpt/:postType', getCPTItems);
 router.get('/cpt/:postType/categories', getCPTCategories);
 router.post('/cpt/:postType/categories', authenticateToken, createCPTCategory);
 router.put('/cpt/:postType/categories/:id', authenticateToken, updateCPTCategory);
 router.delete('/cpt/:postType/categories/:id', authenticateToken, deleteCPTCategory);
+router.get('/cpt/:postType/by-id/:id', getCPTItemById);
+router.get('/cpt/:postType/:slug', getCPTItemBySlug);
+router.post('/cpt/:postType', authenticateToken, createCPTItem);
+router.put('/cpt/:postType/:id', authenticateToken, updateCPTItem);
+router.delete('/cpt/:postType/:id', authenticateToken, deleteCPTItem);
 
 export default router;

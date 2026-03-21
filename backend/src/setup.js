@@ -120,6 +120,22 @@ const setup = async () => {
     `);
     console.log('✅ Pages table created');
 
+    // Create reusable blocs table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS reusable_blocs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content LONGTEXT,
+        status ENUM('draft', 'published') DEFAULT 'published',
+        author_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_status (status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Reusable blocs table created');
+
     // Create settings table
     await connection.query(`
       CREATE TABLE IF NOT EXISTS settings (
@@ -163,6 +179,41 @@ const setup = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Media items table created');
+
+    // Create menus table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS menus (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        location VARCHAR(100) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE INDEX idx_location (location)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Menus table created');
+
+    // Create menu_items table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS menu_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        menu_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        url VARCHAR(500) DEFAULT NULL,
+        type ENUM('page', 'custom', 'category') DEFAULT 'page',
+        page_id INT DEFAULT NULL,
+        parent_id INT DEFAULT NULL,
+        menu_order INT DEFAULT 0,
+        open_in_new_tab BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (menu_id) REFERENCES menus(id) ON DELETE CASCADE,
+        FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE SET NULL,
+        FOREIGN KEY (parent_id) REFERENCES menu_items(id) ON DELETE CASCADE,
+        INDEX idx_menu (menu_id),
+        INDEX idx_order (menu_order)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Menu items table created');
 
     // Create default admin user
     const hashedPassword = await bcrypt.hash('admin123', 10);

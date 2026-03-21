@@ -1,0 +1,362 @@
+@import '../base/common';
+/**
+ * GENERAL
+ * MEDIA QUERIES
+ */
+
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.module-gallery {
+    .module-columns.has-background-primary:not(.cols_have_background) &,
+    &.has-background-primary:not(.cols_have_background), 
+    .cols-background-primary &,
+    .module-columns.has-background-secondary:not(.cols_have_background) &,
+    &.has-background-secondary:not(.cols_have_background), 
+    .cols-background-secondary & {
+        &.style-2 .list {
+            .link {
+                @include hover {
+                    .title {
+                        color: inherit;
+                    }
+                }
+            }
+            .desc {
+                color: $color1;
+            }
+        }
+    }
+    .module-columns.has-background-secondary:not(.cols_have_background) &,
+    &.has-background-secondary:not(.cols_have_background), 
+    .cols-background-secondary & {
+        .list .illus-wrapper::after {
+           background-color: $color4;
+       }
+    }
+    .module-columns.has-background-tertiary:not(.cols_have_background) &,
+    &.has-background-tertiary:not(.cols_have_background), 
+    .cols-background-tertiary & {
+        &.style-2 .list {
+            .link {
+                @include hover {
+                    .title {
+                        color: inherit;
+                    }
+                }
+            }
+            .desc {
+                color: inherit;
+            }
+        }
+        .list .illus-wrapper::after {
+            background-color: $color-default;
+        }
+    }
+    &.style {
+        &-1 .list {
+            .link {
+                &:not(:active) .illus-wrapper::before {
+                    transition: $transition-default;
+                }
+            }
+            .illus-wrapper {
+                &::before {
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 50%;
+                    background: linear-gradient(0deg, rgba($color2, .5) 50%, rgba($color1, 0) 100%);
+                    content: '';
+                }
+                &:last-child::before {
+                    display: none;
+                }
+            }
+            .desc {
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                padding: rem(35px);
+                color: $color1;
+                text-shadow: 0 0 rem(20px) rgba($color2, .5);
+            }            
+            .txt {
+                display: none;
+            }
+        }
+        &-2 .list {
+            .link {
+                &:not(:active) .title {
+                    transition: $transition-default;
+                }
+                @include hover {
+                    .title {
+                        color: $color3;
+                    }
+                }
+            }
+            .desc {
+                margin-top: rem(15px);
+                color: $color7;
+            }
+            .title {
+                font-size: rem(20px);
+                line-height: $line-height-default;
+                letter-spacing: $letter-spacing-default;
+                font-weight: 600;
+            }            
+            .txt {
+                display: block;
+                font-size: rem(16px);
+                margin-top: rem(4px);
+            }
+        }
+        &-3 .list {
+            .link {
+                &:hover, &:focus {
+                    .desc {
+                        top: 0;
+                        color: $color1;
+                    }
+                    .title::before {
+                        top: rem(-60px);
+                        opacity: 0;
+                    }
+                }
+            }
+            .desc {
+                position: absolute;
+                top: rem(40px);
+                left: 0;
+                width: 100%;
+                height: 100%;
+                padding: rem(25px);
+                @include flex(center, center);
+                flex-direction: column;
+                text-align: center;
+                color: transparent;
+                transition: $transition-default;
+            }
+            .title {
+                position: static;
+                text-align: center;
+                &::before {
+                    position: absolute;
+                    top: rem(-40px);
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    padding: rem(25px);
+                    z-index: -1;
+                    @include flex(center, center);
+                    color: $color1;
+                    content: attr(data-text);
+                    transition: $transition-default;
+                }
+            }
+            .txt {
+                display: block;
+            }
+            .fake-btn {
+                display: block;
+                color: inherit;
+                transition: none !important;
+            }
+        }
+    }
+    .list {
+        &.img-fixe {
+            @include flex(flex-start, flex-start, wrap, 3, rem(20px));
+            row-gap: rem(20px);
+            &.columns {
+                &-1 .item {
+                    flex-basis: 100%
+                }
+                &-2 .item {
+                    flex-basis: calc(50% - #{rem(20px)} / 2)
+                }
+                &-4 .item {
+                    flex-basis: calc(25% - #{rem(60px)} / 4)
+                }
+                &-5 .item {
+                    flex-basis: calc(20% - #{rem(80px)} / 5)
+                }
+            }
+            .illus {
+                object-fit: cover;
+                aspect-ratio: 1/.75;
+            }
+        }
+        &.img-fluid {
+            &.columns {
+                &-2 {
+                    columns: 2;
+                }
+                &-3 {
+                    columns: 3;
+                }
+                &-4 {
+                    columns: 5;
+                }
+                &-5 {
+                    columns: 5;
+                }
+            }
+            .item {
+                margin-top: rem(20px);
+                &:first-child {
+                    margin-top: 0;
+                }
+            }
+        }
+        .link {
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            border: 0;
+            &:not(:active) .illus-wrapper::after {
+                transition: $transition-default;
+            }
+            &:hover .overlay {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            @include hover {
+                .illus-wrapper::after {
+                    opacity: .5;
+                }
+            }
+
+        }
+        .illus-wrapper {
+            position: relative;
+            background-color: rgba($color2, .1);
+            overflow: hidden;
+            &::after {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                opacity: 0;
+                background-color: $color3;
+                content: ''
+            }
+            .border-rounded & {
+                border-radius: $border-radius-default;
+            }
+        }
+        .illus {
+            display: block;
+            width: 100%;
+            margin: 0 auto;
+        }
+        .overlay {
+            position: absolute;
+            top: rem(28px);
+            right: rem(28px);
+            opacity: 0;
+            z-index: 5;
+            text-align: center;
+            font-size: rem(15px);
+            line-height: 1;
+            font-weight: 700;
+            letter-spacing: $letter-spacing-default;
+            color: $color1;
+            transform: translateY(rem(-10px));
+            transition: $transition-default;
+            .icon {
+                display: block;
+                margin-bottom: rem(5px);
+            }
+            svg {
+                margin: 0 auto;
+                * {
+                    fill: $color1;
+                }
+            }
+        }
+        .desc {
+            width: 100%;
+        }
+        .category, .title {
+            position: relative;
+            z-index: 5;
+        }
+        .category {
+            margin-bottom: rem(5px);
+            font-size: rem(14px);
+            line-height: $line-height-default;
+            letter-spacing: $letter-spacing-default;
+            text-transform: uppercase;
+        }
+        .title {
+            margin: 0;
+            text-align: left;
+        }
+        .fake-btn {
+            margin-top: rem(6px);
+            display: none;
+
+        }
+    }
+}
+
+
+
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media (hover: none) {
+    .module-gallery.style-3 .list {
+        .desc {
+            position: absolute;
+            top: 0;
+            background: linear-gradient(0deg, rgba($color1, 0) 15%, rgba($color2, .5) 50%, rgba($color1, 0) 85%);
+            color: $color1;
+        }
+        .title::before {
+            display: none;
+        }
+    }
+}
+
+
+
+@media only screen and (max-width: 1024px) {
+    .module-gallery .list {
+        &.img-fixe .item {
+            flex-basis: calc(100% / 2 - #{rem(20px)});
+        }
+        &.img-fluid.columns-3, &.img-fluid.columns-4, &.img-fluid.columns-5 {
+            columns: 2;
+        }
+    }
+}
+
+
+
+@media only screen and (max-width: 600px) {
+    .module-gallery .list {
+        &.img-fixe.columns {
+            &-2, &-3 {
+                .item {
+                    flex-basis: 100%;
+                }
+            }
+        }
+        &.img-fluid.columns {
+            &-2, &-3 {
+                columns: 1;
+            }
+        }
+    }
+}

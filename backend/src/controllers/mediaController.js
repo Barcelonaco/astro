@@ -176,10 +176,30 @@ export async function getMediaItems(req, res) {
   try {
     await ensureMediaTables();
     const folderId = normalizeFolderId(req.query.folder_id);
-    const [rows] = await pool.query(
-      'SELECT id, folder_id, type, filename, original_name, mime_type, size, width, height, url, created_at FROM media_items WHERE folder_id <=> ? ORDER BY created_at DESC',
-      [folderId]
-    );
+    const search = req.query.search ? req.query.search.trim() : '';
+
+    let sql = 'SELECT id, folder_id, type, filename, original_name, mime_type, size, width, height, url, created_at FROM media_items';
+    const params = [];
+
+    const showAll = req.query.all === '1';
+
+    if (search) {
+      sql += ' WHERE original_name LIKE ?';
+      params.push(`%${search}%`);
+      if (!showAll && folderId !== null && folderId !== undefined) {
+        sql += ' AND folder_id <=> ?';
+        params.push(folderId);
+      }
+    } else if (showAll) {
+      // No folder filter — return all items
+    } else {
+      sql += ' WHERE folder_id <=> ?';
+      params.push(folderId);
+    }
+
+    sql += ' ORDER BY created_at DESC';
+
+    const [rows] = await pool.query(sql, params);
     res.json(rows);
   } catch (error) {
     console.error('Get media items error:', error);
@@ -237,12 +257,19 @@ export async function updateMediaItem(req, res) {
   try {
     await ensureMediaTables();
     const { id } = req.params;
-    const folderId = normalizeFolderId(req.body.folder_id);
-    const originalName = req.body.original_name ? String(req.body.original_name).trim() : null;
-    if (originalName) {
-      await pool.query('UPDATE media_items SET folder_id = ?, original_name = ? WHERE id = ?', [folderId, originalName, id]);
-    } else {
-      await pool.query('UPDATE media_items SET folder_id = ? WHERE id = ?', [folderId, id]);
+    const updates = [];
+    const params = [];
+    if ('folder_id' in req.body) {
+      updates.push('folder_id = ?');
+      params.push(normalizeFolderId(req.body.folder_id));
+    }
+    if (req.body.original_name) {
+      updates.push('original_name = ?');
+      params.push(String(req.body.original_name).trim());
+    }
+    if (updates.length > 0) {
+      params.push(id);
+      await pool.query(`UPDATE media_items SET ${updates.join(', ')} WHERE id = ?`, params);
     }
     const [rows] = await pool.query('SELECT id, folder_id, type, filename, original_name, mime_type, size, width, height, url, created_at FROM media_items WHERE id = ?', [id]);
     res.json(rows[0]);

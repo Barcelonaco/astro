@@ -1,0 +1,453 @@
+@import '../base/common';
+@import '../components/buttons';
+@import '../components/form';
+/**
+ * GENERAL
+ * MEDIA QUERIES
+ */
+
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.module-form {
+    .module-columns.has-background-primary:not(.cols_have_background) &,
+    &.has-background-primary:not(.cols_have_background), 
+    .cols-background-primary &,
+    .module-columns.has-background-secondary:not(.cols_have_background) &,
+    &.has-background-secondary:not(.cols_have_background), 
+    .cols-background-secondary &,
+    .module-columns.has-background-tertiary:not(.cols_have_background) &,
+    &.has-background-tertiary:not(.cols_have_background), 
+    .cols-background-tertiary & {
+        .gform_wrapper {
+            .gform_footer input {
+                @extend .btn-primary;
+                min-width: rem(150px);
+                background-image: none;
+            }
+            .gsection {
+                border-color: $color1;
+            }
+            .gf_progressbar_title, h3, .gform_next_button, .gform_previous_button {
+              color: $color1;
+            }
+        }
+    }
+    .title-module {
+        margin-bottom: rem(15px);
+    }
+    h3 {
+        margin-top: rem(20px);
+      margin-bottom: rem(20px);
+      font-size: rem(24px);
+      color: $color3;
+      font-family: $font2;
+      line-height: 1.1;
+      font-weight: 700;
+      letter-spacing: $letter-spacing-default;
+      .mode-uppercase & {
+        text-transform: uppercase;
+      }
+    }
+    .gform_confirmation_wrapper {
+        text-align: center;
+        font-size: $size-default;
+        line-height: $line-height-default;
+        font-weight: 600;
+        letter-spacing: $letter-spacing-default;
+    }
+    .gform_required_legend {
+        display: none;
+    }
+    .gform_wrapper{
+        width: 100%;
+        max-width: 100%;
+        .gsection {
+            border-color: $color1;
+        }
+        .gform_submission_error {
+            text-align: center;
+            font-size: $size-default;
+            line-height: 1.25;
+            font-weight: 700;
+            color: $color-error;
+            padding: rem(8px) rem(8px);
+            background-color: $color1;
+            border: 1px solid $color-error;
+            .border-rounded & {
+                border-radius: .75rem;
+            }
+        }
+        .gf_step_number {
+            border-color: $color3;
+            color: $color-default;
+            font-weight: 700;
+        }
+        .gf_step_completed .gf_step_number::before {
+            background-color: $color-default;
+            border-color: $color-default;
+        }
+        .gf_step_active .gf_step_number {
+            background: $color3;
+            color: $color1;
+        }
+        .gform_fields {
+            display: flex;
+            margin-right: rem(-13px);
+            margin-left: rem(-13px);
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            align-items: flex-start;
+            gap: rem(16px);
+        }
+        /* Styles identiques aux champs woocommerce (pages/woocommerce.scss) */
+        .gfield {
+            position: relative;
+            flex-basis: 100%;
+            margin: rem($form-row-spacing-top) rem(13px) 0 rem(13px);
+
+            /* Width */
+            &.gfield--width-quarter {
+                flex-basis: calc(25% - rem(26px));
+            }
+            &.gfield--width-third {
+                flex-basis: calc(100% / 3 - (rem(26px) + 1.625rem));
+            }
+            &.gfield--width-five-twelfths {
+                flex-basis: calc(40% - rem(26px));
+            }
+            &.gfield--width-half {
+                flex-basis: calc(50% - rem(34px));
+            }
+            &.gfield--width-seven-twelfths {
+                flex-basis: calc(60% - rem(26px));
+            }
+            &.gfield--width-two-thirds {
+                flex-basis: calc((100% / 3) * 2 - rem(26px));
+            }
+            &.gfield--width-three-quarter {
+                flex-basis: calc(75% - rem(26px));
+            }
+            &.gfield--width-five-sixths {
+                flex-basis: calc(80% - rem(26px));
+            }
+            &.gfield--width-eleven-twelfths {
+                flex-basis: calc(90% - rem(26px));
+            }
+            &.gfield--width-full {
+                flex-basis: calc(100% - rem(26px));
+            }
+            &_html a {
+                @include animation-underline();
+                background-position: 0 100%;
+                background-size: 100% 1px;
+                @include hover {
+                    background-position: 100% 100%;
+                    background-size: 0 1px;
+                    color: $color3;
+                }
+            }
+
+            /* Select */
+            .ginput_container_select {
+                position: relative;
+                cursor: pointer;
+                overflow: hidden;
+                background-color: $color-form;
+                .border-rounded & {
+                    border-radius: rem(48px);
+                }
+                &::before, &::after {
+                    position: absolute;
+                    top: rem(21px);
+                    right: rem(17px);
+                    border-right: rem(6px) solid transparent;
+                    border-top: rem(6px) solid $color-default;
+                    border-left: rem(6px) solid transparent;
+                    content: '';
+                }
+                select {
+                    position: relative;
+                    padding-right: rem(45px) !important;
+                    z-index: 5;
+                    background-color: transparent !important;
+                    appearance: none;
+                    cursor: pointer;
+                    &.small {
+                        width: 100%;
+                        cursor: pointer;
+                    }
+                }
+            }
+
+            /* Checkbox / Radio */
+            /* Styles identiques à la page tunnel (pages/woocommerce-checkout.scss) et la page de connexion (pages/woocommerce-account.scss) */
+            .ginput_container_checkbox, .ginput_container_radio, .ginput_container_consent {
+                @extend .input-radio-checkbox;
+            }
+
+            /* RGPD */
+            .ginput_container_consent {
+                label {
+                    font-weight: 600;
+                }
+                + .gfield_description {
+                    margin-top: 0;
+                    padding-left: 0;
+                    border: unset;
+                    overflow-y: hidden;
+                }
+            }
+
+            /* Label */
+            &.hide-label .gfield_label {
+                display: none;
+            }
+            .gfield_label {
+                display: block;
+                margin-bottom: rem(8px);
+                padding-top: 0;
+                font-family: $font-default;
+                font-size: rem(17px);
+                line-height: $line-height-default;
+                font-weight: 700;
+                letter-spacing: $letter-spacing-default;
+                text-transform: none;
+            }
+
+            /* Champ */
+            .ginput_container {
+                input:not([type='radio']):not([type='checkbox']):not([type='submit']):not([type='button']):not([type='image']):not([type='file']),
+                textarea,
+                select {
+                    @extend .input-text;
+                }
+                input:not([type='radio']):not([type='checkbox']):not([type='submit']):not([type='button']):not([type='image']):not([type='file']) {
+                    &.small {
+                        width: 50%;
+                    }
+                    &.medium {
+                        width: 75%;
+                    }
+                    &.large {
+                        width: 100%;
+                    }
+                }
+                select:focus {
+                    border-color: transparent;
+                }
+                textarea {
+                    height: rem(110px);
+                    padding: rem(10px) rem(15px);
+                    line-height: 1.25;
+                    &.small {
+                        height: rem(100px);
+                    }
+                    &.medium {
+                        height: rem(150px);
+                    }
+                    &.large {
+                        height: rem(215px);
+                    }
+                    .border-rounded & {
+                        border-radius: rem(24px);
+                    }
+                }
+            }
+
+            &.gfield_calculation {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                .ginput_container {
+                    text-align: right;
+                    border: unset;
+                    input {
+                        color: $color3!important;
+                        background: none!important;
+                        font-size: 1.2rem!important;
+                        font-weight: 700!important;
+                        border: unset;
+                        &:focus {
+                            border: unset;
+                            pointer: default;
+                        }
+                    }
+                }
+            }
+
+            /* HTML */
+            &.gfield_html {
+                font-size: rem(15px);
+                line-height: 1.07;
+                letter-spacing: $letter-spacing-default;
+            }
+
+            /* Complex name / Complex address */
+            &.hide-sub-label {
+                .ginput_container_name, .ginput_container_address {
+                    label {
+                        display: none;
+                    }
+                }
+            }
+            .ginput_container_name, .ginput_container_address, .ginput_complex.ginput_container_email {
+                display: flex;
+                justify-content: flex-start;
+                align-items: stretch;
+                flex-wrap: wrap;
+                gap: rem(13px) rem(16px);
+                > * {
+                    flex-basis: calc(50% - rem(13px));
+                }
+                label {
+                    display: block;
+                    margin-bottom: rem(4px);
+                    font-size: rem(15px);
+                    line-height: $line-height-default;
+                    letter-spacing: $letter-spacing-default;
+                }
+            }
+
+            /* Complex */
+            .ginput_complex:not(.ginput_container_name):not(.ginput_container_address):not(.ginput_container_email) {
+                max-width: 100%;
+                display: flex;
+                justify-content: flex-start;
+                align-items: stretch;
+                column-gap: rem(26px);
+                > * {
+                    flex-basis: calc(50% - rem(13px));
+                }
+                .hour_minute_colon {
+                    display: none;
+                }
+                .ginput_container_date {
+                    flex-basis: calc((100% / 3) - ((rem(26px) * 2) / 3));
+                    max-width: calc((100% / 3) - ((rem(26px) * 2) / 3));
+                    margin-left: 0!important;
+                }
+            }
+
+            /* Message */
+            .gfield_description, .instruction {
+                margin-top: rem(5px);
+                font-size: rem(15px);
+                line-height: 1.07;
+                letter-spacing: $letter-spacing-default;
+                &.validation_message {
+                    color: $color-error;
+                }
+            }
+
+            /* Error */
+            &.gfield_error {
+                background-color: transparent;
+                border: 0;
+                .ginput_container:not(.ginput_container_checkbox) {
+                    input:not([type='radio']):not([type='checkbox']):not([type='submit']):not([type='button']):not([type='image']):not([type='file']),
+                    textarea, select {
+                        border-color: $color-error;
+                    }
+                }
+                .gfield_description {
+                    padding-left: rem(12px);
+                }
+            }
+        }
+        .gform_button, .gform-button {
+            @extend .btn;
+            @extend .btn-primary;
+            padding-right: rem(45px);
+            padding-left: rem(66px);
+            background-image: url('~@images/svg/send.svg');
+            background-size: rem(20px) rem(17px);
+            background-position: rem(34px) 50%;
+            background-repeat: no-repeat;
+        }
+        .gform_next_button,.gform_previous_button.button {
+            @extend .btn;
+            @extend .btn-tertiary;
+            background-color: transparent;
+            cursor: pointer;
+        }
+        .gform_ajax_spinner {
+            display: inline-block;
+            margin-left: rem(10px);
+            vertical-align: middle;
+        }
+        .gform_footer {
+            position: relative;
+            max-width: 100%;
+            margin: rem(50px) auto 0;
+            .gform_ajax_spinner {
+                position: absolute;
+                top: calc(100% + #{rem(10px)});
+                left: 50%;
+                margin-left: 0;
+                transform: translateX(-50%);
+            }
+        }
+
+      .gchoice {
+        position: relative;
+        &:not(:last-child) {
+          margin-bottom: rem(8px);
+        }
+      }
+      /* reCaptcha */
+      .ginput_recaptcha {
+        display: none;
+      }
+    }
+}
+
+
+@media screen and (max-width: 768px) {
+    .module-form .gform_wrapper {
+        .gfield {
+            &.gfield_calculation {
+                flex-direction: column;
+                .ginput_container {
+                    width: 100%;
+                }
+            }
+            &.gfield--width-half {
+                flex-basis: calc(100%);
+            }
+        }
+    }
+}
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 600px) {
+    .module-form .gform_wrapper {
+        .gform_fields {
+            display: block;
+        }
+        .gfield {
+            .ginput_container_name, .ginput_container_address, .ginput_complex:not(.ginput_container_name):not(.ginput_container_address) {
+                display: block;
+                > * {
+                    display: block;
+                    margin-top: .8125rem;
+                    &:first-child {
+                        margin-top: 0;
+                    }
+                }
+            }
+            &.gfield_calculation {
+                flex-direction: column;
+                .ginput_container {
+                    width: 100%;
+                }
+            }
+        }
+    }
+}

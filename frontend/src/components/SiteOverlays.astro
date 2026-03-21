@@ -11,7 +11,13 @@ const { siteSettings: s = {} } = Astro.props;
 
 // Popup / Alert
 const showAlert = s.show_alert === '1';
+const blocColorAlert = s.bloc_color_alert || 'no-background-color';
 const alertText = s.alert_text || '';
+const alertCtaUrl = s.alert_cta_url || '';
+const alertCtaText = s.alert_cta_text || '';
+const alertCta2Url = s.alert_cta2_url || '';
+const alertCta2Text = s.alert_cta2_text || '';
+const hasAlertCtas = (alertCtaUrl && alertCtaText) || (alertCta2Url && alertCta2Text);
 
 // Floating button
 const showBtn = s.show_btn === '1';
@@ -29,17 +35,31 @@ const schedule = s.schedule || '';
 const socials = [
   { key: 'instagram', label: 'Instagram' },
   { key: 'facebook', label: 'Facebook' },
+  { key: 'threads', label: 'Threads' },
+  { key: 'tiktok', label: 'TikTok' },
   { key: 'linkedin', label: 'LinkedIn' },
   { key: 'twitter', label: 'X' },
+  { key: 'tripadvisor', label: 'Tripadvisor' },
+  { key: 'pinterest', label: 'Pinterest' },
   { key: 'youtube', label: 'YouTube' },
 ].filter(item => s[item.key]);
 ---
 
 {/* Popup / Alerte */}
 {showAlert && alertText && (
-  <div class="site-alert" id="siteAlert">
+  <div class={`site-alert ${blocColorAlert}`} id="siteAlert">
     <div class="alert-content">
       <div class="alert-text" set:html={alertText.replace(/\n/g, '<br />')} />
+      {hasAlertCtas && (
+        <div class="alert-ctas">
+          {alertCtaUrl && alertCtaText && (
+            <a href={alertCtaUrl} class="alert-cta">{alertCtaText}</a>
+          )}
+          {alertCta2Url && alertCta2Text && (
+            <a href={alertCta2Url} class="alert-cta alert-cta-secondary">{alertCta2Text}</a>
+          )}
+        </div>
+      )}
       <button class="alert-close" id="alertClose" aria-label="Fermer">&times;</button>
     </div>
   </div>
@@ -107,6 +127,33 @@ const socials = [
     position: relative;
     line-height: 1.5;
   }
+  /* Popup background color classes */
+  .site-alert.has-background-primary .alert-content { background: var(--color-primary, #333); }
+  .site-alert.has-background-secondary .alert-content { background: var(--color-secondary, #666); }
+  .site-alert.has-background-tertiary .alert-content { background: var(--color-tertiary, #999); }
+  .alert-ctas {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .alert-cta {
+    display: inline-block;
+    padding: 0.4rem 1rem;
+    background: #fff;
+    color: var(--color-primary, #333);
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+  .alert-cta:hover { opacity: 0.9; }
+  .alert-cta-secondary {
+    background: transparent;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.5);
+  }
+  .alert-cta-secondary:hover { border-color: #fff; }
   .alert-close {
     position: absolute;
     top: 0.5rem;

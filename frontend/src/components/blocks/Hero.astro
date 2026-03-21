@@ -42,7 +42,7 @@ function normalizeCta(cta: any): { url: string; title: string; target: string } 
                   <picture>
                     <source
                       media="(min-width: 601px)"
-                      srcset={optimizedImageUrl(slide.image?.url ?? '', 1920, 70)}
+                      srcset={optimizedImageUrl(slide.image?.url ?? '', 1440, 55)}
                     />
                     <source
                       media="(max-width: 600px)"
@@ -52,6 +52,8 @@ function normalizeCta(cta: any): { url: string; title: string; target: string } 
                       src={optimizedImageUrl(slide.image_mobile?.url ?? slide.image?.url ?? '', 600, 50)}
                       alt={slide.image?.alt ?? ''}
                       class="illus"
+                      width="1920"
+                      height="1080"
                       fetchpriority={index === 0 ? 'high' : 'auto'}
                       loading={index === 0 ? 'eager' : 'lazy'}
                       decoding="async"
@@ -120,7 +122,7 @@ function normalizeCta(cta: any): { url: string; title: string; target: string } 
               <div class="link">
                 <div class="background">
                   {bloc.image?.url && (
-                    <img src={optimizedImageUrl(bloc.image.url, 960, 80)} alt={bloc.image.alt ?? ''} class="illus" loading="lazy" />
+                    <img src={optimizedImageUrl(bloc.image.url, 960, 80)} alt={bloc.image.alt ?? ''} class="illus" width="960" height="540" loading="lazy" decoding="async" />
                   )}
                 </div>
                 <div class="desc">
@@ -160,8 +162,12 @@ function normalizeCta(cta: any): { url: string; title: string; target: string } 
 )}
 
 <style is:global>
+  /* Critical Swiper CSS — prevents slides from stacking before JS loads */
+  .swiper{overflow:hidden;position:relative}
+  .swiper-wrapper{display:flex;position:relative;width:100%;height:auto;z-index:1;transition-property:transform}
+  .swiper-slide{flex-shrink:0;width:100%;height:100%;position:relative}
   /* Critical hero CSS only — full styles loaded via deferred hero.css */
-  .module-hero{padding:0}
+  .module-hero{padding:0 !important}
   .module-hero .item{background-color:rgba(0,0,0,.1);color:#fff;overflow:hidden;position:relative}
   .module-hero .background,.module-hero picture{height:100%;left:0;position:absolute;top:0;width:100%}
   .module-hero .illus{height:100%;width:100%;object-fit:cover;object-position:center}
@@ -169,6 +175,7 @@ function normalizeCta(cta: any): { url: string; title: string; target: string } 
   .module-hero.mode-slider .container-large{align-items:flex-end;display:flex;justify-content:center}
   .module-hero.mode-slider .container-large:before{content:"";display:block;flex:0 0 0;height:calc(100vh - 7.5rem);max-width:0;min-width:0;opacity:0;visibility:hidden;width:0}
   .module-hero.mode-slider.medium .container-large,.module-hero.mode-slider.medium .container-large:before{height:67vh}
+  @media only screen and (max-width:960px){.module-hero.mode-slider .container-large:before{height:calc(100vh - 6.07rem)}}
 </style>
 
 {/* Swiper init handled by the unified end-of-body script (detects .js_slider-hero) */}

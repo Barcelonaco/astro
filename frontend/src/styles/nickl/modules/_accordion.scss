@@ -1,0 +1,189 @@
+@import '../base/common';
+@import '../base/common';
+/**
+ * GENERAL
+ * MEDIA QUERIES
+ */
+
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.module-accordion {
+    .module-columns.has-background-primary:not(.cols_have_background) &,
+    .module-columns.has-background-secondary:not(.cols_have_background) &,
+    &.has-background-primary:not(.cols_have_background),
+    &.has-background-secondary:not(.cols_have_background),
+    .cols-background-primary &,
+    .cols-background-secondary & {
+        .accordion::after {
+            background-color: currentColor;
+        }
+        .title {
+            &::before,
+            &::after {
+                background-color: currentColor;
+            }
+            @include hover {
+                color: $color1;
+                &::after {
+                    opacity: .15;
+                }
+                .icon svg {
+                    fill: $color1;
+                }
+            }
+            &.active .icon svg {
+                fill: $color1;
+            }
+            .icon svg {
+                fill: $color1;
+            }
+        }
+    }
+    .module-columns.has-background-tertiary:not(.cols_have_background) &,
+    &.has-background-tertiary:not(.cols_have_background),
+    .cols-background-tertiary &{
+        .accordion::after {
+            background-color: currentColor;
+        }
+        .title {
+            &::before {
+                background-color: currentColor;
+            }
+            &::after {
+                background-color: $color1;
+            }
+            @include hover {
+                color: inherit;
+                &::after {
+                    opacity: .15;
+                }
+                .icon svg {
+                    fill: $color-default;
+
+                }
+            }
+            &.active .icon svg {
+                fill: $color-default;
+            }
+            .icon svg {
+                fill: $color-default;
+            }
+        }
+    }
+    .accordion {
+        position: relative;
+        padding-bottom: 2px;
+        &::after {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: $color5;
+            opacity: .4;
+            content: '';
+        }
+    }
+    .title {
+        position: relative;
+        display: block;
+        width: 100%;
+        padding: em(27px, 48px) em(81px, 48px) em(27px, 48px) rem(27px);
+        border: 0;
+        font-family: $font2;
+        font-size: rem(40px);
+        line-height: 1.1;
+        font-weight: 700;
+        letter-spacing: $letter-spacing-default;
+        &::before {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: $color5;
+            opacity: .4;
+            content: '';
+        }
+        &::after {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            z-index: -1;
+            background-color: $color4;
+            content: '';
+        }
+        &:not(:active) {
+            transition: color .3s ease;
+        }
+        @include hover {
+            color: $color4;
+            .icon {
+                border-color: $color4;
+            }
+        }
+        &.active {
+            &::before {
+                opacity: 0;
+            }
+            &::after {
+                opacity: .15;
+            }
+            .icon svg {
+                fill: $color3;                
+                transform: rotate(0deg);
+            }
+        }
+        .icon {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            right: em(34px, 48px);
+            svg {
+                width: 2.5rem;
+                fill: $color-default;
+                transform: rotate(180deg);
+                transition: $transition-default;
+            }
+        }
+    }
+    .txt {
+        display: none;
+        padding: rem(35px) rem(50px) rem(30px) rem(27px);
+    }
+}
+
+
+
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 960px) {
+    .module-accordion .title {
+        font-size: 2rem;
+    }
+}
+
+
+
+@media only screen and (max-width: 600px) {
+    .module-accordion {
+        .title {
+            padding-left: $container-padding;
+            font-size: 1.75rem;
+        }
+        .txt {
+            padding-right: 1.42rem;
+            padding-left: $container-padding;
+        }
+    }
+}

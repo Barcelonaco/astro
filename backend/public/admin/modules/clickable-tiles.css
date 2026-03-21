@@ -555,11 +555,11 @@
  */
 /* GENERAL
 ---------------------------------------- */
-.module-clickable.style-2 .item-content:hover .illus-wrapper::before, .module-clickable.style-2 .item-content:hover .video-wrapper::before, .module-clickable.style-2 .item-content:focus .illus-wrapper::before, .module-clickable.style-2 .item-content:focus .video-wrapper::before {
+.module-clickable.style-2 .item:hover .illus-wrapper::before, .module-clickable.style-2 .item:hover .video-wrapper::before, .module-clickable.style-2 .item:focus .illus-wrapper::before, .module-clickable.style-2 .item:focus .video-wrapper::before {
   opacity: 1;
 }
-.module-clickable.style-2 .item-content:hover .desc, .module-clickable.style-2 .item-content:focus .desc {
-  top: 0;
+.module-clickable.style-2 .item:hover .desc, .module-clickable.style-2 .item:focus .desc {
+  transform: translateY(0);
   opacity: 1;
 }
 .module-clickable.style-2 .illus-wrapper::before, .module-clickable.style-2 .video-wrapper::before {
@@ -567,7 +567,7 @@
   transition: all 0.3s ease;
 }
 .module-clickable.style-2 .desc {
-  top: 0.625rem;
+  transform: translateY(0.625rem);
   opacity: 0;
   transition: all 0.3s ease;
 }
@@ -585,7 +585,7 @@
   flex: 0 1 auto;
 }
 .module-clickable .cols-wrapper {
-  gap: 1.25rem 1.75rem;
+  gap: 1.75rem;
 }
 .module-clickable .cols-wrapper .col-1 .item::before, .module-clickable .cols-wrapper.items-2 .col-2 .item::before {
   padding-top: 40.625rem;
@@ -605,6 +605,34 @@
 .module-clickable .cols-wrapper.items-3 .item {
   flex-basis: 100%;
 }
+.module-clickable .cols-wrapper.items-6 .col-1, .module-clickable .cols-wrapper.items-6 .col-1-bis, .module-clickable .cols-wrapper.items-7 .col-1, .module-clickable .cols-wrapper.items-7 .col-1-bis {
+  flex-basis: calc(25% - 0.9375rem);
+}
+.module-clickable .cols-wrapper.items-7 .col-2 {
+  flex-basis: calc(75% - 0.875rem);
+}
+.module-clickable .cols-wrapper.items-7 .col-2 .item {
+  flex-basis: calc(33.3333333333% - 1.16667rem);
+}
+.module-clickable .cols-wrapper.items-8 .items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.75rem;
+}
+.module-clickable .cols-wrapper.items-8 .item:nth-child(2),
+.module-clickable .cols-wrapper.items-8 .item:nth-child(7) {
+  flex-basis: calc(30% - 1.3125rem);
+}
+.module-clickable .cols-wrapper.items-8 .item:nth-child(1),
+.module-clickable .cols-wrapper.items-8 .item:nth-child(3),
+.module-clickable .cols-wrapper.items-8 .item:nth-child(6),
+.module-clickable .cols-wrapper.items-8 .item:nth-child(8) {
+  flex-basis: calc(25% - 1.3125rem);
+}
+.module-clickable .cols-wrapper.items-8 .item:nth-child(4),
+.module-clickable .cols-wrapper.items-8 .item:nth-child(5) {
+  flex-basis: calc(20% - 1.3125rem);
+}
 .module-clickable .col {
   flex-basis: calc((100% - 1.75rem) / 2);
   display: flex;
@@ -620,7 +648,7 @@
   flex-grow: 1;
 }
 .module-clickable .col-2 {
-  gap: 1.25rem 1.75rem;
+  gap: 1.75rem;
 }
 .module-clickable {
   /* Tuiles non imbriqué */
@@ -636,7 +664,7 @@
   flex: 0 1 auto;
 }
 .module-clickable .list {
-  gap: 1.25rem 1.75rem;
+  gap: 1.75rem;
 }
 .module-clickable .list.items-1 .item {
   flex-grow: 1;
@@ -669,6 +697,25 @@
 }
 .module-clickable .list .txt {
   margin-top: 0;
+}
+.module-clickable .list.items-6, .module-clickable .list.items-7, .module-clickable .list.items-8 {
+  flex-wrap: nowrap;
+}
+.module-clickable .list.items-6 .item, .module-clickable .list.items-7 .item, .module-clickable .list.items-8 .item {
+  transition: all 0.3s ease;
+}
+.module-clickable .list.items-6 .item .desc, .module-clickable .list.items-7 .item .desc, .module-clickable .list.items-8 .item .desc {
+  padding: 2rem;
+  width: calc(0.25 * (min(100vw, 120rem) - 10vw) - 1.75rem);
+  min-width: calc(0.25 * (min(100vw, 120rem) - 10vw) - 1.75rem);
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+.module-clickable .list.items-6 .item:hover, .module-clickable .list.items-7 .item:hover, .module-clickable .list.items-8 .item:hover {
+  flex-basis: 25% !important;
+}
+.module-clickable .list.items-6 .item:hover .desc, .module-clickable .list.items-7 .item:hover .desc, .module-clickable .list.items-8 .item:hover .desc {
+  opacity: 1;
 }
 .module-clickable .item {
   position: relative;
@@ -908,6 +955,16 @@
   }
   .module-clickable .list .item::before {
     padding-top: 73%;
+  }
+  .module-clickable .list.items-6, .module-clickable .list.items-7, .module-clickable .list.items-8 {
+    flex-wrap: wrap;
+  }
+  .module-clickable .list.items-6 .item .desc, .module-clickable .list.items-7 .item .desc, .module-clickable .list.items-8 .item .desc {
+    opacity: 1;
+    width: 100%;
+  }
+  .module-clickable .list.items-6 .item:hover, .module-clickable .list.items-7 .item:hover, .module-clickable .list.items-8 .item:hover {
+    flex-basis: 100% !important;
   }
   .module-clickable .item::before {
     padding-top: 73%;

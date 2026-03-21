@@ -1,8 +1,8 @@
 ---
 /**
- * Unified deferred CSS loader.
- * Loads app.css + Google Fonts + module CSS + plugin CSS in a single script
- * after window.load to avoid competing with LCP image bandwidth.
+ * Loads Nickl module CSS directly (non-deferred) via <link> tags.
+ * CSS files live in /nickl-assets/css/ (copied from nickl/public/css/).
+ * This ensures styles are available before first paint — no FOUC.
  */
 
 interface Props {
@@ -27,6 +27,7 @@ const blockToCss: Record<string, string> = {
   hero: 'hero',
   'head-text': 'head-text',
   icons: 'icons',
+  'icon-logo': 'icons',
   'illus-video': 'illustration-video',
   'images-slider': 'images-slider',
   'images-videos-parallax': 'images-videos-parallax',
@@ -35,6 +36,7 @@ const blockToCss: Record<string, string> = {
   link: 'link',
   'link-alone': 'link',
   'logos-slider': 'logos-slider',
+  'slider-logo': 'logos-slider',
   map: 'map',
   'news-slider': 'news-slider',
   'newsletter-form': 'newsletter-form',
@@ -42,6 +44,7 @@ const blockToCss: Record<string, string> = {
   plansite: 'plansite',
   'free-post': 'free-post',
   quote: 'quote',
+  references: 'references',
   review: 'review',
   separator: 'separator',
   share: 'share',
@@ -62,7 +65,7 @@ const cssFiles = blocks
     )]
   : [];
 
-/** Plugin blocks: types not in blockToCss → try loading CSS from /plugin-assets/{type}/css/{type}.css */
+/** Plugin blocks: types not in blockToCss */
 const pluginBlockTypes = blocks
   ? [...new Set(
       blocks
@@ -72,5 +75,16 @@ const pluginBlockTypes = blocks
   : [];
 ---
 
-{/* Data for the unified deferred loader (script at end of body) */}
-<meta name="x-deferred-css" content={JSON.stringify({ c: cssFiles, p: pluginBlockTypes })} />
+{/* Base Nickl styles — loaded async to avoid render-blocking (1.4MB) */}
+<link rel="stylesheet" href="/nickl-assets/css/app.css" media="print" onload="this.media='all'" />
+<noscript><link rel="stylesheet" href="/nickl-assets/css/app.css" /></noscript>
+
+{/* Module-specific CSS (only for blocks used on this page) */}
+{cssFiles.map((name) => (
+  <link rel="stylesheet" href={`/nickl-assets/css/${name}.css`} />
+))}
+
+{/* Plugin CSS */}
+{pluginBlockTypes.map((type) => (
+  <link rel="stylesheet" href={`/plugin-assets/${type}/css/${type}.css`} />
+))}

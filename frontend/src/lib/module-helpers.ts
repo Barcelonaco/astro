@@ -51,7 +51,7 @@ export function resolveImageUrl(
     rawUrl = rawUrl.startsWith('http') ? rawUrl : apiOrigin + rawUrl;
   }
   // Auto-optimize local uploads to WebP
-  return optimizedImageUrl(rawUrl, 1200, 80);
+  return optimizedImageUrl(rawUrl, 800, 70);
 }
 
 /**

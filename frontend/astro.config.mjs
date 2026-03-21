@@ -19,7 +19,6 @@ export default defineConfig({
 	vite: {
 		server: {
 			proxy: {
-				'/nickl-assets': 'http://localhost:3000',
 				'/uploads': 'http://localhost:3000',
 			},
 		},

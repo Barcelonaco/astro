@@ -12,6 +12,7 @@ export async function getAllSettings(req, res) {
     rows.forEach((row) => {
       settings[row.setting_key] = row.setting_value;
     });
+    settings.frontend_url = process.env.FRONTEND_URL || 'http://localhost:4321';
     return res.json(settings);
   } catch (error) {
     console.error('getAllSettings error:', error);
@@ -116,11 +117,19 @@ export async function getFrontendBootstrap(req, res) {
     }
 
     const { Page } = await import('../models/Page.js');
+    const { Menu } = await import('../models/Menu.js');
 
-    const [settingsRows, navigation] = await Promise.all([
+    const [settingsRows, menuNav, secondaryNav] = await Promise.all([
       pool.query('SELECT setting_key, setting_value FROM settings').then(([rows]) => rows),
-      Page.findNavigation(),
+      Menu.getNavigationByLocation('primary'),
+      Menu.getNavigationByLocation('secondary'),
     ]);
+
+    // Use menu-based navigation, fallback to page-based
+    let navigation = menuNav;
+    if (!navigation) {
+      navigation = await Page.findNavigation();
+    }
 
     const s = {};
     settingsRows.forEach((row) => { s[row.setting_key] = row.setting_value; });
@@ -137,26 +146,42 @@ export async function getFrontendBootstrap(req, res) {
 
     // All frontend-visible settings (header, footer, socials, contact, popup, floating, maintenance, tracking)
     const frontendKeys = [
+      // Logos
+      'logo', 'logo_white', 'logo_loader', 'favicon', 'replacement_image',
       // Header & menu
       'menu_seamless', 'rounded', 'uppercase', 'home_loader', 'menu_style',
       'secret_menu', 'logo_custom_height', 'accessibility', 'show_breadcrumb',
       'pages_share_btn', 'share_btn_position',
       // Contact / secondary menu
+      'alt_secondary_menu',
+      'top_link_1_url', 'top_link_1_text', 'icon_link_1',
+      'top_link_2_url', 'top_link_2_text', 'icon_link_2',
       'show_phone', 'show_search', 'show_socials', 'phone', 'phone_2', 'email',
+      'address', 'address_2',
       // Footer
+      'footer_color', 'footer_bg_img', 'footer_bg_opacity', 'footer_bg_parallax',
+      'footer_custom_bloc', 'footer_custom_bloc_location',
+      'link_1_url', 'link_1_text', 'link_2_url', 'link_2_text',
       'footer_text', 'schedule', 'opening',
       'newsletter_form', 'newsletter_form_title', 'newsletter_form_desc',
       // Social networks
       'instagram', 'facebook', 'threads', 'tiktok', 'linkedin',
       'twitter', 'tripadvisor', 'pinterest', 'youtube',
       // Popup
-      'show_alert', 'alert_text',
+      'show_alert', 'bloc_color_alert', 'is_small_marged_alert',
+      'bg_img_alert', 'bg_opacity_alert', 'alert_text',
+      'alert_cta_url', 'alert_cta_text', 'alert_cta2_url', 'alert_cta2_text',
       // Floating button
-      'show_btn', 'floating_btn_link',
+      'show_btn', 'floating_btn_link', 'floating_btn_img',
       // Maintenance
       'is_maintenance', 'text_maintenance', 'show_infos', 'show_rs',
+      // Instagram feed
+      'id_application_instagram', 'secret_key_application_instagram',
+      'link_account_instagram', 'access_token_instagram',
       // Tracking
-      'ga_code', 'aw_code', 'gtm_code', 'meta_pixel_code'
+      'ga_code', 'aw_code', 'gtm_code', 'meta_pixel_code',
+      // Technique
+      'is_onepage', 'is_activate_schemas', 'custom_balise', 'google_api_key'
     ];
     const siteSettings = {};
     frontendKeys.forEach(k => { if (s[k] !== undefined) siteSettings[k] = s[k]; });
@@ -178,6 +203,7 @@ export async function getFrontendBootstrap(req, res) {
       styleSettings,
       siteSettings,
       navigation: navigation || [],
+      secondaryNavigation: secondaryNav || [],
       frontPage: frontPage || null,
     };
 
@@ -191,6 +217,7 @@ export async function getFrontendBootstrap(req, res) {
       siteInfo: { siteName: '', siteDescription: '', frontPage: '' },
       styleSettings: {},
       navigation: [],
+      secondaryNavigation: [],
       frontPage: null,
     });
   }
@@ -210,6 +237,12 @@ export async function updateSettings(req, res) {
       'site_description',
       'posts_per_page',
       'front_page',
+      // Logos
+      'logo',
+      'logo_white',
+      'logo_loader',
+      'favicon',
+      'replacement_image',
       // Couleurs marque (admin / front)
       'brand_primary',
       'brand_primary_dark',
@@ -238,13 +271,32 @@ export async function updateSettings(req, res) {
       'pages_share_btn',
       'share_btn_position',
       // Menu secondaire / coordonnées
+      'alt_secondary_menu',
+      'top_link_1_url',
+      'top_link_1_text',
+      'icon_link_1',
+      'top_link_2_url',
+      'top_link_2_text',
+      'icon_link_2',
       'show_phone',
       'show_search',
       'show_socials',
       'phone',
       'phone_2',
       'email',
-      // Footer / contenus
+      'address',
+      'address_2',
+      // Footer
+      'footer_color',
+      'footer_bg_img',
+      'footer_bg_opacity',
+      'footer_bg_parallax',
+      'footer_custom_bloc',
+      'footer_custom_bloc_location',
+      'link_1_url',
+      'link_1_text',
+      'link_2_url',
+      'link_2_text',
       'footer_text',
       'schedule',
       'opening',
@@ -261,12 +313,25 @@ export async function updateSettings(req, res) {
       'tripadvisor',
       'pinterest',
       'youtube',
+      'id_application_instagram',
+      'secret_key_application_instagram',
+      'link_account_instagram',
+      'access_token_instagram',
       // Popup
       'show_alert',
+      'bloc_color_alert',
+      'is_small_marged_alert',
+      'bg_img_alert',
+      'bg_opacity_alert',
       'alert_text',
+      'alert_cta_url',
+      'alert_cta_text',
+      'alert_cta2_url',
+      'alert_cta2_text',
       // Bouton flottant
       'show_btn',
       'floating_btn_link',
+      'floating_btn_img',
       // Maintenance
       'is_maintenance',
       'text_maintenance',
@@ -276,16 +341,24 @@ export async function updateSettings(req, res) {
       'ga_code',
       'aw_code',
       'gtm_code',
-      'meta_pixel_code'
+      'meta_pixel_code',
+      // Technique (admin)
+      'is_onepage',
+      'is_activate_schemas',
+      'custom_balise',
+      'google_api_key'
     ];
-    const updates = req.body;
+    const raw = req.body;
 
-    if (!updates || typeof updates !== 'object') {
+    if (!raw || typeof raw !== 'object') {
       return res.status(400).json({ error: 'Body must be an object of key-value settings' });
     }
 
+    // Support both { key: value } and { settings: { key: value } } formats
+    const updates = (raw.settings && typeof raw.settings === 'object') ? raw.settings : raw;
+
     for (const [key, value] of Object.entries(updates)) {
-      if (!allowedKeys.includes(key)) continue;
+      if (!allowedKeys.includes(key) && !/^cpt_[a-z0-9_]+$/.test(key)) continue;
       const strValue = value === undefined || value === null ? '' : String(value);
       await pool.query(
         `INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)

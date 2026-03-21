@@ -1,0 +1,38 @@
+/**
+ * GENERAL
+ */
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.page-account {
+    // List
+    table.woocommerce-orders-table {
+        text-align: center;
+        .woocommerce-orders-table__cell-order-actions .button {
+            @extend .btn;
+            @extend .btn-quaternary;
+        }
+    }
+
+
+    // Detail
+    .intro-view-order mark {
+        background-color: transparent;
+        font-weight: 500;
+    }
+    .woocommerce-order-details, .woocommerce-customer-details {
+        margin-top: rem(50px);
+    }
+    .woocommerce-order-details .order-again {
+        margin-top: rem(10px);
+        text-align: center;
+        .button {
+            @extend .btn;
+            @extend .btn-primary;
+        }
+    }
+}

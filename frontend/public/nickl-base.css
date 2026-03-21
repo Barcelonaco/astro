@@ -29,6 +29,18 @@
 .img-parallax .illus-wrapper.full-height .illus{height:calc(100vh + 200px)}
 .no-background-color{background-color:transparent}
 
+/* ── Border rounded mode ── */
+.border-rounded .btn-primary,.border-rounded .btn-secondary{border-radius:3rem}
+.border-rounded .alert-content{border-radius:1rem}
+.border-rounded .floating-btn{border-radius:50%}
+.border-rounded input,.border-rounded textarea,.border-rounded select,.border-rounded .form-input,.border-rounded .newsletter-input{border-radius:.5rem}
+.border-rounded .newsletter-btn{border-radius:.5rem}
+
+/* ── Uppercase mode ── */
+.mode-uppercase .title-section-1,.mode-uppercase .title-section-2,.mode-uppercase .title-section-3,.mode-uppercase .title-section-4{text-transform:uppercase}
+.mode-uppercase .btn-primary,.mode-uppercase .btn-secondary,.mode-uppercase .btn-tertiary{text-transform:uppercase}
+.mode-uppercase nav a{text-transform:uppercase}
+
 /* ── Buttons ── */
 .btn{display:inline-block;text-decoration:none;transition:all .3s;cursor:pointer}
 .btn-primary{background-color:var(--color-primary);border:0;border-radius:0;color:#fff;font-family:var(--font-title),sans-serif;font-size:1.25rem;font-weight:500;letter-spacing:-.04em;line-height:1.2;padding:.6875rem 1.625rem;text-align:center}

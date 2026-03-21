@@ -2,6 +2,13 @@ const API_BASE = window.location.origin + '/api';
 let token = localStorage.getItem('token');
 let currentUser = null;
 
+const MENU_LOCATIONS = [
+  { value: '', label: '— Aucun —' },
+  { value: 'primary', label: 'Menu principal' },
+  { value: 'secondary', label: 'Menu secondaire (top)' },
+  { value: 'footer', label: 'Menu footer' },
+];
+
 // Check auth on load
 if (!token) {
   window.location.href = '/admin/login.html';
@@ -83,6 +90,9 @@ async function init() {
     if (lastView && lastView.startsWith('builder:')) {
       const pageId = lastView.split(':')[1];
       await openPageBuilder(pageId === 'new' ? null : Number(pageId));
+    } else if (lastView && lastView.startsWith('rb-builder:')) {
+      const blocId = lastView.split(':')[1];
+      await openReusableBlocBuilder(blocId === 'new' ? null : Number(blocId));
     } else if (lastView) {
       await loadSection(lastView);
     } else {
@@ -137,6 +147,11 @@ async function loadSection(section) {
   localStorage.setItem('adminLastView', section);
   const content = document.getElementById('content');
 
+  // Highlight the correct nav item
+  document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+  const activeNav = document.querySelector(`.nav-item[data-section="${section}"]`);
+  if (activeNav) activeNav.classList.add('active');
+
   switch(section) {
     case 'dashboard':
       content.innerHTML = await renderDashboard();
@@ -150,6 +165,10 @@ async function loadSection(section) {
     case 'pages':
       content.innerHTML = await renderPages();
       break;
+    case 'menus':
+      content.innerHTML = await renderMenus();
+      attachMenuEvents();
+      break;
     case 'media':
       content.innerHTML = await renderMediaLibrary();
       break;
@@ -160,16 +179,34 @@ async function loadSection(section) {
     case 'theme':
       content.innerHTML = await renderTheme();
       break;
+    case 'reusable-blocs':
+      content.innerHTML = await renderReusableBlocs();
+      break;
     case 'users':
       content.innerHTML = await renderUsers();
       break;
     default:
-      if (section.startsWith('cpt:')) {
+      if (section.startsWith('cpt-add:')) {
         const slug = section.split(':')[1];
         const ptDef = findPostTypeDef(slug);
-        if (ptDef) {
-          content.innerHTML = await renderCPTList(ptDef);
-        }
+        if (ptDef) { content.innerHTML = await renderCPTEditPage(ptDef, null); attachCPTFormEvents(ptDef); }
+      } else if (section.startsWith('cpt-edit:')) {
+        const parts = section.split(':');
+        const slug = parts[1]; const itemId = parseInt(parts[2]);
+        const ptDef = findPostTypeDef(slug);
+        if (ptDef) { content.innerHTML = await renderCPTEditPage(ptDef, itemId); attachCPTFormEvents(ptDef); }
+      } else if (section.startsWith('cpt-categories:')) {
+        const slug = section.split(':')[1];
+        const ptDef = findPostTypeDef(slug);
+        if (ptDef) { content.innerHTML = await renderCPTCategoriesPage(ptDef); }
+      } else if (section.startsWith('cpt-options:')) {
+        const slug = section.split(':')[1];
+        const ptDef = findPostTypeDef(slug);
+        if (ptDef) { content.innerHTML = await renderCPTOptionsPage(ptDef); attachCPTOptionsEvents(); }
+      } else if (section.startsWith('cpt:')) {
+        const slug = section.split(':')[1];
+        const ptDef = findPostTypeDef(slug);
+        if (ptDef) { content.innerHTML = await renderCPTList(ptDef); attachCPTListEvents(); }
       }
       break;
   }
@@ -259,42 +296,37 @@ async function renderPosts() {
   }
 }
 
+const _svgEdit = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+const _svgDelete = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+
 function renderPostsTable(posts) {
   return `
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Titre</th>
-            <th>Auteur</th>
-            <th>Catégories</th>
-            <th>Date</th>
-            <th>Statut</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${posts.map(post => `
-            <tr>
-              <td><strong>${post.title}</strong></td>
-              <td>${post.author.name}</td>
-              <td>${post.categories?.map(c => c.name).join(', ') || '-'}</td>
-              <td>${new Date(post.published_date).toLocaleDateString('fr-FR')}</td>
-              <td>
-                <span class="badge ${post.status === 'published' ? 'badge-success' : 'badge-warning'}">
-                  ${post.status === 'published' ? 'Publié' : 'Brouillon'}
-                </span>
-              </td>
-              <td>
-                <div class="actions">
-                  <button class="btn btn-sm btn-outline" onclick="editPost(${post.id})">✏️ Modifier</button>
-                  <button class="btn btn-sm btn-danger" onclick="deletePost(${post.id}, '${post.title}')">🗑️</button>
-                </div>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+    <div class="pages-list">
+      <div class="pages-list-header">
+        <span class="page-item__info">Article</span>
+        <span class="page-item__parent">Catégories</span>
+        <span class="page-item__meta">Date</span>
+        <span class="page-item__badges">Statut</span>
+        <span class="page-item__actions" style="opacity:1">Actions</span>
+      </div>
+      ${posts.map(post => {
+        const safeTitle = escapeHtml(post.title).replace(/'/g, "\\'");
+        const cats = post.categories?.map(c => escapeHtml(c.name)).join(', ') || '';
+        const dateStr = new Date(post.published_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+        return '<div class="page-item">'
+          + '<div class="page-item__info" style="cursor:pointer" onclick="editPost(' + post.id + ')">'
+          +   '<div class="page-item__title">' + escapeHtml(post.title) + '</div>'
+          +   '<div class="page-item__slug">' + escapeHtml(post.author?.name || '') + '</div>'
+          + '</div>'
+          + '<div class="page-item__parent">' + (cats || '<span style="color:var(--gray-400);">—</span>') + '</div>'
+          + '<div class="page-item__meta"><span class="page-item__date">' + dateStr + '</span></div>'
+          + '<div class="page-item__badges"><span class="badge ' + (post.status === 'published' ? 'badge-success' : 'badge-warning') + '">' + (post.status === 'published' ? 'Publié' : 'Brouillon') + '</span></div>'
+          + '<div class="page-item__actions">'
+          +   '<button class="btn-icon-action" onclick="editPost(' + post.id + ')" title="Modifier">' + _svgEdit + '</button>'
+          +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deletePost(' + post.id + ', \'' + safeTitle + '\')" title="Supprimer">' + _svgDelete + '</button>'
+          + '</div>'
+        + '</div>';
+      }).join('')}
     </div>
   `;
 }
@@ -474,32 +506,27 @@ async function renderCategories() {
 
 function renderCategoriesTable(categories) {
   return `
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Nom</th>
-            <th>Slug</th>
-            <th>Description</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${categories.map(cat => `
-            <tr>
-              <td><strong>${cat.name}</strong></td>
-              <td><code>${cat.slug}</code></td>
-              <td>${cat.description || '-'}</td>
-              <td>
-                <div class="actions">
-                  <button class="btn btn-sm btn-outline" onclick="editCategory(${cat.id})">✏️ Modifier</button>
-                  <button class="btn btn-sm btn-danger" onclick="deleteCategory(${cat.id}, '${cat.name}')">🗑️</button>
-                </div>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+    <div class="pages-list">
+      <div class="pages-list-header">
+        <span class="page-item__info">Nom</span>
+        <span class="page-item__parent">Slug</span>
+        <span class="page-item__meta">Description</span>
+        <span class="page-item__actions" style="opacity:1">Actions</span>
+      </div>
+      ${categories.map(cat => {
+        const safeName = escapeHtml(cat.name).replace(/'/g, "\\'");
+        return '<div class="page-item">'
+          + '<div class="page-item__info" style="cursor:pointer" onclick="editCategory(' + cat.id + ')">'
+          +   '<div class="page-item__title">' + escapeHtml(cat.name) + '</div>'
+          + '</div>'
+          + '<div class="page-item__parent"><span class="page-item__slug" style="display:inline">' + escapeHtml(cat.slug) + '</span></div>'
+          + '<div class="page-item__meta">' + escapeHtml(cat.description || '—') + '</div>'
+          + '<div class="page-item__actions">'
+          +   '<button class="btn-icon-action" onclick="editCategory(' + cat.id + ')" title="Modifier">' + _svgEdit + '</button>'
+          +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteCategory(' + cat.id + ', \'' + safeName + '\')" title="Supprimer">' + _svgDelete + '</button>'
+          + '</div>'
+        + '</div>';
+      }).join('')}
     </div>
   `;
 }
@@ -755,22 +782,83 @@ async function loadPlugins() {
       }
     }
 
-    // Inject sidebar items for custom post types
+    // Inject sidebar items for custom post types with sub-navigation
     if (plugin.postTypes && plugin.postTypes.length > 0) {
       const nav = document.querySelector('.sidebar .nav');
       const settingsLink = nav ? nav.querySelector('[data-section="site-settings"]') : null;
       for (const pt of plugin.postTypes) {
         if (!nav || nav.querySelector(`[data-section="cpt:${pt.slug}"]`)) continue;
+        // Main CPT link
         const a = document.createElement('a');
         a.href = '#';
-        a.className = 'nav-item';
+        a.className = 'nav-item nav-item-parent';
         a.dataset.section = `cpt:${pt.slug}`;
-        a.textContent = pt.labelPlural || pt.label;
-        if (settingsLink) {
-          nav.insertBefore(a, settingsLink);
-        } else {
-          nav.appendChild(a);
+        a.innerHTML = `${pt.icon || '📁'} ${escapeHtml(pt.labelPlural || pt.label)}`;
+        if (settingsLink) nav.insertBefore(a, settingsLink);
+        else nav.appendChild(a);
+
+        // Sub-items container
+        const sub = document.createElement('div');
+        sub.className = 'nav-sub-items';
+        sub.dataset.parent = `cpt:${pt.slug}`;
+        sub.style.display = 'none';
+
+        // Sub: All items
+        const subAll = document.createElement('a');
+        subAll.href = '#'; subAll.className = 'nav-item nav-sub-item';
+        subAll.dataset.section = `cpt:${pt.slug}`;
+        subAll.textContent = `Toutes les ${(pt.labelPlural || pt.label).toLowerCase()}`;
+        sub.appendChild(subAll);
+
+        // Sub: Add new
+        const subAdd = document.createElement('a');
+        subAdd.href = '#'; subAdd.className = 'nav-item nav-sub-item';
+        subAdd.dataset.section = `cpt-add:${pt.slug}`;
+        subAdd.textContent = 'Ajouter';
+        sub.appendChild(subAdd);
+
+        // Sub: Categories (if enabled)
+        if (pt.hasCategories) {
+          const subCat = document.createElement('a');
+          subCat.href = '#'; subCat.className = 'nav-item nav-sub-item';
+          subCat.dataset.section = `cpt-categories:${pt.slug}`;
+          subCat.textContent = pt.categoryLabel || 'Catégories';
+          sub.appendChild(subCat);
         }
+
+        // Sub: Options
+        const subOpt = document.createElement('a');
+        subOpt.href = '#'; subOpt.className = 'nav-item nav-sub-item';
+        subOpt.dataset.section = `cpt-options:${pt.slug}`;
+        subOpt.textContent = 'Options';
+        sub.appendChild(subOpt);
+
+        if (settingsLink) nav.insertBefore(sub, settingsLink);
+        else nav.appendChild(sub);
+
+        // Toggle sub-items on parent click
+        a.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          const isVisible = sub.style.display !== 'none';
+          // Close all other sub-navs
+          document.querySelectorAll('.nav-sub-items').forEach(s => s.style.display = 'none');
+          sub.style.display = isVisible ? 'none' : 'block';
+          if (!isVisible) {
+            // Show list by default
+            loadSection(`cpt:${pt.slug}`);
+          }
+        });
+
+        // Add click handlers for sub-items
+        sub.querySelectorAll('.nav-sub-item').forEach(subItem => {
+          subItem.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            subItem.classList.add('active');
+            a.classList.add('active');
+            loadSection(subItem.dataset.section);
+          });
+        });
       }
     }
   }
@@ -787,215 +875,574 @@ function findPostTypeDef(slug) {
 
 // ========== CUSTOM POST TYPE UI ==========
 
+let _cptListItems = [];
+let _cptListPtDef = null;
+let _cptListSort = { field: 'date', dir: 'desc' };
+let _cptListSearch = '';
+
 async function renderCPTList(ptDef) {
   showLoading();
   try {
-    const items = await apiFetch(`/cpt/${ptDef.slug}`);
+    _cptListItems = await apiFetch(`/cpt/${ptDef.slug}`);
+    _cptListPtDef = ptDef;
+    _cptListSort = { field: 'date', dir: 'desc' };
+    _cptListSearch = '';
     hideLoading();
-
-    const tableRows = items.length > 0 ? items.map(item => {
-      return `
-        <tr>
-          <td><strong>${escapeHtml(item.title)}</strong></td>
-          <td>${escapeHtml(item.slug)}</td>
-          <td>
-            <span class="badge ${item.status === 'published' ? 'badge-success' : 'badge-warning'}">
-              ${item.status === 'published' ? 'Publié' : 'Brouillon'}
-            </span>
-          </td>
-          <td>${item.created_at ? new Date(item.created_at).toLocaleDateString('fr-FR') : '-'}</td>
-          <td>
-            <div class="actions">
-              <button class="btn btn-sm btn-outline" onclick="showCPTForm('${escapeHtml(ptDef.slug)}', ${item.id})">✏️ Modifier</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteCPTItemUI('${escapeHtml(ptDef.slug)}', ${item.id}, '${escapeHtml(item.title).replace(/'/g, "\\'")}')">🗑️</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('') : '';
 
     return `
       <div class="page-header">
         <h1>${escapeHtml(ptDef.labelPlural || ptDef.label)}</h1>
-        <button class="btn btn-primary" onclick="showCPTForm('${escapeHtml(ptDef.slug)}')">
-          <span class="icon">➕</span>
-          Nouveau ${escapeHtml(ptDef.label.toLowerCase())}
+        <button class="btn btn-primary" onclick="loadSection('cpt-add:${escapeHtml(ptDef.slug)}')">
+          <span class="icon">+</span> Ajouter
         </button>
       </div>
 
       <div class="card">
-        ${items.length > 0 ? `
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Titre</th>
-                  <th>Slug</th>
-                  <th>Statut</th>
-                  <th>Date</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>${tableRows}</tbody>
-            </table>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <div style="position:relative;flex:1;max-width:320px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" class="form-input" id="cptListSearch" placeholder="Rechercher…" style="padding-left:34px;">
           </div>
-        ` : renderEmptyState(ptDef.icon || '📁', 'Aucun élément', `Créez votre premier ${ptDef.label.toLowerCase()}`)}
+        </div>
+        <div id="cptListContainer"></div>
       </div>
-
-      <div id="cptModal" style="display: none;"></div>
     `;
-  } catch (error) {
+  } catch {
     hideLoading();
     showToast('Erreur lors du chargement', 'error');
     return '<div class="card"><p>Erreur de chargement</p></div>';
   }
 }
 
-async function showCPTForm(postTypeSlug, itemId = null) {
-  const ptDef = findPostTypeDef(postTypeSlug);
-  if (!ptDef) return;
-
-  showLoading();
-  let item = null;
-  if (itemId) {
-    const items = await apiFetch(`/cpt/${postTypeSlug}`);
-    item = items.find(i => i.id === itemId);
+function attachCPTListEvents() {
+  const searchInput = document.getElementById('cptListSearch');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      _cptListSearch = searchInput.value.toLowerCase().trim();
+      renderCPTListRows();
+    });
   }
-  hideLoading();
+  renderCPTListRows();
+}
 
-  const cf = item ? (typeof item.custom_fields === 'string' ? JSON.parse(item.custom_fields) : (item.custom_fields || {})) : {};
-  const fields = ptDef.fields || [];
+function cptListSortBy(field) {
+  if (_cptListSort.field === field) {
+    _cptListSort.dir = _cptListSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _cptListSort = { field, dir: 'asc' };
+  }
+  renderCPTListRows();
+}
 
-  const customFieldsHtml = fields.map(field => {
-    const value = cf[field.name] || '';
-    return renderCPTField(field, value);
+function renderCPTListRows() {
+  const container = document.getElementById('cptListContainer');
+  if (!container || !_cptListPtDef) return;
+  const ptDef = _cptListPtDef;
+
+  // Filter
+  let filtered = _cptListItems;
+  if (_cptListSearch) {
+    filtered = filtered.filter(item => {
+      const cats = (item.categories || []).map(c => c.name.toLowerCase()).join(' ');
+      return item.title.toLowerCase().includes(_cptListSearch) || cats.includes(_cptListSearch);
+    });
+  }
+
+  // Sort
+  const s = _cptListSort;
+  filtered = [...filtered].sort((a, b) => {
+    let va, vb;
+    if (s.field === 'title') {
+      va = (a.title || '').toLowerCase(); vb = (b.title || '').toLowerCase();
+    } else if (s.field === 'category') {
+      va = (a.categories || [])[0]?.name?.toLowerCase() || ''; vb = (b.categories || [])[0]?.name?.toLowerCase() || '';
+    } else {
+      va = a.created_at || ''; vb = b.created_at || '';
+    }
+    if (va < vb) return s.dir === 'asc' ? -1 : 1;
+    if (va > vb) return s.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  function sortIcon(field) {
+    if (_cptListSort.field !== field) return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M7 10l5-5 5 5"/><path d="M7 14l5 5 5-5"/></svg>';
+    return _cptListSort.dir === 'asc'
+      ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 14l5-5 5 5"/></svg>'
+      : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 10l5 5 5-5"/></svg>';
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = _cptListSearch
+      ? '<p style="text-align:center;color:var(--gray-500);padding:40px 0;">Aucun résultat pour « ' + escapeHtml(_cptListSearch) + ' »</p>'
+      : renderEmptyState(ptDef.icon || '📁', 'Aucun élément', 'Créez votre premier ' + ptDef.label.toLowerCase());
+    return;
+  }
+
+  const rows = filtered.map(item => {
+    const fi = item.featured_image;
+    const thumbUrl = fi ? (fi.sizes?.thumbnail || fi.url || '') : '';
+    const cats = (item.categories || []).map(c => escapeHtml(c.name)).join(', ');
+    const safeTitle = escapeHtml(item.title).replace(/'/g, "\\'");
+    const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+    return '<div class="page-item">'
+      + '<div class="page-item__info" style="cursor:pointer" onclick="loadSection(\'cpt-edit:' + escapeHtml(ptDef.slug) + ':' + item.id + '\')">'
+      +   '<div style="display:flex;align-items:center;gap:12px;">'
+      +     (thumbUrl
+            ? '<img src="' + escapeHtml(thumbUrl) + '" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;">'
+            : '<div style="width:48px;height:48px;background:var(--gray-100);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);flex-shrink:0;font-size:18px;">' + (ptDef.icon || '📷') + '</div>')
+      +     '<div>'
+      +       '<div class="page-item__title">' + escapeHtml(item.title) + '</div>'
+      +       '<div class="page-item__slug">/' + escapeHtml(ptDef.slug) + '/' + escapeHtml(item.slug) + '</div>'
+      +     '</div>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="page-item__parent">' + (cats || '<span style="color:var(--gray-400);">—</span>') + '</div>'
+      + '<div class="page-item__meta"><span class="page-item__date">' + dateStr + '</span></div>'
+      + '<div class="page-item__badges">'
+      +   '<span class="badge ' + (item.status === 'published' ? 'badge-success' : 'badge-warning') + '">'
+      +     (item.status === 'published' ? 'Publié' : 'Brouillon')
+      +   '</span>'
+      + '</div>'
+      + '<div class="page-item__actions">'
+      +   '<button class="btn-icon-action" onclick="loadSection(\'cpt-edit:' + escapeHtml(ptDef.slug) + ':' + item.id + '\')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+      +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteCPTItemUI(\'' + escapeHtml(ptDef.slug) + '\', ' + item.id + ', \'' + safeTitle + '\')" title="Supprimer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
+      + '</div>'
+    + '</div>';
   }).join('');
 
-  const modal = document.getElementById('cptModal');
-  modal.style.display = 'block';
-  modal.innerHTML = `
-    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;" onclick="if(event.target === this) closeCPTModal()">
-      <div class="card" style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-          <h2>${itemId ? 'Modifier' : 'Nouveau'} ${escapeHtml(ptDef.label)}</h2>
-          <button class="btn btn-outline btn-sm" onclick="closeCPTModal()">✕</button>
-        </div>
-
-        <form id="cptForm" onsubmit="saveCPTItem(event, '${escapeHtml(postTypeSlug)}', ${itemId || 'null'})">
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Titre *</label>
-              <input type="text" class="form-input" name="title" value="${escapeHtml(item?.title || '')}" required
-                oninput="this.form.querySelector('[name=slug]').value = this.value.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Slug</label>
-              <input type="text" class="form-input" name="slug" value="${escapeHtml(item?.slug || '')}">
-            </div>
-          </div>
-
-          ${ptDef.supports?.includes('content') ? `
-            <div class="form-group">
-              <label class="form-label">Contenu</label>
-              <textarea class="form-textarea" name="content" rows="8">${escapeHtml(item?.content || '')}</textarea>
-            </div>
-          ` : ''}
-
-          ${customFieldsHtml ? `
-            <div style="border-top: 1px solid var(--border); margin-top: 16px; padding-top: 16px;">
-              <h3 style="margin-bottom: 12px;">Champs personnalisés</h3>
-              ${customFieldsHtml}
-            </div>
-          ` : ''}
-
-          <div class="form-row" style="margin-top: 16px;">
-            <div class="form-group">
-              <label class="form-label">Statut</label>
-              <select class="form-input" name="status">
-                <option value="draft" ${item?.status === 'draft' ? 'selected' : ''}>Brouillon</option>
-                <option value="published" ${item?.status === 'published' ? 'selected' : ''}>Publié</option>
-              </select>
-            </div>
-          </div>
-
-          <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
-            <button type="button" class="btn btn-outline" onclick="closeCPTModal()">Annuler</button>
-            <button type="submit" class="btn btn-primary">${itemId ? 'Enregistrer' : 'Créer'}</button>
-          </div>
-        </form>
+  container.innerHTML = `
+    <div class="pages-list">
+      <div class="pages-list-header">
+        <span class="page-item__info cpt-sort-header" onclick="cptListSortBy('title')" style="cursor:pointer;user-select:none;">${escapeHtml(ptDef.label)} ${sortIcon('title')}</span>
+        <span class="page-item__parent cpt-sort-header" onclick="cptListSortBy('category')" style="cursor:pointer;user-select:none;">Catégories ${sortIcon('category')}</span>
+        <span class="page-item__meta cpt-sort-header" onclick="cptListSortBy('date')" style="cursor:pointer;user-select:none;">Date ${sortIcon('date')}</span>
+        <span class="page-item__badges">Statut</span>
+        <span class="page-item__actions" style="opacity:1">Actions</span>
       </div>
+      ${rows}
     </div>
   `;
 }
 
-function renderCPTField(field, value) {
-  const name = `cf_${field.name}`;
-  const label = escapeHtml(field.label || field.name);
+// ========== CPT EDIT PAGE (full page, not modal) ==========
 
-  switch (field.type) {
-    case 'Text':
-    case 'Email':
-    case 'Url':
-    case 'URL':
-      return `<div class="form-group"><label class="form-label">${label}</label><input type="${field.type === 'Email' ? 'email' : (field.type === 'Url' || field.type === 'URL') ? 'url' : 'text'}" class="form-input" name="${name}" value="${escapeHtml(String(value || ''))}"></div>`;
-    case 'Number':
-    case 'Range':
-      return `<div class="form-group"><label class="form-label">${label}</label><input type="number" class="form-input" name="${name}" value="${escapeHtml(String(value || ''))}"></div>`;
-    case 'Textarea':
-    case 'WYSIWYGEditor':
-      return `<div class="form-group"><label class="form-label">${label}</label><textarea class="form-textarea" name="${name}" rows="4">${escapeHtml(String(value || ''))}</textarea></div>`;
-    case 'TrueFalse':
-      return `<div class="form-group"><label class="form-label" style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" name="${name}" ${value ? 'checked' : ''}> ${label}</label></div>`;
-    case 'Select':
-      const opts = (field.choices || []).map(c => `<option value="${escapeHtml(c.value)}" ${String(value) === String(c.value) ? 'selected' : ''}>${escapeHtml(c.label)}</option>`).join('');
-      return `<div class="form-group"><label class="form-label">${label}</label><select class="form-input" name="${name}">${opts}</select></div>`;
-    default:
-      return `<div class="form-group"><label class="form-label">${label}</label><input type="text" class="form-input" name="${name}" value="${escapeHtml(String(value || ''))}"></div>`;
-  }
-}
+async function renderCPTEditPage(ptDef, itemId) {
+  showLoading();
+  let item = null;
+  let categories = [];
+  let allPages = [];
 
-function closeCPTModal() {
-  const modal = document.getElementById('cptModal');
-  if (modal) { modal.style.display = 'none'; modal.innerHTML = ''; }
-}
-
-async function saveCPTItem(event, postTypeSlug, itemId) {
-  event.preventDefault();
-  const form = event.target;
-  const formData = new FormData(form);
-
-  const ptDef = findPostTypeDef(postTypeSlug);
-  const fields = ptDef?.fields || [];
-
-  const custom_fields = {};
-  for (const field of fields) {
-    const key = `cf_${field.name}`;
-    if (field.type === 'TrueFalse') {
-      custom_fields[field.name] = form.querySelector(`[name="${key}"]`)?.checked ? true : false;
-    } else {
-      custom_fields[field.name] = formData.get(key) || '';
+  try {
+    const fetches = [
+      ptDef.hasCategories ? apiFetch(`/cpt/${ptDef.slug}/categories`) : Promise.resolve([]),
+      apiFetch('/pages')
+    ];
+    if (itemId) {
+      fetches.push(apiFetch(`/cpt/${ptDef.slug}/by-id/${itemId}`));
     }
+    const results = await Promise.all(fetches);
+    categories = results[0] || [];
+    allPages = results[1] || [];
+    if (itemId) item = results[2] || null;
+  } catch {
+    hideLoading();
+    return '<div class="card"><p>Erreur de chargement</p></div>';
   }
+  hideLoading();
+
+  const cf = item ? (typeof item.custom_fields === 'string' ? JSON.parse(item.custom_fields) : (item.custom_fields || {})) : {};
+  const fi = item?.featured_image || null;
+  const itemCategories = item?.categories || [];
+
+  // Parse photos gallery
+  let photos = [];
+  try { photos = JSON.parse(cf.photos || '[]'); } catch { photos = []; }
+  if (!Array.isArray(photos)) photos = [];
+
+  // Parse link
+  let linkObj = { url: '', title: '', target: '_self' };
+  try { if (cf.link) linkObj = typeof cf.link === 'string' ? JSON.parse(cf.link) : cf.link; } catch { /* keep defaults */ }
+
+  const featuredImgPreview = fi
+    ? `<img src="${escapeHtml(fi.sizes?.thumbnail || fi.url || '')}" alt="" style="max-width:200px;max-height:150px;object-fit:cover;border-radius:8px;">`
+    : '<div style="width:200px;height:150px;background:#f5f5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#999;">Aucune image</div>';
+
+  const photosPreview = photos.length > 0
+    ? photos.map((url, i) => `<div class="cpt-photo-item" data-index="${i}" style="position:relative;display:inline-block;margin:4px;">
+        <img src="${escapeHtml(url)}" style="width:100px;height:80px;object-fit:cover;border-radius:4px;">
+        <button type="button" class="btn-remove-photo" onclick="removeCPTPhoto(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e74c3c;color:#fff;border:0;cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;">×</button>
+      </div>`).join('')
+    : '<p style="color:#999;font-size:13px;">Aucune photo</p>';
+
+  const categoriesHtml = ptDef.hasCategories && categories.length > 0
+    ? `<div class="form-group">
+        <label class="form-label">${escapeHtml(ptDef.categoryLabel || 'Catégories')}</label>
+        <div class="cpt-categories-checkboxes" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px;">
+          ${categories.map(cat => `
+            <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;">
+              <input type="checkbox" name="cat_${cat.id}" value="${cat.id}" ${itemCategories.find(c => c.id === cat.id) ? 'checked' : ''}>
+              ${escapeHtml(cat.name)}
+            </label>
+          `).join('')}
+        </div>
+      </div>`
+    : ptDef.hasCategories
+      ? `<div class="form-group"><label class="form-label">${escapeHtml(ptDef.categoryLabel || 'Catégories')}</label><p style="color:#999;font-size:13px;">Aucune catégorie. <a href="#" onclick="loadSection('cpt-categories:${escapeHtml(ptDef.slug)}');return false;">Créer des catégories</a></p></div>`
+      : '';
+
+  return `
+    <div class="page-header">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="btn btn-outline btn-sm" onclick="loadSection('cpt:${escapeHtml(ptDef.slug)}')">← Retour</button>
+        <h1>${itemId ? 'Modifier' : 'Nouvelle'} ${escapeHtml(ptDef.label)}</h1>
+      </div>
+    </div>
+
+    <form id="cptEditForm" data-post-type="${escapeHtml(ptDef.slug)}" data-item-id="${itemId || ''}">
+      <div style="display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start;">
+        <!-- Main column -->
+        <div>
+          <div class="card" style="margin-bottom:24px;">
+            <div class="form-group">
+              <label class="form-label">Titre *</label>
+              <input type="text" class="form-input" name="title" value="${escapeHtml(item?.title || '')}" required id="cptTitleInput">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Slug</label>
+              <input type="text" class="form-input" name="slug" value="${escapeHtml(item?.slug || '')}" id="cptSlugInput">
+            </div>
+          </div>
+
+          <!-- Tabs: Popup / Contenu -->
+          <div class="card" style="margin-bottom:24px;">
+            <div class="cpt-tabs" style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px;">
+              <button type="button" class="cpt-tab active" data-tab="popup" style="padding:10px 20px;border:0;background:0;cursor:pointer;font-weight:600;border-bottom:2px solid var(--primary);margin-bottom:-2px;">Popup</button>
+              <button type="button" class="cpt-tab" data-tab="contenu" style="padding:10px 20px;border:0;background:0;cursor:pointer;font-weight:600;color:#999;border-bottom:2px solid transparent;margin-bottom:-2px;">Contenu</button>
+            </div>
+
+            <!-- Tab: Popup -->
+            <div class="cpt-tab-content" data-tab="popup">
+              <div class="form-group">
+                <label class="form-label">Sous-titre / Nom du client</label>
+                <input type="text" class="form-input" name="cf_customer_name" value="${escapeHtml(cf.customer_name || '')}">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Texte / Description</label>
+                <div id="cptQuillEditor" style="min-height:200px;"></div>
+                <input type="hidden" name="cf_text" value="${escapeHtml(cf.text || '')}">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Photos</label>
+                <div id="cptPhotosPreview" style="margin-bottom:8px;">${photosPreview}</div>
+                <input type="hidden" name="cf_photos" id="cptPhotosInput" value="${escapeHtml(JSON.stringify(photos))}">
+                <button type="button" class="btn btn-outline btn-sm" onclick="openCPTPhotoPicker()">📸 Ajouter des photos</button>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Lien</label>
+                <div class="form-row" style="grid-template-columns:1fr 2fr 1fr auto;">
+                  <div class="form-group">
+                    <select class="form-input" id="cptLinkPageSelect">
+                      <option value="">— Page du site —</option>
+                      ${allPages.filter(p => p.status === 'published').map(p => `<option value="/pages/${escapeHtml(p.slug)}" ${linkObj.url === '/pages/' + p.slug ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <input type="text" class="form-input" name="cf_link_url" id="cptLinkUrlInput" value="${escapeHtml(linkObj.url || '')}" placeholder="URL (ou choisir une page)">
+                  </div>
+                  <div class="form-group">
+                    <input type="text" class="form-input" name="cf_link_title" value="${escapeHtml(linkObj.title || '')}" placeholder="Titre du lien">
+                  </div>
+                  <div class="form-group">
+                    <select class="form-input" name="cf_link_target">
+                      <option value="_self" ${linkObj.target !== '_blank' ? 'selected' : ''}>Même fenêtre</option>
+                      <option value="_blank" ${linkObj.target === '_blank' ? 'selected' : ''}>Nouvel onglet</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab: Contenu (flexible modules - stored in content field) -->
+            <div class="cpt-tab-content" data-tab="contenu" style="display:none;">
+              <p style="color:#999;font-size:13px;">Le contenu flexible (modules) est géré via le champ contenu du CPT. Vous pouvez y ajouter du JSON de blocs.</p>
+              <div class="form-group">
+                <label class="form-label">Contenu (JSON blocs)</label>
+                <textarea class="form-textarea" name="content" rows="12" style="font-family:monospace;font-size:13px;">${escapeHtml(item?.content || '')}</textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div>
+          <div class="card" style="margin-bottom:16px;">
+            <h3 style="margin-bottom:12px;">Publication</h3>
+            <div class="form-group">
+              <label class="form-label">Statut</label>
+              <select class="form-input" name="status">
+                <option value="draft" ${item?.status === 'draft' || !item ? 'selected' : ''}>Brouillon</option>
+                <option value="published" ${item?.status === 'published' ? 'selected' : ''}>Publié</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+              <button type="submit" class="btn btn-primary" style="flex:1;">${itemId ? 'Mettre à jour' : 'Publier'}</button>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:16px;">
+            <h3 style="margin-bottom:12px;">Image à la une</h3>
+            <div id="cptFeaturedPreview" style="margin-bottom:8px;">${featuredImgPreview}</div>
+            <input type="hidden" name="featured_image" id="cptFeaturedInput" value="${fi ? escapeHtml(JSON.stringify(fi)) : ''}">
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="openCPTFeaturedPicker()">📷 Choisir</button>
+              ${fi ? '<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearCPTFeatured()">Supprimer</button>' : ''}
+            </div>
+          </div>
+
+          ${categoriesHtml ? `<div class="card" style="margin-bottom:16px;">${categoriesHtml}</div>` : ''}
+        </div>
+      </div>
+    </form>
+  `;
+}
+
+function attachCPTFormEvents(ptDef) {
+  // Auto-slug from title
+  const titleInput = document.getElementById('cptTitleInput');
+  const slugInput = document.getElementById('cptSlugInput');
+  if (titleInput && slugInput && !slugInput.value) {
+    titleInput.addEventListener('input', () => {
+      slugInput.value = titleInput.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    });
+  }
+
+  // Tab switching
+  document.querySelectorAll('.cpt-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.cpt-tab').forEach(t => { t.classList.remove('active'); t.style.borderBottomColor = 'transparent'; t.style.color = '#999'; });
+      tab.classList.add('active'); tab.style.borderBottomColor = 'var(--primary)'; tab.style.color = '';
+      document.querySelectorAll('.cpt-tab-content').forEach(c => c.style.display = 'none');
+      const target = document.querySelector(`.cpt-tab-content[data-tab="${tab.dataset.tab}"]`);
+      if (target) target.style.display = '';
+    });
+  });
+
+  // Link page selector → URL sync
+  const pageSelect = document.getElementById('cptLinkPageSelect');
+  const linkUrlInput = document.getElementById('cptLinkUrlInput');
+  if (pageSelect && linkUrlInput) {
+    pageSelect.addEventListener('change', () => {
+      if (pageSelect.value) linkUrlInput.value = pageSelect.value;
+    });
+  }
+
+  // Init Quill editor for text field
+  initCPTQuillEditor();
+
+  // Form submit
+  const form = document.getElementById('cptEditForm');
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      saveCPTItemFromForm(ptDef);
+    });
+  }
+}
+
+function initCPTQuillEditor() {
+  const container = document.getElementById('cptQuillEditor');
+  const hiddenInput = document.querySelector('input[name="cf_text"]');
+  if (!container || !hiddenInput) return;
+
+  // Load Quill if not already loaded
+  if (typeof Quill === 'undefined') {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet'; link.href = 'https://cdn.quilljs.com/1.3.7/quill.snow.css';
+    document.head.appendChild(link);
+    const script = document.createElement('script');
+    script.src = 'https://cdn.quilljs.com/1.3.7/quill.min.js';
+    script.onload = () => createCPTQuill(container, hiddenInput);
+    document.head.appendChild(script);
+  } else {
+    createCPTQuill(container, hiddenInput);
+  }
+}
+
+let _cptQuill = null;
+function createCPTQuill(container, hiddenInput) {
+  _cptQuill = new Quill(container, {
+    theme: 'snow',
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        [{ align: [] }],
+        ['link'],
+        ['clean']
+      ]
+    }
+  });
+  // Set initial content
+  if (hiddenInput.value) {
+    _cptQuill.root.innerHTML = hiddenInput.value;
+  }
+  // Sync on change
+  _cptQuill.on('text-change', () => {
+    hiddenInput.value = _cptQuill.root.innerHTML;
+  });
+}
+
+// Featured image picker
+function openCPTFeaturedPicker() {
+  mediaPickerState = {
+    isOpen: true,
+    blockId: '__cpt_featured__',
+    fieldName: 'featured_image',
+    type: 'image',
+    folderId: null,
+    folders: [],
+    items: [],
+    multiple: false,
+    selectedIds: []
+  };
+  ensureMediaPickerModal();
+  showLoading();
+  Promise.all([apiFetch('/media/folders'), apiFetch('/media?all=1')])
+    .then(([folders, items]) => {
+      mediaPickerState.folders = folders;
+      mediaPickerState.items = items;
+      hideLoading();
+      document.getElementById('mediaPickerModal').classList.add('is-open');
+      updateMediaPickerContent();
+    })
+    .catch(() => hideLoading());
+}
+
+function clearCPTFeatured() {
+  document.getElementById('cptFeaturedInput').value = '';
+  document.getElementById('cptFeaturedPreview').innerHTML = '<div style="width:200px;height:150px;background:#f5f5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#999;">Aucune image</div>';
+}
+
+// Photos gallery picker
+function openCPTPhotoPicker() {
+  mediaPickerState = {
+    isOpen: true,
+    blockId: '__cpt_photos__',
+    fieldName: 'photos',
+    type: 'image',
+    folderId: null,
+    folders: [],
+    items: [],
+    multiple: true,
+    selectedIds: []
+  };
+  ensureMediaPickerModal();
+  showLoading();
+  Promise.all([apiFetch('/media/folders'), apiFetch('/media?all=1')])
+    .then(([folders, items]) => {
+      mediaPickerState.folders = folders;
+      mediaPickerState.items = items;
+      hideLoading();
+      document.getElementById('mediaPickerModal').classList.add('is-open');
+      updateMediaPickerContent();
+    })
+    .catch(() => hideLoading());
+}
+
+function removeCPTPhoto(index) {
+  const input = document.getElementById('cptPhotosInput');
+  let photos = [];
+  try { photos = JSON.parse(input.value || '[]'); } catch { photos = []; }
+  photos.splice(index, 1);
+  input.value = JSON.stringify(photos);
+  updateCPTPhotosPreview(photos);
+}
+
+function updateCPTPhotosPreview(photos) {
+  const preview = document.getElementById('cptPhotosPreview');
+  if (!preview) return;
+  if (photos.length === 0) {
+    preview.innerHTML = '<p style="color:#999;font-size:13px;">Aucune photo</p>';
+    return;
+  }
+  preview.innerHTML = photos.map((url, i) => `<div class="cpt-photo-item" data-index="${i}" style="position:relative;display:inline-block;margin:4px;">
+    <img src="${escapeHtml(url)}" style="width:100px;height:80px;object-fit:cover;border-radius:4px;">
+    <button type="button" class="btn-remove-photo" onclick="removeCPTPhoto(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e74c3c;color:#fff;border:0;cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;">×</button>
+  </div>`).join('');
+}
+
+// Hook into selectMediaFromPicker for CPT fields
+const _origSelectMediaForCPT = typeof selectMediaFromPicker === 'function' ? selectMediaFromPicker : null;
+const _origConfirmMediaForCPT = typeof confirmMediaPickerSelection === 'function' ? confirmMediaPickerSelection : null;
+
+// We'll override in a non-destructive way by hooking into the existing flow
+// The media picker calls selectMediaFromPicker(id) for single, confirmMediaPickerSelection() for multi
+
+async function saveCPTItemFromForm(ptDef) {
+  const form = document.getElementById('cptEditForm');
+  if (!form) return;
+
+  const formData = new FormData(form);
+  const itemId = form.dataset.itemId ? parseInt(form.dataset.itemId) : null;
+
+  // Sync Quill content
+  if (_cptQuill) {
+    form.querySelector('input[name="cf_text"]').value = _cptQuill.root.innerHTML;
+  }
+
+  // Build link object
+  const linkUrl = formData.get('cf_link_url') || '';
+  const linkTitle = formData.get('cf_link_title') || '';
+  const linkTarget = formData.get('cf_link_target') || '_self';
+  const linkObj = linkUrl ? JSON.stringify({ url: linkUrl, title: linkTitle, target: linkTarget }) : '';
+
+  // Build custom_fields
+  const custom_fields = {
+    customer_name: formData.get('cf_customer_name') || '',
+    text: formData.get('cf_text') || '',
+    photos: formData.get('cf_photos') || '[]',
+    link: linkObj
+  };
+
+  // Featured image
+  const fiRaw = document.getElementById('cptFeaturedInput')?.value || '';
+  let featured_image = null;
+  try { if (fiRaw) featured_image = JSON.parse(fiRaw); } catch { /* ignore */ }
+
+  // Categories
+  const categories = [];
+  form.querySelectorAll('.cpt-categories-checkboxes input[type="checkbox"]:checked').forEach(cb => {
+    categories.push(parseInt(cb.value));
+  });
 
   const payload = {
     title: formData.get('title'),
     slug: formData.get('slug'),
     content: formData.get('content') || '',
     status: formData.get('status') || 'draft',
-    custom_fields
+    featured_image,
+    custom_fields,
+    categories
   };
 
   try {
+    showLoading();
     if (itemId) {
-      await apiFetch(`/cpt/${postTypeSlug}/${itemId}`, { method: 'PUT', body: JSON.stringify(payload) });
-      showToast('Élément mis à jour', 'success');
+      await apiFetch(`/cpt/${ptDef.slug}/${itemId}`, { method: 'PUT', body: JSON.stringify(payload) });
+      showToast(`${ptDef.label} mis à jour`, 'success');
     } else {
-      await apiFetch(`/cpt/${postTypeSlug}`, { method: 'POST', body: JSON.stringify(payload) });
-      showToast('Élément créé', 'success');
+      await apiFetch(`/cpt/${ptDef.slug}`, { method: 'POST', body: JSON.stringify(payload) });
+      showToast(`${ptDef.label} créé`, 'success');
     }
-    closeCPTModal();
-    loadSection(`cpt:${postTypeSlug}`);
+    hideLoading();
+    loadSection(`cpt:${ptDef.slug}`);
   } catch (error) {
+    hideLoading();
     showToast(error.message || 'Erreur lors de la sauvegarde', 'error');
   }
 }
@@ -1011,8 +1458,336 @@ async function deleteCPTItemUI(postTypeSlug, itemId, title) {
   }
 }
 
+// ========== CPT CATEGORIES PAGE ==========
+
+async function renderCPTCategoriesPage(ptDef) {
+  showLoading();
+  try {
+    const categories = await apiFetch(`/cpt/${ptDef.slug}/categories`);
+    hideLoading();
+
+    const rows = categories.map(cat => {
+      const safeName = escapeHtml(cat.name).replace(/'/g, "\\'");
+      return '<div class="page-item">'
+        + '<div class="page-item__info" style="cursor:pointer" onclick="editCPTCategory(\'' + escapeHtml(ptDef.slug) + '\', ' + cat.id + ', \'' + safeName + '\')">'
+        +   '<div class="page-item__title">' + escapeHtml(cat.name) + '</div>'
+        + '</div>'
+        + '<div class="page-item__parent"><span class="page-item__slug" style="display:inline">' + escapeHtml(cat.slug) + '</span></div>'
+        + '<div class="page-item__actions">'
+        +   '<button class="btn-icon-action" onclick="editCPTCategory(\'' + escapeHtml(ptDef.slug) + '\', ' + cat.id + ', \'' + safeName + '\')" title="Modifier">' + _svgEdit + '</button>'
+        +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteCPTCategory(\'' + escapeHtml(ptDef.slug) + '\', ' + cat.id + ', \'' + safeName + '\')" title="Supprimer">' + _svgDelete + '</button>'
+        + '</div>'
+      + '</div>';
+    }).join('');
+
+    return `
+      <div class="page-header">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="btn btn-outline btn-sm" onclick="loadSection('cpt:${escapeHtml(ptDef.slug)}')">← Retour</button>
+          <h1>${escapeHtml(ptDef.categoryLabel || 'Catégories')}</h1>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:350px 1fr;gap:24px;align-items:start;">
+        <div class="card">
+          <h3 style="margin-bottom:12px;">Ajouter une catégorie</h3>
+          <form onsubmit="createCPTCategoryUI(event, '${escapeHtml(ptDef.slug)}')">
+            <div class="form-group">
+              <label class="form-label">Nom</label>
+              <input type="text" class="form-input" name="name" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Ajouter</button>
+          </form>
+        </div>
+
+        <div class="card">
+          ${categories.length > 0 ? `
+            <div class="pages-list">
+              <div class="pages-list-header">
+                <span class="page-item__info">Nom</span>
+                <span class="page-item__parent">Slug</span>
+                <span class="page-item__actions" style="opacity:1">Actions</span>
+              </div>
+              ${rows}
+            </div>
+          ` : renderEmptyState('🏷️', 'Aucune catégorie', 'Ajoutez votre première catégorie')}
+        </div>
+      </div>
+    `;
+  } catch {
+    hideLoading();
+    return '<div class="card"><p>Erreur de chargement</p></div>';
+  }
+}
+
+async function createCPTCategoryUI(event, postTypeSlug) {
+  event.preventDefault();
+  const form = event.target;
+  const name = new FormData(form).get('name');
+  try {
+    await apiFetch(`/cpt/${postTypeSlug}/categories`, { method: 'POST', body: JSON.stringify({ name }) });
+    showToast('Catégorie créée', 'success');
+    loadSection(`cpt-categories:${postTypeSlug}`);
+  } catch (error) {
+    showToast(error.message || 'Erreur', 'error');
+  }
+}
+
+async function editCPTCategory(postTypeSlug, catId, currentName) {
+  const newName = prompt('Nouveau nom :', currentName);
+  if (!newName || newName === currentName) return;
+  try {
+    await apiFetch(`/cpt/${postTypeSlug}/categories/${catId}`, { method: 'PUT', body: JSON.stringify({ name: newName }) });
+    showToast('Catégorie mise à jour', 'success');
+    loadSection(`cpt-categories:${postTypeSlug}`);
+  } catch (error) {
+    showToast(error.message || 'Erreur', 'error');
+  }
+}
+
+async function deleteCPTCategory(postTypeSlug, catId, name) {
+  if (!confirm(`Supprimer la catégorie "${name}" ?`)) return;
+  try {
+    await apiFetch(`/cpt/${postTypeSlug}/categories/${catId}`, { method: 'DELETE' });
+    showToast('Catégorie supprimée', 'success');
+    loadSection(`cpt-categories:${postTypeSlug}`);
+  } catch {
+    showToast('Erreur lors de la suppression', 'error');
+  }
+}
+
+// ========== CPT OPTIONS PAGE ==========
+
+let _cptOptionsQuill = null;
+
+async function renderCPTOptionsPage(ptDef) {
+  showLoading();
+  let settings = {};
+  try {
+    const allSettings = await apiFetch('/settings');
+    for (const s of allSettings) {
+      if (s.setting_key.startsWith(`cpt_${ptDef.slug}_`)) {
+        settings[s.setting_key.replace(`cpt_${ptDef.slug}_`, '')] = s.setting_value;
+      }
+    }
+  } catch { /* ignore */ }
+  hideLoading();
+
+  const headerImg = settings.header_img || '';
+  const headerImgPreview = headerImg
+    ? `<img src="${escapeHtml(headerImg)}" style="max-width:200px;max-height:120px;object-fit:cover;border-radius:6px;">`
+    : '<span style="color:#999;font-size:13px;">Aucune image sélectionnée</span>';
+
+  return `
+    <div class="page-header">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="btn btn-outline btn-sm" onclick="loadSection('cpt:${escapeHtml(ptDef.slug)}')">← Retour</button>
+        <h1>Page d'archive des ${escapeHtml((ptDef.labelPlural || ptDef.label).toLowerCase())}</h1>
+      </div>
+    </div>
+
+    <div class="settings-tabs" style="margin-bottom:0;">
+      <button type="button" class="settings-tab is-active" data-cpt-opt-tab="general">Général</button>
+      <button type="button" class="settings-tab" data-cpt-opt-tab="affichage">Affichage</button>
+    </div>
+
+    <div class="card" style="margin-bottom:24px;border-top-left-radius:0;">
+      <form id="cptOptionsForm" onsubmit="saveCPTOptions(event, '${escapeHtml(ptDef.slug)}')">
+
+        <!-- Tab: Général -->
+        <div class="cpt-opt-panel" data-cpt-opt-panel="general">
+          <div class="form-row" style="grid-template-columns:2fr 1fr 1fr;">
+            <div class="form-group">
+              <label class="form-label">Titre de la page (h1)</label>
+              <input type="text" class="form-input" name="archive_title" value="${escapeHtml(settings.archive_title || ptDef.labelPlural || 'Références')}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Afficher le titre ?</label>
+              <div class="cpt-toggle-group" data-name="title_in_header">
+                <button type="button" class="cpt-toggle-btn ${settings.title_in_header !== 'hideTitle' ? 'active' : ''}" data-value="showTitle">Oui</button>
+                <button type="button" class="cpt-toggle-btn ${settings.title_in_header === 'hideTitle' ? 'active' : ''}" data-value="hideTitle">Non</button>
+              </div>
+              <input type="hidden" name="title_in_header" value="${escapeHtml(settings.title_in_header || 'showTitle')}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Balise H1 dans le titre ?</label>
+              <div class="cpt-toggle-group" data-name="h1_in_header">
+                <button type="button" class="cpt-toggle-btn ${settings.h1_in_header !== 'no' ? 'active' : ''}" data-value="yes">Oui</button>
+                <button type="button" class="cpt-toggle-btn ${settings.h1_in_header === 'no' ? 'active' : ''}" data-value="no">Non</button>
+              </div>
+              <input type="hidden" name="h1_in_header" value="${escapeHtml(settings.h1_in_header || 'yes')}">
+            </div>
+          </div>
+          <div class="form-row" style="grid-template-columns:1fr 1fr;margin-top:16px;">
+            <div class="form-group">
+              <label class="form-label">Description</label>
+              <div id="cptOptionsDescEditor" style="min-height:200px;"></div>
+              <input type="hidden" name="archive_desc" value="${escapeHtml(settings.archive_desc || '')}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Image de fond</label>
+              <div id="cptOptionsImgPreview" style="margin-bottom:8px;">${headerImgPreview}</div>
+              <input type="hidden" name="header_img" id="cptOptionsImgInput" value="${escapeHtml(headerImg)}">
+              <div style="display:flex;gap:8px;">
+                <button type="button" class="btn btn-outline btn-sm" onclick="openCPTOptionsImgPicker()">Ajouter image</button>
+                ${headerImg ? '<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearCPTOptionsImg()">Supprimer</button>' : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Affichage -->
+        <div class="cpt-opt-panel" data-cpt-opt-panel="affichage" style="display:none;">
+          <div class="form-group" style="max-width:25%;">
+            <label class="form-label">Disposition du contenu</label>
+            <div class="cpt-toggle-group" data-name="archive_display">
+              <button type="button" class="cpt-toggle-btn ${settings.archive_display !== 'columns-2' ? 'active' : ''}" data-value="column-1">1 colonne</button>
+              <button type="button" class="cpt-toggle-btn ${settings.archive_display === 'columns-2' ? 'active' : ''}" data-value="columns-2">2 colonnes</button>
+            </div>
+            <input type="hidden" name="archive_display" value="${escapeHtml(settings.archive_display || 'column-1')}">
+          </div>
+          <div class="form-group" style="max-width:25%;margin-top:16px;">
+            <label class="form-label">Affichage individuel</label>
+            <div class="cpt-toggle-group cpt-toggle-vertical" data-name="ref_display">
+              <button type="button" class="cpt-toggle-btn ${settings.ref_display === 'page' ? 'active' : ''}" data-value="page">Page</button>
+              <button type="button" class="cpt-toggle-btn ${settings.ref_display === 'popup' || !settings.ref_display ? 'active' : ''}" data-value="popup">Pop-up</button>
+              <button type="button" class="cpt-toggle-btn ${settings.ref_display === 'both' ? 'active' : ''}" data-value="both">Les deux</button>
+            </div>
+            <input type="hidden" name="ref_display" value="${escapeHtml(settings.ref_display || 'popup')}">
+          </div>
+          <div class="form-group" style="max-width:25%;margin-top:16px;">
+            <label class="form-label">Ordre d'affichage</label>
+            <div class="cpt-toggle-group" data-name="randomise_refs">
+              <button type="button" class="cpt-toggle-btn ${settings.randomise_refs !== 'random' ? 'active' : ''}" data-value="asc">Chronologique</button>
+              <button type="button" class="cpt-toggle-btn ${settings.randomise_refs === 'random' ? 'active' : ''}" data-value="random">Aléatoire</button>
+            </div>
+            <input type="hidden" name="randomise_refs" value="${escapeHtml(settings.randomise_refs || 'asc')}">
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:24px;">
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+function attachCPTOptionsEvents() {
+  // Tab switching
+  document.querySelectorAll('[data-cpt-opt-tab]').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('[data-cpt-opt-tab]').forEach(t => t.classList.remove('is-active'));
+      tab.classList.add('is-active');
+      document.querySelectorAll('[data-cpt-opt-panel]').forEach(p => p.style.display = 'none');
+      const panel = document.querySelector(`[data-cpt-opt-panel="${tab.dataset.cptOptTab}"]`);
+      if (panel) panel.style.display = '';
+    });
+  });
+
+  // Toggle button groups
+  document.querySelectorAll('.cpt-toggle-group').forEach(group => {
+    const name = group.dataset.name;
+    const hiddenInput = group.parentElement.querySelector(`input[name="${name}"]`);
+    group.querySelectorAll('.cpt-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        group.querySelectorAll('.cpt-toggle-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (hiddenInput) hiddenInput.value = btn.dataset.value;
+      });
+    });
+  });
+
+  // Init Quill for description
+  const descContainer = document.getElementById('cptOptionsDescEditor');
+  const descInput = document.querySelector('#cptOptionsForm input[name="archive_desc"]');
+  if (descContainer && descInput) {
+    if (typeof Quill === 'undefined') {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet'; link.href = 'https://cdn.quilljs.com/1.3.7/quill.snow.css';
+      document.head.appendChild(link);
+      const script = document.createElement('script');
+      script.src = 'https://cdn.quilljs.com/1.3.7/quill.min.js';
+      script.onload = () => createCPTOptionsQuill(descContainer, descInput);
+      document.head.appendChild(script);
+    } else {
+      createCPTOptionsQuill(descContainer, descInput);
+    }
+  }
+}
+
+function createCPTOptionsQuill(container, hiddenInput) {
+  _cptOptionsQuill = new Quill(container, {
+    theme: 'snow',
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        [{ align: [] }],
+        ['link'],
+        ['clean']
+      ]
+    }
+  });
+  if (hiddenInput.value) _cptOptionsQuill.root.innerHTML = hiddenInput.value;
+  _cptOptionsQuill.on('text-change', () => {
+    hiddenInput.value = _cptOptionsQuill.root.innerHTML;
+  });
+}
+
+function openCPTOptionsImgPicker() {
+  mediaPickerState = {
+    isOpen: true,
+    blockId: '__cpt_options_img__',
+    fieldName: 'header_img',
+    type: 'image',
+    folderId: null,
+    folders: [],
+    items: [],
+    multiple: false,
+    selectedIds: []
+  };
+  ensureMediaPickerModal();
+  showLoading();
+  Promise.all([apiFetch('/media/folders'), apiFetch('/media?all=1')])
+    .then(([folders, items]) => {
+      mediaPickerState.folders = folders;
+      mediaPickerState.items = items;
+      hideLoading();
+      updateMediaPickerContent();
+    })
+    .catch(() => hideLoading());
+}
+
+function clearCPTOptionsImg() {
+  document.getElementById('cptOptionsImgInput').value = '';
+  document.getElementById('cptOptionsImgPreview').innerHTML = '<span style="color:#999;font-size:13px;">Aucune image sélectionnée</span>';
+}
+
+async function saveCPTOptions(event, postTypeSlug) {
+  event.preventDefault();
+  const form = event.target;
+  // Sync Quill
+  if (_cptOptionsQuill) {
+    form.querySelector('input[name="archive_desc"]').value = _cptOptionsQuill.root.innerHTML;
+  }
+  const formData = new FormData(form);
+  const settings = {};
+  for (const [key, value] of formData.entries()) {
+    settings[`cpt_${postTypeSlug}_${key}`] = value;
+  }
+  try {
+    await apiFetch('/settings', { method: 'PUT', body: JSON.stringify({ settings }) });
+    showToast('Options enregistrées', 'success');
+  } catch (error) {
+    showToast(error.message || 'Erreur', 'error');
+  }
+}
+
 let pageBuilderState = { editingPageId: null, blocks: [], meta: { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null } };
 let selectedBlockId = null;
+let reusableBlocBuilderMode = false;
 let _inlineEditingBlockId = null;
 let _inlineEditingFieldName = null;
 let _inlineEditingDataRef = null;  // direct ref to the data object (block.data or sub-module data)
@@ -1022,8 +1797,8 @@ const moduleTemplateCache = {};
 const moduleTemplatePromises = {};
 const moduleStylesLoaded = new Set();
 let baseStylesLoaded = false;
-let mediaState = { folders: [], items: [], currentFolderId: null, selectedIds: [] };
-let mediaPickerState = { isOpen: false, blockId: null, fieldName: null, type: 'all', folderId: null, folders: [], items: [] };
+let mediaState = { folders: [], items: [], currentFolderId: null, selectedIds: [], search: '' };
+let mediaPickerState = { isOpen: false, blockId: null, fieldName: null, type: 'all', folderId: null, folders: [], items: [], search: '' };
 let siteSettingsCache = null;
 
 function applyCssVariablesFromSettings(settings) {
@@ -1086,6 +1861,13 @@ function applyCssVariablesFromSettings(settings) {
   if (!Number.isNaN(logoHeight)) {
     rootStyle.setProperty('--logo-height', `${logoHeight}px`);
   }
+
+  // Toggle border-rounded class on builderCanvas so module previews
+  // render with rounded corners when the setting is active
+  const canvas = document.getElementById('builderCanvas');
+  if (canvas) {
+    canvas.classList.toggle('border-rounded', settings.rounded === '1');
+  }
 }
 
 async function loadSiteSettings() {
@@ -1127,6 +1909,7 @@ async function openPageBuilder(pageId) {
   pageBuilderState.editingPageId = pageId;
   pageBuilderState.blocks = [];
   pageBuilderState.meta = { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null };
+  pageBuilderState.pageMenus = [];       // menus with per-menu toggle/position state
   selectedBlockId = null;
   // Mémoriser la dernière vue comme "builder" pour restaurer après rafraîchissement
   localStorage.setItem('adminLastView', `builder:${pageId ?? 'new'}`);
@@ -1135,58 +1918,44 @@ async function openPageBuilder(pageId) {
   if (pageId) {
     showLoading();
     try {
-      const pages = await apiFetch('/pages');
+      const [pages, pageMenus] = await Promise.all([
+        apiFetch('/pages'),
+        apiFetch(`/pages/${pageId}/menus`),
+      ]);
       const page = pages.find(p => p.id === pageId);
       if (page) {
         pageBuilderState.blocks = parsePageContent(page.content);
         pageBuilderState.meta = { title: page.title, slug: page.slug, status: page.status, show_in_menu: page.show_in_menu !== false, menu_order: page.menu_order || 0, parent_id: page.parent_id || null };
       }
+      pageBuilderState.pageMenus = pageMenus?.menus || [];
     } catch (e) {}
     hideLoading();
+  } else {
+    // New page — load menus with empty state
+    try {
+      const pageMenus = await apiFetch('/menus');
+      pageBuilderState.pageMenus = (pageMenus || []).map(m => ({
+        id: m.id, name: m.name, location: m.location,
+        enabled: false, parent_id: null, menu_order: 0, items: [],
+      }));
+    } catch (e) {}
   }
   document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
   document.getElementById('content').innerHTML = await renderPageBuilder();
   attachPageBuilderListeners();
-}
-
-function buildMenuPositions(parentId) {
-  const pid = parentId || null;
-  const siblings = (pageBuilderState._allPages || [])
-    .filter(p => p.show_in_menu && p.id !== pageBuilderState.editingPageId && (p.parent_id || null) == pid)
-    .sort((a, b) => (a.menu_order || 0) - (b.menu_order || 0));
-  if (siblings.length === 0) {
-    return [{ value: 0, label: '— Première position' }];
+  // Apply border-rounded class to canvas based on current settings
+  if (siteSettingsCache) {
+    const canvas = document.getElementById('builderCanvas');
+    if (canvas) canvas.classList.toggle('border-rounded', siteSettingsCache.rounded === '1');
   }
-  return [
-    { value: 0, label: `Avant "${escapeHtml(siblings[0].title)}"` },
-    ...siblings.map(p => ({ value: (p.menu_order || 0) + 1, label: `Après "${escapeHtml(p.title)}"` }))
-  ];
 }
 
-function updatePagePositionOptions() {
-  const parentEl = document.querySelector('.builder-parent');
-  const orderEl = document.querySelector('.builder-order');
-  if (!orderEl) return;
-  const parentId = parentEl && parentEl.value ? parseInt(parentEl.value, 10) : null;
-  const positions = buildMenuPositions(parentId);
-  orderEl.innerHTML = positions.map(pos =>
-    `<option value="${pos.value}">${pos.label}</option>`
-  ).join('');
-  orderEl.value = positions[0].value;
-  syncBuilderMetaFromDOM();
-}
+// Legacy buildMenuPositions/updatePagePositionOptions removed — now per-menu via renderPageMenuToggles
 
 async function renderPageBuilder() {
   const m = pageBuilderState.meta;
   const pages = await apiFetch('/pages').catch(() => []);
-  const parentOptions = (pages || []).filter(p => !p.parent_id && p.id !== pageBuilderState.editingPageId);
-
   pageBuilderState._allPages = pages || [];
-  const menuPositions = buildMenuPositions(m.parent_id);
-  let selectedPos = 0;
-  for (const pos of menuPositions) {
-    if (pos.value <= m.menu_order) selectedPos = pos.value;
-  }
 
   return `
     <div class="page-builder">
@@ -1203,41 +1972,32 @@ async function renderPageBuilder() {
           </div>
           <div class="builder-field-group">
             <label class="builder-field-label">Statut</label>
-            <select class="form-select builder-status" data-field="status">
+            <select class="form-select builder-status" data-field="status" onchange="onBuilderStatusChange(this.value)">
               <option value="draft" ${m.status === 'draft' ? 'selected' : ''}>Brouillon</option>
               <option value="published" ${m.status === 'published' ? 'selected' : ''}>Publié</option>
             </select>
           </div>
-          <div class="builder-field-group">
-            <label class="builder-field-label">Menu</label>
-            <label class="toggle-field toggle-compact">
-              <span class="toggle-label toggle-label-off">Non</span>
-              <span class="toggle-switch">
-                <input type="checkbox" class="builder-show-menu" ${m.show_in_menu ? 'checked' : ''} data-field="show_in_menu" onchange="toggleBuilderMenuFields()">
-                <span class="toggle-slider" aria-hidden="true"></span>
-              </span>
-              <span class="toggle-label toggle-label-on">Oui</span>
-            </label>
-          </div>
-          <div class="builder-field-group builder-menu-field" ${m.show_in_menu ? '' : 'style="display:none"'}>
-            <label class="builder-field-label">Page parente</label>
-            <select class="form-select builder-parent" data-field="parent_id">
-              <option value="">Aucune</option>
-              ${parentOptions.map(p => `<option value="${p.id}" ${m.parent_id === p.id ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
-            </select>
-          </div>
-          <div class="builder-field-group builder-menu-field" ${m.show_in_menu ? '' : 'style="display:none"'}>
-            <label class="builder-field-label">Position</label>
-            <select class="form-select builder-order" data-field="menu_order">
-              ${menuPositions.map(pos => `<option value="${pos.value}" ${selectedPos === pos.value ? 'selected' : ''}>${pos.label}</option>`).join('')}
-            </select>
-          </div>
         </div>
-        <button type="button" class="btn btn-primary btn-pill" onclick="savePageBuilder()">Enregistrer</button>
+        <div class="builder-actions">
+          <button type="button" class="btn btn-primary" onclick="savePageBuilder()">Enregistrer</button>
+          <a href="${(siteSettingsCache?.frontend_url || 'http://localhost:4321')}/pages/${encodeURIComponent(m.slug)}" target="_blank" class="btn btn-outline" id="viewPageBtn">Voir la page</a>
+        </div>
       </header>
       <div class="builder-body">
         <aside class="builder-sidebar">
+          <!-- Menu settings panel (collapsible) -->
+          <div class="builder-menu-settings-panel" id="builderMenuSettingsPanel" style="display:none">
+            <div class="builder-menu-settings-header">
+              <h3>Paramètres menu</h3>
+              <button type="button" class="btn btn-xs" onclick="toggleMenuSettingsPanel(false)">&times;</button>
+            </div>
+            <div class="builder-menu-settings-body">
+              ${renderPageMenuToggles()}
+              ${pageBuilderState.pageMenus.length === 0 ? '<p class="text-muted" style="font-size:0.85rem">Aucun menu créé. <a href="#" onclick="loadSection(\'menus\');return false">Créer un menu</a></p>' : ''}
+            </div>
+          </div>
           <div class="builder-modules-panel" id="builderModulesPanel" style="${selectedBlockId ? 'display:none' : ''}">
+            <button type="button" class="btn btn-sm btn-outline builder-menu-settings-btn" onclick="toggleMenuSettingsPanel(true)" style="${m.status === 'draft' ? 'display:none' : ''}">⚙ Paramètres menu</button>
             <h3>Modules</h3>
             <p class="form-help">Glissez un module dans la zone de droite.</p>
             <div class="builder-modules-list">
@@ -1511,9 +2271,65 @@ function renderBlockPreviewHtml(block) {
     const cls = [isFs ? 'full-width' : '', d.bloc_color || '', d.padding_top || '', d.padding_bottom || ''].filter(Boolean).join(' ');
     return `<div class="module module-illustration-video ${escapeHtml(cls)}"><div class="container-large"><div class="video-wrapper" style="height:calc(100vh / ${ratio});position:relative"><video class="video" autoplay loop muted playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"><source src="${escapeHtml(url)}" type="video/mp4"></video></div></div></div>`;
   }
+  // Accordion — empty state: render add button directly
+  if ((block.type === 'accordion' || block.type === 'Accordion') && (!Array.isArray(d.accordions) || d.accordions.length === 0)) {
+    return `<div class="module module-accordion"><div class="container"><div class="accordion"><button type="button" class="accordion-add-btn">+ Ajouter un élément</button></div></div></div>`;
+  }
   // ColumnsTab — custom preview (renders sub-modules recursively)
   if (block.type === 'columns-tab' || block.type === 'ColumnsTab') {
     return renderColumnsTabPreviewHtml(d);
+  }
+  // IconLogo — custom preview (@php block stripped by JS Blade engine → $img unresolved)
+  if (block.type === 'icon-logo' || block.type === 'IconLogo' || block.type === 'icons') {
+    const logos = Array.isArray(d.logos) ? d.logos : [];
+    const greyFilter = d.grey_filter === true || d.grey_filter === 1 || d.grey_filter === '1';
+    const iconType = d.icon_type !== false && d.icon_type !== 0 && d.icon_type !== '0';
+    const extraCls = [];
+    if (d.bloc_color) extraCls.push(d.bloc_color);
+    if (d.padding_top) extraCls.push(d.padding_top);
+    if (d.padding_bottom) extraCls.push(d.padding_bottom);
+    // Background image
+    let bgHtml = '';
+    const bgImg = d.bg_img;
+    if (bgImg) {
+      const bgUrl = typeof bgImg === 'string' ? bgImg : (bgImg.url || '');
+      const bgOpacity = (d.bg_opacity ?? 10) / 100;
+      if (bgUrl) {
+        bgHtml = `<div class="background" style="background-image: url(${escapeHtml(bgUrl)}); opacity: ${bgOpacity}; background-size: cover; background-position: center; position: absolute; inset: 0;"></div>`;
+        extraCls.push('has-background-image');
+      }
+    }
+    // Bloc title
+    let titleHtml = '';
+    const titleBloc = d.title_bloc || d.title || '';
+    if (titleBloc) {
+      const titleStyle = d.title_style || 2;
+      const titleAlign = d.title_align || 'center';
+      titleHtml = `<h${titleStyle} class="title-module title-section-${titleStyle} align-${escapeHtml(String(titleAlign))}">${escapeHtml(String(titleBloc))}</h${titleStyle}>`;
+    }
+    const listCls = `list${greyFilter ? ' grey_filter' : ''}${!iconType ? ' icon_type_jpg' : ''}`;
+    const itemsHtml = logos.map(logo => {
+      const logoObj = logo.logo || {};
+      const imgUrl = typeof logoObj === 'string' ? logoObj : (logoObj.url || '');
+      const link = logo.link || {};
+      const linkUrl = typeof link === 'string' ? link : (link.url || '');
+      const linkTarget = (typeof link === 'object' && link.target) ? link.target : '_self';
+      const titre = logo.titre || '';
+      const desc = logo.desc || '';
+      const imgCls = `illus${!iconType ? ' icon_type_jpg' : ''}`;
+      let inner = `<div class="illus-wrapper"><img src="${escapeHtml(imgUrl)}" alt="" class="${imgCls}"></div>`;
+      if (titre || desc) {
+        inner += `<div class="desc">${titre ? `<p class="title">${escapeHtml(titre)}</p>` : ''}${desc ? `<div class="txt editor"><p>${desc.replace(/\n/g, '<br>')}</p></div>` : ''}</div>`;
+      }
+      if (linkUrl) {
+        inner = `<a href="${escapeHtml(linkUrl)}" class="link" target="${escapeHtml(linkTarget)}">${inner}</a>`;
+      }
+      return `<li class="item">${inner}</li>`;
+    }).join('');
+    // Ensure icons CSS is loaded
+    const iconsLayout = moduleFieldSchema?.modules?.IconLogo?.layout || 'icons';
+    if (!moduleTemplateCache[iconsLayout]) queueModuleTemplateLoad(iconsLayout);
+    return `<div class="module module-icons ${extraCls.join(' ')}">${bgHtml}<div class="container">${titleHtml}${logos.length > 0 ? `<ul class="${listCls}">${itemsHtml}</ul>` : ''}</div></div>`;
   }
   const layout = getModuleLayout(block);
   if (!layout) return '';
@@ -1540,6 +2356,9 @@ function renderBlockPreviewHtml(block) {
   // Remplacer les &nbsp; par des espaces normaux pour permettre le retour
   // à la ligne naturel entre les mots dans la prévisualisation
   html = html.replace(/&nbsp;/g, ' ').replace(/\u00A0/g, ' ');
+  // Nettoyer les .txt.editor vides (supprimer le whitespace interne)
+  // pour que le pseudo-élément CSS :empty::before affiche le placeholder
+  html = html.replace(/<div class="txt editor">\s*<\/div>/g, '<div class="txt editor"></div>');
   return html;
 }
 
@@ -1780,7 +2599,7 @@ function buildTemplateContext(block) {
     }
     ctx.module = { ...ctx.module, img_width: data.img_width || moduleData.img_width || '' };
   }
-  // TextImage : placement, ratioImg, classes parallax + media_ratio
+  // TextImage : placement, ratioImg, classes parallax + media_ratio, image, media_choice normalization
   if (block.type === 'text-image' || block.type === 'TextImage') {
     const imgToLeft = data.img_to_left === true || data.img_to_left === 1 || data.img_to_left === '1'
       || moduleData.img_to_left === true || moduleData.img_to_left === 1 || moduleData.img_to_left === '1';
@@ -1794,6 +2613,17 @@ function buildTemplateContext(block) {
     const imgParallax = data.img_parallax === true || data.img_parallax === 1 || data.img_parallax === '1';
     const mediaChoice = data.media_choice === true || data.media_choice === 1 || data.media_choice === '1';
     if (imgParallax && mediaChoice) extraClasses.push('img-parallax');
+    // Normalize media_choice to numeric 1/0 so Blade @if ($module['media_choice'] == 1) works
+    // (PHP loose comparison: true == 1 is true, but JS String(true) !== '1')
+    ctx.module = { ...ctx.module, media_choice: mediaChoice ? 1 : 0 };
+    // Replicate the @php block that creates $img (stripped by the JS Blade engine)
+    const imgData = data.image || moduleData.image || ctx.image;
+    if (imgData) {
+      const imgUrl = typeof imgData === 'string' ? imgData
+        : (imgData?.sizes?.[ctx.ratioImg] || imgData?.sizes?.banner || imgData?.url || '');
+      const imgAlt = typeof imgData === 'object' ? (imgData?.alt || '') : '';
+      ctx.img = { url: imgUrl, alt: imgAlt };
+    }
   }
   // TextScrolling : textes, taille, direction, vitesse
   if (block.type === 'text-scrolling' || block.type === 'TextScrolling') {
@@ -1844,15 +2674,16 @@ function buildTemplateContext(block) {
       const img = slide.image || {};
       const imgUrl = typeof img === 'string' ? img : (img.url || '');
       const imgAlt = typeof img === 'object' ? (img.alt || '') : '';
-      const link1 = slide.link_1 || {};
+      const link1 = slide.link || {};
       const link2 = slide.link_2 || null;
+      const link1Url = typeof link1 === 'string' ? link1 : (link1.url || '');
       return {
         image_url: imgUrl,
         image_alt: imgAlt,
         legend: slide.legend || '',
         text: slide.text || '',
-        has_desc: !!(slide.legend || slide.text),
-        link_url: typeof link1 === 'string' ? link1 : (link1.url || ''),
+        has_desc: !!(slide.legend || slide.text || link1Url),
+        link_url: link1Url,
         link_title: typeof link1 === 'string' ? link1 : (link1.title || ''),
         link_target: typeof link1 === 'object' ? (link1.target || '_self') : '_self',
         link2: link2
@@ -1890,7 +2721,7 @@ function buildTemplateContext(block) {
   // LogosSlider : indexPopin
   if (block.type === 'logos-slider' || block.type === 'LogosSlider' || block.type === 'slider-logo' || block.type === 'SliderLogo') {
     ctx.indexPopin = Math.floor(Math.random() * 1000);
-    ctx.columns = 0;
+    delete ctx.columns;
   }
   // ImagesVideosParallax : blocs
   if (block.type === 'images-videos-parallax' || block.type === 'ImagesVideosParallax') {
@@ -1910,6 +2741,7 @@ function renderBladeTemplate(template, ctx) {
   html = html.replace(/<\?=[\s\S]*?\?>/g, '');
   html = html.replace(/{{--[\s\S]*?--}}/g, '');
   html = html.replace(/@include\(\s*['"]components\.bloc-title-module['"][\s\S]*?\)/g, () => renderBlocTitle(ctx));
+  html = renderForLoops(html, ctx);
   html = renderForeach(html, ctx);
   html = renderIfBlocks(html, ctx);
   html = renderSwitchBlocks(html, ctx);
@@ -1979,6 +2811,67 @@ function renderClickableItem(ctx) {
   }
 
   return `<div class="item ${descClass}${orientClass}" role="article">${contentHtml}</div>`;
+}
+
+function findMatchingEndfor(source, startIndex) {
+  let depth = 0;
+  let i = startIndex;
+  while (i < source.length) {
+    // Find next @for that is NOT @foreach/@forelse (char after @for must be '(' or whitespace)
+    let nextFor = -1;
+    let sf = i;
+    while (true) {
+      const pos = source.indexOf('@for', sf);
+      if (pos === -1) break;
+      const ch = source[pos + 4] || '';
+      if (ch === '(' || ch === ' ') { nextFor = pos; break; }
+      sf = pos + 4;
+    }
+    // Find next @endfor that is NOT @endforeach/@endforelse (char after @endfor must not be a letter)
+    let nextEnd = -1;
+    sf = i;
+    while (true) {
+      const pos = source.indexOf('@endfor', sf);
+      if (pos === -1) break;
+      const ch = source[pos + 7] || '';
+      if (!/[a-zA-Z]/.test(ch)) { nextEnd = pos; break; }
+      sf = pos + 7;
+    }
+    if (nextEnd === -1) return -1;
+    if (nextFor !== -1 && nextFor < nextEnd) {
+      depth++;
+      i = nextFor + 4;
+      continue;
+    }
+    if (depth === 0) return nextEnd;
+    depth--;
+    i = nextEnd + 7;
+  }
+  return -1;
+}
+
+function renderForLoops(input, ctx) {
+  // Handles @for($i = 0; $i < N; $i++) ... @endfor
+  const headerRegex = /@for\s*\(\s*\$([A-Za-z0-9_]+)\s*=\s*(\d+)\s*;\s*\$\1\s*<\s*(\d+)\s*;\s*\$\1\+\+\s*\)/;
+  let html = input;
+  let safety = 0;
+  while (safety++ < 50) {
+    const headerMatch = headerRegex.exec(html);
+    if (!headerMatch) break;
+    const start = headerMatch.index;
+    const bodyStart = start + headerMatch[0].length;
+    const endIndex = findMatchingEndfor(html, bodyStart);
+    if (endIndex === -1) break;
+    const initVal = parseInt(headerMatch[2], 10);
+    const limitVal = parseInt(headerMatch[3], 10);
+    const body = html.slice(bodyStart, endIndex);
+    let rendered = '';
+    for (let idx = initVal; idx < limitVal; idx++) {
+      rendered += renderBladeTemplate(body, { ...ctx });
+    }
+    html = html.slice(0, start) + rendered + html.slice(endIndex + 7); // '@endfor'.length = 7
+  }
+  return html;
 }
 
 function findMatchingEndforeach(source, startIndex) {
@@ -2344,6 +3237,17 @@ function resolveValue(expr, ctx) {
     return value.slice(1, -1);
   }
   if (/^\d+$/.test(value)) return Number(value);
+  // null coalescing (??) — PHP $a ?? $b returns $a if not null/undefined, else $b
+  if (value.includes('??')) {
+    const parts = value.split(/\s*\?\?\s*/);
+    if (parts.length > 1) {
+      for (const part of parts) {
+        const v = resolveValue(part, ctx);
+        if (v !== undefined && v !== null) return v;
+      }
+      return undefined;
+    }
+  }
   // count($var) → array length
   const countMatch = value.match(/^count\(\s*(.+?)\s*\)$/);
   if (countMatch) {
@@ -2527,7 +3431,7 @@ function attachPageBuilderListeners() {
     placeholder.addEventListener('drop', handleBuilderDrop);
   }
 
-  document.querySelectorAll('.builder-meta input, .builder-meta select, .builder-title, .builder-slug, .builder-status, .builder-show-menu, .builder-order, .builder-parent').forEach(el => {
+  document.querySelectorAll('.builder-meta input, .builder-meta select, .builder-title, .builder-slug, .builder-status').forEach(el => {
     const field = el.dataset?.field || (el.classList.contains('builder-title') ? 'title' : el.classList.contains('builder-slug') ? 'slug' : null);
     if (!field) return;
     el.addEventListener('input', () => syncBuilderMetaFromDOM());
@@ -2547,10 +3451,7 @@ function attachPageBuilderListeners() {
     });
   }
 
-  const parentSelect = document.querySelector('.builder-parent');
-  if (parentSelect) {
-    parentSelect.addEventListener('change', () => updatePagePositionOptions());
-  }
+  // No more .builder-parent in header — parent_id derived from primary menu
 
   // ── Accordion toggle avec slideUp/slideDown (reproduit le JS Nickl) ──
   const adminSlideProp = 'height 400ms ease, padding 400ms ease';
@@ -2612,9 +3513,46 @@ function attachPageBuilderListeners() {
     }, duration);
   }
 
+  // ── Accordion : click on title text → inline editing ──
+  canvas.addEventListener('click', (e) => {
+    const titleText = e.target.closest('.accordion-title-text');
+    if (!titleText) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const card = titleText.closest('.builder-block-card');
+    if (!card) return;
+    const blockId = card.dataset.blockId;
+    const block = pageBuilderState.blocks.find(b => b.id === blockId);
+    if (!block) return;
+    const allTitleTexts = Array.from(card.querySelectorAll('.builder-block-render .accordion .accordion-title-text'));
+    const idx = allTitleTexts.indexOf(titleText);
+    if (idx === -1 || !Array.isArray(block.data.accordions) || !block.data.accordions[idx]) return;
+    if (selectedBlockId !== blockId) selectBlock(blockId);
+    enableInlineEditing(blockId, titleText, block.data.accordions[idx], 'title');
+  });
+
+  // ── Accordion : add item button ──
+  canvas.addEventListener('click', (e) => {
+    const addBtn = e.target.closest('.accordion-add-btn');
+    if (!addBtn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const card = addBtn.closest('.builder-block-card');
+    if (!card) return;
+    const blockId = card.dataset.blockId;
+    const block = pageBuilderState.blocks.find(b => b.id === blockId);
+    if (!block) return;
+    if (!Array.isArray(block.data.accordions)) block.data.accordions = [];
+    block.data.accordions.push({ title: 'Nouvel élément', text: '' });
+    updateBlockCardPreview(blockId);
+    if (selectedBlockId === blockId) renderBlockSettings();
+  });
+
   canvas.addEventListener('click', (e) => {
     const btn = e.target.closest('.js_toggle-accordion');
     if (!btn) return;
+    // Skip toggle if title is being edited inline
+    if (btn.getAttribute('contenteditable') === 'true') return;
     e.preventDefault();
     e.stopPropagation();
     const accordion = btn.closest('.accordion');
@@ -2696,19 +3634,171 @@ function syncBuilderMetaFromDOM() {
   pageBuilderState.meta.title = get('.builder-title') || get('input[data-field="title"]') || '';
   pageBuilderState.meta.slug = get('.builder-slug') || get('input[data-field="slug"]') || '';
   pageBuilderState.meta.status = get('.builder-status') || get('select[data-field="status"]') || 'draft';
-  const showMenuEl = document.querySelector('.builder-show-menu') || document.querySelector('input[data-field="show_in_menu"]');
-  pageBuilderState.meta.show_in_menu = showMenuEl ? showMenuEl.checked : false;
-  pageBuilderState.meta.menu_order = parseInt(get('.builder-order') || document.querySelector('input[data-field="menu_order"]')?.value || '0', 10) || 0;
-  const parentEl = document.querySelector('.builder-parent') || document.querySelector('select[data-field="parent_id"]');
-  pageBuilderState.meta.parent_id = parentEl && parentEl.value ? parseInt(parentEl.value, 10) : null;
+
+  // show_in_menu derived from menu toggles
+  const anyMenuChecked = document.querySelectorAll('.menu-toggle-cb:checked').length > 0;
+  pageBuilderState.meta.show_in_menu = anyMenuChecked;
+
+  // parent_id derived from primary menu hierarchy
+  pageBuilderState.meta.parent_id = derivePrimaryParentPageId();
+  pageBuilderState.meta.menu_order = 0;
 }
 
-function toggleBuilderMenuFields() {
-  const checked = document.querySelector('.builder-show-menu')?.checked;
-  document.querySelectorAll('.builder-menu-field').forEach(el => {
-    el.style.display = checked ? '' : 'none';
+/**
+ * Derive the page's parent_id from the primary menu.
+ * If this page has a parent menu-item in the primary menu,
+ * and that parent is a page-type item, return its page_id.
+ */
+function derivePrimaryParentPageId() {
+  const menus = pageBuilderState.pageMenus || [];
+  const primary = menus.find(m => m.location === 'primary');
+  if (!primary) return null;
+
+  // Read current parent from the DOM select
+  const parentSelect = document.querySelector(`.menu-parent-select[data-menu-id="${primary.id}"]`);
+  if (!parentSelect || !parentSelect.value) return null;
+
+  const parentItemId = parseInt(parentSelect.value, 10);
+  // Find that menu item and get its page_id
+  const parentItem = (primary.items || []).find(i => i.id === parentItemId);
+  return parentItem?.page_id || null;
+}
+
+function renderPageMenuToggles() {
+  const menus = pageBuilderState.pageMenus || [];
+  if (menus.length === 0) return '';
+
+  const currentPageId = pageBuilderState.editingPageId;
+
+  return menus.map(menu => {
+    const loc = MENU_LOCATIONS.find(l => l.value === menu.location);
+    const locLabel = loc && loc.value ? loc.label : '';
+
+    // Build position options from items in this menu (excluding current page)
+    const siblings = (menu.items || []).filter(i => i.page_id !== currentPageId);
+
+    function buildPositionOpts(parentId) {
+      const filtered = siblings
+        .filter(i => (i.parent_id || null) == parentId)
+        .sort((a, b) => (a.menu_order || 0) - (b.menu_order || 0));
+      if (filtered.length === 0) return [{ value: 0, label: 'Première position' }];
+      return [
+        { value: 0, label: `Avant "${escapeHtml(filtered[0].title)}"` },
+        ...filtered.map(item => ({ value: (item.menu_order || 0) + 1, label: `Après "${escapeHtml(item.title)}"` }))
+      ];
+    }
+
+    const parentItems = siblings.filter(i => !i.parent_id);
+    const posOpts = buildPositionOpts(menu.parent_id);
+    let selPos = 0;
+    for (const p of posOpts) { if (p.value <= (menu.menu_order || 0)) selPos = p.value; }
+
+    return `
+      <div class="menu-toggle-block" data-menu-id="${menu.id}">
+        <div class="menu-toggle-header">
+          <label class="toggle-field toggle-compact">
+            <span class="toggle-switch">
+              <input type="checkbox" class="menu-toggle-cb" data-menu-id="${menu.id}" ${menu.enabled ? 'checked' : ''} onchange="onPageMenuToggle(${menu.id})">
+              <span class="toggle-slider" aria-hidden="true"></span>
+            </span>
+            <span class="menu-toggle-name">${escapeHtml(menu.name)}</span>
+          </label>
+          ${locLabel ? `<span class="menu-toggle-loc">${locLabel}</span>` : ''}
+        </div>
+        <div class="menu-toggle-options" data-menu-id="${menu.id}" style="${menu.enabled ? '' : 'display:none'}">
+          <div class="form-group">
+            <label class="form-label-sm">Parent</label>
+            <select class="form-input form-input-sm menu-parent-select" data-menu-id="${menu.id}" onchange="onPageMenuParentChange(${menu.id})">
+              <option value="">— Racine —</option>
+              ${parentItems.map(item => `<option value="${item.id}" ${menu.parent_id == item.id ? 'selected' : ''}>${escapeHtml(item.title)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label-sm">Position</label>
+            <select class="form-input form-input-sm menu-order-select" data-menu-id="${menu.id}">
+              ${posOpts.map(o => `<option value="${o.value}" ${selPos === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function onPageMenuToggle(menuId) {
+  const cb = document.querySelector(`.menu-toggle-cb[data-menu-id="${menuId}"]`);
+  const opts = document.querySelector(`.menu-toggle-options[data-menu-id="${menuId}"]`);
+  if (opts) opts.style.display = cb?.checked ? '' : 'none';
+}
+
+function onPageMenuParentChange(menuId) {
+  const parentSelect = document.querySelector(`.menu-parent-select[data-menu-id="${menuId}"]`);
+  const orderSelect = document.querySelector(`.menu-order-select[data-menu-id="${menuId}"]`);
+  if (!parentSelect || !orderSelect) return;
+
+  const parentId = parentSelect.value || null;
+  const menu = (pageBuilderState.pageMenus || []).find(m => m.id === menuId);
+  if (!menu) return;
+
+  const currentPageId = pageBuilderState.editingPageId;
+  const siblings = (menu.items || [])
+    .filter(i => i.page_id !== currentPageId && (i.parent_id || null) == parentId)
+    .sort((a, b) => (a.menu_order || 0) - (b.menu_order || 0));
+
+  let opts = '';
+  if (siblings.length === 0) {
+    opts = '<option value="0">Première position</option>';
+  } else {
+    opts = `<option value="0">Avant "${escapeHtml(siblings[0].title)}"</option>`;
+    siblings.forEach(item => {
+      opts += `<option value="${(item.menu_order || 0) + 1}">Après "${escapeHtml(item.title)}"</option>`;
+    });
+  }
+  orderSelect.innerHTML = opts;
+}
+
+function getPageMenuAssignments() {
+  const assignments = [];
+  document.querySelectorAll('.menu-toggle-cb:checked').forEach(cb => {
+    const menuId = parseInt(cb.getAttribute('data-menu-id'));
+    const parentSelect = document.querySelector(`.menu-parent-select[data-menu-id="${menuId}"]`);
+    const orderSelect = document.querySelector(`.menu-order-select[data-menu-id="${menuId}"]`);
+    assignments.push({
+      menuId,
+      parent_id: parentSelect?.value ? parseInt(parentSelect.value) : null,
+      menu_order: orderSelect?.value ? parseInt(orderSelect.value) : 0,
+    });
   });
-  syncBuilderMetaFromDOM();
+  return assignments;
+}
+
+function toggleMenuSettingsPanel(show) {
+  const panel = document.getElementById('builderMenuSettingsPanel');
+  const modules = document.getElementById('builderModulesPanel');
+  if (!panel) return;
+  if (show) {
+    panel.style.display = '';
+    if (modules) modules.style.display = 'none';
+    // Also hide settings panel if open
+    const settings = document.getElementById('builderSettings');
+    if (settings) settings.style.display = 'none';
+  } else {
+    panel.style.display = 'none';
+    if (modules && !selectedBlockId) modules.style.display = '';
+    const settings = document.getElementById('builderSettings');
+    if (settings && selectedBlockId) settings.style.display = '';
+  }
+}
+
+function onBuilderStatusChange(status) {
+  const btn = document.querySelector('.builder-menu-settings-btn');
+  if (btn) {
+    btn.style.display = status === 'draft' ? 'none' : '';
+  }
+  // If switching to draft, close the menu settings panel
+  if (status === 'draft') {
+    toggleMenuSettingsPanel(false);
+  }
 }
 
 function updateBuilderPlaceholder() {
@@ -2846,6 +3936,42 @@ function reattachBlockCardListeners() {
             return;
           }
 
+          // Direct TextImage block
+          if (moduleName === 'TextImage') {
+            if (selectedBlockId !== blockId) selectBlock(blockId);
+            enableInlineEditing(blockId, txtTarget, block.data);
+            return;
+          }
+
+          // Direct HeadText block
+          if (moduleName === 'HeadText') {
+            if (selectedBlockId !== blockId) selectBlock(blockId);
+            enableInlineEditing(blockId, txtTarget, block.data);
+            return;
+          }
+
+          // Accordion block — find which accordion item was clicked
+          if (moduleName === 'Accordion') {
+            const allTxtEditors = Array.from(card.querySelectorAll('.builder-block-render .accordion .txt.editor'));
+            const idx = allTxtEditors.indexOf(txtTarget);
+            if (idx !== -1 && Array.isArray(block.data.accordions) && block.data.accordions[idx]) {
+              if (selectedBlockId !== blockId) selectBlock(blockId);
+              enableInlineEditing(blockId, txtTarget, block.data.accordions[idx]);
+              return;
+            }
+          }
+
+          // SliderTextVideo block — find which slide was clicked
+          if (moduleName === 'SliderTextVideo') {
+            const allTxtEditors = Array.from(card.querySelectorAll('.builder-block-render .swiper-slide .txt.editor'));
+            const idx = allTxtEditors.indexOf(txtTarget);
+            if (idx !== -1 && Array.isArray(block.data.slider) && block.data.slider[idx]) {
+              if (selectedBlockId !== blockId) selectBlock(blockId);
+              enableInlineEditing(blockId, txtTarget, block.data.slider[idx], 'desc');
+              return;
+            }
+          }
+
           // TextSimple sub-module inside ColumnsTab
           if (moduleName === 'ColumnsTab') {
             // Find which .module-text contains this .txt.editor
@@ -2910,6 +4036,9 @@ function duplicateBlock(id) {
   const copy = { type: original.type, id: blockId(), data: JSON.parse(JSON.stringify(original.data || {})) };
   pageBuilderState.blocks.splice(idx + 1, 0, copy);
   rebuildBuilderBlocksDOM();
+  selectBlock(copy.id);
+  const newCard = document.querySelector(`.builder-block-card[data-block-id="${copy.id}"]`);
+  if (newCard) newCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function removeBlock(id) {
@@ -3072,10 +4201,19 @@ function renderSchemaForm(block, schemaFields) {
   const data = block.data && typeof block.data === 'object' ? block.data : {};
   const def = BLOCK_TYPES[block.type] || {};
   const moduleName = def.moduleName || block.type;
-  const isTextSimple = moduleName === 'TextSimple';
+  const isInlineEditable = (moduleName === 'TextSimple' || moduleName === 'TextImage' || moduleName === 'HeadText');
   const fields = schemaFields.map(field => {
-    // Hide the WYSIWYG text field for TextSimple — edited inline in the preview
-    if (isTextSimple && field.type === 'WYSIWYGEditor' && field.name === 'text') {
+    // Hide the accordions repeater for Accordion — managed from the preview
+    if (moduleName === 'Accordion' && field.type === 'Repeater' && field.name === 'accordions') {
+      return `<div class="form-group inline-edit-hint">
+        <div class="inline-edit-hint-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          <span>Gérez les éléments directement dans la preview</span>
+        </div>
+      </div>`;
+    }
+    // Hide the WYSIWYG text field for inline-editable modules — edited inline in the preview
+    if (isInlineEditable && field.type === 'WYSIWYGEditor' && field.name === 'text') {
       return `<div class="form-group inline-edit-hint">
         <div class="inline-edit-hint-box">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -3083,7 +4221,9 @@ function renderSchemaForm(block, schemaFields) {
         </div>
       </div>`;
     }
-    const val = data[field.name] !== undefined ? data[field.name] : field.defaultValue;
+    let val = data[field.name] !== undefined ? data[field.name] : field.defaultValue;
+    // Normalize false to '' for padding fields (PHP default(false) = "Normal" = empty string value)
+    if ((field.name === 'padding_top' || field.name === 'padding_bottom') && (val === false || val === 'false' || val === undefined)) val = '';
     return renderSchemaField(field, val, block.id, data);
   }).join('');
   return `
@@ -3121,6 +4261,30 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
   const label = field.label || field.name;
   const name = field.name;
   const type = field.type || 'Text';
+  // Dynamic select for reusable-bloc module: populate bloc_id from API
+  if (name === 'bloc_id') {
+    const selectId = `rb-select-${blockId}`;
+    // Render placeholder then fetch choices async
+    setTimeout(async () => {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      try {
+        const blocs = await apiFetch('/reusable-blocs');
+        sel.innerHTML = '<option value="">— Sélectionner un bloc —</option>' +
+          (blocs || []).filter(b => b.status === 'published').map(b =>
+            `<option value="${b.id}" ${String(value ?? '') === String(b.id) ? 'selected' : ''}>${escapeHtml(b.title)}</option>`
+          ).join('');
+      } catch (e) {}
+    }, 0);
+    return `
+      <div class="form-group">
+        <label class="form-label">${escapeHtml(label)}</label>
+        <select class="form-select" name="${escapeHtml(name)}" id="${selectId}">
+          <option value="">Chargement…</option>
+        </select>
+      </div>
+    `;
+  }
   // Compute the compound input name for nested fields
   const inputName = rowCtx
     ? (rowCtx.rowIndex !== null
@@ -3991,7 +5155,18 @@ function updateSchemaConditionals(form) {
     } else {
       input = form.querySelector(`[name="${CSS.escape(condField)}"]`);
     }
-    const currentVal = input ? (input.type === 'checkbox' ? (input.checked ? '1' : '0') : (input.value ?? '')) : '';
+    // For radio buttons, find the checked input, not just the first one
+    let currentVal = '';
+    if (input) {
+      if (input.type === 'checkbox') {
+        currentVal = input.checked ? '1' : '0';
+      } else if (input.type === 'radio') {
+        const checked = form.querySelector(`[name="${CSS.escape(condField)}"]:checked`);
+        currentVal = checked ? checked.value : '';
+      } else {
+        currentVal = input.value ?? '';
+      }
+    }
     const isEmpty = condOp === '!=empty' || (condOp === '!=' && (condVal === '' || condVal === 'null'));
     const show = isEmpty ? currentVal !== '' : (condOp === '==' ? currentVal === condVal : currentVal !== condVal);
     wrapper.style.display = show ? '' : 'none';
@@ -4207,6 +5382,62 @@ function updateBlockCardPreview(blockId) {
       card.appendChild(richEl);
     }
     richEl.innerHTML = rich;
+    // Accordion : post-traitement du DOM pour l'admin
+    if (block.type === 'accordion' || block.type === 'Accordion') {
+      let accordionDiv = richEl.querySelector('.accordion');
+      // If no .accordion div (empty/new block), create a minimal structure
+      if (!accordionDiv) {
+        const moduleDiv = richEl.querySelector('.module-accordion') || richEl;
+        let container = moduleDiv.querySelector('.container');
+        if (!container) {
+          container = document.createElement('div');
+          container.className = 'container';
+          moduleDiv.appendChild(container);
+        }
+        accordionDiv = document.createElement('div');
+        accordionDiv.className = 'accordion';
+        container.appendChild(accordionDiv);
+      }
+      if (accordionDiv) {
+        const chevronSvg = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>';
+        accordionDiv.querySelectorAll('.js_toggle-accordion').forEach((btn, i) => {
+          if (btn.querySelector('.accordion-title-text')) return;
+          // Inject chevron SVG into .icon if empty
+          const icon = btn.querySelector('.icon');
+          if (icon && !icon.innerHTML.trim()) icon.innerHTML = chevronSvg;
+          // Wrap title text in a clickable span (exclude the .icon)
+          const titleSpan = document.createElement('span');
+          titleSpan.className = 'accordion-title-text';
+          Array.from(btn.childNodes).forEach(node => {
+            if (node === icon) return;
+            titleSpan.appendChild(node);
+          });
+          btn.insertBefore(titleSpan, icon);
+          // Open first item by default
+          if (i === 0) {
+            btn.classList.add('active');
+            const txt = btn.nextElementSibling;
+            if (txt && txt.classList.contains('txt')) txt.style.display = 'block';
+          }
+        });
+        // Inject add button
+        if (!accordionDiv.querySelector('.accordion-add-btn')) {
+          const addBtn = document.createElement('button');
+          addBtn.type = 'button';
+          addBtn.className = 'accordion-add-btn';
+          addBtn.textContent = '+ Ajouter un élément';
+          accordionDiv.appendChild(addBtn);
+        }
+      }
+    }
+    // ImagesSlider: init Swiper carousel in preview
+    if (block.type === 'images-slider' || block.type === 'ImagesSlider') {
+      initPreviewImagesSlider(richEl);
+    }
+    // LogosSlider: init Swiper carousel in preview
+    if (block.type === 'logos-slider' || block.type === 'LogosSlider' || block.type === 'slider-logo' || block.type === 'SliderLogo') {
+      initPreviewLogosSlider(richEl);
+    }
     syncModulePaddingClasses(richEl, block.data);
     syncModuleBlocColorClasses(richEl, block.data);
     updateBuilderParallax();
@@ -4214,6 +5445,67 @@ function updateBlockCardPreview(blockId) {
   } else if (richEl) {
     richEl.remove();
   }
+}
+
+// ── ImagesSlider: Swiper init in preview ────────────────────────────────────
+function initPreviewImagesSlider(richEl) {
+  if (typeof window.Swiper === 'undefined') return;
+  richEl.querySelectorAll('.js_images-slider').forEach(function(el, i) {
+    // Destroy previous instance if re-rendering
+    if (el.swiper) el.swiper.destroy(true, true);
+    var slideCount = el.querySelectorAll('.swiper-slide').length;
+    if (slideCount <= 1) return;
+    var wrapper = el.closest('.slider-wrapper');
+    var pagEl = wrapper ? wrapper.querySelector('.js_images-slider-pagination') : null;
+    if (pagEl) pagEl.classList.add('index-' + i);
+    new window.Swiper(el, {
+      loop: slideCount > 2,
+      speed: 750,
+      slidesPerView: 1,
+      autoplay: { delay: 4000, disableOnInteraction: true },
+      navigation: {
+        nextEl: wrapper ? wrapper.querySelector('.next') : null,
+        prevEl: wrapper ? wrapper.querySelector('.prev') : null
+      },
+      pagination: { el: pagEl, type: 'bullets', clickable: true }
+    });
+  });
+}
+
+// ── LogosSlider: Swiper init in preview ──────────────────────────────────────
+function initPreviewLogosSlider(richEl) {
+  if (typeof window.Swiper === 'undefined') return;
+  richEl.querySelectorAll('.js_logos-slider').forEach(function(el) {
+    if (el.swiper) el.swiper.destroy(true, true);
+    var slideCount = el.querySelectorAll('.swiper-slide').length;
+    var ww = window.innerWidth;
+    var spv = 2;
+    if (ww >= 1025) spv = 6;
+    else if (ww >= 961) spv = 4;
+    else if (ww >= 601) spv = 3;
+    else if (ww >= 481) spv = 2;
+    if (slideCount <= spv) return;
+    var wrapper = el.closest('.slider-wrapper');
+    new window.Swiper(el, {
+      loop: true,
+      speed: 750,
+      slidesPerView: 2,
+      spaceBetween: 26,
+      preventClicks: false,
+      preventClicksPropagation: false,
+      breakpoints: {
+        481: { slidesPerView: 2 },
+        601: { slidesPerView: 3 },
+        961: { slidesPerView: 4 },
+        1025: { slidesPerView: 6 }
+      },
+      autoplay: { delay: 3000, disableOnInteraction: true },
+      navigation: {
+        nextEl: wrapper ? wrapper.querySelector('.js_logos-slider-btn-next') : null,
+        prevEl: wrapper ? wrapper.querySelector('.js_logos-slider-btn-prev') : null
+      }
+    });
+  });
 }
 
 // ── Inline Editing (TextSimple) ─────────────────────────────────────────────
@@ -4518,22 +5810,54 @@ async function savePageBuilder() {
   if (form && selectedBlockId) {
     liveUpdateFromSettingsForm(form);
   }
-  const { title, slug, status, show_in_menu, menu_order, parent_id } = pageBuilderState.meta;
+  const { title, slug, status, parent_id } = pageBuilderState.meta;
   if (!title || !slug) { showToast('Titre et slug requis', 'error'); return; }
+
+  // Derive show_in_menu from menu toggles
+  const assignments = getPageMenuAssignments();
+  const show_in_menu = assignments.length > 0;
+
   const content = JSON.stringify(pageBuilderState.blocks);
   showLoading();
   try {
     if (pageBuilderState.editingPageId) {
-      await apiFetch(`/pages/${pageBuilderState.editingPageId}`, { method: 'PUT', body: JSON.stringify({ title, slug, content, status, show_in_menu, menu_order, parent_id: parent_id || null }) });
+      await apiFetch(`/pages/${pageBuilderState.editingPageId}`, { method: 'PUT', body: JSON.stringify({ title, slug, content, status, show_in_menu, menu_order: 0, parent_id: parent_id || null }) });
       showToast('Page mise à jour', 'success');
     } else {
-      const res = await apiFetch('/pages', { method: 'POST', body: JSON.stringify({ title, slug, content, status, show_in_menu, menu_order, parent_id: parent_id || null }) });
+      const res = await apiFetch('/pages', { method: 'POST', body: JSON.stringify({ title, slug, content, status, show_in_menu, menu_order: 0, parent_id: parent_id || null }) });
       showToast('Page créée', 'success');
       if (res && res.id) {
         pageBuilderState.editingPageId = res.id;
         localStorage.setItem('adminLastView', `builder:${res.id}`);
       }
     }
+
+    // Sync menu assignments (title + slug sent so menu_items stay up to date)
+    if (pageBuilderState.editingPageId && pageBuilderState.pageMenus.length > 0) {
+      await apiFetch(`/pages/${pageBuilderState.editingPageId}/menus`, {
+        method: 'PUT',
+        body: JSON.stringify({ assignments, title, slug })
+      });
+    }
+
+    // Reload menus with full item data and re-render toggles panel
+    if (pageBuilderState.editingPageId) {
+      try {
+        const freshMenus = await apiFetch(`/pages/${pageBuilderState.editingPageId}/menus`);
+        if (freshMenus?.menus) {
+          pageBuilderState.pageMenus = freshMenus.menus;
+          const body = document.querySelector('#builderMenuSettingsPanel .builder-menu-settings-body');
+          if (body) {
+            body.innerHTML = renderPageMenuToggles() ||
+              '<p class="text-muted" style="font-size:0.85rem">Aucun menu créé. <a href="#" onclick="loadSection(\'menus\');return false">Créer un menu</a></p>';
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Update "Voir la page" link with current slug
+    const viewBtn = document.getElementById('viewPageBtn');
+    if (viewBtn) viewBtn.href = `${siteSettingsCache?.frontend_url || 'http://localhost:4321'}/pages/${encodeURIComponent(slug)}`;
   } catch (error) {
     hideLoading();
     showToast('Erreur: ' + error.message, 'error');
@@ -4547,10 +5871,17 @@ let _pagesSearch = '';
 let _pagesCurrentPage = 1;
 const PAGES_PER_PAGE = 10;
 
+let _pagesMenuInfo = {}; // { pageId: { menus: [{id,name,location}], primaryParent: {title,page_id}|null } }
+
 async function renderPages() {
   showLoading();
   try {
-    _pagesCache = await apiFetch('/pages');
+    const [pages, menuInfo] = await Promise.all([
+      apiFetch('/pages'),
+      apiFetch('/pages/menu-info'),
+    ]);
+    _pagesCache = pages;
+    _pagesMenuInfo = menuInfo || {};
     _pagesSearch = '';
     _pagesCurrentPage = 1;
     hideLoading();
@@ -4635,6 +5966,316 @@ function refreshPagesView() {
   }
 }
 
+// ========== BLOCS RÉUTILISABLES ==========
+let _reusableBlocsCache = [];
+let _reusableBlocsSearch = '';
+let _reusableBlocsCurrentPage = 1;
+const REUSABLE_BLOCS_PER_PAGE = 10;
+
+async function renderReusableBlocs() {
+  showLoading();
+  try {
+    _reusableBlocsCache = await apiFetch('/reusable-blocs');
+    _reusableBlocsSearch = '';
+    _reusableBlocsCurrentPage = 1;
+    hideLoading();
+    return renderReusableBlocsView();
+  } catch (error) {
+    hideLoading();
+    showToast('Erreur lors du chargement des blocs réutilisables', 'error');
+    return '<div class="card"><p>Erreur de chargement</p></div>';
+  }
+}
+
+function getFilteredReusableBlocs() {
+  if (!_reusableBlocsSearch) return _reusableBlocsCache;
+  const q = _reusableBlocsSearch.toLowerCase();
+  return _reusableBlocsCache.filter(b => b.title.toLowerCase().includes(q));
+}
+
+function renderReusableBlocsView() {
+  const filtered = getFilteredReusableBlocs();
+  const totalPages = Math.max(1, Math.ceil(filtered.length / REUSABLE_BLOCS_PER_PAGE));
+  if (_reusableBlocsCurrentPage > totalPages) _reusableBlocsCurrentPage = totalPages;
+  const start = (_reusableBlocsCurrentPage - 1) * REUSABLE_BLOCS_PER_PAGE;
+  const paginated = filtered.slice(start, start + REUSABLE_BLOCS_PER_PAGE);
+
+  return `
+    <div class="page-header">
+      <h1>Blocs réutilisables</h1>
+      <button class="btn btn-primary" onclick="openReusableBlocBuilder(null)">
+        <span class="icon">➕</span>
+        Nouveau bloc
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="pages-toolbar">
+        <div class="search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" class="form-input pages-search-input" placeholder="Rechercher un bloc…" value="${escapeHtml(_reusableBlocsSearch)}" oninput="handleReusableBlocsSearch(this.value)">
+          ${_reusableBlocsSearch ? '<button type="button" class="search-clear" onclick="handleReusableBlocsSearch(\'\')">✕</button>' : ''}
+        </div>
+        <span class="pages-count">${filtered.length} bloc${filtered.length > 1 ? 's' : ''}${_reusableBlocsSearch ? ` trouvé${filtered.length > 1 ? 's' : ''}` : ''}</span>
+      </div>
+      ${paginated.length > 0 ? renderReusableBlocsTable(paginated) : renderEmptyState('📦', 'Aucun bloc réutilisable', 'Créez un bloc pour le réutiliser sur plusieurs pages')}
+      ${totalPages > 1 ? renderReusableBlocsPagination(totalPages) : ''}
+    </div>
+  `;
+}
+
+function renderReusableBlocsTable(blocs) {
+  return `
+    <div class="pages-list">
+      ${blocs.map(bloc => {
+        const safeTitle = bloc.title.replace(/'/g, "\\'");
+        return '<div class="page-item">'
+          + '<div class="page-item__info">'
+          +   '<div class="page-item__title">' + escapeHtml(bloc.title) + '</div>'
+          + '</div>'
+          + '<div class="page-item__meta">'
+          +   (bloc.author?.name ? '<span class="page-item__author">' + escapeHtml(bloc.author.name) + '</span>' : '')
+          +   '<span class="page-item__date">' + new Date(bloc.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span>'
+          + '</div>'
+          + '<div class="page-item__badges">'
+          +   '<span class="badge ' + (bloc.status === 'published' ? 'badge-success' : 'badge-warning') + '">'
+          +     (bloc.status === 'published' ? 'Publié' : 'Brouillon')
+          +   '</span>'
+          + '</div>'
+          + '<div class="page-item__actions">'
+          +   '<button class="btn-icon-action" onclick="editReusableBloc(' + bloc.id + ')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+          +   '<button class="btn-icon-action" onclick="duplicateReusableBloc(' + bloc.id + ')" title="Dupliquer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+          +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteReusableBloc(' + bloc.id + ', \'' + safeTitle + '\')" title="Supprimer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
+          + '</div>'
+        + '</div>';
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderReusableBlocsPagination(totalPages) {
+  let btns = '';
+  for (let i = 1; i <= totalPages; i++) {
+    btns += `<button type="button" class="pagination-btn ${i === _reusableBlocsCurrentPage ? 'active' : ''}" onclick="goToReusableBlocsPage(${i})">${i}</button>`;
+  }
+  return `<div class="pages-pagination">${btns}</div>`;
+}
+
+function handleReusableBlocsSearch(value) {
+  _reusableBlocsSearch = value;
+  _reusableBlocsCurrentPage = 1;
+  refreshReusableBlocsView();
+}
+
+function goToReusableBlocsPage(page) {
+  _reusableBlocsCurrentPage = page;
+  refreshReusableBlocsView();
+}
+
+function refreshReusableBlocsView() {
+  const container = document.getElementById('content');
+  if (!container) return;
+  container.innerHTML = renderReusableBlocsView();
+  const input = container.querySelector('.pages-search-input');
+  if (input && _reusableBlocsSearch) {
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
+}
+
+async function openReusableBlocBuilder(blocId) {
+  reusableBlocBuilderMode = true;
+  pageBuilderState.editingPageId = blocId;
+  pageBuilderState.blocks = [];
+  pageBuilderState.meta = { title: '', slug: '', status: 'published', show_in_menu: false, menu_order: 0, parent_id: null };
+  pageBuilderState.pageMenus = [];
+  selectedBlockId = null;
+  localStorage.setItem('adminLastView', `rb-builder:${blocId ?? 'new'}`);
+  await loadModuleFieldSchema();
+  ensureBaseModuleStyles();
+  if (blocId) {
+    showLoading();
+    try {
+      const bloc = await apiFetch(`/reusable-blocs/${blocId}`);
+      if (bloc) {
+        pageBuilderState.blocks = parsePageContent(bloc.content);
+        pageBuilderState.meta = { title: bloc.title, slug: '', status: bloc.status || 'published', show_in_menu: false, menu_order: 0, parent_id: null };
+      }
+    } catch (e) {}
+    hideLoading();
+  }
+  document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+  const rbNav = document.querySelector('[data-section="reusable-blocs"]');
+  if (rbNav) rbNav.classList.add('active');
+  document.getElementById('content').innerHTML = await renderReusableBlocBuilder();
+  attachPageBuilderListeners();
+  // Apply border-rounded class to canvas based on current settings
+  if (siteSettingsCache) {
+    const canvas = document.getElementById('builderCanvas');
+    if (canvas) canvas.classList.toggle('border-rounded', siteSettingsCache.rounded === '1');
+  }
+}
+
+async function renderReusableBlocBuilder() {
+  const m = pageBuilderState.meta;
+
+  // Filter out reusable-bloc from module categories to prevent recursion
+  const filteredCategories = MODULE_CATEGORIES.map(category => ({
+    ...category,
+    modules: category.modules.filter(name => toKebabCase(name) !== 'reusable-bloc')
+  })).filter(category => category.modules.length > 0);
+
+  return `
+    <div class="page-builder">
+      <header class="builder-header">
+        <button type="button" class="btn btn-danger" onclick="closeReusableBlocBuilder()">← Retour</button>
+        <div class="builder-meta">
+          <div class="builder-field-group">
+            <label class="builder-field-label">Titre du bloc</label>
+            <input type="text" class="form-input builder-title" placeholder="Nom du bloc réutilisable" value="${escapeHtml(m.title)}" data-field="title">
+          </div>
+        </div>
+        <div class="builder-actions">
+          <button type="button" class="btn btn-primary" onclick="saveReusableBlocBuilder()">Enregistrer</button>
+        </div>
+      </header>
+      <div class="builder-body">
+        <aside class="builder-sidebar">
+          <div class="builder-modules-panel" id="builderModulesPanel" style="${selectedBlockId ? 'display:none' : ''}">
+            <h3>Modules</h3>
+            <p class="form-help">Glissez un module dans la zone de droite.</p>
+            <div class="builder-modules-list">
+              ${filteredCategories.map(category => `
+                <div class="builder-module-category">
+                  <div class="builder-module-category-title">
+                    <span class="icon">${category.icon || '▦'}</span>
+                    <span>${category.label}</span>
+                  </div>
+                  <div class="builder-module-category-items">
+                    ${category.modules.map(name => {
+                      const type = toKebabCase(name);
+                      const def = BLOCK_TYPES[type] || { label: MODULE_LABELS[name] || humanizeModuleName(name), icon: category.icon || '▦' };
+                      return `
+                        <div class="builder-module-item" draggable="true" data-block-type="${type}" onclick="addBlockByClick('${type}')" title="Glisser ici ou cliquer pour ajouter">
+                          <span>${def.label}</span>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <div class="builder-settings" id="builderSettings" style="${selectedBlockId ? '' : 'display:none'}">
+            ${renderBuilderSettingsPanel()}
+          </div>
+        </aside>
+        <main class="builder-canvas" id="builderCanvas" data-drop-zone="true">
+          <div class="builder-canvas-inner">
+            <div class="builder-canvas-placeholder" id="builderPlaceholder">Glissez des modules ici ou cliquez sur un module à gauche pour l'ajouter.</div>
+            <div class="builder-blocks" id="builderBlocks">
+              ${pageBuilderState.blocks.map(block => renderBlockCard(block)).join('')}
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  `;
+}
+
+function closeReusableBlocBuilder() {
+  reusableBlocBuilderMode = false;
+  loadSection('reusable-blocs');
+}
+
+async function saveReusableBlocBuilder() {
+  // Sync inline editing content if active
+  if (_inlineEditingBlockId && _inlineEditingElement) {
+    _syncInlineContentToBlockData(_inlineEditingElement);
+  }
+  // Sync title from DOM
+  const titleInput = document.querySelector('.builder-title');
+  const title = titleInput ? titleInput.value.trim() : pageBuilderState.meta.title;
+  if (!title) { showToast('Le titre est requis', 'error'); return; }
+
+  // Force-sync all Quill editors
+  _quillInstances.forEach((quill, id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const textarea = el.parentElement?.querySelector('.wysiwyg-source');
+    if (textarea) textarea.value = quill.getSemanticHTML();
+  });
+  // Sync the currently open block settings form
+  const panel = document.getElementById('builderSettings');
+  const form = panel?.querySelector('form.builder-block-form');
+  if (form && selectedBlockId) {
+    liveUpdateFromSettingsForm(form);
+  }
+
+  const content = JSON.stringify(pageBuilderState.blocks);
+  showLoading();
+  try {
+    if (pageBuilderState.editingPageId) {
+      await apiFetch(`/reusable-blocs/${pageBuilderState.editingPageId}`, { method: 'PUT', body: JSON.stringify({ title, content, status: 'published' }) });
+      showToast('Bloc réutilisable mis à jour', 'success');
+    } else {
+      const res = await apiFetch('/reusable-blocs', { method: 'POST', body: JSON.stringify({ title, content, status: 'published' }) });
+      showToast('Bloc réutilisable créé', 'success');
+      if (res && res.id) {
+        pageBuilderState.editingPageId = res.id;
+        localStorage.setItem('adminLastView', `rb-builder:${res.id}`);
+      }
+    }
+  } catch (error) {
+    hideLoading();
+    showToast('Erreur: ' + error.message, 'error');
+    return;
+  }
+  hideLoading();
+}
+
+async function editReusableBloc(id) {
+  await openReusableBlocBuilder(id);
+}
+
+async function duplicateReusableBloc(id) {
+  showLoading();
+  try {
+    const blocs = await apiFetch('/reusable-blocs');
+    const source = blocs.find(b => b.id === id);
+    if (!source) { hideLoading(); showToast('Bloc introuvable', 'error'); return; }
+
+    await apiFetch('/reusable-blocs', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: source.title + ' (copie)',
+        content: source.content,
+        status: 'published',
+      }),
+    });
+    showToast('Bloc dupliqué', 'success');
+    loadSection('reusable-blocs');
+  } catch (error) {
+    hideLoading();
+    showToast('Erreur: ' + error.message, 'error');
+  }
+}
+
+async function deleteReusableBloc(id, title) {
+  const ok = await confirmModal(`Voulez-vous vraiment supprimer le bloc "${title}" ?`);
+  if (!ok) return;
+
+  showLoading();
+  try {
+    await apiFetch(`/reusable-blocs/${id}`, { method: 'DELETE' });
+    showToast('Bloc supprimé', 'success');
+    loadSection('reusable-blocs');
+  } catch (error) {
+    hideLoading();
+    showToast('Erreur: ' + error.message, 'error');
+  }
+}
+
 // ========== MEDIA LIBRARY ==========
 async function fetchMediaFolders() {
   try {
@@ -4645,9 +6286,17 @@ async function fetchMediaFolders() {
 }
 
 async function fetchMediaItems(folderId = null) {
-  const query = folderId ? `?folder_id=${encodeURIComponent(folderId)}` : '?folder_id=';
+  const params = new URLSearchParams();
+  if (mediaState.search) {
+    params.set('search', mediaState.search);
+    if (folderId) params.set('folder_id', folderId);
+  } else if (folderId === null) {
+    params.set('all', '1');
+  } else {
+    params.set('folder_id', folderId);
+  }
   try {
-    mediaState.items = await apiFetch(`/media${query}`);
+    mediaState.items = await apiFetch(`/media?${params.toString()}`);
   } catch (e) {
     mediaState.items = [];
   }
@@ -4662,10 +6311,6 @@ async function renderMediaLibrary() {
 
   const folders = mediaState.folders;
   const currentFolder = mediaState.currentFolderId;
-  const folderList = [
-    { id: null, name: 'Tous les médias' },
-    ...folders
-  ];
 
   return `
     <div class="page-header">
@@ -4688,9 +6333,16 @@ async function renderMediaLibrary() {
     </div>
     <div class="media-library">
       <aside class="media-sidebar">
+        <div class="media-search">
+          <input type="text" class="media-search-input" placeholder="Rechercher un média…" value="${escapeHtml(mediaState.search)}" oninput="handleMediaSearch(this.value)" />
+          ${mediaState.search ? `<button class="media-search-clear" onclick="clearMediaSearch()" title="Effacer">&times;</button>` : ''}
+        </div>
+        <button class="media-folder-item media-folder-all ${currentFolder === null ? 'is-active' : ''}" onclick="selectMediaFolder(null)">
+          📁 Tous les médias
+        </button>
         <h3>Dossiers</h3>
         <div class="media-folder-list">
-          ${folderList.map(folder => `
+          ${folders.map(folder => `
             <button class="media-folder-item ${String(folder.id) === String(currentFolder) ? 'is-active' : ''}" onclick="selectMediaFolder(${folder.id ?? 'null'})">
               📁 ${escapeHtml(folder.name)}
             </button>
@@ -4698,7 +6350,11 @@ async function renderMediaLibrary() {
         </div>
       </aside>
       <section class="media-grid">
-        ${mediaState.items.length === 0 ? renderEmptyState('🗂️', 'Aucun média', 'Importez des images ou vidéos pour commencer.') : ''}
+        ${mediaState.items.length === 0
+          ? (mediaState.search
+            ? renderEmptyState('🔍', 'Aucun résultat', `Aucun média ne correspond à « ${escapeHtml(mediaState.search)} ».`)
+            : renderEmptyState('🗂️', 'Aucun média', 'Importez des images ou vidéos pour commencer.'))
+          : ''}
         ${mediaState.items.map(item => renderMediaCard(item)).join('')}
       </section>
     </div>
@@ -4712,10 +6368,10 @@ function renderMediaCard(item, forPicker = false) {
     : (!forPicker && Array.isArray(mediaState.selectedIds) && mediaState.selectedIds.includes(String(item.id)));
   const thumb = isImage
     ? `<img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.original_name)}">`
-    : `<div class="media-thumb-icon">🎬</div>`;
+    : `<video src="${escapeHtml(item.url)}#t=0.5" preload="metadata" muted></video>`;
   const meta = `${isImage ? 'Image' : 'Vidéo'} · ${formatBytes(item.size)}`;
   const folderSelect = forPicker ? '' : `
-    <select class="media-move-select" onchange="moveMediaItem(${item.id}, this.value)">
+    <select class="media-move-select" onclick="event.stopPropagation()" onchange="moveMediaItem(${item.id}, this.value)">
       <option value="">Sans dossier</option>
       ${mediaState.folders.map(f => `
         <option value="${f.id}" ${String(f.id) === String(item.folder_id) ? 'selected' : ''}>${escapeHtml(f.name)}</option>
@@ -4725,19 +6381,21 @@ function renderMediaCard(item, forPicker = false) {
   const actions = forPicker
     ? ''
     : `
-        <button class="btn btn-sm btn-outline" onclick="renameMediaItem(${item.id}, '${escapeHtml(item.original_name || '')}')">Renommer</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteMediaItem(${item.id})">Suppr.</button>
+        <div class="media-actions-row">
+          <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); renameMediaItem(${item.id}, '${escapeHtml(item.original_name || '')}')">Renommer</button>
+          <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteMediaItem(${item.id})">Suppr.</button>
+        </div>
       `;
   return `
     <article class="media-card ${forPicker ? 'is-picker' : ''} ${isSelected ? 'is-selected' : ''}" onclick="${forPicker ? `selectMediaFromPicker(${item.id})` : ''}">
       ${!forPicker ? `
-        <label class="media-select">
+        <label class="media-select" onclick="event.stopPropagation()">
           <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleMediaSelection(${item.id}, this.checked); event.stopPropagation();" />
         </label>
       ` : ''}
       <div class="media-thumb ${isImage ? '' : 'is-video'}">${thumb}</div>
       <div class="media-meta">
-        <div class="media-name">${escapeHtml(item.original_name)}</div>
+        <div class="media-name" title="${escapeHtml(item.original_name)}">${escapeHtml(item.original_name)}</div>
         <div class="media-info">${escapeHtml(meta)}</div>
       </div>
       <div class="media-actions">
@@ -4751,9 +6409,56 @@ function renderMediaCard(item, forPicker = false) {
 async function selectMediaFolder(folderId) {
   mediaState.currentFolderId = folderId === 'null' ? null : folderId;
   mediaState.selectedIds = [];
+  mediaState.search = '';
   const content = document.getElementById('content');
   if (!content) return;
   content.innerHTML = await renderMediaLibrary();
+}
+
+let _mediaSearchTimer = null;
+function handleMediaSearch(value) {
+  clearTimeout(_mediaSearchTimer);
+  _mediaSearchTimer = setTimeout(async () => {
+    mediaState.search = value;
+    await fetchMediaItems(mediaState.currentFolderId);
+    const grid = document.querySelector('.media-grid');
+    const clearBtn = document.querySelector('.media-search-clear');
+    if (grid) {
+      grid.innerHTML = mediaState.items.length === 0
+        ? (mediaState.search
+          ? renderEmptyState('🔍', 'Aucun résultat', `Aucun média ne correspond à « ${escapeHtml(mediaState.search)} ».`)
+          : renderEmptyState('🗂️', 'Aucun média', 'Importez des images ou vidéos pour commencer.'))
+        : mediaState.items.map(item => renderMediaCard(item)).join('');
+    }
+    if (clearBtn) {
+      clearBtn.style.display = value ? '' : 'none';
+    } else if (value) {
+      const input = document.querySelector('.media-search-input');
+      if (input) {
+        const btn = document.createElement('button');
+        btn.className = 'media-search-clear';
+        btn.title = 'Effacer';
+        btn.innerHTML = '&times;';
+        btn.onclick = clearMediaSearch;
+        input.parentNode.appendChild(btn);
+      }
+    }
+  }, 300);
+}
+
+async function clearMediaSearch() {
+  mediaState.search = '';
+  const input = document.querySelector('.media-search-input');
+  if (input) input.value = '';
+  await fetchMediaItems(mediaState.currentFolderId);
+  const grid = document.querySelector('.media-grid');
+  if (grid) {
+    grid.innerHTML = mediaState.items.length === 0
+      ? renderEmptyState('🗂️', 'Aucun média', 'Importez des images ou vidéos pour commencer.')
+      : mediaState.items.map(item => renderMediaCard(item)).join('');
+  }
+  const clearBtn = document.querySelector('.media-search-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
 }
 
 async function handleMediaUpload(event) {
@@ -4868,11 +6573,19 @@ function ensureMediaPickerModal() {
         </div>
         <div class="media-modal-header-actions">
           <div class="media-modal-actions" id="mediaPickerActions"></div>
+          <label class="btn btn-primary btn-sm" style="cursor:pointer;margin:0">
+            Importer
+            <input type="file" multiple accept="image/*,video/*" onchange="handleMediaPickerUpload(event)" style="display:none">
+          </label>
           <button class="btn btn-outline btn-sm" onclick="closeMediaPicker()">Fermer</button>
         </div>
       </div>
       <div class="media-modal-body">
         <aside class="media-sidebar">
+          <div class="media-search">
+            <input type="text" class="media-search-input" id="mediaPickerSearchInput" placeholder="Rechercher un média…" oninput="handleMediaPickerSearch(this.value)" />
+            <button class="media-search-clear" id="mediaPickerSearchClear" onclick="clearMediaPickerSearch()" title="Effacer" style="display:none">&times;</button>
+          </div>
           <h3>Dossiers</h3>
           <div class="media-folder-list" id="mediaPickerFolders"></div>
         </aside>
@@ -4882,6 +6595,80 @@ function ensureMediaPickerModal() {
   `;
   document.body.appendChild(modal);
 }
+
+// ── Settings media picker (for logo/favicon fields) ──
+let settingsMediaPickerTarget = null;
+
+async function openSettingsMediaPicker(settingName) {
+  settingsMediaPickerTarget = settingName;
+  mediaPickerState = {
+    isOpen: true,
+    blockId: '__settings__',
+    fieldName: settingName,
+    type: 'image',
+    folderId: null,
+    folders: [],
+    items: [],
+    multiple: false,
+    selectedIds: []
+  };
+  ensureMediaPickerModal();
+  showLoading();
+  try {
+    mediaPickerState.folders = await apiFetch('/media/folders');
+    mediaPickerState.items = await apiFetch('/media?all=1');
+  } catch (e) {
+    mediaPickerState.folders = [];
+    mediaPickerState.items = [];
+  } finally {
+    hideLoading();
+  }
+  updateMediaPickerContent();
+  document.getElementById('mediaPickerModal').classList.add('is-open');
+}
+
+function clearSettingsMedia(settingName) {
+  const field = document.querySelector(`.settings-media-field[data-setting="${settingName}"]`);
+  if (!field) return;
+  field.querySelector('input[type="hidden"]').value = '';
+  field.querySelector('.settings-media-preview').innerHTML = '';
+  const removeBtn = field.querySelector('.btn-danger-outline');
+  if (removeBtn) removeBtn.remove();
+  if (settingName === 'footer_bg_img') toggleFooterBgOptions();
+}
+
+function toggleFooterBgOptions() {
+  const input = document.querySelector('input[name="footer_bg_img"]');
+  const hasImg = input && input.value;
+  document.querySelectorAll('.footer-bg-option').forEach(el => {
+    el.style.display = hasImg ? '' : 'none';
+  });
+}
+
+function toggleNewsletterOptions() {
+  const checked = document.querySelector('input[name="newsletter_form"]').checked;
+  document.querySelectorAll('.newsletter-option').forEach(el => {
+    el.style.display = checked ? '' : 'none';
+  });
+}
+
+function toggleAltSecondaryMenu() {
+  const checked = document.querySelector('input[name="alt_secondary_menu"]').checked;
+  document.querySelectorAll('.alt-secondary-menu-options').forEach(el => {
+    el.style.display = checked ? '' : 'none';
+  });
+}
+
+function toggleAlertBgOptions() {
+  const input = document.querySelector('input[name="bg_img_alert"]');
+  const hasImg = input && input.value;
+  document.querySelectorAll('.alert-bg-option').forEach(el => {
+    el.style.display = hasImg ? '' : 'none';
+  });
+}
+
+// Hook into selectMediaFromPicker to handle settings media picks
+const _origSelectMediaFromPicker = typeof selectMediaFromPicker === 'function' ? selectMediaFromPicker : null;
 
 async function openMediaPicker(type, blockId, fieldName, options = {}) {
   const normalizedOptions = typeof options === 'boolean' ? { multiple: options } : options;
@@ -4902,7 +6689,7 @@ async function openMediaPicker(type, blockId, fieldName, options = {}) {
   showLoading();
   try {
     mediaPickerState.folders = await apiFetch('/media/folders');
-    mediaPickerState.items = await apiFetch('/media?folder_id=');
+    mediaPickerState.items = await apiFetch('/media?all=1');
   } catch (e) {
     mediaPickerState.folders = [];
     mediaPickerState.items = [];
@@ -4910,6 +6697,10 @@ async function openMediaPicker(type, blockId, fieldName, options = {}) {
     hideLoading();
   }
   updateMediaPickerContent();
+  const searchInput = document.getElementById('mediaPickerSearchInput');
+  if (searchInput) searchInput.value = '';
+  const clearBtn = document.getElementById('mediaPickerSearchClear');
+  if (clearBtn) clearBtn.style.display = 'none';
   document.getElementById('mediaPickerModal').classList.add('is-open');
 }
 
@@ -4919,11 +6710,37 @@ function closeMediaPicker() {
   if (modal) modal.classList.remove('is-open');
 }
 
-async function selectMediaPickerFolder(folderId) {
-  mediaPickerState.folderId = folderId;
+async function handleMediaPickerUpload(event) {
+  const files = Array.from(event.target.files || []);
+  if (files.length === 0) return;
+  const formData = new FormData();
+  files.forEach(file => formData.append('files', file));
+  if (mediaPickerState.folderId) formData.append('folder_id', mediaPickerState.folderId);
   showLoading();
   try {
-    mediaPickerState.items = await apiFetch(`/media?folder_id=${folderId ?? ''}`);
+    await apiUpload('/media/upload', formData);
+    showToast('Médias importés', 'success');
+    mediaPickerState.items = await apiFetch(`/media?${mediaPickerState.folderId === null ? 'all=1' : 'folder_id=' + mediaPickerState.folderId}`);
+    updateMediaPickerContent();
+  } catch (e) {
+    showToast(e.message || "Erreur lors de l'import", 'error');
+  } finally {
+    hideLoading();
+    event.target.value = '';
+  }
+}
+
+async function selectMediaPickerFolder(folderId) {
+  mediaPickerState.folderId = folderId;
+  mediaPickerState.search = '';
+  const searchInput = document.getElementById('mediaPickerSearchInput');
+  if (searchInput) searchInput.value = '';
+  const clearBtn = document.getElementById('mediaPickerSearchClear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  showLoading();
+  try {
+    const query = folderId === null ? 'all=1' : `folder_id=${folderId}`;
+    mediaPickerState.items = await apiFetch(`/media?${query}`);
   } catch (e) {
     mediaPickerState.items = [];
   } finally {
@@ -4932,16 +6749,56 @@ async function selectMediaPickerFolder(folderId) {
   updateMediaPickerContent();
 }
 
+let _mediaPickerSearchTimer = null;
+function handleMediaPickerSearch(value) {
+  clearTimeout(_mediaPickerSearchTimer);
+  _mediaPickerSearchTimer = setTimeout(async () => {
+    mediaPickerState.search = value;
+    const params = new URLSearchParams();
+    if (value) {
+      params.set('search', value);
+      if (mediaPickerState.folderId) params.set('folder_id', mediaPickerState.folderId);
+    } else if (mediaPickerState.folderId === null) {
+      params.set('all', '1');
+    } else {
+      params.set('folder_id', mediaPickerState.folderId);
+    }
+    try {
+      mediaPickerState.items = await apiFetch(`/media?${params.toString()}`);
+    } catch (e) {
+      mediaPickerState.items = [];
+    }
+    updateMediaPickerContent();
+    const clearBtn = document.getElementById('mediaPickerSearchClear');
+    if (clearBtn) clearBtn.style.display = value ? '' : 'none';
+  }, 300);
+}
+
+async function clearMediaPickerSearch() {
+  mediaPickerState.search = '';
+  const input = document.getElementById('mediaPickerSearchInput');
+  if (input) input.value = '';
+  const clearBtn = document.getElementById('mediaPickerSearchClear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  try {
+    mediaPickerState.items = await apiFetch(`/media?${mediaPickerState.folderId === null ? 'all=1' : 'folder_id=' + mediaPickerState.folderId}`);
+  } catch (e) {
+    mediaPickerState.items = [];
+  }
+  updateMediaPickerContent();
+}
+
 function updateMediaPickerContent() {
-  const folderList = [
-    { id: null, name: 'Tous les médias' },
-    ...mediaPickerState.folders
-  ];
   const folderEl = document.getElementById('mediaPickerFolders');
   const gridEl = document.getElementById('mediaPickerGrid');
   const actionsEl = document.getElementById('mediaPickerActions');
   if (!folderEl || !gridEl) return;
-  folderEl.innerHTML = folderList.map(folder => `
+  folderEl.innerHTML = `
+    <button class="media-folder-item media-folder-all ${mediaPickerState.folderId === null ? 'is-active' : ''}" onclick="selectMediaPickerFolder(null)">
+      📁 Tous les médias
+    </button>
+    <h3 style="margin:8px 0 4px;font-size:13px;font-weight:600;color:var(--gray-600)">Dossiers</h3>
+  ` + mediaPickerState.folders.map(folder => `
     <button class="media-folder-item ${String(folder.id) === String(mediaPickerState.folderId) ? 'is-active' : ''}" onclick="selectMediaPickerFolder(${folder.id ?? 'null'})">
       📁 ${escapeHtml(folder.name)}
     </button>
@@ -4976,6 +6833,50 @@ function selectMediaFromPicker(id) {
   }
   const item = mediaPickerState.items.find(m => String(m.id) === key);
   if (!item) return;
+
+  // Settings media picker (logo/favicon)
+  if (mediaPickerState.blockId === '__settings__' && settingsMediaPickerTarget) {
+    const settingName = settingsMediaPickerTarget;
+    const field = document.querySelector(`.settings-media-field[data-setting="${settingName}"]`);
+    if (field) {
+      field.querySelector('input[type="hidden"]').value = item.url;
+      field.querySelector('.settings-media-preview').innerHTML = `<img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.original_name || '')}">`;
+      // Add remove button if not present
+      const actions = field.querySelector('.settings-media-actions');
+      if (actions && !actions.querySelector('.btn-danger-outline')) {
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-sm btn-danger-outline';
+        removeBtn.textContent = 'Supprimer';
+        removeBtn.onclick = () => clearSettingsMedia(settingName);
+        actions.appendChild(removeBtn);
+      }
+    }
+    if (settingName === 'footer_bg_img') toggleFooterBgOptions();
+    settingsMediaPickerTarget = null;
+    closeMediaPicker();
+    return;
+  }
+
+  // CPT Featured image picker
+  if (mediaPickerState.blockId === '__cpt_featured__') {
+    const payload = { id: item.id, url: item.url, alt: item.original_name || '', sizes: { thumbnail: item.url, half: item.url, banner: item.url } };
+    document.getElementById('cptFeaturedInput').value = JSON.stringify(payload);
+    document.getElementById('cptFeaturedPreview').innerHTML = `<img src="${escapeHtml(item.url)}" style="max-width:200px;max-height:150px;object-fit:cover;border-radius:8px;">`;
+    closeMediaPicker();
+    return;
+  }
+
+  // CPT Options image picker (header_img)
+  if (mediaPickerState.blockId === '__cpt_options_img__') {
+    const input = document.getElementById('cptOptionsImgInput');
+    const preview = document.getElementById('cptOptionsImgPreview');
+    if (input) input.value = item.url;
+    if (preview) preview.innerHTML = `<img src="${escapeHtml(item.url)}" style="max-width:100%;max-height:200px;object-fit:cover;border-radius:8px;">`;
+    closeMediaPicker();
+    return;
+  }
+
   applyMediaSelection(mediaPickerState.blockId, mediaPickerState.fieldName, item);
   closeMediaPicker();
 }
@@ -5065,6 +6966,20 @@ function clearMediaPickerSelection() {
 
 function confirmMediaPickerSelection() {
   const items = mediaPickerState.items.filter(item => (mediaPickerState.selectedIds || []).includes(String(item.id)));
+
+  // CPT Photos gallery picker
+  if (mediaPickerState.blockId === '__cpt_photos__') {
+    const input = document.getElementById('cptPhotosInput');
+    let existing = [];
+    try { existing = JSON.parse(input.value || '[]'); } catch { existing = []; }
+    const newUrls = items.map(item => item.url);
+    const merged = [...existing, ...newUrls];
+    input.value = JSON.stringify(merged);
+    updateCPTPhotosPreview(merged);
+    closeMediaPicker();
+    return;
+  }
+
   applyMediaSelectionMultiple(mediaPickerState.blockId, mediaPickerState.fieldName, items);
   closeMediaPicker();
 }
@@ -5287,66 +7202,98 @@ function promptModal(message, defaultValue = '', title = 'Saisie') {
 }
 
 /**
- * Sort pages hierarchically: parent first, then its children (sorted by menu_order),
- * then next parent, etc. Supports one level of nesting.
+ * Sort pages hierarchically based on primary menu structure.
+ * Pages in the primary menu come first (ordered by menu_order), with children nested under parents.
+ * Pages not in any menu come last, sorted by title.
  */
 function sortPagesHierarchically(pages) {
-  const roots = pages.filter(p => !p.parent_id).sort((a, b) => a.menu_order - b.menu_order);
-  const childrenMap = {};
-  pages.filter(p => p.parent_id).forEach(p => {
-    if (!childrenMap[p.parent_id]) childrenMap[p.parent_id] = [];
-    childrenMap[p.parent_id].push(p);
+  // Build a map: pageId → primaryParent page_id (from menu info)
+  const parentMap = {}; // pageId → parent page_id
+  Object.entries(_pagesMenuInfo).forEach(([pid, info]) => {
+    if (info.primaryParent && info.primaryParent.page_id) {
+      parentMap[parseInt(pid)] = info.primaryParent.page_id;
+    }
   });
-  Object.values(childrenMap).forEach(arr => arr.sort((a, b) => a.menu_order - b.menu_order));
+
+  const roots = pages.filter(p => !parentMap[p.id]).sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  const childrenMap = {};
+  pages.filter(p => parentMap[p.id]).forEach(p => {
+    const parentPageId = parentMap[p.id];
+    if (!childrenMap[parentPageId]) childrenMap[parentPageId] = [];
+    childrenMap[parentPageId].push(p);
+  });
+  Object.values(childrenMap).forEach(arr => arr.sort((a, b) => (a.title || '').localeCompare(b.title || '')));
   const sorted = [];
   roots.forEach(parent => {
     sorted.push(parent);
     if (childrenMap[parent.id]) sorted.push(...childrenMap[parent.id]);
   });
-  // Append orphans (children whose parent is not in the list)
+  // Append orphans
   const inSorted = new Set(sorted.map(p => p.id));
   pages.forEach(p => { if (!inSorted.has(p.id)) sorted.push(p); });
   return sorted;
 }
 
+/**
+ * Check if a page is a child in the primary menu
+ */
+function getPagePrimaryParent(pageId) {
+  const info = _pagesMenuInfo[pageId];
+  return info?.primaryParent || null;
+}
+
+function renderPageMenuBadges(pageId) {
+  const info = _pagesMenuInfo[pageId];
+  if (!info || !info.menus || info.menus.length === 0) {
+    return '<span class="badge badge-muted">Hors menu</span>';
+  }
+  return info.menus.map(m => {
+    const loc = MENU_LOCATIONS.find(l => l.value === m.location);
+    const label = loc && loc.value ? loc.label : m.name;
+    return `<span class="badge badge-success">${escapeHtml(label)}</span>`;
+  }).join(' ');
+}
+
 function renderPagesTable(pages) {
   return `
     <div class="pages-list">
-      ${pages.map(page => `
-        <div class="page-item ${page.parent_id ? 'page-item--child' : ''}">
-          <div class="page-item__order">${page.menu_order}</div>
-          <div class="page-item__info">
-            <div class="page-item__title">
-              ${page.parent_id ? '<span class="page-item__child-icon">↳</span>' : ''}${page.title}
-            </div>
-            <div class="page-item__slug">/${page.slug}</div>
-          </div>
-          ${page.parent_title ? `<div class="page-item__parent"><span class="page-item__parent-tag">${page.parent_title}</span></div>` : '<div class="page-item__parent"></div>'}
-          <div class="page-item__meta">
-            ${page.author?.name ? `<span class="page-item__author">${page.author.name}</span>` : ''}
-            <span class="page-item__date">${new Date(page.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-          </div>
-          <div class="page-item__badges">
-            <span class="badge ${page.show_in_menu ? 'badge-success' : 'badge-muted'}">
-              ${page.show_in_menu ? 'Menu' : 'Hors menu'}
-            </span>
-            <span class="badge ${page.status === 'published' ? 'badge-success' : 'badge-warning'}">
-              ${page.status === 'published' ? 'Publié' : 'Brouillon'}
-            </span>
-          </div>
-          <div class="page-item__actions">
-            <button class="btn-icon-action" onclick="editPage(${page.id})" title="Modifier">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-            <button class="btn-icon-action" onclick="duplicatePage(${page.id})" title="Dupliquer">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            </button>
-            <button class="btn-icon-action btn-icon-action--danger" onclick="deletePage(${page.id}, '${page.title.replace(/'/g, "\\'")}')" title="Supprimer">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-          </div>
-        </div>
-      `).join('')}
+      <div class="pages-list-header">
+        <span class="page-item__info">Page</span>
+        <span class="page-item__parent">Parent</span>
+        <span class="page-item__meta">Modifié</span>
+        <span class="page-item__badges">Statut</span>
+        <span class="page-item__actions" style="opacity:1">Actions</span>
+      </div>
+      ${pages.map(page => {
+        const primaryParent = getPagePrimaryParent(page.id);
+        const isChild = !!primaryParent;
+        const parentHtml = primaryParent ? '<div class="page-item__parent"><span class="page-item__parent-tag">' + escapeHtml(primaryParent.title) + '</span></div>' : '<div class="page-item__parent"></div>';
+        const safeTitle = page.title.replace(/'/g, "\\'");
+        return '<div class="page-item ' + (isChild ? 'page-item--child' : '') + '">'
+          + '<div class="page-item__info">'
+          +   '<div class="page-item__title">'
+          +     (isChild ? '<span class="page-item__child-icon">↳</span>' : '') + escapeHtml(page.title)
+          +   '</div>'
+          +   '<div class="page-item__slug">/' + escapeHtml(page.slug) + '</div>'
+          + '</div>'
+          + parentHtml
+          + '<div class="page-item__meta">'
+          +   (page.author?.name ? '<span class="page-item__author">' + escapeHtml(page.author.name) + '</span>' : '')
+          +   '<span class="page-item__date">' + new Date(page.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span>'
+          + '</div>'
+          + '<div class="page-item__badges">'
+          +   renderPageMenuBadges(page.id)
+          +   '<span class="badge ' + (page.status === 'published' ? 'badge-success' : 'badge-warning') + '">'
+          +     (page.status === 'published' ? 'Publié' : 'Brouillon')
+          +   '</span>'
+          + '</div>'
+          + '<div class="page-item__actions">'
+          +   '<button class="btn-icon-action" onclick="editPage(' + page.id + ')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+          +   '<button class="btn-icon-action" onclick="duplicatePage(' + page.id + ')" title="Dupliquer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+          +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deletePage(' + page.id + ', \'' + safeTitle + '\')" title="Supprimer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
+          + '</div>'
+        + '</div>';
+      }).join('')}
     </div>
   `;
 }
@@ -5555,6 +7502,13 @@ async function renderSiteSettings() {
       pagesForSelect = pagesForSelect.filter(p => p.status === 'published');
     } catch (e) { console.error('Failed to load pages for front page selector', e); }
 
+    // Charger les blocs réutilisables pour le sélecteur footer
+    let reusableBlocsForSelect = [];
+    try {
+      reusableBlocsForSelect = await apiFetch('/reusable-blocs');
+      reusableBlocsForSelect = reusableBlocsForSelect.filter(b => b.status === 'published');
+    } catch (e) { console.error('Failed to load reusable blocs', e); }
+
     const primaryColor = settings.primary_color || '#667eea';
     const secondaryColor = settings.secondary_color || '#f97316';
     const tertiaryColor = settings.tertiary_color || '#0ea5e9';
@@ -5564,6 +7518,12 @@ async function renderSiteSettings() {
 
     const fontTitle = settings.font_title || 'jakarta';
     const fontGeneral = settings.font_general || 'jakarta';
+
+    const logo = settings.logo || '';
+    const logoWhite = settings.logo_white || '';
+    const logoLoader = settings.logo_loader || '';
+    const favicon = settings.favicon || '';
+    const replacementImage = settings.replacement_image || '';
 
     const menuSeamless = settings.menu_seamless === '1';
     const rounded = settings.rounded === '1';
@@ -5578,20 +7538,41 @@ async function renderSiteSettings() {
     const pagesShareBtn = settings.pages_share_btn === '1';
     const shareBtnPosition = settings.share_btn_position === '1';
 
+    const altSecondaryMenu = settings.alt_secondary_menu === '1';
+    const topLink1Url = settings.top_link_1_url || '';
+    const topLink1Text = settings.top_link_1_text || '';
+    const iconLink1 = settings.icon_link_1 || '';
+    const topLink2Url = settings.top_link_2_url || '';
+    const topLink2Text = settings.top_link_2_text || '';
+    const iconLink2 = settings.icon_link_2 || '';
     const showPhone = settings.show_phone === '1';
     const showSearch = settings.show_search === '1';
     const showSocials = settings.show_socials === '1';
     const phone = settings.phone || '';
     const phone2 = settings.phone_2 || '';
     const email = settings.email || '';
+    const address = settings.address || '';
+    const address2 = settings.address_2 || '';
 
+    // Footer
+    const footerColor = settings.footer_color || 'no-background-color';
     const footerText = settings.footer_text || '';
     const schedule = settings.schedule || '';
     const opening = settings.opening || '';
+    const link1Url = settings.link_1_url || '';
+    const link1Text = settings.link_1_text || '';
+    const link2Url = settings.link_2_url || '';
+    const link2Text = settings.link_2_text || '';
     const newsletterForm = settings.newsletter_form === '1';
     const newsletterFormTitle = settings.newsletter_form_title || '';
     const newsletterFormDesc = settings.newsletter_form_desc || '';
+    const footerBgImg = settings.footer_bg_img || '';
+    const footerBgOpacity = settings.footer_bg_opacity || '60';
+    const footerBgParallax = settings.footer_bg_parallax === '1';
+    const footerCustomBloc = settings.footer_custom_bloc || '';
+    const footerCustomBlocLocation = settings.footer_custom_bloc_location || 'none';
 
+    // Réseaux sociaux
     const instagram = settings.instagram || '';
     const facebook = settings.facebook || '';
     const threads = settings.threads || '';
@@ -5601,22 +7582,45 @@ async function renderSiteSettings() {
     const tripadvisor = settings.tripadvisor || '';
     const pinterest = settings.pinterest || '';
     const youtube = settings.youtube || '';
+    const idApplicationInstagram = settings.id_application_instagram || '';
+    const secretKeyApplicationInstagram = settings.secret_key_application_instagram || '';
+    const linkAccountInstagram = settings.link_account_instagram || '';
+    const accessTokenInstagram = settings.access_token_instagram || '';
 
+    // Popup
     const showAlert = settings.show_alert === '1';
+    const blocColorAlert = settings.bloc_color_alert || 'no-background-color';
+    const isSmallMargedAlert = settings.is_small_marged_alert === '1';
+    const bgImgAlert = settings.bg_img_alert || '';
+    const bgOpacityAlert = settings.bg_opacity_alert || '10';
     const alertText = settings.alert_text || '';
+    const alertCtaUrl = settings.alert_cta_url || '';
+    const alertCtaText = settings.alert_cta_text || '';
+    const alertCta2Url = settings.alert_cta2_url || '';
+    const alertCta2Text = settings.alert_cta2_text || '';
 
+    // Bouton flottant
     const showBtn = settings.show_btn === '1';
     const floatingBtnLink = settings.floating_btn_link || '';
+    const floatingBtnImg = settings.floating_btn_img || '';
 
+    // Maintenance
     const isMaintenance = settings.is_maintenance === '1';
     const textMaintenance = settings.text_maintenance || '';
     const showInfos = settings.show_infos === '1';
     const showRs = settings.show_rs === '1';
 
+    // Tracking
     const gaCode = settings.ga_code || '';
     const awCode = settings.aw_code || '';
     const gtmCode = settings.gtm_code || '';
     const metaPixelCode = settings.meta_pixel_code || '';
+
+    // Technique (admin)
+    const isOnepage = settings.is_onepage === '1';
+    const isActivateSchemas = settings.is_activate_schemas === '1';
+    const customBalise = settings.custom_balise || '';
+    const googleApiKey = settings.google_api_key || '';
 
     return `
       <div class="settings-page">
@@ -5627,85 +7631,154 @@ async function renderSiteSettings() {
       <div class="card">
         <div class="settings-tabs" id="siteSettingsTabs">
           <button type="button" class="settings-tab is-active" data-target="#settings-identity">Identité</button>
-          <button type="button" class="settings-tab" data-target="#settings-appearance">Apparence</button>
-          <button type="button" class="settings-tab" data-target="#settings-header">Header & menu</button>
-          <button type="button" class="settings-tab" data-target="#settings-contact">Menu secondaire & coordonnées</button>
+          <button type="button" class="settings-tab" data-target="#settings-secondary-menu">Menu secondaire</button>
           <button type="button" class="settings-tab" data-target="#settings-footer">Footer</button>
+          <button type="button" class="settings-tab" data-target="#settings-contact">Coordonnées</button>
           <button type="button" class="settings-tab" data-target="#settings-social">Réseaux sociaux</button>
           <button type="button" class="settings-tab" data-target="#settings-popup">Popup</button>
           <button type="button" class="settings-tab" data-target="#settings-floating">Bouton flottant</button>
-          <button type="button" class="settings-tab" data-target="#settings-maintenance">Maintenance</button>
-          <button type="button" class="settings-tab" data-target="#settings-tracking">Tracking</button>
+          <button type="button" class="settings-tab" data-target="#settings-maintenance">Mode maintenance</button>
+          <button type="button" class="settings-tab" data-target="#settings-tracking">Tracking & Analytics</button>
+          <button type="button" class="settings-tab" data-target="#settings-technical">Technique</button>
         </div>
 
         <form id="siteSettingsForm" onsubmit="saveSiteSettings(event)">
           <div class="settings-section is-active" id="settings-identity">
-          <h2 class="builder-settings-title" style="margin-top: 0;">Identité</h2>
-          <div class="form-group">
-            <label class="form-label">Nom du site</label>
-            <input type="text" class="form-input" name="site_name" value="${escapeHtml(siteName)}" placeholder="Nom affiché dans le header, le titre, etc.">
+          <div class="settings-subtabs">
+            <button type="button" class="settings-subtab is-active" data-subtarget="#identity-general">Général</button>
+            <button type="button" class="settings-subtab" data-subtarget="#identity-logos">Logos</button>
+            <button type="button" class="settings-subtab" data-subtarget="#identity-colors">Couleurs</button>
+            <button type="button" class="settings-subtab" data-subtarget="#identity-fonts">Polices</button>
+            <button type="button" class="settings-subtab" data-subtarget="#identity-appearance">Apparence & navigation</button>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Description du site</label>
-            <textarea class="form-textarea" name="site_description" rows="3" placeholder="Slogan ou description courte (utilisée pour le SEO, les métadonnées, etc.)">${escapeHtml(siteDescription)}</textarea>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Articles par page (blog)</label>
-            <input type="number" min="1" class="form-input" name="posts_per_page" value="${escapeHtml(postsPerPage)}">
-            <div class="form-help">Nombre d'articles affichés par page sur le listing blog.</div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Page d'accueil</label>
-            <select class="form-select" name="front_page">
-              <option value="">— Aucune (page par défaut) —</option>
-              ${pagesForSelect.map(p => `<option value="${escapeHtml(p.slug)}"${p.slug === frontPage ? ' selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
-            </select>
-            <div class="form-help">Choisissez la page qui servira de page d'accueil du site.</div>
-          </div>
-
-          </div>
-          <div class="settings-section" id="settings-appearance">
-          <h2 class="builder-settings-title" style="margin-top: 0;">Couleurs & typographies</h2>
-          <div class="form-group">
-            <label class="form-label">Couleurs du site</label>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Couleur primaire</label>
-                <input type="color" class="form-input" name="primary_color" value="${escapeHtml(primaryColor)}">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Couleur secondaire</label>
-                <input type="color" class="form-input" name="secondary_color" value="${escapeHtml(secondaryColor)}">
-              </div>
+          <div class="settings-subsection is-active" id="identity-general">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nom du site</label>
+              <input type="text" class="form-input" name="site_name" value="${escapeHtml(siteName)}" placeholder="Nom affiché dans le header, le titre, etc.">
             </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Couleur tertiaire</label>
-                <input type="color" class="form-input" name="tertiary_color" value="${escapeHtml(tertiaryColor)}">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Couleur des textes</label>
-                <input type="color" class="form-input" name="text_color" value="${escapeHtml(textColor)}">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Couleur de fond du site</label>
-                <input type="color" class="form-input" name="background_color" value="${escapeHtml(backgroundColor)}">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Fond des champs de formulaire</label>
-                <input type="color" class="form-input" name="bg_form_field" value="${escapeHtml(bgFormField)}">
-              </div>
-            </div>
-            <div class="form-help">
-              Ces couleurs reprennent l'esprit des options ACF Nickl (primaire / secondaire / tertiaire, textes, fond).
+            <div class="form-group">
+              <label class="form-label">Slogan du site</label>
+              <textarea class="form-textarea" name="site_description" rows="2" placeholder="Slogan ou description courte (utilisée pour le SEO, les métadonnées, etc.)">${escapeHtml(siteDescription)}</textarea>
             </div>
           </div>
 
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Articles par page (blog)</label>
+              <input type="number" min="1" class="form-input" name="posts_per_page" value="${escapeHtml(postsPerPage)}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Page d'accueil</label>
+              <select class="form-select" name="front_page">
+                <option value="">— Aucune (page par défaut) —</option>
+                ${pagesForSelect.map(p => `<option value="${escapeHtml(p.slug)}"${p.slug === frontPage ? ' selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          </div>
+
+          <div class="settings-subsection" id="identity-logos">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Logo</label>
+              <div class="settings-media-field" data-setting="logo">
+                <div class="settings-media-preview">${logo ? `<img src="${escapeHtml(logo)}" alt="Logo">` : ''}</div>
+                <input type="hidden" name="logo" value="${escapeHtml(logo)}">
+                <div class="settings-media-actions">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="openSettingsMediaPicker('logo')">Choisir</button>
+                  ${logo ? `<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearSettingsMedia('logo')">Supprimer</button>` : ''}
+                </div>
+                <p class="form-hint">Privilégiez un logo au format SVG.</p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Logo blanc</label>
+              <div class="settings-media-field" data-setting="logo_white">
+                <div class="settings-media-preview">${logoWhite ? `<img src="${escapeHtml(logoWhite)}" alt="Logo blanc">` : ''}</div>
+                <input type="hidden" name="logo_white" value="${escapeHtml(logoWhite)}">
+                <div class="settings-media-actions">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="openSettingsMediaPicker('logo_white')">Choisir</button>
+                  ${logoWhite ? `<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearSettingsMedia('logo_white')">Supprimer</button>` : ''}
+                </div>
+                <p class="form-hint">Privilégiez un logo au format SVG.</p>
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Logo du loader</label>
+              <div class="settings-media-field" data-setting="logo_loader">
+                <div class="settings-media-preview">${logoLoader ? `<img src="${escapeHtml(logoLoader)}" alt="Logo loader">` : ''}</div>
+                <input type="hidden" name="logo_loader" value="${escapeHtml(logoLoader)}">
+                <div class="settings-media-actions">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="openSettingsMediaPicker('logo_loader')">Choisir</button>
+                  ${logoLoader ? `<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearSettingsMedia('logo_loader')">Supprimer</button>` : ''}
+                </div>
+                <p class="form-hint">Privilégiez un logo au format SVG.</p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Favicon</label>
+              <div class="settings-media-field" data-setting="favicon">
+                <div class="settings-media-preview">${favicon ? `<img src="${escapeHtml(favicon)}" alt="Favicon">` : ''}</div>
+                <input type="hidden" name="favicon" value="${escapeHtml(favicon)}">
+                <div class="settings-media-actions">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="openSettingsMediaPicker('favicon')">Choisir</button>
+                  ${favicon ? `<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearSettingsMedia('favicon')">Supprimer</button>` : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Image de remplacement</label>
+              <div class="settings-media-field" data-setting="replacement_image">
+                <div class="settings-media-preview">${replacementImage ? `<img src="${escapeHtml(replacementImage)}" alt="Image de remplacement">` : ''}</div>
+                <input type="hidden" name="replacement_image" value="${escapeHtml(replacementImage)}">
+                <div class="settings-media-actions">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="openSettingsMediaPicker('replacement_image')">Choisir</button>
+                  ${replacementImage ? `<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearSettingsMedia('replacement_image')">Supprimer</button>` : ''}
+                </div>
+                <p class="form-hint">Cette image sera utilisée partout où aucune image n'a été renseignée.</p>
+              </div>
+            </div>
+          </div>
+          </div>
+
+          <div class="settings-subsection" id="identity-colors">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Couleur primaire</label>
+              <input type="color" class="form-input" name="primary_color" value="${escapeHtml(primaryColor)}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Couleur secondaire</label>
+              <input type="color" class="form-input" name="secondary_color" value="${escapeHtml(secondaryColor)}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Couleur tertiaire</label>
+              <input type="color" class="form-input" name="tertiary_color" value="${escapeHtml(tertiaryColor)}">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Couleur des textes</label>
+              <input type="color" class="form-input" name="text_color" value="${escapeHtml(textColor)}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Couleur de fond du site</label>
+              <input type="color" class="form-input" name="background_color" value="${escapeHtml(backgroundColor)}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fond des champs de formulaire</label>
+              <input type="color" class="form-input" name="bg_form_field" value="${escapeHtml(bgFormField)}">
+            </div>
+          </div>
+          </div>
+
+          <div class="settings-subsection" id="identity-fonts">
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Police des titres</label>
@@ -5762,36 +7835,23 @@ async function renderSiteSettings() {
               </select>
             </div>
           </div>
+          </div>
 
-          </div>
-          <div class="settings-section" id="settings-header">
-          <h2 class="builder-settings-title" style="margin-top: 0;">Header & menu</h2>
+          <div class="settings-subsection" id="identity-appearance">
           <div class="form-row">
             <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="menu_seamless" ${menuSeamless ? 'checked' : ''}>
-                <span>Fond du menu transparent</span>
-              </label>
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="menu_seamless" ${menuSeamless ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Fond du menu transparent</span></div>
             </div>
             <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="rounded" ${rounded ? 'checked' : ''}>
-                <span>Bords arrondis</span>
-              </label>
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="rounded" ${rounded ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Bords arrondis</span></div>
             </div>
             <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="uppercase" ${uppercase ? 'checked' : ''}>
-                <span>Éléments en majuscules (menu, titres, boutons)</span>
-              </label>
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="uppercase" ${uppercase ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Éléments en majuscules (menu, titres, boutons)</span></div>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="home_loader" ${homeLoader ? 'checked' : ''}>
-                <span>Logo de chargement (page d'accueil)</span>
-              </label>
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="home_loader" ${homeLoader ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Logo de chargement (page d'accueil)</span></div>
             </div>
             <div class="form-group">
               <label class="form-label">Style du menu</label>
@@ -5802,96 +7862,153 @@ async function renderSiteSettings() {
               </select>
             </div>
             <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="secret_menu" ${secretMenu ? 'checked' : ''}>
-                <span>Menu secondaire discret</span>
-              </label>
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="secret_menu" ${secretMenu ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Menu secondaire discret</span></div>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="logo_custom_height" ${logoCustomHeight ? 'checked' : ''}>
-                <span>Modifier la taille du logo</span>
-              </label>
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="logo_custom_height" ${logoCustomHeight ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Modifier la taille du logo</span></div>
             </div>
             <div class="form-group">
               <label class="form-label">Hauteur du logo (px)</label>
               <input type="number" class="form-input" name="logo_height" value="${escapeHtml(logoHeight)}" min="50" max="400">
             </div>
-          </div>
-
-          <div class="form-row">
             <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="accessibility" ${accessibility ? 'checked' : ''}>
-                <span>Accessibilité</span>
-              </label>
-            </div>
-            <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="show_breadcrumb" ${showBreadcrumb ? 'checked' : ''}>
-                <span>Fils d'ariane</span>
-              </label>
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="accessibility" ${accessibility ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Accessibilité</span></div>
             </div>
           </div>
-
           <div class="form-row">
             <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="pages_share_btn" ${pagesShareBtn ? 'checked' : ''}>
-                <span>Boutons de partage sur les pages</span>
-              </label>
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="show_breadcrumb" ${showBreadcrumb ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Fils d'ariane</span></div>
             </div>
             <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="share_btn_position" ${shareBtnPosition ? 'checked' : ''}>
-                <span>Position des boutons de partage (après le contenu)</span>
-              </label>
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="pages_share_btn" ${pagesShareBtn ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Boutons de partage sur les pages</span></div>
             </div>
+            <div class="form-group">
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="share_btn_position" ${shareBtnPosition ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Position des boutons de partage (après le contenu)</span></div>
+            </div>
+          </div>
           </div>
 
           </div>
-          <div class="settings-section" id="settings-contact">
-          <h2 class="builder-settings-title" style="margin-top: 0;">Menu secondaire & coordonnées</h2>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="show_phone" ${showPhone ? 'checked' : ''}>
-                <span>Afficher le téléphone</span>
-              </label>
-            </div>
-            <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="show_search" ${showSearch ? 'checked' : ''}>
-                <span>Afficher la recherche</span>
-              </label>
-            </div>
-            <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="show_socials" ${showSocials ? 'checked' : ''}>
-                <span>Afficher les réseaux sociaux</span>
-              </label>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Téléphone (principal)</label>
-              <input type="text" class="form-input" name="phone" value="${escapeHtml(phone)}" placeholder="ex : 0123456789">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Téléphone (secondaire)</label>
-              <input type="text" class="form-input" name="phone_2" value="${escapeHtml(phone2)}" placeholder="ex : 0123456789">
-            </div>
-          </div>
+          <div class="settings-section" id="settings-secondary-menu">
+          <h2 class="builder-settings-title" style="margin-top: 0;">Menu secondaire</h2>
           <div class="form-group">
-            <label class="form-label">Adresse e-mail</label>
-            <input type="email" class="form-input" name="email" value="${escapeHtml(email)}" placeholder="ex : john.doe@monsite.fr">
+            <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="alt_secondary_menu" ${altSecondaryMenu ? 'checked' : ''} onchange="toggleAltSecondaryMenu()"><span class="toggle-slider"></span></label><span class="toggle-label">Menu secondaire alternatif</span></div>
+          </div>
+          <div class="alt-secondary-menu-options" style="${altSecondaryMenu ? '' : 'display:none;'}">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Lien 1 — URL</label>
+              <input type="url" class="form-input" name="top_link_1_url" value="${escapeHtml(topLink1Url)}" placeholder="https://...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Lien 1 — Texte</label>
+              <input type="text" class="form-input" name="top_link_1_text" value="${escapeHtml(topLink1Text)}" placeholder="Libellé du lien">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Icône lien 1</label>
+              <div class="settings-media-field" data-setting="icon_link_1">
+                <div class="settings-media-preview">${iconLink1 ? `<img src="${escapeHtml(iconLink1)}" alt="Icône lien 1">` : ''}</div>
+                <input type="hidden" name="icon_link_1" value="${escapeHtml(iconLink1)}">
+                <div class="settings-media-actions">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="openSettingsMediaPicker('icon_link_1')">Choisir</button>
+                  ${iconLink1 ? `<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearSettingsMedia('icon_link_1')">Supprimer</button>` : ''}
+                </div>
+                <p class="form-hint">SVG ou PNG uniquement.</p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Icône lien 2</label>
+              <div class="settings-media-field" data-setting="icon_link_2">
+                <div class="settings-media-preview">${iconLink2 ? `<img src="${escapeHtml(iconLink2)}" alt="Icône lien 2">` : ''}</div>
+                <input type="hidden" name="icon_link_2" value="${escapeHtml(iconLink2)}">
+                <div class="settings-media-actions">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="openSettingsMediaPicker('icon_link_2')">Choisir</button>
+                  ${iconLink2 ? `<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearSettingsMedia('icon_link_2')">Supprimer</button>` : ''}
+                </div>
+                <p class="form-hint">SVG ou PNG uniquement.</p>
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Lien 2 — URL</label>
+              <input type="url" class="form-input" name="top_link_2_url" value="${escapeHtml(topLink2Url)}" placeholder="https://...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Lien 2 — Texte</label>
+              <input type="text" class="form-input" name="top_link_2_text" value="${escapeHtml(topLink2Text)}" placeholder="Libellé du lien">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="show_phone" ${showPhone ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Affichage du téléphone</span></div>
+            </div>
+            <div class="form-group">
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="show_search" ${showSearch ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Affichage de la recherche</span></div>
+            </div>
+            <div class="form-group">
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="show_socials" ${showSocials ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Affichage des réseaux sociaux</span></div>
+            </div>
+          </div>
           </div>
 
           </div>
           <div class="settings-section" id="settings-footer">
           <h2 class="builder-settings-title" style="margin-top: 0;">Footer</h2>
+          <div class="form-group">
+            <label class="form-label">Couleur de fond du footer</label>
+            <select class="form-select" name="footer_color">
+              <option value="no-background-color" ${footerColor === 'no-background-color' ? 'selected' : ''}>Aucune</option>
+              <option value="has-background-primary" ${footerColor === 'has-background-primary' ? 'selected' : ''}>Couleur primaire</option>
+              <option value="has-background-secondary" ${footerColor === 'has-background-secondary' ? 'selected' : ''}>Couleur secondaire</option>
+              <option value="has-background-dark" ${footerColor === 'has-background-dark' ? 'selected' : ''}>Couleur textes (sombre)</option>
+            </select>
+          </div>
+          <div class="form-row" style="align-items:end;">
+            <div class="form-group">
+              <label class="form-label">Image de fond</label>
+              <div class="settings-media-field" data-setting="footer_bg_img">
+                <div class="settings-media-preview">${footerBgImg ? `<img src="${escapeHtml(footerBgImg)}" alt="Image de fond footer">` : ''}</div>
+                <input type="hidden" name="footer_bg_img" value="${escapeHtml(footerBgImg)}" onchange="toggleFooterBgOptions()">
+                <div class="settings-media-actions">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="openSettingsMediaPicker('footer_bg_img')">Choisir</button>
+                  ${footerBgImg ? `<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearSettingsMedia('footer_bg_img')">Supprimer</button>` : ''}
+                </div>
+              </div>
+            </div>
+            <div class="form-group footer-bg-option" style="${footerBgImg ? '' : 'display:none;'}">
+              <label class="form-label">Opacité</label>
+              <input type="range" class="form-range" name="footer_bg_opacity" min="0" max="100" value="${escapeHtml(footerBgOpacity)}" oninput="this.nextElementSibling.value=this.value" style="flex:1;">
+              <input type="number" class="form-input" value="${escapeHtml(footerBgOpacity)}" min="0" max="100" style="width:60px;" oninput="this.previousElementSibling.value=this.value;this.previousElementSibling.dispatchEvent(new Event('input'))">
+            </div>
+            <div class="form-group footer-bg-option" style="${footerBgImg ? '' : 'display:none;'}">
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="footer_bg_parallax" ${footerBgParallax ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Mettre un effet de parallax ?</span></div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Lien 1 — URL</label>
+              <input type="url" class="form-input" name="link_1_url" value="${escapeHtml(link1Url)}" placeholder="https://...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Lien 1 — Texte</label>
+              <input type="text" class="form-input" name="link_1_text" value="${escapeHtml(link1Text)}" placeholder="Libellé du lien">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Lien 2 — URL</label>
+              <input type="url" class="form-input" name="link_2_url" value="${escapeHtml(link2Url)}" placeholder="https://...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Lien 2 — Texte</label>
+              <input type="text" class="form-input" name="link_2_text" value="${escapeHtml(link2Text)}" placeholder="Libellé du lien">
+            </div>
+          </div>
           <div class="form-group">
             <label class="form-label">Texte libre</label>
             <textarea class="form-textarea" name="footer_text" rows="3">${escapeHtml(footerText)}</textarea>
@@ -5906,14 +8023,10 @@ async function renderSiteSettings() {
               <textarea class="form-textarea" name="opening" rows="2" placeholder="Mo-Fr 09:00-18:00">${escapeHtml(opening)}</textarea>
             </div>
           </div>
-
           <div class="form-group">
-            <label class="theme-toggle-label">
-              <input type="checkbox" name="newsletter_form" ${newsletterForm ? 'checked' : ''}>
-              <span>Inscription newsletter</span>
-            </label>
+            <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="newsletter_form" ${newsletterForm ? 'checked' : ''} onchange="toggleNewsletterOptions()"><span class="toggle-slider"></span></label><span class="toggle-label">Inscription newsletter</span></div>
           </div>
-          <div class="form-row">
+          <div class="form-row newsletter-option" style="${newsletterForm ? '' : 'display:none;'}">
             <div class="form-group">
               <label class="form-label">Titre newsletter</label>
               <input type="text" class="form-input" name="newsletter_form_title" value="${escapeHtml(newsletterFormTitle)}">
@@ -5923,10 +8036,65 @@ async function renderSiteSettings() {
               <input type="text" class="form-input" name="newsletter_form_desc" value="${escapeHtml(newsletterFormDesc)}">
             </div>
           </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Emplacement du bloc</label>
+              <div class="btn-group-toggle" style="display:flex;gap:0;">
+                <label class="btn-toggle ${footerCustomBlocLocation === 'none' ? 'is-active' : ''}">
+                  <input type="radio" name="footer_custom_bloc_location" value="none" ${footerCustomBlocLocation === 'none' ? 'checked' : ''} onchange="this.closest('.btn-group-toggle').querySelectorAll('.btn-toggle').forEach(b=>b.classList.remove('is-active'));this.closest('.btn-toggle').classList.add('is-active');toggleFooterBlocSelect()">
+                  Ne pas afficher
+                </label>
+                <label class="btn-toggle ${footerCustomBlocLocation === 'before' ? 'is-active' : ''}">
+                  <input type="radio" name="footer_custom_bloc_location" value="before" ${footerCustomBlocLocation === 'before' ? 'checked' : ''} onchange="this.closest('.btn-group-toggle').querySelectorAll('.btn-toggle').forEach(b=>b.classList.remove('is-active'));this.closest('.btn-toggle').classList.add('is-active');toggleFooterBlocSelect()">
+                  Avant le Footer
+                </label>
+                <label class="btn-toggle ${footerCustomBlocLocation === 'after' ? 'is-active' : ''}">
+                  <input type="radio" name="footer_custom_bloc_location" value="after" ${footerCustomBlocLocation === 'after' ? 'checked' : ''} onchange="this.closest('.btn-group-toggle').querySelectorAll('.btn-toggle').forEach(b=>b.classList.remove('is-active'));this.closest('.btn-toggle').classList.add('is-active');toggleFooterBlocSelect()">
+                  Après le Footer
+                </label>
+              </div>
+            </div>
+            <div class="form-group" id="footerBlocSelectGroup" style="${footerCustomBlocLocation === 'none' ? 'display:none' : ''}">
+              <label class="form-label">Bloc réutilisable</label>
+              <select class="form-select" name="footer_custom_bloc">
+                <option value="">— Sélectionner un bloc —</option>
+                ${reusableBlocsForSelect.map(b => `<option value="${b.id}" ${String(footerCustomBloc) === String(b.id) ? 'selected' : ''}>${escapeHtml(b.title)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+
+          </div>
+          <div class="settings-section" id="settings-contact">
+          <h2 class="builder-settings-title" style="margin-top: 0;">Coordonnées</h2>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">N° de téléphone (principal)</label>
+              <input type="text" class="form-input" name="phone" value="${escapeHtml(phone)}" placeholder="ex : 01 23 45 67 89">
+            </div>
+            <div class="form-group">
+              <label class="form-label">N° de téléphone (secondaire)</label>
+              <input type="text" class="form-input" name="phone_2" value="${escapeHtml(phone2)}" placeholder="ex : 01 23 45 67 89">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Adresse principale</label>
+              <input type="text" class="form-input" name="address" value="${escapeHtml(address)}" placeholder="ex : 1 rue de la Paix, 75001 Paris">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Adresse secondaire</label>
+              <input type="text" class="form-input" name="address_2" value="${escapeHtml(address2)}" placeholder="ex : 10 avenue des Champs-Élysées, 75008 Paris">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Adresse e-mail</label>
+            <input type="email" class="form-input" name="email" value="${escapeHtml(email)}" placeholder="ex : john.doe@monsite.fr">
+          </div>
 
           </div>
           <div class="settings-section" id="settings-social">
           <h2 class="builder-settings-title" style="margin-top: 0;">Réseaux sociaux</h2>
+          <div class="form-help" style="margin-bottom: 1rem;">Si vous ne souhaitez pas afficher un réseau social, laissez le champ vide.</div>
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Instagram</label>
@@ -5969,43 +8137,120 @@ async function renderSiteSettings() {
               <input type="url" class="form-input" name="youtube" value="${escapeHtml(youtube)}">
             </div>
           </div>
+          <h3 class="builder-settings-title" style="margin-top: 1.5rem;">Configuration du Feed Instagram</h3>
+          <div class="form-help" style="margin-bottom: 1rem;">Le compte Instagram doit être public et être un business account.</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Id application</label>
+              <input type="text" class="form-input" name="id_application_instagram" value="${escapeHtml(idApplicationInstagram)}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Clé secrète application</label>
+              <input type="text" class="form-input" name="secret_key_application_instagram" value="${escapeHtml(secretKeyApplicationInstagram)}">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Lien du compte Instagram</label>
+              <input type="url" class="form-input" name="link_account_instagram" value="${escapeHtml(linkAccountInstagram)}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Jeton d'accès temporaire</label>
+              <input type="text" class="form-input" name="access_token_instagram" value="${escapeHtml(accessTokenInstagram)}">
+            </div>
+          </div>
 
           </div>
           <div class="settings-section" id="settings-popup">
           <h2 class="builder-settings-title" style="margin-top: 0;">Popup</h2>
           <div class="form-group">
-            <label class="theme-toggle-label">
-              <input type="checkbox" name="show_alert" ${showAlert ? 'checked' : ''}>
-              <span>Affichage de l'alerte</span>
-            </label>
+            <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="show_alert" ${showAlert ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Affichage de l'alerte</span></div>
+          </div>
+          <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Couleur de fond du bloc</label>
+            <select class="form-select" name="bloc_color_alert">
+              <option value="no-background-color" ${blocColorAlert === 'no-background-color' ? 'selected' : ''}>Aucune</option>
+              <option value="has-background-primary" ${blocColorAlert === 'has-background-primary' ? 'selected' : ''}>Couleur primaire</option>
+              <option value="has-background-secondary" ${blocColorAlert === 'has-background-secondary' ? 'selected' : ''}>Couleur secondaire</option>
+              <option value="has-background-tertiary" ${blocColorAlert === 'has-background-tertiary' ? 'selected' : ''}>Couleur tertiaire</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="is_small_marged_alert" ${isSmallMargedAlert ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Marges réduites autour du bloc</span></div>
+          </div>
+          </div>
+          <div class="form-row" style="align-items:end;">
+            <div class="form-group">
+              <label class="form-label">Image de fond</label>
+              <div class="settings-media-field" data-setting="bg_img_alert">
+                <div class="settings-media-preview">${bgImgAlert ? `<img src="${escapeHtml(bgImgAlert)}" alt="Image de fond popup">` : ''}</div>
+                <input type="hidden" name="bg_img_alert" value="${escapeHtml(bgImgAlert)}" onchange="toggleAlertBgOptions()">
+                <div class="settings-media-actions">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="openSettingsMediaPicker('bg_img_alert')">Choisir</button>
+                  ${bgImgAlert ? `<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearSettingsMedia('bg_img_alert')">Supprimer</button>` : ''}
+                </div>
+              </div>
+            </div>
+            <div class="form-group alert-bg-option" style="${bgImgAlert ? '' : 'display:none;'}">
+              <label class="form-label">Opacité</label>
+              <input type="range" class="form-range" name="bg_opacity_alert" min="0" max="100" value="${escapeHtml(bgOpacityAlert)}" oninput="this.nextElementSibling.value=this.value" style="flex:1;">
+              <input type="number" class="form-input" value="${escapeHtml(bgOpacityAlert)}" min="0" max="100" style="width:60px;" oninput="this.previousElementSibling.value=this.value;this.previousElementSibling.dispatchEvent(new Event('input'))">
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">Texte de la popup</label>
             <textarea class="form-textarea" name="alert_text" rows="4">${escapeHtml(alertText)}</textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Premier lien — URL</label>
+              <input type="url" class="form-input" name="alert_cta_url" value="${escapeHtml(alertCtaUrl)}" placeholder="https://...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Premier lien — Texte</label>
+              <input type="text" class="form-input" name="alert_cta_text" value="${escapeHtml(alertCtaText)}" placeholder="Libellé du lien">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Deuxième lien — URL</label>
+              <input type="url" class="form-input" name="alert_cta2_url" value="${escapeHtml(alertCta2Url)}" placeholder="https://...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Deuxième lien — Texte</label>
+              <input type="text" class="form-input" name="alert_cta2_text" value="${escapeHtml(alertCta2Text)}" placeholder="Libellé du lien">
+            </div>
           </div>
 
           </div>
           <div class="settings-section" id="settings-floating">
           <h2 class="builder-settings-title" style="margin-top: 0;">Bouton flottant</h2>
           <div class="form-group">
-            <label class="theme-toggle-label">
-              <input type="checkbox" name="show_btn" ${showBtn ? 'checked' : ''}>
-              <span>Affichage du bouton</span>
-            </label>
+            <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="show_btn" ${showBtn ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Affichage du bouton</span></div>
           </div>
           <div class="form-group">
             <label class="form-label">Lien du bouton</label>
             <input type="url" class="form-input" name="floating_btn_link" value="${escapeHtml(floatingBtnLink)}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Icône du bouton</label>
+            <div class="settings-media-field" data-setting="floating_btn_img">
+              <div class="settings-media-preview">${floatingBtnImg ? `<img src="${escapeHtml(floatingBtnImg)}" alt="Icône bouton flottant">` : ''}</div>
+              <input type="hidden" name="floating_btn_img" value="${escapeHtml(floatingBtnImg)}">
+              <div class="settings-media-actions">
+                <button type="button" class="btn btn-sm btn-outline" onclick="openSettingsMediaPicker('floating_btn_img')">Choisir</button>
+                ${floatingBtnImg ? `<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearSettingsMedia('floating_btn_img')">Supprimer</button>` : ''}
+              </div>
+              <p class="form-hint">SVG ou PNG uniquement.</p>
+            </div>
           </div>
 
           </div>
           <div class="settings-section" id="settings-maintenance">
           <h2 class="builder-settings-title" style="margin-top: 0;">Mode maintenance</h2>
           <div class="form-group">
-            <label class="theme-toggle-label">
-              <input type="checkbox" name="is_maintenance" ${isMaintenance ? 'checked' : ''}>
-              <span>Activer le mode maintenance</span>
-            </label>
+            <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="is_maintenance" ${isMaintenance ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Activer le mode maintenance</span></div>
           </div>
           <div class="form-group">
             <label class="form-label">Texte de la page maintenance</label>
@@ -6013,16 +8258,10 @@ async function renderSiteSettings() {
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="show_infos" ${showInfos ? 'checked' : ''}>
-                <span>Afficher coordonnées et horaires</span>
-              </label>
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="show_infos" ${showInfos ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Afficher coordonnées et horaires</span></div>
             </div>
             <div class="form-group">
-              <label class="theme-toggle-label">
-                <input type="checkbox" name="show_rs" ${showRs ? 'checked' : ''}>
-                <span>Afficher les réseaux sociaux</span>
-              </label>
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="show_rs" ${showRs ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Afficher les réseaux sociaux</span></div>
             </div>
           </div>
 
@@ -6046,6 +8285,26 @@ async function renderSiteSettings() {
           <div class="form-group">
             <label class="form-label">Code Meta Pixel</label>
             <input type="text" class="form-input" name="meta_pixel_code" value="${escapeHtml(metaPixelCode)}">
+          </div>
+
+          </div>
+          <div class="settings-section" id="settings-technical">
+          <h2 class="builder-settings-title" style="margin-top: 0;">Technique</h2>
+          <div class="form-row">
+            <div class="form-group">
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="is_onepage" ${isOnepage ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Site en OnePage</span></div>
+            </div>
+            <div class="form-group">
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="is_activate_schemas" ${isActivateSchemas ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Schemas.org</span></div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Balise head personnalisée</label>
+            <textarea class="form-textarea" name="custom_balise" rows="3" placeholder="Code HTML à injecter dans le <head>">${escapeHtml(customBalise)}</textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Google API Key</label>
+            <input type="text" class="form-input" name="google_api_key" value="${escapeHtml(googleApiKey)}">
           </div>
 
           </div>
@@ -6077,6 +8336,11 @@ async function saveSiteSettings(event) {
     site_description: formData.get('site_description') || '',
     posts_per_page: formData.get('posts_per_page') || '',
     front_page: formData.get('front_page') || '',
+    logo: formData.get('logo') || '',
+    logo_white: formData.get('logo_white') || '',
+    logo_loader: formData.get('logo_loader') || '',
+    favicon: formData.get('favicon') || '',
+    replacement_image: formData.get('replacement_image') || '',
     primary_color: formData.get('primary_color') || '',
     secondary_color: formData.get('secondary_color') || '',
     tertiary_color: formData.get('tertiary_color') || '',
@@ -6097,12 +8361,31 @@ async function saveSiteSettings(event) {
     show_breadcrumb: formData.get('show_breadcrumb') ? '1' : '0',
     pages_share_btn: formData.get('pages_share_btn') ? '1' : '0',
     share_btn_position: formData.get('share_btn_position') ? '1' : '0',
+    alt_secondary_menu: formData.get('alt_secondary_menu') ? '1' : '0',
+    top_link_1_url: formData.get('top_link_1_url') || '',
+    top_link_1_text: formData.get('top_link_1_text') || '',
+    icon_link_1: formData.get('icon_link_1') || '',
+    top_link_2_url: formData.get('top_link_2_url') || '',
+    top_link_2_text: formData.get('top_link_2_text') || '',
+    icon_link_2: formData.get('icon_link_2') || '',
     show_phone: formData.get('show_phone') ? '1' : '0',
     show_search: formData.get('show_search') ? '1' : '0',
     show_socials: formData.get('show_socials') ? '1' : '0',
     phone: formData.get('phone') || '',
     phone_2: formData.get('phone_2') || '',
     email: formData.get('email') || '',
+    address: formData.get('address') || '',
+    address_2: formData.get('address_2') || '',
+    footer_color: formData.get('footer_color') || 'no-background-color',
+    footer_bg_img: formData.get('footer_bg_img') || '',
+    footer_bg_opacity: formData.get('footer_bg_opacity') || '60',
+    footer_bg_parallax: formData.get('footer_bg_parallax') ? '1' : '0',
+    footer_custom_bloc: formData.get('footer_custom_bloc') || '',
+    footer_custom_bloc_location: formData.get('footer_custom_bloc_location') || 'none',
+    link_1_url: formData.get('link_1_url') || '',
+    link_1_text: formData.get('link_1_text') || '',
+    link_2_url: formData.get('link_2_url') || '',
+    link_2_text: formData.get('link_2_text') || '',
     footer_text: formData.get('footer_text') || '',
     schedule: formData.get('schedule') || '',
     opening: formData.get('opening') || '',
@@ -6118,10 +8401,23 @@ async function saveSiteSettings(event) {
     tripadvisor: formData.get('tripadvisor') || '',
     pinterest: formData.get('pinterest') || '',
     youtube: formData.get('youtube') || '',
+    id_application_instagram: formData.get('id_application_instagram') || '',
+    secret_key_application_instagram: formData.get('secret_key_application_instagram') || '',
+    link_account_instagram: formData.get('link_account_instagram') || '',
+    access_token_instagram: formData.get('access_token_instagram') || '',
     show_alert: formData.get('show_alert') ? '1' : '0',
+    bloc_color_alert: formData.get('bloc_color_alert') || 'no-background-color',
+    is_small_marged_alert: formData.get('is_small_marged_alert') ? '1' : '0',
+    bg_img_alert: formData.get('bg_img_alert') || '',
+    bg_opacity_alert: formData.get('bg_opacity_alert') || '10',
     alert_text: formData.get('alert_text') || '',
+    alert_cta_url: formData.get('alert_cta_url') || '',
+    alert_cta_text: formData.get('alert_cta_text') || '',
+    alert_cta2_url: formData.get('alert_cta2_url') || '',
+    alert_cta2_text: formData.get('alert_cta2_text') || '',
     show_btn: formData.get('show_btn') ? '1' : '0',
     floating_btn_link: formData.get('floating_btn_link') || '',
+    floating_btn_img: formData.get('floating_btn_img') || '',
     is_maintenance: formData.get('is_maintenance') ? '1' : '0',
     text_maintenance: formData.get('text_maintenance') || '',
     show_infos: formData.get('show_infos') ? '1' : '0',
@@ -6129,8 +8425,18 @@ async function saveSiteSettings(event) {
     ga_code: formData.get('ga_code') || '',
     aw_code: formData.get('aw_code') || '',
     gtm_code: formData.get('gtm_code') || '',
-    meta_pixel_code: formData.get('meta_pixel_code') || ''
+    meta_pixel_code: formData.get('meta_pixel_code') || '',
+    is_onepage: formData.get('is_onepage') ? '1' : '0',
+    is_activate_schemas: formData.get('is_activate_schemas') ? '1' : '0',
+    custom_balise: formData.get('custom_balise') || '',
+    google_api_key: formData.get('google_api_key') || ''
   };
+
+  // Remember active tab & subtab before reload
+  const activeTab = document.querySelector('#siteSettingsTabs .settings-tab.is-active');
+  const activeTabTarget = activeTab ? activeTab.getAttribute('data-target') : null;
+  const activeSubtab = document.querySelector('.settings-section.is-active .settings-subtab.is-active');
+  const activeSubtabTarget = activeSubtab ? activeSubtab.getAttribute('data-subtarget') : null;
 
   showLoading();
   try {
@@ -6141,11 +8447,29 @@ async function saveSiteSettings(event) {
     applyCssVariablesFromSettings(siteSettingsCache);
     hideLoading();
     showToast('Paramètres du site enregistrés', 'success');
-    loadSection('site-settings');
+    await loadSection('site-settings');
+
+    // Restore active tab
+    if (activeTabTarget) {
+      const tab = document.querySelector(`#siteSettingsTabs .settings-tab[data-target="${activeTabTarget}"]`);
+      if (tab) tab.click();
+    }
+    // Restore active subtab
+    if (activeSubtabTarget) {
+      const subtab = document.querySelector(`.settings-section.is-active .settings-subtab[data-subtarget="${activeSubtabTarget}"]`);
+      if (subtab) subtab.click();
+    }
   } catch (error) {
     hideLoading();
     showToast('Erreur: ' + error.message, 'error');
   }
+}
+
+function toggleFooterBlocSelect() {
+  const group = document.getElementById('footerBlocSelectGroup');
+  if (!group) return;
+  const checked = document.querySelector('input[name="footer_custom_bloc_location"]:checked');
+  group.style.display = (checked && checked.value !== 'none') ? '' : 'none';
 }
 
 function attachSiteSettingsTabs() {
@@ -6164,6 +8488,22 @@ function attachSiteSettingsTabs() {
       // Update active tab
       tabs.forEach(t => t.classList.remove('is-active'));
       tab.classList.add('is-active');
+    });
+  });
+
+  // Sub-tabs (inside sections like Identité)
+  document.querySelectorAll('.settings-subtab').forEach(subtab => {
+    subtab.addEventListener('click', (e) => {
+      e.preventDefault();
+      const target = subtab.getAttribute('data-subtarget');
+      if (!target) return;
+      const parent = subtab.closest('.settings-section');
+      if (!parent) return;
+      parent.querySelectorAll('.settings-subsection').forEach(s => s.classList.remove('is-active'));
+      const section = parent.querySelector(target);
+      if (section) section.classList.add('is-active');
+      parent.querySelectorAll('.settings-subtab').forEach(t => t.classList.remove('is-active'));
+      subtab.classList.add('is-active');
     });
   });
 }
@@ -6198,10 +8538,7 @@ async function renderTheme() {
 
         <form id="themeForm" onsubmit="saveTheme(event)">
           <div class="form-group">
-            <label class="theme-toggle-label">
-              <input type="checkbox" id="themeUseChild" name="theme_use_child" ${useChildTheme ? 'checked' : ''}>
-              <span>Activer un thème enfant</span>
-            </label>
+            <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" id="themeUseChild" name="theme_use_child" ${useChildTheme ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Activer un thème enfant</span></div>
             <div class="form-help">Quand activé, le thème enfant sélectionné ci-dessous sera appliqué en plus du thème de base.</div>
           </div>
 
@@ -6547,43 +8884,30 @@ function renderUsersTable(users) {
   const roleBadge = r => r === 'admin' ? 'badge-danger' : 'badge-warning';
 
   return `
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Nom</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Cree le</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${users.map(user => `
-            <tr>
-              <td>
-                <strong>${user.name}</strong>
-                ${user.id === currentUser.id ? ' <span class="badge badge-info" style="font-size:10px">Vous</span>' : ''}
-              </td>
-              <td>${user.email}</td>
-              <td>
-                <span class="badge ${roleBadge(user.role)}">
-                  ${roleLabel(user.role)}
-                </span>
-              </td>
-              <td>${new Date(user.created_at).toLocaleDateString('fr-FR')}</td>
-              <td>
-                <div class="actions">
-                  <button class="btn btn-sm btn-outline" onclick="showUserForm(${user.id})">✏️ Modifier</button>
-                  ${user.id !== currentUser.id
-                    ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id}, ${JSON.stringify(user.name)})">🗑️</button>`
-                    : ''}
-                </div>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+    <div class="pages-list">
+      <div class="pages-list-header">
+        <span class="page-item__info">Utilisateur</span>
+        <span class="page-item__parent">Email</span>
+        <span class="page-item__meta">Créé le</span>
+        <span class="page-item__badges">Rôle</span>
+        <span class="page-item__actions" style="opacity:1">Actions</span>
+      </div>
+      ${users.map(user => {
+        const safeName = escapeHtml(user.name).replace(/'/g, "\\'");
+        const dateStr = new Date(user.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+        return '<div class="page-item">'
+          + '<div class="page-item__info" style="cursor:pointer" onclick="showUserForm(' + user.id + ')">'
+          +   '<div class="page-item__title">' + escapeHtml(user.name) + (user.id === currentUser.id ? ' <span class="badge badge-info" style="font-size:10px">Vous</span>' : '') + '</div>'
+          + '</div>'
+          + '<div class="page-item__parent">' + escapeHtml(user.email) + '</div>'
+          + '<div class="page-item__meta"><span class="page-item__date">' + dateStr + '</span></div>'
+          + '<div class="page-item__badges"><span class="badge ' + roleBadge(user.role) + '">' + roleLabel(user.role) + '</span></div>'
+          + '<div class="page-item__actions">'
+          +   '<button class="btn-icon-action" onclick="showUserForm(' + user.id + ')" title="Modifier">' + _svgEdit + '</button>'
+          +   (user.id !== currentUser.id ? '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteUser(' + user.id + ', \'' + safeName + '\')" title="Supprimer">' + _svgDelete + '</button>' : '')
+          + '</div>'
+        + '</div>';
+      }).join('')}
     </div>
   `;
 }
@@ -6675,4 +8999,489 @@ async function deleteUser(userId, name) {
   } catch (error) {
     showToast('Erreur : ' + error.message, 'error');
   }
+}
+
+// ========== MENUS ==========
+let _menusCache = [];
+let _menuEditId = null;
+let _menuItems = [];
+let _menuAvailablePages = [];
+let _menuTempIdCounter = 1;
+
+async function renderMenus() {
+  showLoading();
+  try {
+    _menusCache = await apiFetch('/menus');
+    hideLoading();
+    return renderMenusList();
+  } catch (error) {
+    hideLoading();
+    showToast('Erreur lors du chargement des menus', 'error');
+    return '<div class="card"><p>Erreur de chargement</p></div>';
+  }
+}
+
+function renderMenusList() {
+  return `
+    <div class="page-header">
+      <h1>Menus</h1>
+      <button class="btn btn-primary" onclick="openCreateMenuModal()">
+        <span class="icon">➕</span>
+        Nouveau menu
+      </button>
+    </div>
+
+    <div class="card">
+      ${_menusCache.length > 0 ? `
+        <div class="pages-list">
+          <div class="pages-list-header">
+            <span class="page-item__info">Menu</span>
+            <span class="page-item__parent">Emplacement</span>
+            <span class="page-item__actions" style="opacity:1">Actions</span>
+          </div>
+          ${_menusCache.map(m => {
+            const safeName = escapeHtml(m.name).replace(/'/g, "\\'");
+            const loc = m.location ? (MENU_LOCATIONS.find(l => l.value === m.location)?.label || m.location) : '<em style="color:var(--gray-400);">Non assigné</em>';
+            return '<div class="page-item">'
+              + '<div class="page-item__info" style="cursor:pointer" onclick="openMenuEditor(' + m.id + ')">'
+              +   '<div class="page-item__title">' + escapeHtml(m.name) + '</div>'
+              + '</div>'
+              + '<div class="page-item__parent">' + loc + '</div>'
+              + '<div class="page-item__actions">'
+              +   '<button class="btn-icon-action" onclick="openMenuEditor(' + m.id + ')" title="Modifier">' + _svgEdit + '</button>'
+              +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteMenu(' + m.id + ', \'' + safeName + '\')" title="Supprimer">' + _svgDelete + '</button>'
+              + '</div>'
+            + '</div>';
+          }).join('')}
+        </div>
+      ` : renderEmptyState('📋', 'Aucun menu', 'Créez votre premier menu de navigation')}
+    </div>
+  `;
+}
+
+function openCreateMenuModal() {
+  const html = `
+    <div class="modal-overlay active" id="menuModal">
+      <div class="modal" style="max-width:450px">
+        <div class="modal-header">
+          <h2>Nouveau menu</h2>
+          <button class="modal-close" onclick="closeMenuModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Nom du menu</label>
+            <input type="text" class="form-input" id="menuNameInput" placeholder="Ex : Menu principal">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Emplacement</label>
+            <select class="form-input" id="menuLocationInput">
+              ${MENU_LOCATIONS.map(l => `<option value="${l.value}">${l.label}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" onclick="closeMenuModal()">Annuler</button>
+          <button class="btn btn-primary" onclick="createMenu()">Créer</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('menuNameInput').focus();
+}
+
+function closeMenuModal() {
+  const modal = document.getElementById('menuModal');
+  if (modal) modal.remove();
+}
+
+async function createMenu() {
+  const name = document.getElementById('menuNameInput').value.trim();
+  const location = document.getElementById('menuLocationInput').value;
+  if (!name) { showToast('Le nom est obligatoire', 'error'); return; }
+
+  try {
+    await apiFetch('/menus', { method: 'POST', body: JSON.stringify({ name, location }) });
+    showToast('Menu créé', 'success');
+    closeMenuModal();
+    document.getElementById('content').innerHTML = await renderMenus();
+    attachMenuEvents();
+  } catch (error) {
+    showToast('Erreur : ' + error.message, 'error');
+  }
+}
+
+async function deleteMenu(id, name) {
+  const ok = await confirmModal(`Voulez-vous vraiment supprimer le menu "${name}" ?`);
+  if (!ok) return;
+  try {
+    await apiFetch(`/menus/${id}`, { method: 'DELETE' });
+    showToast('Menu supprimé', 'success');
+    document.getElementById('content').innerHTML = await renderMenus();
+    attachMenuEvents();
+  } catch (error) {
+    showToast('Erreur : ' + error.message, 'error');
+  }
+}
+
+async function openMenuEditor(menuId) {
+  showLoading();
+  try {
+    const [menu, pages] = await Promise.all([
+      apiFetch(`/menus/${menuId}`),
+      apiFetch('/menus/pages')
+    ]);
+    _menuEditId = menuId;
+    _menuAvailablePages = pages;
+    _menuTempIdCounter = 1;
+
+    // Convert flatItems to our working format
+    _menuItems = (menu.flatItems || []).map(item => ({
+      id: item.id,
+      temp_id: null,
+      title: item.type === 'page' && item.page_title ? item.page_title : item.title,
+      url: item.url || '',
+      type: item.type || 'custom',
+      page_id: item.page_id || null,
+      parent_id: item.parent_id || null,
+      menu_order: item.menu_order || 0,
+      open_in_new_tab: !!item.open_in_new_tab,
+      _page_title: item.page_title || '',
+      _page_slug: item.page_slug || '',
+    }));
+
+    hideLoading();
+    document.getElementById('content').innerHTML = renderMenuEditor(menu);
+    attachMenuEditorEvents();
+  } catch (error) {
+    hideLoading();
+    showToast('Erreur lors du chargement du menu', 'error');
+  }
+}
+
+function renderMenuEditor(menu) {
+  return `
+    <div class="page-header">
+      <div>
+        <button class="btn btn-sm" onclick="backToMenusList()" style="margin-bottom:8px">&larr; Retour aux menus</button>
+        <h1>Modifier : ${escapeHtml(menu.name)}</h1>
+      </div>
+      <button class="btn btn-primary" onclick="saveCurrentMenu()">Enregistrer le menu</button>
+    </div>
+
+    <div class="menu-editor-layout">
+      <!-- Left: Add items panel -->
+      <div class="card menu-add-panel">
+        <h3>Ajouter des éléments</h3>
+
+        <!-- Add page -->
+        <div class="menu-add-section">
+          <h4>Pages</h4>
+          <div class="menu-pages-list" id="menuPagesList">
+            ${_menuAvailablePages.map(p => `
+              <label class="menu-page-checkbox">
+                <input type="checkbox" value="${p.id}" data-title="${escapeHtml(p.title)}" data-slug="${escapeHtml(p.slug)}">
+                ${escapeHtml(p.title)}${p.parent_title ? ` <small>(${escapeHtml(p.parent_title)})</small>` : ''}
+              </label>
+            `).join('')}
+          </div>
+          <button class="btn btn-sm" onclick="addSelectedPages()" style="margin-top:8px">Ajouter au menu</button>
+        </div>
+
+        <!-- Add custom link -->
+        <div class="menu-add-section" style="margin-top:16px">
+          <h4>Lien personnalisé</h4>
+          <div class="form-group">
+            <label class="form-label">URL</label>
+            <input type="text" class="form-input" id="customLinkUrl" placeholder="https://...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Texte du lien</label>
+            <input type="text" class="form-input" id="customLinkTitle" placeholder="Mon lien">
+          </div>
+          <button class="btn btn-sm" onclick="addCustomLink()">Ajouter au menu</button>
+        </div>
+
+        <!-- Menu settings -->
+        <div class="menu-add-section" style="margin-top:16px">
+          <h4>Paramètres du menu</h4>
+          <div class="form-group">
+            <label class="form-label">Nom</label>
+            <input type="text" class="form-input" id="menuEditorName" value="${escapeHtml(menu.name)}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Emplacement</label>
+            <select class="form-input" id="menuEditorLocation">
+              ${MENU_LOCATIONS.map(l => `<option value="${l.value}" ${menu.location === l.value ? 'selected' : ''}>${l.label}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Items structure -->
+      <div class="card menu-items-panel">
+        <h3>Structure du menu</h3>
+        <div id="menuItemsList">
+          ${renderMenuItemsList()}
+        </div>
+        ${_menuItems.length === 0 ? '<p class="text-muted" style="padding:16px;text-align:center">Ajoutez des éléments depuis le panneau de gauche</p>' : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderMenuItemsList() {
+  // Sort by menu_order
+  const sorted = [..._menuItems].sort((a, b) => a.menu_order - b.menu_order);
+  const roots = sorted.filter(i => !i.parent_id);
+  const childrenOf = (parentId) => sorted.filter(i => {
+    const pid = i.parent_id;
+    return pid === parentId || (typeof pid === 'string' && typeof parentId === 'number' && parseInt(pid) === parentId);
+  });
+
+  function renderItem(item, depth = 0) {
+    const itemId = item.id || item.temp_id;
+    const children = childrenOf(itemId);
+    const indent = depth * 24;
+    const typeLabel = item.type === 'page' ? 'Page' : item.type === 'category' ? 'Catégorie' : 'Lien';
+
+    return `
+      <div class="menu-item-row" data-item-id="${itemId}" data-depth="${depth}" style="margin-left:${indent}px">
+        <div class="menu-item-header">
+          <span class="menu-item-drag" title="Réordonner">☰</span>
+          <span class="menu-item-title">${escapeHtml(item.title || '(sans titre)')}</span>
+          <span class="menu-item-type">${typeLabel}</span>
+          <button class="btn btn-xs" onclick="toggleMenuItemEdit('${itemId}')">▼</button>
+          <button class="btn btn-xs btn-danger-outline" onclick="removeMenuItem('${itemId}')">✕</button>
+        </div>
+        <div class="menu-item-edit" id="menuItemEdit_${itemId}" style="display:none">
+          <div class="form-group">
+            <label class="form-label">Titre de navigation</label>
+            <input type="text" class="form-input" value="${escapeHtml(item.title || '')}" onchange="updateMenuItemField('${itemId}', 'title', this.value)">
+          </div>
+          ${item.type === 'custom' ? `
+            <div class="form-group">
+              <label class="form-label">URL</label>
+              <input type="text" class="form-input" value="${escapeHtml(item.url || '')}" onchange="updateMenuItemField('${itemId}', 'url', this.value)">
+            </div>
+          ` : ''}
+          <div class="form-group">
+            <label class="form-label">Parent</label>
+            <select class="form-input" onchange="updateMenuItemField('${itemId}', 'parent_id', this.value || null)">
+              <option value="">— Aucun (racine) —</option>
+              ${_menuItems.filter(mi => (mi.id || mi.temp_id) !== itemId).map(mi => {
+                const miId = mi.id || mi.temp_id;
+                const selected = item.parent_id && (item.parent_id == miId) ? 'selected' : '';
+                return `<option value="${miId}" ${selected}>${escapeHtml(mi.title || '(sans titre)')}</option>`;
+              }).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="menu-page-checkbox">
+              <input type="checkbox" ${item.open_in_new_tab ? 'checked' : ''} onchange="updateMenuItemField('${itemId}', 'open_in_new_tab', this.checked)">
+              Ouvrir dans un nouvel onglet
+            </label>
+          </div>
+        </div>
+      </div>
+      ${children.map(c => renderItem(c, depth + 1)).join('')}
+    `;
+  }
+
+  return roots.map(r => renderItem(r)).join('');
+}
+
+function toggleMenuItemEdit(itemId) {
+  const el = document.getElementById('menuItemEdit_' + itemId);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function updateMenuItemField(itemId, field, value) {
+  const item = _menuItems.find(i => String(i.id) === String(itemId) || String(i.temp_id) === String(itemId));
+  if (!item) return;
+  if (field === 'parent_id') {
+    item.parent_id = value ? (isNaN(value) ? value : parseInt(value)) : null;
+  } else if (field === 'open_in_new_tab') {
+    item.open_in_new_tab = !!value;
+  } else {
+    item[field] = value;
+  }
+  refreshMenuItemsList();
+}
+
+function removeMenuItem(itemId) {
+  // Also remove children
+  const idsToRemove = new Set();
+  function collectChildren(id) {
+    idsToRemove.add(String(id));
+    _menuItems.filter(i => String(i.parent_id) === String(id)).forEach(c => {
+      collectChildren(c.id || c.temp_id);
+    });
+  }
+  collectChildren(itemId);
+  _menuItems = _menuItems.filter(i => !idsToRemove.has(String(i.id || i.temp_id)));
+  refreshMenuItemsList();
+}
+
+function addSelectedPages() {
+  const checks = document.querySelectorAll('#menuPagesList input[type="checkbox"]:checked');
+  if (checks.length === 0) { showToast('Sélectionnez au moins une page', 'error'); return; }
+
+  const maxOrder = _menuItems.length > 0 ? Math.max(..._menuItems.map(i => i.menu_order || 0)) : -1;
+
+  checks.forEach((cb, i) => {
+    const pageId = parseInt(cb.value);
+    const title = cb.getAttribute('data-title');
+    const slug = cb.getAttribute('data-slug');
+    const tempId = 'temp_' + (_menuTempIdCounter++);
+    _menuItems.push({
+      id: null,
+      temp_id: tempId,
+      title: title,
+      url: `/pages/${slug}`,
+      type: 'page',
+      page_id: pageId,
+      parent_id: null,
+      menu_order: maxOrder + 1 + i,
+      open_in_new_tab: false,
+      _page_title: title,
+      _page_slug: slug,
+    });
+    cb.checked = false;
+  });
+  refreshMenuItemsList();
+}
+
+function addCustomLink() {
+  const url = document.getElementById('customLinkUrl').value.trim();
+  const title = document.getElementById('customLinkTitle').value.trim();
+  if (!url || !title) { showToast('URL et titre requis', 'error'); return; }
+
+  const maxOrder = _menuItems.length > 0 ? Math.max(..._menuItems.map(i => i.menu_order || 0)) : -1;
+  const tempId = 'temp_' + (_menuTempIdCounter++);
+  _menuItems.push({
+    id: null,
+    temp_id: tempId,
+    title: title,
+    url: url,
+    type: 'custom',
+    page_id: null,
+    parent_id: null,
+    menu_order: maxOrder + 1,
+    open_in_new_tab: false,
+  });
+
+  document.getElementById('customLinkUrl').value = '';
+  document.getElementById('customLinkTitle').value = '';
+  refreshMenuItemsList();
+}
+
+function refreshMenuItemsList() {
+  const container = document.getElementById('menuItemsList');
+  if (container) container.innerHTML = renderMenuItemsList();
+  // Update empty message
+  const panel = document.querySelector('.menu-items-panel .text-muted');
+  if (panel && _menuItems.length > 0) panel.remove();
+}
+
+async function saveCurrentMenu() {
+  if (!_menuEditId) return;
+
+  const name = document.getElementById('menuEditorName').value.trim();
+  const location = document.getElementById('menuEditorLocation').value;
+  if (!name) { showToast('Le nom du menu est obligatoire', 'error'); return; }
+
+  // Reindex menu_order based on DOM order
+  const rows = document.querySelectorAll('.menu-item-row');
+  rows.forEach((row, idx) => {
+    const itemId = row.getAttribute('data-item-id');
+    const item = _menuItems.find(i => String(i.id) === String(itemId) || String(i.temp_id) === String(itemId));
+    if (item) item.menu_order = idx;
+  });
+
+  // Build flat items array for API
+  const itemsPayload = _menuItems.map(item => ({
+    old_id: item.id || undefined,
+    temp_id: item.temp_id || undefined,
+    title: item.title,
+    url: item.url || null,
+    type: item.type,
+    page_id: item.page_id || null,
+    parent_id: item.parent_id || null,
+    menu_order: item.menu_order,
+    open_in_new_tab: item.open_in_new_tab,
+  }));
+
+  showLoading();
+  try {
+    await Promise.all([
+      apiFetch(`/menus/${_menuEditId}`, { method: 'PUT', body: JSON.stringify({ name, location }) }),
+      apiFetch(`/menus/${_menuEditId}/items`, { method: 'PUT', body: JSON.stringify({ items: itemsPayload }) }),
+    ]);
+    showToast('Menu enregistré', 'success');
+    // Reload to get fresh IDs
+    await openMenuEditor(_menuEditId);
+  } catch (error) {
+    showToast('Erreur : ' + error.message, 'error');
+  }
+  hideLoading();
+}
+
+async function backToMenusList() {
+  _menuEditId = null;
+  _menuItems = [];
+  document.getElementById('content').innerHTML = await renderMenus();
+  attachMenuEvents();
+}
+
+function attachMenuEvents() {
+  // Nothing special needed for the list view — events are inline onclick
+}
+
+function attachMenuEditorEvents() {
+  // Enable drag-and-drop reordering
+  const list = document.getElementById('menuItemsList');
+  if (!list) return;
+
+  let dragItem = null;
+
+  list.addEventListener('mousedown', function(e) {
+    const handle = e.target.closest('.menu-item-drag');
+    if (!handle) return;
+    dragItem = handle.closest('.menu-item-row');
+    if (!dragItem) return;
+    dragItem.classList.add('dragging');
+
+    const onMove = (ev) => {
+      const rows = [...list.querySelectorAll('.menu-item-row:not(.dragging)')];
+      const y = ev.clientY;
+      let after = null;
+      for (const row of rows) {
+        const rect = row.getBoundingClientRect();
+        if (y > rect.top + rect.height / 2) after = row;
+      }
+      if (after) {
+        after.insertAdjacentElement('afterend', dragItem);
+      } else if (rows.length > 0) {
+        list.insertBefore(dragItem, rows[0]);
+      }
+    };
+
+    const onUp = () => {
+      dragItem.classList.remove('dragging');
+      dragItem = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      // Update menu_order from DOM
+      const allRows = list.querySelectorAll('.menu-item-row');
+      allRows.forEach((row, idx) => {
+        const itemId = row.getAttribute('data-item-id');
+        const item = _menuItems.find(i => String(i.id) === String(itemId) || String(i.temp_id) === String(itemId));
+        if (item) item.menu_order = idx;
+      });
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
 }

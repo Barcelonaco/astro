@@ -12,6 +12,7 @@
 /* GENERAL
 ---------------------------------------- */
 .module-separator {
+    text-align: center;
     .module-columns.has-background-primary:not(.cols_have_background) &,
     &.has-background-primary:not(.cols_have_background), 
     .cols-background-primary &,
@@ -35,8 +36,7 @@
         }
     }
     hr {
-        margin-top: 0;
-        margin-bottom: 0;
+        margin: 0 auto;
         background-color: $color3;
         &.default {
             height: rem(2px);

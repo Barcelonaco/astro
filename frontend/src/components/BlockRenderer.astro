@@ -131,8 +131,10 @@ const { blocks = [] } = Astro.props as { blocks: Block[] };
       case 'images-slider':
         return <NicklImagesSlider data={data} />;
       case 'logos-slider':
+      case 'slider-logo':
         return <NicklLogosSlider data={data} />;
       case 'icons':
+      case 'icon-logo':
         return <NicklIcons data={data} />;
       case 'team':
         return <NicklTeam data={data} />;

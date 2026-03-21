@@ -22,7 +22,7 @@ class ClickableTiles
         $fields = [];
 
         if ($is_columns === false) {
-            $fields = array_merge($fields, [                
+            $fields = array_merge($fields, [
                 ...BlockParams::getBlocTitle(),
                 BlockParams::getBgColor(),
                 BlockParams::getTopPadding(),
@@ -33,7 +33,7 @@ class ClickableTiles
                 BlockParams::getBackgroundParallax(),
             ]);
         }
-        
+
         $fields = array_merge($fields, [
             RadioButton::make('Choix du style ?', 'style_choice')
                 ->choices([
@@ -43,22 +43,22 @@ class ClickableTiles
                 ->wrapper(['width' => 50])
                 ->default('style-1'),
             TrueFalse::make('Type de lien', 'clickable_block')
-                ->stylized(on : 'Bloc cliquable', off : 'Boutons')
+                ->stylized(on: 'Bloc cliquable', off: 'Boutons')
                 ->default(true)
                 ->wrapper(['width' => 50]),
             TrueFalse::make('Tuiles imbriquées ?', 'interlocking_tiles')
-                ->stylized(on : 'Oui', off : 'Non')
+                ->stylized(on: 'Oui', off: 'Non')
                 ->default(true)
                 ->wrapper(['width' => 50]),
             TrueFalse::make('Orientation', 'orientation')
-                    ->stylized(on : 'Portrait', off : 'Paysage')
-                    ->default(True)
-                    ->wrapper(['width' => 50])
-                    ->conditionalLogic([
-                        ConditionalLogic::where('interlocking_tiles', '==', 0)
-                    ]),
+                ->stylized(on: 'Portrait', off: 'Paysage')
+                ->default(True)
+                ->wrapper(['width' => 50])
+                ->conditionalLogic([
+                    ConditionalLogic::where('interlocking_tiles', '==', 0)
+                ]),
             TrueFalse::make('Position du bloc principale', 'main-bloc-position')
-                ->stylized(on : 'Droite', off : 'Gauche')
+                ->stylized(on: 'Droite', off: 'Gauche')
                 ->default(False)
                 ->wrapper(['width' => 50])
                 ->conditionalLogic([
@@ -71,7 +71,7 @@ class ClickableTiles
                 ]),
             Repeater::make('Tuiles', 'list_interlocking')
                 ->minRows(1)
-                ->maxRows(5)
+                ->maxRows(8)
                 ->button('Ajouter une tuile')
                 ->layout('block')
                 ->collapsed('title')
@@ -87,10 +87,10 @@ class ClickableTiles
                         ->wrapper(['width' => 50])
                         ->conditionalLogic([
                             ConditionalLogic::where('clickable_block', '==', 0)
-                    ])
-            ])
+                        ])
+                ])
         ]);
-        
+
         return Layout::make('Tuiles cliquables', 'clickable-tiles')
             ->layout('block')
             ->fields($fields);

@@ -1,57 +1,77 @@
 ---
 import { getNavigation, type NavigationItem } from '../lib/api';
-import HeaderLink from './HeaderLink.astro';
 
 interface Props {
   navigation?: NavigationItem[];
+  menuClass?: string;
+  depth?: number;
+  isSecondary?: boolean;
+  side?: 'left' | 'right';
+  mobile?: boolean;
 }
 
+const {
+  menuClass = 'menu',
+  depth = 3,
+  isSecondary = false,
+  side,
+  mobile = false,
+} = Astro.props;
+
 const navigation = Astro.props.navigation || await getNavigation();
+
+// For center menu style, split nav items in half
+let items = navigation;
+if (side === 'left') {
+  items = navigation.slice(0, Math.ceil(navigation.length / 2));
+} else if (side === 'right') {
+  items = navigation.slice(Math.ceil(navigation.length / 2));
+}
+
+function hasChildren(item: any): boolean {
+  return !!(item.children && item.children.length > 0);
+}
+
+function itemUrl(item: any): string {
+  // Menu-based items have a url field; page-based fallback uses slug
+  if (item.url) return item.url;
+  if (item.slug) return `/pages/${item.slug}`;
+  return '#';
+}
+
+function itemTarget(item: any): string | undefined {
+  return item.open_in_new_tab ? '_blank' : undefined;
+}
 ---
 
-{navigation.map((item) => (
-  <div class="nav-item-wrapper">
-    <HeaderLink href={`/pages/${item.slug}`}>{item.title}</HeaderLink>
-    {item.children && item.children.length > 0 && (
-      <div class="submenu">
-        {item.children.map((child) => (
-          <HeaderLink href={`/pages/${child.slug}`}>{child.title}</HeaderLink>
-        ))}
-      </div>
-    )}
-  </div>
-))}
-
-<style>
-  .nav-item-wrapper {
-    position: relative;
-    display: inline-block;
-  }
-
-  .submenu {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    background: white;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    border-radius: 4px;
-    min-width: 200px;
-    z-index: 1000;
-  }
-
-  .nav-item-wrapper:hover .submenu {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .submenu :global(a) {
-    padding: 0.75em 1em !important;
-    border-bottom: none !important;
-  }
-
-  .submenu :global(a:hover) {
-    background: rgba(var(--accent), 0.1);
-    color: var(--color-primary, var(--accent));
-  }
-</style>
+<div class="menu-wrapper">
+  <ul class={menuClass}>
+    {items.map((item) => (
+      <li class:list={[
+        hasChildren(item) ? 'menu-item-has-children' : '',
+      ]}>
+        <a href={itemUrl(item)} target={itemTarget(item)}>{item.title}</a>
+        {hasChildren(item) && depth >= 2 && (
+          <ul class="sub-menu">
+            {item.children!.map((child: any) => (
+              <li class:list={[
+                hasChildren(child) ? 'menu-item-has-children' : '',
+              ]}>
+                <a href={itemUrl(child)} target={itemTarget(child)}>{child.title}</a>
+                {hasChildren(child) && depth >= 3 && (
+                  <ul class="sub-menu">
+                    {child.children!.map((grandchild: any) => (
+                      <li>
+                        <a href={itemUrl(grandchild)} target={itemTarget(grandchild)}>{grandchild.title}</a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </li>
+    ))}
+  </ul>
+</div>

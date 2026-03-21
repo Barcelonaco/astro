@@ -14,6 +14,11 @@
   if (window.__nicklModuleAnimInit) return;
   window.__nicklModuleAnimInit = true;
 
+  // Defer heavy DOM setup to avoid blocking main thread (TBT)
+  var defer = window.requestIdleCallback || function(cb) { setTimeout(cb, 100); };
+  defer(function() { setupAnimations(); });
+  function setupAnimations() {
+
   /**
    * Config des animations par module.
    * Chaque entrée = sélecteur du module → liste de steps.
@@ -207,5 +212,6 @@
   modulesToObserve.forEach(function(mod) {
     observer.observe(mod);
   });
+  } // end setupAnimations
 })();
 </script>

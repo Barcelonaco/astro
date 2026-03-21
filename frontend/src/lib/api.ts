@@ -63,8 +63,9 @@ const CACHE_TTL = 30_000 // 30 seconds
 async function fetchAPI(endpoint: string, options?: RequestInit) {
   const url = `${API_URL}${endpoint}`
 
-  // Check cache (only for GET requests, i.e. no body/method override)
-  if (!options?.method && !options?.body) {
+  // Check cache (only for GET requests, skip for options endpoints)
+  const useCache = !options?.method && !options?.body && !endpoint.includes('/options')
+  if (useCache) {
     const cached = apiCache.get(endpoint)
     if (cached && cached.expires > Date.now()) {
       return cached.data
@@ -87,7 +88,7 @@ async function fetchAPI(endpoint: string, options?: RequestInit) {
     const data = await response.json()
 
     // Cache GET responses
-    if (!options?.method && !options?.body) {
+    if (useCache) {
       apiCache.set(endpoint, { data, expires: Date.now() + CACHE_TTL })
     }
 
@@ -152,6 +153,7 @@ export interface FrontendBootstrap {
   styleSettings: Record<string, string>
   siteSettings: Record<string, string>
   navigation: NavigationItem[]
+  secondaryNavigation: NavigationItem[]
   frontPage: Page | null
 }
 
@@ -163,6 +165,7 @@ export async function getFrontendBootstrap(): Promise<FrontendBootstrap> {
       styleSettings: data.styleSettings || {},
       siteSettings: data.siteSettings || {},
       navigation: data.navigation || [],
+      secondaryNavigation: data.secondaryNavigation || [],
       frontPage: data.frontPage || null,
     }
   } catch {
@@ -171,6 +174,7 @@ export async function getFrontendBootstrap(): Promise<FrontendBootstrap> {
       styleSettings: {},
       siteSettings: {},
       navigation: [],
+      secondaryNavigation: [],
       frontPage: null,
     }
   }
@@ -209,6 +213,102 @@ export async function getThemeSettings(): Promise<ThemeSettings> {
     }
   } catch {
     return { useChildTheme: false, activeTheme: 'default' }
+  }
+}
+
+export interface ReusableBloc {
+  id: number
+  title: string
+  content: string
+  status: 'draft' | 'published'
+  created_at: string
+  updated_at: string
+}
+
+export async function getReusableBlocById(id: number): Promise<ReusableBloc | null> {
+  try {
+    const data = await fetchAPI(`/reusable-blocs/${id}`)
+    return data || null
+  } catch {
+    return null
+  }
+}
+
+// ============ REFERENCES (CPT) ============
+
+export interface ReferenceItem {
+  id: number
+  title: string
+  slug: string
+  excerpt: string
+  content: string
+  featured_image: Record<string, any> | null
+  custom_fields: {
+    customer_name?: string
+    text?: string
+    photos?: string
+    link?: string
+    project_url?: string
+    year?: number
+  }
+  categories: Array<{ id: number; name: string; slug: string }>
+  status: 'draft' | 'published'
+  created_at: string
+  updated_at: string
+}
+
+export interface ReferenceCategory {
+  id: number
+  name: string
+  slug: string
+}
+
+export async function getReferences(options?: {
+  status?: string
+  category?: string
+  limit?: number
+  offset?: number
+  order?: string
+}): Promise<{ items: ReferenceItem[]; total: number } | ReferenceItem[]> {
+  const params = new URLSearchParams()
+  if (options?.status) params.set('status', options.status)
+  if (options?.category) params.set('category', options.category)
+  if (options?.limit) params.set('limit', String(options.limit))
+  if (options?.offset) params.set('offset', String(options.offset))
+  if (options?.order) params.set('order', options.order)
+  const qs = params.toString()
+  try {
+    const data = await fetchAPI(`/cpt/references${qs ? '?' + qs : ''}`)
+    return data || []
+  } catch {
+    return options?.limit ? { items: [], total: 0 } : []
+  }
+}
+
+export async function getReferenceBySlug(slug: string): Promise<ReferenceItem | null> {
+  try {
+    const data = await fetchAPI(`/cpt/references/${slug}`)
+    return data || null
+  } catch {
+    return null
+  }
+}
+
+export async function getReferenceCategories(): Promise<ReferenceCategory[]> {
+  try {
+    const data = await fetchAPI('/cpt/references/categories')
+    return data || []
+  } catch {
+    return []
+  }
+}
+
+export async function getCPTOptions(postType: string): Promise<Record<string, string>> {
+  try {
+    const data = await fetchAPI(`/cpt/${postType}/options`)
+    return data || {}
+  } catch {
+    return {}
   }
 }
 

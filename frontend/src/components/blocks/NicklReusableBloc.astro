@@ -1,20 +1,31 @@
 ---
 /**
- * Module ReusableBloc — Reproduit reusable-bloc.blade.php
- * Stub — la résolution récursive des blocs réutilisables
- * nécessite un mécanisme de stockage côté CMS.
+ * Module ReusableBloc — Fetch le bloc réutilisable par ID
+ * et rend ses modules inline via BlockRenderer.
  */
-import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import BlockRenderer from '../BlockRenderer.astro';
+import { getReusableBlocById } from '../../lib/api';
 
 interface Props {
   data: Record<string, any>;
 }
 
 const { data } = Astro.props;
+const blocId = data.bloc_id;
+const isVisible = (data.is_visible ?? 'yes') !== 'no';
+
+let blocks: any[] = [];
+if (blocId && isVisible) {
+  const bloc = await getReusableBlocById(Number(blocId));
+  if (bloc && bloc.content) {
+    try {
+      const parsed = JSON.parse(bloc.content);
+      if (Array.isArray(parsed)) blocks = parsed;
+    } catch { /* invalid JSON */ }
+  }
+}
 ---
 
-<NicklModuleWrapper data={data} moduleName="reusable-bloc">
-  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
-    Les blocs réutilisables ne sont pas disponibles en mode statique.
-  </p>
-</NicklModuleWrapper>
+{isVisible && blocks.length > 0 && (
+  <BlockRenderer blocks={blocks} />
+)}

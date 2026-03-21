@@ -1,170 +1,722 @@
 ---
+import BlockRenderer from './BlockRenderer.astro';
+import ModuleStyles from './ModuleStyles.astro';
+
 interface Props {
   siteSettings?: Record<string, string>;
+  styleSettings?: Record<string, string>;
 }
 
-const { siteSettings: s = {} } = Astro.props;
+const { siteSettings: s = {}, styleSettings: st = {} } = Astro.props;
 
-const footerText = s.footer_text || '';
-const schedule = s.schedule || '';
-const opening = s.opening || '';
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000';
+const apiOrigin = API_URL.replace(/\/api\/?$/, '');
+
+function resolveUrl(url: string) {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  return `${apiOrigin}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+// Footer color
+const footerColor = s.footer_color || 'no-background-color';
+const isColored = footerColor === 'has-background-primary' || footerColor === 'has-background-secondary' || footerColor === 'has-background-dark';
+
+// Logo — use white logo on colored backgrounds
+const logoUrl = resolveUrl(isColored ? (s.logo_white || s.logo || '') : (s.logo || ''));
+const siteName = s.site_name || '';
+
+// Background image
+const footerBgImg = resolveUrl(s.footer_bg_img || '');
+const footerBgOpacity = parseInt(s.footer_bg_opacity || '60', 10) / 100;
+const footerBgParallax = s.footer_bg_parallax === '1';
+
+// Contact
 const phone = s.phone || '';
 const phone2 = s.phone_2 || '';
-const email = s.email || '';
 
+// Action buttons
+const link1Url = s.link_1_url || '';
+const link1Text = s.link_1_text || '';
+const link2Url = s.link_2_url || '';
+const link2Text = s.link_2_text || '';
+
+// Content
+const footerText = s.footer_text || '';
+const schedule = s.schedule || '';
+
+// Newsletter
 const showNewsletter = s.newsletter_form === '1';
 const newsletterTitle = s.newsletter_form_title || '';
 const newsletterDesc = s.newsletter_form_desc || '';
 
-const socials = [
+// Social networks
+const socialNetworks = [
   { key: 'instagram', label: 'Instagram' },
   { key: 'facebook', label: 'Facebook' },
   { key: 'threads', label: 'Threads' },
   { key: 'tiktok', label: 'TikTok' },
   { key: 'linkedin', label: 'LinkedIn' },
-  { key: 'twitter', label: 'X (Twitter)' },
+  { key: 'twitter', label: 'X' },
   { key: 'tripadvisor', label: 'Tripadvisor' },
   { key: 'pinterest', label: 'Pinterest' },
   { key: 'youtube', label: 'YouTube' },
 ].filter(item => s[item.key]);
 
-const hasContact = phone || phone2 || email;
-const hasSchedule = schedule || opening;
+// SVG icons for social networks
+const socialSvgs: Record<string, string> = {
+  instagram: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><path d="M7.64,25.92a9.47,9.47,0,0,1-3.16-.6,6.5,6.5,0,0,1-2.3-1.5,6.41,6.41,0,0,1-1.5-2.3,9.73,9.73,0,0,1-.6-3.16C0,17,0,16.52,0,13S0,9,.08,7.64a9.73,9.73,0,0,1,.6-3.16A6.66,6.66,0,0,1,4.48.68,9.73,9.73,0,0,1,7.64.08C9,0,9.48,0,13,0s4,0,5.36.08a9.78,9.78,0,0,1,3.16.6,6.66,6.66,0,0,1,3.8,3.8,10,10,0,0,1,.6,3.16C26,9,26,9.46,26,13s0,4-.08,5.36a9.52,9.52,0,0,1-.6,3.16,6.65,6.65,0,0,1-3.8,3.8,10,10,0,0,1-3.15.6C17,26,16.54,26,13,26S9,26,7.64,25.92Zm.11-23.5a7.15,7.15,0,0,0-2.42.45,4.09,4.09,0,0,0-1.49,1,4.07,4.07,0,0,0-1,1.5,7.34,7.34,0,0,0-.44,2.41C2.36,9.12,2.34,9.53,2.34,13s0,3.88.08,5.25a7.15,7.15,0,0,0,.45,2.42,4,4,0,0,0,1,1.49,4,4,0,0,0,1.49,1,7.15,7.15,0,0,0,2.42.45c1.36.07,1.77.08,5.25.08s3.89,0,5.25-.08a7.11,7.11,0,0,0,2.42-.45,4.26,4.26,0,0,0,2.46-2.46,7.15,7.15,0,0,0,.45-2.42c.07-1.36.08-1.77.08-5.25s0-3.89-.08-5.25a7.15,7.15,0,0,0-.45-2.42,4,4,0,0,0-1-1.49,4.11,4.11,0,0,0-1.49-1,7.4,7.4,0,0,0-2.42-.44c-1.37-.06-1.79-.08-5.25-.08s-3.88,0-5.25.08ZM6.32,13A6.68,6.68,0,1,1,13,19.67,6.68,6.68,0,0,1,6.32,13Zm2.35,0A4.33,4.33,0,1,0,13,8.67h0A4.33,4.33,0,0,0,8.67,13Zm9.71-6.94a1.56,1.56,0,1,1,1.56,1.56h0A1.56,1.56,0,0,1,18.38,6.06Z"/></svg>',
+  facebook: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 25.73 25.74"><path d="M24.31,0H1.42A1.43,1.43,0,0,0,0,1.42H0V24.31a1.42,1.42,0,0,0,1.42,1.42H13.75v-10H10.4v-3.9h3.35V9c0-3.32,2-5.13,5-5.13a24.85,24.85,0,0,1,3,.15V7.51h-2c-1.61,0-1.93.76-1.93,1.89v2.48h3.86l-.5,3.9H17.75v10h6.56a1.42,1.42,0,0,0,1.42-1.42h0V1.42A1.42,1.42,0,0,0,24.31,0Z"/></svg>',
+  threads: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><path d="M18.9,11.9c.1,0,.2.1.3.2,1.6.8,2.7,1.9,3.3,3.3.9,2,.9,5.2-1.6,7.8-2,2-4.3,2.8-7.7,2.9h0c-3.8,0-6.7-1.3-8.7-3.8-1.7-2.2-2.6-5.3-2.7-9.2h0c0-3.9.9-7,2.7-9.2C6.5,1.3,9.4,0,13.2,0h0c3.8,0,6.8,1.3,8.8,3.8,1,1.2,1.7,2.7,2.2,4.4l-2.2.6c-.4-1.4-1-2.6-1.7-3.5-1.6-1.9-4-2.9-7.1-3-3.1,0-5.4,1-6.9,2.9-1.4,1.8-2.2,4.4-2.2,7.8,0,3.3.8,6,2.2,7.8,1.5,1.9,3.9,2.9,6.9,2.9,2.8,0,4.6-.7,6.2-2.2,1.7-1.7,1.7-3.9,1.2-5.2-.3-.8-.9-1.4-1.7-1.9-.2,1.5-.6,2.6-1.3,3.5-.9,1.2-2.2,1.8-3.9,1.9-1.3,0-2.5-.2-3.5-.9-1.1-.7-1.8-1.9-1.9-3.2-.1-2.6,1.9-4.5,5.2-4.7,1.1,0,2.2,0,3.2.2-.1-.8-.4-1.4-.8-1.9-.5-.6-1.4-1-2.5-1h0c-.9,0-2.1.2-2.9,1.4l-1.9-1.3c1-1.6,2.7-2.4,4.8-2.4h0c3.4,0,5.4,2.1,5.6,5.8h0s0,0,0,0ZM10.4,15.6c0,1.4,1.5,2,3,1.9,1.4,0,3-.6,3.2-4-.7-.2-1.5-.2-2.4-.2s-.5,0-.8,0c-2.3.1-3.1,1.3-3,2.3h0s0,0,0,0Z"/></svg>',
+  tiktok: '<svg xmlns="http://www.w3.org/2000/svg" width="25" height="29" viewBox="0 0 25.152 29.022"><path d="M22.02,6.207a6.609,6.609,0,0,1-.571-.333,8.033,8.033,0,0,1-1.467-1.247,6.921,6.921,0,0,1-1.653-3.412h.006A4.2,4.2,0,0,1,18.268,0H13.284V19.273c0,.259,0,.515-.011.767,0,.031,0,.06,0,.094a.206.206,0,0,1,0,.043v.011a4.232,4.232,0,0,1-2.129,3.359,4.159,4.159,0,0,1-2.062.544,4.232,4.232,0,0,1,0-8.464,4.164,4.164,0,0,1,1.294.2l.006-5.075A9.258,9.258,0,0,0,3.24,12.845a9.782,9.782,0,0,0-2.134,2.632,9.121,9.121,0,0,0-1.1,4.186,9.88,9.88,0,0,0,.535,3.309v.012a9.74,9.74,0,0,0,1.353,2.468,10.129,10.129,0,0,0,2.159,2.037v-.012l.012.012a9.326,9.326,0,0,0,5.088,1.532,9.007,9.007,0,0,0,3.776-.835A9.477,9.477,0,0,0,16,25.881,9.58,9.58,0,0,0,17.667,23.1a10.4,10.4,0,0,0,.6-3.176V9.7c.06.036.866.569.866.569A11.527,11.527,0,0,0,22.1,11.5a17.1,17.1,0,0,0,3.048.417V6.969a6.463,6.463,0,0,1-3.132-.762"/></svg>',
+  linkedin: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24"><path d="M22.224,24H1.77A1.753,1.753,0,0,1,0,22.268V1.731A1.753,1.753,0,0,1,1.77,0H22.224A1.756,1.756,0,0,1,24,1.731V22.268A1.756,1.756,0,0,1,22.224,24ZM9.353,9V20.451h3.555V14.786c0-1.454.254-2.941,2.134-2.941,1.85,0,1.85,1.755,1.85,3.036v5.571h3.559V14.17a7.2,7.2,0,0,0-.784-3.886,3.764,3.764,0,0,0-3.487-1.571,3.763,3.763,0,0,0-3.368,1.849h-.049V9Zm-5.8,0V20.451H7.118V9ZM5.339,3.3A2.065,2.065,0,1,0,7.4,5.368,2.068,2.068,0,0,0,5.339,3.3Z"/></svg>',
+  twitter: '<svg xmlns="http://www.w3.org/2000/svg" width="25" height="22.6" viewBox="0 0 25 22.6"><path d="M19.7,0h3.8l-8.4,9.6L25,22.6h-7.7l-6-7.9-6.9,7.9H0.5l8.9-10.2L0,0h7.9l5.5,7.2L19.7,0z M18.4,20.3h2.1L6.8,2.2H4.4 L18.4,20.3z"/></svg>',
+  tripadvisor: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="26" viewBox="0 0 39.932 25.64"><path d="M36.668,7.468l3.264-3.551H32.695a22.612,22.612,0,0,0-25.439,0H0L3.264,7.468a9.977,9.977,0,1,0,13.5,14.691l3.2,3.481,3.2-3.478A9.98,9.98,0,1,0,36.668,7.468M9.988,21.593a6.751,6.751,0,1,1,6.751-6.751,6.75,6.75,0,0,1-6.751,6.751m9.978-6.948c0-4.443-3.23-8.256-7.494-9.885a19.477,19.477,0,0,1,14.986,0C23.2,6.392,19.966,10.2,19.966,14.645m9.976,6.948a6.751,6.751,0,1,1,6.751-6.751,6.75,6.75,0,0,1-6.751,6.751m0-10.293a3.539,3.539,0,1,0,3.539,3.539A3.538,3.538,0,0,0,29.942,11.3M13.526,14.842A3.539,3.539,0,1,1,9.988,11.3a3.538,3.538,0,0,1,3.539,3.539"/></svg>',
+  pinterest: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 25.75 25.74"><path d="M12.87,0A12.87,12.87,0,0,0,8.18,24.85a12.34,12.34,0,0,1,0-3.69c.24-1,1.51-6.4,1.51-6.4a4.69,4.69,0,0,1-.38-1.91c0-1.79,1-3.13,2.32-3.13a1.61,1.61,0,0,1,1.64,1.6,1.7,1.7,0,0,1,0,.22,25.28,25.28,0,0,1-1.07,4.28,1.87,1.87,0,0,0,1.35,2.27,1.78,1.78,0,0,0,.56.06c2.29,0,4-2.41,4-5.89A5.09,5.09,0,0,0,13.27,7h-.46A5.58,5.58,0,0,0,7,12.34v.27a5,5,0,0,0,1,2.93.41.41,0,0,1,.09.37c-.1.41-.32,1.28-.36,1.46s-.19.28-.43.17c-1.61-.75-2.61-3.1-2.61-5,0-4.06,2.95-7.79,8.5-7.79,4.46,0,7.93,3.18,7.93,7.43,0,4.44-2.8,8-6.68,8a3.43,3.43,0,0,1-3-1.48s-.64,2.46-.8,3.06a14.14,14.14,0,0,1-1.6,3.38A12.87,12.87,0,1,0,16.69.58,12.73,12.73,0,0,0,12.87,0"/></svg>',
+  youtube: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="28" viewBox="0 0 40.402 28.283"><path d="M39.558,4.417A5.059,5.059,0,0,0,35.986.845C32.836,0,20.2,0,20.2,0S7.566,0,4.417.845A5.06,5.06,0,0,0,.845,4.417C0,7.566,0,14.142,0,14.142s0,6.575.845,9.725a5.06,5.06,0,0,0,3.572,3.572c3.15.845,15.784.845,15.784.845s12.635,0,15.784-.845a5.059,5.059,0,0,0,3.572-3.572c.845-3.15.845-9.725.845-9.725s0-6.575-.845-9.725M16.157,20.2V8.083l10.5,6.06Z"/></svg>',
+};
+
+// Reusable bloc
+const footerCustomBloc = s.footer_custom_bloc || '';
+const footerCustomBlocLocation = s.footer_custom_bloc_location || 'none';
+let customBlocBlocks: unknown[] | null = null;
+if (footerCustomBloc && footerCustomBlocLocation !== 'none') {
+  try {
+    const { getReusableBlocById } = await import('../lib/api');
+    const bloc = await getReusableBlocById(Number(footerCustomBloc));
+    if (bloc?.content) {
+      const parsed = JSON.parse(bloc.content);
+      if (Array.isArray(parsed)) customBlocBlocks = parsed;
+    }
+  } catch {}
+}
+
+const hasCol1 = logoUrl || phone || phone2 || link1Url || link2Url;
+const hasCol3 = footerText || schedule || socialNetworks.length > 0;
+
 const today = new Date();
 ---
 
-<footer>
-  <div class="footer-inner">
-    {(hasContact || hasSchedule) && (
-      <div class="footer-col">
-        {hasContact && (
-          <div class="footer-contact">
-            {phone && <a href={`tel:${phone.replace(/\s/g, '')}`} class="footer-link">{phone}</a>}
-            {phone2 && <a href={`tel:${phone2.replace(/\s/g, '')}`} class="footer-link">{phone2}</a>}
-            {email && <a href={`mailto:${email}`} class="footer-link">{email}</a>}
-          </div>
-        )}
-        {hasSchedule && (
-          <div class="footer-schedule">
-            {schedule && <p class="schedule-text" set:html={schedule.replace(/\n/g, '<br />')} />}
-            {opening && !schedule && <p class="schedule-text">{opening}</p>}
-          </div>
-        )}
-      </div>
-    )}
-
-    {footerText && (
-      <div class="footer-col">
-        <div class="footer-text" set:html={footerText.replace(/\n/g, '<br />')} />
-      </div>
-    )}
-
-    {showNewsletter && (
-      <div class="footer-col footer-newsletter">
-        {newsletterTitle && <h3 class="newsletter-title">{newsletterTitle}</h3>}
-        {newsletterDesc && <p class="newsletter-desc">{newsletterDesc}</p>}
-        <form class="newsletter-form" onsubmit="return false;">
-          <input type="email" placeholder="Votre e-mail" class="newsletter-input" />
-          <button type="submit" class="newsletter-btn">S'inscrire</button>
-        </form>
-      </div>
-    )}
+{customBlocBlocks && footerCustomBlocLocation === 'before' && (
+  <div class="footer-custom-block footer-custom-block-before">
+    <ModuleStyles blocks={customBlocBlocks} />
+    <BlockRenderer blocks={customBlocBlocks} />
   </div>
-
-  {socials.length > 0 && (
-    <div class="footer-socials">
-      {socials.map(item => (
-        <a href={s[item.key]} target="_blank" rel="noopener noreferrer" title={item.label}>
-          {item.label}
-        </a>
-      ))}
-    </div>
+)}
+<footer id="footer" class={`footer-page${footerBgImg && footerBgParallax ? ' parallax' : ''}${footerBgImg ? ' has-background-image' : ''} ${footerColor}`} role="contentinfo">
+  {footerBgImg && (
+    <div class="background" style={`background-image: url('${footerBgImg}'); background-size: cover; background-position: center; opacity: ${footerBgOpacity};`}></div>
   )}
+  <button type="button" class="btn-scroll btn-scroll-up js_footer-btn-scroll">En haut</button>
+  <div class="container">
+    <div class="top">
+      {hasCol1 && (
+        <div class="col col-1">
+          {logoUrl && (
+            <div class="logo-wrapper">
+              <img src={logoUrl} alt={siteName} title={siteName} class="logo" />
+            </div>
+          )}
+          {phone && (
+            <p class="phone-wrapper">Tel.
+              <a href={`tel:${phone.replace(/\s/g, '')}`} class="phone">{phone}</a>
+            </p>
+          )}
+          {phone2 && (
+            <p class="phone-wrapper">Tel.
+              <a href={`tel:${phone2.replace(/\s/g, '')}`} class="phone">{phone2}</a>
+            </p>
+          )}
+          {(link1Url || link2Url) && (
+            <div class="btn-wrapper">
+              {link1Url && link1Text && (
+                <a href={link1Url} class="btn btn-primary">{link1Text}</a>
+              )}
+              {link2Url && link2Text && (
+                <a href={link2Url} class="btn btn-secondary">{link2Text}</a>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
-  <div class="footer-bottom">
-    &copy; {today.getFullYear()} — Tous droits réservés.
+      {hasCol3 && (
+        <div class="col col-3">
+          {footerText && (
+            <div class="editor txt-1">
+              <p set:html={footerText.replace(/\n/g, '<br />')} />
+            </div>
+          )}
+          {schedule && (
+            <div class="editor txt-2">
+              <p><b>Horaires d'ouverture</b></p>
+              <p set:html={schedule.replace(/\n/g, '<br />')} />
+            </div>
+          )}
+          {socialNetworks.length > 0 && (
+            <ul class="social-networks">
+              {socialNetworks.map(item => (
+                <li class="item-social">
+                  <a href={s[item.key]} title={item.label} target="_blank" rel="noopener noreferrer" class="link">
+                    <span class="icon" aria-hidden="true" set:html={socialSvgs[item.key]} />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {showNewsletter && (
+        <div class="col col-4 newsletter-form">
+          {newsletterTitle && <p class="title-section-4">{newsletterTitle}</p>}
+          {newsletterDesc && <p class="desc">{newsletterDesc}</p>}
+          <form class="newsletter-form-inner" onsubmit="return false;">
+            <div class="onefield">
+              <input type="email" placeholder="Votre e-mail" required />
+            </div>
+            <div class="newsletter-submit">
+              <button type="submit">S'inscrire</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+
+    <div class="bottom">
+      <ul class="nav">
+        <li class="item">
+          Copyright &copy; {today.getFullYear()} {siteName}
+        </li>
+        <li class="item">
+          <a href="https://nickl.fr" target="_blank" rel="noopener noreferrer" class="link">Un site web développé par Nickl / Barcelona&co</a>
+        </li>
+        <li class="item">
+          <button type="button" class="link" data-cc="show-preferencesModal" aria-haspopup="dialog">
+            <span class="icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 14.97 14.97"><path d="M7.485,0A7.485,7.485,0,1,0,14.97,7.485,7.485,7.485,0,0,0,7.485,0m2.581,2.065a.258.258,0,1,1-.258.258.258.258,0,0,1,.258-.258M1.431,5.252a.258.258,0,1,1-.484-.179A6.974,6.974,0,0,1,3.38,1.856a.258.258,0,0,1,.308.414l0,0A6.458,6.458,0,0,0,1.431,5.252M3.613,4.9a.258.258,0,1,1-.258-.258.258.258,0,0,1,.258.258m.258,6.711a.258.258,0,1,1,.258-.258.258.258,0,0,1-.258.258M3.355,8.775A1.032,1.032,0,1,1,4.388,7.743,1.032,1.032,0,0,1,3.355,8.775M4.388,1.807a.258.258,0,1,1,.258-.258.258.258,0,0,1-.258.258m2.065,10.84a.774.774,0,1,1,.774-.774.774.774,0,0,1-.774.774m0-3.871a.258.258,0,1,1,.258.258.258.258,0,0,1-.258-.258m.806-4.1c-.4.4-.874.586-1.278.183a1.032,1.032,0,0,1,0-1.46c.4-.4,1.359-.706,1.762-.3s-.082,1.177-.485,1.58m1,2.292a.258.258,0,1,1,.258-.258.258.258,0,0,1-.258.258m1.807,5.42a.258.258,0,1,1,.258-.258.258.258,0,0,1-.258.258m.258-1.807c-.57,0-.774-.72-.774-1.29s.2-1.032.774-1.032a1.032,1.032,0,0,1,1.032,1.032c0,.57-.462,1.29-1.032,1.29m1.032-4.388a.774.774,0,1,1,.774-.774.774.774,0,0,1-.774.774"/></svg>
+            </span>
+            <span class="cookies-link">Gestion des cookies</span>
+          </button>
+        </li>
+      </ul>
+    </div>
   </div>
 </footer>
+{customBlocBlocks && footerCustomBlocLocation === 'after' && (
+  <div class="footer-custom-block footer-custom-block-after">
+    <ModuleStyles blocks={customBlocBlocks} />
+    <BlockRenderer blocks={customBlocBlocks} />
+  </div>
+)}
 
-<style>
-  footer {
-    background: var(--color-primary, var(--accent));
-    color: #fff;
-    padding: 3rem 1em 1.5rem;
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.querySelector('.js_footer-btn-scroll');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    }
+  });
+</script>
+
+<style is:global>
+/* =========================================
+   FOOTER — Nickl pattern
+   ========================================= */
+
+#footer {
+  position: relative;
+  padding-top: clamp(3rem, 6vw, 5rem);
+  padding-bottom: 1.875rem;
+}
+
+/* No background — inherits page background, uses default text color */
+#footer.no-background-color {
+  color: var(--color-default, #333);
+}
+
+/* Colored backgrounds — white text */
+#footer.has-background-primary,
+#footer.has-background-secondary,
+#footer.has-background-dark {
+  color: var(--color-background, #fff);
+}
+#footer.has-background-primary {
+  background-color: var(--color-primary, var(--accent));
+}
+#footer.has-background-secondary {
+  background-color: var(--color-secondary, var(--accent));
+}
+#footer.has-background-dark {
+  background-color: var(--color-default, #333);
+}
+
+/* Scroll-to-top button */
+#footer .btn-scroll {
+  position: absolute;
+  top: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: none;
+  border: none;
+  color: currentColor;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.7;
+  transition: opacity 0.3s;
+  border-radius: var(--border-radius, 0);
+}
+#footer .btn-scroll:hover {
+  opacity: 1;
+}
+
+/* Container */
+#footer > .container {
+  max-width: 75rem;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* Top section — 4 columns */
+#footer .top {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  column-gap: 3rem;
+  row-gap: 2rem;
+}
+#footer .top .col {
+  flex-basis: calc(25% - (9rem / 4));
+}
+
+/* When col-1 is the only column, center everything */
+#footer .top .col-1:not(:has(~ .col)) {
+  text-align: center;
+}
+#footer .top .col-1:not(:has(~ .col)) .logo-wrapper,
+#footer .top .col-1:not(:has(~ .col)) .logo {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Logo */
+#footer .logo-wrapper {
+  max-width: 18.75rem;
+}
+#footer .logo {
+  display: block;
+  max-height: 6.25rem;
+}
+
+/* Address */
+#footer .address {
+  margin-top: 1.0625rem;
+  font-size: 1.25rem;
+  line-height: 1.5;
+  font-style: normal;
+}
+
+/* Phone */
+#footer .phone-wrapper {
+  margin-top: 0.9375rem;
+  font-size: 1.25rem;
+  line-height: 1.5;
+}
+#footer .phone {
+  font-family: var(--font-title, inherit);
+  font-size: 2rem;
+  line-height: 1.5;
+  font-weight: 700;
+  color: currentColor;
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 0 3px;
+  transition: background-size 0.3s;
+}
+#footer .phone:hover {
+  background-size: 100% 3px;
+}
+
+/* Action buttons */
+#footer .btn-wrapper {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 1.1875rem;
+}
+/* Buttons — base (no-background-color) */
+#footer .btn-primary,
+#footer .btn-secondary {
+  display: inline-block;
+  padding: 0.6875rem 1.625rem;
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+  text-align: center;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.3s;
+  border-radius: var(--border-radius, 0);
+}
+#footer .btn-primary {
+  background-color: var(--color-primary, var(--accent));
+  color: var(--color-background, #fff);
+  border: 2px solid var(--color-primary, var(--accent));
+}
+#footer .btn-primary:hover {
+  background-color: transparent;
+  color: var(--color-primary, var(--accent));
+}
+#footer .btn-secondary {
+  background-color: transparent;
+  color: var(--color-primary, var(--accent));
+  border: 2px solid var(--color-primary, var(--accent));
+}
+#footer .btn-secondary:hover {
+  background-color: var(--color-primary, var(--accent));
+  color: var(--color-background, #fff);
+}
+
+/* Buttons — colored backgrounds override */
+#footer.has-background-primary .btn-primary,
+#footer.has-background-secondary .btn-primary,
+#footer.has-background-dark .btn-primary {
+  background-color: var(--color-background, #fff);
+  color: currentColor;
+  border-color: var(--color-background, #fff);
+}
+#footer.has-background-primary .btn-primary:hover,
+#footer.has-background-secondary .btn-primary:hover,
+#footer.has-background-dark .btn-primary:hover {
+  background-color: transparent;
+  color: var(--color-background, #fff);
+}
+#footer.has-background-primary .btn-secondary,
+#footer.has-background-secondary .btn-secondary,
+#footer.has-background-dark .btn-secondary {
+  color: var(--color-background, #fff);
+  border-color: var(--color-background, #fff);
+}
+#footer.has-background-primary .btn-secondary:hover,
+#footer.has-background-secondary .btn-secondary:hover,
+#footer.has-background-dark .btn-secondary:hover {
+  background-color: var(--color-background, #fff);
+  border-color: var(--color-background, #fff);
+  color: currentColor;
+}
+
+/* Footer text */
+#footer .editor p {
+  margin: 0;
+}
+#footer .txt-1 {
+  line-height: 1.6;
+}
+
+/* Schedule — txt-2 with top bar */
+#footer .txt-2 {
+  position: relative;
+  margin-top: 1.75rem;
+  padding-top: 1.375rem;
+}
+#footer .txt-2::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1.5rem;
+  height: 3px;
+  opacity: 0.4;
+  background-color: currentColor;
+  border-radius: 3px;
+}
+
+/* Social networks */
+#footer .social-networks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+#footer .social-networks .link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  text-decoration: none;
+  transition: opacity 0.3s;
+}
+#footer .social-networks .link:hover {
+  opacity: 0.7;
+}
+#footer .social-networks .icon {
+  display: flex;
+  width: 1.625rem;
+  height: 1.625rem;
+}
+#footer .social-networks svg {
+  width: 100%;
+  height: 100%;
+}
+#footer .social-networks svg * {
+  fill: currentColor;
+}
+
+/* Newsletter form */
+#footer .col-4.newsletter-form .title-section-4 {
+  text-align: left;
+  font-family: var(--font-title, inherit);
+  font-weight: 700;
+  font-size: 1.125rem;
+  margin: 0 0 0.25rem;
+}
+#footer .col-4.newsletter-form .desc {
+  opacity: 0.85;
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem;
+}
+#footer .newsletter-form-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-top: 1rem;
+}
+#footer .newsletter-form-inner .onefield input {
+  border: 2px solid currentColor;
+  padding: 0.6875rem 1.625rem;
+  line-height: 1;
+  width: 100%;
+  background: transparent;
+  color: currentColor;
+  font-size: 0.9rem;
+  border-radius: var(--border-radius, 0);
+}
+#footer .newsletter-form-inner .onefield input::placeholder {
+  color: currentColor;
+  opacity: 0.75;
+}
+#footer .newsletter-form-inner .newsletter-submit button {
+  background-color: var(--color-default, #333);
+  border: 2px solid var(--color-default, #333);
+  color: var(--color-background, #fff);
+  white-space: nowrap;
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.6875rem 1.625rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  border-radius: var(--border-radius, 0);
+}
+#footer .newsletter-form-inner .newsletter-submit button:hover {
+  color: var(--color-default, #333);
+  background-color: transparent;
+  border-color: var(--color-default, #333);
+}
+/* Newsletter — colored backgrounds override */
+#footer.has-background-primary .newsletter-form-inner .newsletter-submit button,
+#footer.has-background-secondary .newsletter-form-inner .newsletter-submit button,
+#footer.has-background-dark .newsletter-form-inner .newsletter-submit button {
+  background-color: var(--color-background, #fff);
+  border-color: var(--color-background, #fff);
+  color: currentColor;
+}
+#footer.has-background-primary .newsletter-form-inner .newsletter-submit button:hover,
+#footer.has-background-secondary .newsletter-form-inner .newsletter-submit button:hover,
+#footer.has-background-dark .newsletter-form-inner .newsletter-submit button:hover {
+  background-color: transparent;
+  color: var(--color-background, #fff);
+  border-color: var(--color-background, #fff);
+}
+#footer.has-background-primary .newsletter-form-inner .onefield input,
+#footer.has-background-secondary .newsletter-form-inner .onefield input,
+#footer.has-background-dark .newsletter-form-inner .onefield input {
+  border-color: var(--color-background, #fff);
+  color: var(--color-background, #fff);
+}
+#footer.has-background-primary .newsletter-form-inner .onefield input::placeholder,
+#footer.has-background-secondary .newsletter-form-inner .onefield input::placeholder,
+#footer.has-background-dark .newsletter-form-inner .onefield input::placeholder {
+  color: var(--color-background, #fff);
+}
+
+/* Bottom section */
+#footer .bottom {
+  display: flex;
+  margin-top: 2.125rem;
+  justify-content: space-between;
+  align-items: center;
+  flex-direction: column;
+  row-gap: 0.5rem;
+}
+#footer .nav {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+#footer .nav .item a,
+#footer .nav .item .cookies-link {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 0 1px;
+  transition: background-size 0.3s;
+  cursor: pointer;
+}
+#footer .nav .item a:hover,
+#footer .nav .item .cookies-link:hover {
+  background-size: 100% 1px;
+}
+#footer .nav .link {
+  display: inline-flex;
+  vertical-align: middle;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0 0.25rem;
+  border: 0;
+  background: none;
+  color: currentColor;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+}
+#footer .nav .link svg {
+  width: 0.9375rem;
+}
+#footer .nav .link svg * {
+  fill: var(--color-primary, var(--accent));
+}
+#footer.has-background-primary .nav .link svg *,
+#footer.has-background-secondary .nav .link svg *,
+#footer.has-background-dark .nav .link svg * {
+  fill: currentColor;
+}
+
+/* Bottom nav separators (desktop) */
+@media screen and (min-width: 600px) {
+  #footer .nav .item {
+    margin-left: 1.25rem;
+    position: relative;
   }
-  .footer-inner {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2rem;
-    max-width: 120rem;
-    margin: 0 auto;
-    padding-bottom: 2rem;
+  #footer .nav .item::before {
+    content: '-';
+    position: absolute;
+    left: -0.625rem;
+    transform: translateX(-50%);
   }
-  .footer-col { flex: 1 1 250px; }
-  .footer-contact {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    margin-bottom: 1rem;
+  #footer .nav .item:first-child {
+    margin-left: 0;
   }
-  .footer-link {
-    color: #fff;
-    text-decoration: none;
-    opacity: 0.9;
+  #footer .nav .item:first-child::before {
+    display: none;
   }
-  .footer-link:hover { opacity: 1; text-decoration: underline; }
-  .footer-text { opacity: 0.9; line-height: 1.6; }
-  .schedule-text { opacity: 0.85; font-size: 0.9rem; line-height: 1.5; margin: 0; }
-  .footer-newsletter { max-width: 400px; }
-  .newsletter-title { font-size: 1.125rem; margin: 0 0 0.25rem; }
-  .newsletter-desc { opacity: 0.85; font-size: 0.9rem; margin: 0 0 0.75rem; }
-  .newsletter-form { display: flex; gap: 0.5rem; }
-  .newsletter-input {
-    flex: 1;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid rgba(255,255,255,0.3);
-    border-radius: 4px;
-    background: rgba(255,255,255,0.15);
-    color: #fff;
-    font-size: 0.9rem;
+}
+
+/* Rounded borders mode */
+.border-rounded #footer .btn-primary,
+.border-rounded #footer .btn-secondary,
+.border-rounded #footer .newsletter-form-inner .onefield input,
+.border-rounded #footer .newsletter-form-inner .newsletter-submit button {
+  border-radius: 3rem;
+}
+
+/* Uppercase mode */
+.mode-uppercase #footer .btn-primary,
+.mode-uppercase #footer .btn-secondary,
+.mode-uppercase #footer .newsletter-form-inner .newsletter-submit button {
+  text-transform: uppercase;
+}
+
+/* ----------------------------------------
+   MEDIA QUERIES
+   ---------------------------------------- */
+@media only screen and (max-width: 1024px) {
+  #footer .top .col-4 {
+    margin-top: 1.5rem;
   }
-  .newsletter-input::placeholder { color: rgba(255,255,255,0.6); }
-  .newsletter-btn {
-    padding: 0.5rem 1rem;
-    background: #fff;
-    color: var(--color-primary, var(--accent));
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.9rem;
-  }
-  .newsletter-btn:hover { opacity: 0.9; }
-  .footer-socials {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-    padding: 1.5rem 0;
-    border-top: 1px solid rgba(255,255,255,0.2);
-    max-width: 120rem;
-    margin: 0 auto;
-  }
-  .footer-socials a {
-    color: #fff;
-    text-decoration: none;
-    opacity: 0.8;
-    font-size: 0.875rem;
-  }
-  .footer-socials a:hover { opacity: 1; }
-  .footer-bottom {
+  #footer .col-4.newsletter-form .title-section-4 {
     text-align: center;
-    opacity: 0.7;
-    font-size: 0.8125rem;
-    padding-top: 1rem;
   }
-  @media (max-width: 600px) {
-    .footer-inner { flex-direction: column; }
-    .newsletter-form { flex-direction: column; }
+}
+
+@media only screen and (max-width: 960px) {
+  #footer {
+    padding-top: clamp(2rem, 4vw, 3rem);
   }
+  #footer .btn-scroll {
+    display: none;
+  }
+  #footer .top,
+  #footer .bottom {
+    display: block;
+    text-align: center;
+  }
+  #footer .top .col {
+    margin-right: 0;
+    padding-top: 0;
+  }
+  #footer .top .col + .col {
+    margin-top: 2rem;
+  }
+  #footer .logo-wrapper {
+    max-width: 14.29rem;
+    margin-right: auto;
+    margin-left: auto;
+  }
+  #footer .logo {
+    max-height: 4.64rem;
+    margin-right: auto;
+    margin-left: auto;
+  }
+  #footer .btn-wrapper {
+    justify-content: center;
+  }
+  #footer .phone-wrapper {
+    margin-top: 1.5rem;
+  }
+  #footer .phone {
+    font-size: 2rem;
+  }
+  #footer .txt-1 {
+    display: none;
+  }
+  #footer .txt-2::before {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  #footer .social-networks,
+  #footer .nav {
+    justify-content: center;
+  }
+  #footer .nav .item {
+    margin-left: 0;
+  }
+  #footer .nav .item::before {
+    display: none;
+  }
+}
+
+@media screen and (max-width: 600px) {
+  #footer .nav {
+    flex-direction: column;
+  }
+}
 </style>

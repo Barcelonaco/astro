@@ -1,0 +1,377 @@
+---
+export const prerender = false;
+
+import BaseHead from '../../components/BaseHead.astro';
+import ModuleStyles from '../../components/ModuleStyles.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import BlockRenderer from '../../components/BlockRenderer.astro';
+import DeferredLoader from '../../components/DeferredLoader.astro';
+import SiteOverlays from '../../components/SiteOverlays.astro';
+import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
+import { getReferenceBySlug, getFrontendBootstrap } from '../../lib/api';
+import { cleanHtml, resolveLink } from '../../lib/module-classes';
+import { optimizedImageUrl } from '../../lib/module-helpers';
+
+const { slug } = Astro.params;
+
+const [ref, { siteInfo, styleSettings, siteSettings, navigation: navigationData, secondaryNavigation }] = await Promise.all([
+  getReferenceBySlug(slug as string),
+  getFrontendBootstrap(),
+]);
+
+const siteName = siteInfo.siteName || SITE_TITLE;
+const siteDescription = siteInfo.siteDescription || SITE_DESCRIPTION;
+
+if (!ref || ref.status !== 'published') {
+  return Astro.redirect('/404');
+}
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ');
+
+const cf = ref.custom_fields || {};
+const customerName = cf.customer_name || '';
+const description = cf.text || '';
+const category = ref.categories?.[0]?.name || '';
+
+// Parse photos
+let photos: string[] = [];
+try {
+  photos = JSON.parse(cf.photos || '[]');
+  if (!Array.isArray(photos)) photos = [];
+} catch { photos = []; }
+
+// If no photos, use featured_image
+if (photos.length === 0 && ref.featured_image) {
+  const fi = ref.featured_image as Record<string, any>;
+  const url = fi.sizes?.banner || fi.url || '';
+  if (url) photos = [url];
+}
+
+// Parse link
+let ctaLink: { url: string; title: string; target: string } | null = null;
+if (cf.link) {
+  try {
+    const parsed = JSON.parse(cf.link);
+    ctaLink = resolveLink(parsed);
+  } catch {
+    ctaLink = resolveLink(cf.link);
+  }
+}
+
+// Parse content blocks (flexible modules)
+let blocks: any[] | null = null;
+if (ref.content) {
+  try {
+    const parsed = JSON.parse(ref.content);
+    if (Array.isArray(parsed) && parsed.every((b: any) => b && typeof b.type === 'string')) {
+      blocks = parsed;
+    }
+  } catch {}
+}
+---
+
+<!doctype html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`${ref.title} | ${siteName}`} description={siteDescription} styleSettings={styleSettings} siteSettings={siteSettings} />
+    {blocks && <ModuleStyles blocks={blocks} />}
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigationData} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+    <main class="main-page page-single-refs">
+      <article>
+        <div class="container-large">
+          <div class="cols-wrapper">
+            {/* Col 1: Image slider */}
+            <div class="col-1" id="js_ref-col1">
+              <div class="slider-wrapper">
+                {photos.length > 1 ? (
+                  <div class="swiper slider js_ref-single-slider">
+                    <div class="swiper-wrapper">
+                      {photos.map((photo) => (
+                        <div class="swiper-slide">
+                          <div class="illus-wrapper">
+                            <img src={optimizedImageUrl(photo, 800, 80)} alt={ref.title} class="illus" loading="lazy" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button type="button" class="slider-navigation prev"></button>
+                    <button type="button" class="slider-navigation next"></button>
+                    <div class="slider-pagination js_ref-single-pagination"></div>
+                  </div>
+                ) : photos.length === 1 ? (
+                  <div class="illus-wrapper">
+                    <img src={optimizedImageUrl(photos[0], 800, 80)} alt={ref.title} class="illus" loading="lazy" />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Col 2: Content */}
+            <div class="col-2">
+              {category && <p class="category">{category}</p>}
+              <h1 class="title title-section-1">{ref.title}</h1>
+              {customerName && <p class="name">{customerName}</p>}
+              {description && (
+                <div class="txt editor">
+                  <Fragment set:html={cleanHtml(description).replace(/\n/g, '<br />')} />
+                </div>
+              )}
+              {ctaLink && (
+                <div class="btn-wrapper">
+                  <a href={ctaLink.url} class="btn btn-primary" target={ctaLink.target}>{ctaLink.title}</a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div><!-- /.container-large -->
+
+        {/* Flexible content modules */}
+        {blocks && blocks.length > 0 && (
+          <div class="content content-blocks">
+            <BlockRenderer blocks={blocks} />
+          </div>
+        )}
+      </article>
+
+      {/* Navigation prev/next */}
+      <div class="container">
+        <div class="btn-wrapper space-between">
+          <a href="/references" class="btn btn-tertiary prev">Retour aux références</a>
+        </div>
+      </div>
+    </main>
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+  </body>
+</html>
+
+<style>
+  .page-single-refs {
+    padding-bottom: 60px;
+  }
+  .page-single-refs article {
+    padding-top: 60px;
+  }
+</style>
+
+<style is:global>
+  .page-single-refs .cols-wrapper {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+    gap: 40px;
+    position: relative;
+  }
+  .page-single-refs .col-1 {
+    width: calc(45% - 20px);
+    flex-shrink: 0;
+  }
+  .page-single-refs .col-1.sticky .slider-wrapper {
+    position: sticky;
+    top: 20px;
+    align-self: flex-start;
+  }
+  .page-single-refs .col-2 {
+    width: calc(55% - 20px);
+  }
+  .page-single-refs .slider-wrapper {
+    overflow: hidden;
+  }
+  .border-rounded .page-single-refs .slider-wrapper {
+    border-radius: var(--border-radius, 0);
+  }
+  .page-single-refs .slider-wrapper:hover .slider-navigation {
+    opacity: 1;
+  }
+  .page-single-refs .slider-wrapper:hover .slider-navigation.prev,
+  .page-single-refs .slider-wrapper:hover .slider-navigation.next {
+    transform: translateY(-50%);
+  }
+  .page-single-refs .slider-navigation {
+    opacity: 0;
+    transition: all .3s ease;
+  }
+  .border-rounded .page-single-refs .slider-navigation {
+    border-radius: 50%;
+  }
+  .page-single-refs .slider-navigation::before {
+    border-color: #fff;
+  }
+  .page-single-refs .slider-navigation.prev {
+    left: 16px;
+    transform: translate(.5rem, -50%);
+  }
+  .page-single-refs .slider-navigation.next {
+    right: 16px;
+    transform: translate(-.5rem, -50%);
+  }
+  .page-single-refs .slider-pagination {
+    bottom: 20px;
+  }
+  .page-single-refs .slider-pagination .swiper-pagination-bullet {
+    background-color: #fff;
+  }
+  .page-single-refs .illus-wrapper {
+    display: block;
+    width: 100%;
+    position: relative;
+    padding-top: 82.76%;
+    border: 0;
+    overflow: hidden;
+  }
+  .page-single-refs .illus {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+  }
+  .page-single-refs .category {
+    margin-bottom: 4px;
+    font-size: 14px;
+    line-height: 1.4;
+    letter-spacing: .05em;
+    color: var(--color-primary, #666);
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .page-single-refs .title {
+    margin: 0;
+    text-align: inherit;
+  }
+  .page-single-refs .name {
+    margin-top: 10px;
+    font-family: var(--font-title, inherit);
+    font-size: 24px;
+    line-height: 1.4;
+    letter-spacing: .05em;
+    font-weight: 600;
+    color: var(--color-primary, #666);
+    text-transform: uppercase;
+  }
+  .page-single-refs .txt {
+    margin-top: 12px;
+    line-height: 1.7;
+  }
+  .page-single-refs .txt h1,
+  .page-single-refs .txt h2,
+  .page-single-refs .txt h3 {
+    margin-top: 20px;
+    margin-bottom: 8px;
+  }
+  .page-single-refs .txt p {
+    margin-bottom: 12px;
+  }
+  .page-single-refs .btn-wrapper {
+    display: flex;
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .page-single-refs .btn-wrapper.space-between {
+    justify-content: space-between;
+    margin-top: 40px;
+  }
+  .page-single-refs .content-blocks {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin-top: 40px;
+  }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .page-single-refs {
+      padding-top: 24px;
+    }
+    .page-single-refs .cols-wrapper {
+      flex-direction: column !important;
+      gap: 40px !important;
+    }
+    .page-single-refs .col-1,
+    .page-single-refs .col-2 {
+      width: 100% !important;
+    }
+    .page-single-refs .btn-wrapper {
+      flex-direction: column;
+    }
+    .page-single-refs .btn-wrapper .prev {
+      text-align: left;
+    }
+    .page-single-refs .btn-wrapper .next {
+      text-align: right;
+    }
+  }
+</style>
+
+<script is:inline>
+(function() {
+  // Adjust alignment: center if image taller, sticky if text taller
+  function adjustAlignment() {
+    var wrapper = document.querySelector('.page-single-refs .cols-wrapper');
+    if (!wrapper) return;
+    var col1 = wrapper.querySelector('.col-1');
+    var col2 = wrapper.querySelector('.col-2');
+    var img = col1.querySelector('.slider-wrapper');
+    if (!img || !col2) return;
+
+    var imgHeight = img.offsetHeight;
+    var txtHeight = col2.offsetHeight;
+
+    if (imgHeight > txtHeight) {
+      wrapper.style.alignItems = 'center';
+      col1.classList.remove('sticky');
+    } else {
+      wrapper.style.alignItems = 'flex-start';
+      col1.classList.add('sticky');
+    }
+  }
+
+  // Init Swiper for single reference
+  function initSingleSlider() {
+    if (!window.Swiper) return;
+    document.querySelectorAll('.js_ref-single-slider').forEach(function(el) {
+      if (el.swiper) return;
+      var count = el.querySelectorAll('.swiper-slide').length;
+      if (count < 2) return;
+      var w = el.closest('.slider-wrapper') || el.parentElement;
+      new window.Swiper(el, {
+        loop: count > 2,
+        speed: 750,
+        slidesPerView: 1,
+        navigation: {
+          nextEl: w.querySelector('.next'),
+          prevEl: w.querySelector('.prev')
+        },
+        pagination: {
+          el: w.querySelector('.js_ref-single-pagination'),
+          type: 'bullets',
+          clickable: true
+        }
+      });
+    });
+    adjustAlignment();
+  }
+
+  if (window.Swiper) {
+    initSingleSlider();
+  } else {
+    var check = setInterval(function() {
+      if (window.Swiper) { clearInterval(check); initSingleSlider(); }
+    }, 500);
+    setTimeout(function() { clearInterval(check); }, 15000);
+  }
+
+  window.addEventListener('load', adjustAlignment);
+  window.addEventListener('resize', adjustAlignment);
+})();
+</script>

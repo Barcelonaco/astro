@@ -25,13 +25,25 @@ const gaCode = s.ga_code || '';
 const awCode = s.aw_code || '';
 const gtmCode = s.gtm_code || '';
 const metaPixelCode = s.meta_pixel_code || '';
+
+// Favicon
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000';
+const apiOrigin = API_URL.replace(/\/api\/?$/, '');
+const faviconSetting = s.favicon || '';
+const faviconUrl = faviconSetting ? (faviconSetting.startsWith('http') ? faviconSetting : `${apiOrigin}${faviconSetting.startsWith('/') ? '' : '/'}${faviconSetting}`) : '';
 ---
 
 <!-- Global Metadata -->
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-<link rel="icon" href="/favicon.ico" />
+{faviconUrl ? (
+  <link rel="icon" href={faviconUrl} />
+) : (
+  <>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" />
+  </>
+)}
 <link rel="sitemap" href="/sitemap-index.xml" />
 <link
 	rel="alternate"
@@ -41,9 +53,9 @@ const metaPixelCode = s.meta_pixel_code || '';
 />
 <meta name="generator" content={Astro.generator} />
 
-<!-- app.css + Google Fonts + module CSS all loaded by single deferred script in ModuleStyles -->
-<noscript><link rel="stylesheet" href="/nickl-assets/css/app.css" /></noscript>
-
+<!-- Preconnect to Google Fonts for faster font loading -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <!-- Canonical URL -->
 <link rel="canonical" href={canonicalURL} />
 

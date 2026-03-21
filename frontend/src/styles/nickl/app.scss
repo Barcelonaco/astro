@@ -1,0 +1,41 @@
+// BASE
+// ----------------------------------------
+@import 'base/reset';
+@import 'base/variables';
+@import 'base/mixin';
+
+
+// COMPONENT
+// ----------------------------------------
+@import 'components/buttons';
+@import 'components/breadcrumb';
+@import 'components/floating-btn';
+@import 'components/editor';
+@import 'components/form';
+@import 'components/module-protected';
+@import 'components/no-cookies';
+@import 'components/pagination';
+@import 'components/popins';
+@import 'components/sliders';
+@import 'components/social-networks';
+@import 'components/tabs';
+
+
+// PARTIALS
+// ----------------------------------------
+@import 'partials/accessibility';
+@import 'partials/document';
+@import 'partials/cookies';
+@import 'partials/footer';
+@import 'partials/header';
+@import 'partials/search-form';
+@import 'partials/sidebar';
+
+
+// MODULES (inclus dans app.css)
+// ----------------------------------------
+@import 'modules/modules';
+@import 'modules/gallery';
+@import 'modules/references';
+@import 'modules/alert';
+@import 'modules/share';

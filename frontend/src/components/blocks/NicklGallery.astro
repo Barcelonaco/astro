@@ -75,76 +75,42 @@ const list = (data.list as any[]) ?? [];
         const image = gallery.image || {};
         const imgSizes = image.sizes || {};
         const imgUrl = imgSizes[sizes] || image.url || '';
-        const link = gallery.link || {};
-        const hasLink = !!(link.url);
         return (
           <li class="item">
-            {hasLink ? (
-              <a href={link.url} target={link.target || '_self'} class="link">
-                <div class="illus-wrapper">
-                  {typeImg === 'img-fluid' ? (
-                    <img src={imgUrl} alt={image.alt ?? ''} class="illus" no-lazy />
-                  ) : (
-                    <img src={imgUrl} alt={image.alt ?? ''} class="illus" loading="lazy" />
-                  )}
-                  <div class="overlay">
-                    <span class="icon" aria-hidden="false">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    </span>
-                    Agrandir
-                  </div>
-                </div>
-                {(!!(gallery.tag) || !!(gallery.titre)) && (
-                  <div class="desc">
-                    {gallery.tag && <p class="category">{gallery.tag}</p>}
-                    {gallery.titre && (
-                      <h2 class="title title-section-3" data-text={gallery.titre}>{gallery.titre}</h2>
-                    )}
-                    {gallery.desc && (
-                      <div class="txt editor">
-                        <p set:html={cleanHtml(gallery.desc).replace(/\n/g, '<br>')} />
-                      </div>
-                    )}
-                    <span class="btn btn-primary">{link.title || 'En savoir plus'}</span>
-                  </div>
+            <button
+              type="button"
+              class="link js_open-popin"
+              data-popin={`gallery-${indexPopin}`}
+              data-slide={String(index + 1)}
+            >
+              <div class="illus-wrapper">
+                {typeImg === 'img-fluid' ? (
+                  <img src={imgUrl} alt={image.alt ?? ''} class="illus" no-lazy />
+                ) : (
+                  <img src={imgUrl} alt={image.alt ?? ''} class="illus" loading="lazy" />
                 )}
-              </a>
-            ) : (
-              <button
-                type="button"
-                class="link js_open-popin"
-                data-popin={`gallery-${indexPopin}`}
-                data-slide={String(index + 1)}
-              >
-                <div class="illus-wrapper">
-                  {typeImg === 'img-fluid' ? (
-                    <img src={imgUrl} alt={image.alt ?? ''} class="illus" no-lazy />
-                  ) : (
-                    <img src={imgUrl} alt={image.alt ?? ''} class="illus" loading="lazy" />
-                  )}
-                  <div class="overlay">
-                    <span class="icon" aria-hidden="false">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    </span>
-                    Agrandir
-                  </div>
+                <div class="overlay">
+                  <span class="icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>
+                  </span>
+                  Agrandir
                 </div>
-                {(!!(gallery.tag) || !!(gallery.titre)) && (
-                  <div class="desc">
-                    {gallery.tag && <p class="category">{gallery.tag}</p>}
-                    {gallery.titre && (
-                      <h2 class="title title-section-3" data-text={gallery.titre}>{gallery.titre}</h2>
-                    )}
-                    {gallery.desc && (
-                      <div class="txt editor">
-                        <p set:html={cleanHtml(gallery.desc).replace(/\n/g, '<br>')} />
-                      </div>
-                    )}
-                    <span class="fake-btn btn btn-tertiary">En savoir plus</span>
-                  </div>
-                )}
-              </button>
-            )}
+              </div>
+              {(!!(gallery.tag) || !!(gallery.titre)) && (
+                <div class="desc">
+                  {gallery.tag && <p class="category">{gallery.tag}</p>}
+                  {gallery.titre && (
+                    <h2 class="title title-section-3" data-text={gallery.titre}>{gallery.titre}</h2>
+                  )}
+                  {gallery.desc && (
+                    <div class="txt editor">
+                      <p set:html={cleanHtml(gallery.desc).replace(/\n/g, '<br>')} />
+                    </div>
+                  )}
+                  <span class="fake-btn btn btn-tertiary">En savoir plus</span>
+                </div>
+              )}
+            </button>
           </li>
         );
       })}
@@ -158,7 +124,7 @@ const list = (data.list as any[]) ?? [];
 
       <button type="button" class="btn-close js_close-popin" title="Fermer la popin">
         <span class="icon" aria-hidden="true">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8,6.61L14.61,0l1.39,1.39-6.61,6.61,6.61,6.61-1.39,1.39-6.61-6.61L1.39,16l-1.39-1.39,6.61-6.61L0,1.39,1.39,0l6.61,6.61Z"/></svg>
         </span>
       </button>
 
@@ -174,7 +140,7 @@ const list = (data.list as any[]) ?? [];
                   return (
                     <div class={`swiper-slide item ${hasDesc ? 'has-desc' : 'no-desc'}`}>
                       <div class="illus-wrapper">
-                        <img src={optimizedImageUrl(image.url || '', 800, 80)} alt={image.alt ?? ''} class="illus" loading="lazy" />
+                        <img src={optimizedImageUrl(image.url || '', 800, 70)} alt={image.alt ?? ''} class="illus" loading="lazy" />
                       </div>
                       {hasDesc && (
                         <div class="container-large container-2">
@@ -216,3 +182,266 @@ const list = (data.list as any[]) ?? [];
   </div>
 
 </div>
+
+<style is:global>
+  /* Popin gallery — critical styles (reproduces _popins.scss + _images-slider.scss) */
+  .popin-gallery-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    visibility: hidden;
+    opacity: 0;
+    z-index: 9999;
+    transition: all .6s ease;
+  }
+  .popin-gallery-wrapper::before {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: .74;
+    z-index: -1;
+    background-color: #000;
+    content: '';
+  }
+  .popin-gallery-wrapper.active {
+    visibility: visible;
+    opacity: 1;
+  }
+  .popin-gallery-wrapper .popin {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, .5);
+  }
+  .popin-gallery-wrapper .popin .btn-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 70px;
+    height: 70px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .popin-gallery-wrapper .popin .btn-close .icon {
+    display: block;
+    max-width: 24px;
+  }
+  .popin-gallery-wrapper .popin .btn-close svg * {
+    fill: #fff;
+  }
+  /* Swiper critical */
+  .popin-gallery-wrapper .swiper {
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+  }
+  .popin-gallery-wrapper .swiper-wrapper {
+    display: flex;
+    height: 100%;
+  }
+  .popin-gallery-wrapper .swiper-slide {
+    flex-shrink: 0;
+    width: 100%;
+    height: 100%;
+  }
+  /* Slide item — reproduces .module-images-slider.full-width .item */
+  .popin-gallery-wrapper .item {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    height: 100vh;
+    max-height: 100vh;
+    color: #fff;
+  }
+  .popin-gallery-wrapper .item::after {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 50%;
+    z-index: 5;
+    background: linear-gradient(0deg, rgba(0,0,0,.5) 50%, rgba(255,255,255,0) 100%);
+    content: '';
+  }
+  .popin-gallery-wrapper .item.no-desc::after {
+    display: none;
+  }
+  /* Image — full cover behind desc */
+  .popin-gallery-wrapper .illus-wrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .popin-gallery-wrapper .illus {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+  }
+  /* Desc overlay — reproduces .module-images-slider .desc */
+  .popin-gallery-wrapper .container-large {
+    max-width: 100vw;
+  }
+  .popin-gallery-wrapper .container-2 {
+    padding-right: 0;
+    padding-left: 0;
+  }
+  .popin-gallery-wrapper .desc {
+    position: relative;
+    width: 100%;
+    padding: 0 3.5% 6%;
+    z-index: 10;
+    text-shadow: 0 0 20px rgba(0,0,0,.5);
+  }
+  .popin-gallery-wrapper .desc .title {
+    margin: 0;
+    max-width: 726px;
+    text-align: inherit;
+    color: #fff;
+  }
+  .popin-gallery-wrapper .desc .txt {
+    max-width: 726px;
+    margin-top: 18px;
+  }
+  .popin-gallery-wrapper .desc .btn-wrapper {
+    margin-top: 30px;
+  }
+  /* Pagination — reproduces .module-images-slider.full-width .slider-pagination */
+  .popin-gallery-wrapper .slider-pagination {
+    top: auto;
+    bottom: 0;
+    padding-bottom: 2.72%;
+  }
+  .popin-gallery-wrapper .slider-pagination .swiper-pagination-bullet {
+    background-color: #fff;
+  }
+  /* Navigation — reproduces .module-images-slider.full-width .slider-navigation */
+  .popin-gallery-wrapper .slider-navigation::before {
+    border-color: #fff;
+  }
+  .popin-gallery-wrapper .slider-navigation.prev {
+    left: 8px;
+  }
+  .popin-gallery-wrapper .slider-navigation.next {
+    right: 8px;
+  }
+  html.disable-scroll {
+    overflow: hidden;
+  }
+</style>
+
+<script is:inline>
+(function() {
+  function initGallerySwiper(el, slide) {
+    // Destroy any existing broken instance (e.g. initialized while hidden)
+    if (el.swiper) {
+      el.swiper.destroy(true, true);
+    }
+    var count = el.querySelectorAll(':scope > .swiper-wrapper > .swiper-slide').length;
+    if (count < 1) return;
+    var w = el.closest('.slider-wrapper');
+    var pagEl = w ? w.querySelector('.js_images-slider-pagination') : null;
+    new window.Swiper(el, {
+      loop: count > 2,
+      speed: 750,
+      slidesPerView: 1,
+      initialSlide: (slide || 1) - 1,
+      autoplay: false,
+      navigation: {
+        nextEl: w ? w.querySelector('.next') : null,
+        prevEl: w ? w.querySelector('.prev') : null
+      },
+      pagination: { el: pagEl, type: 'bullets', clickable: true }
+    });
+  }
+
+  function loadSwiper(callback) {
+    if (window.Swiper) { callback(); return; }
+    // Load Swiper CSS
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css';
+    document.head.appendChild(link);
+    // Load Swiper JS
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js';
+    s.onload = callback;
+    document.head.appendChild(s);
+  }
+
+  function openGalleryPopin(popinId, slide) {
+    var wrapper = document.querySelector('.popin-wrapper[data-popin="' + popinId + '"]');
+    if (!wrapper) return;
+
+    wrapper.style.display = '';
+    // Force reflow before adding active class for CSS transition
+    wrapper.offsetHeight;
+    wrapper.classList.add('active');
+    document.documentElement.classList.add('disable-scroll');
+
+    // Init Swiper (always destroy + recreate to get correct dimensions)
+    var sliderEl = wrapper.querySelector('.js_images-slider');
+    if (sliderEl) {
+      loadSwiper(function() { initGallerySwiper(sliderEl, slide); });
+    }
+  }
+
+  function closeGalleryPopin(wrapper) {
+    if (!wrapper) return;
+    wrapper.classList.remove('active');
+    setTimeout(function() {
+      document.documentElement.classList.remove('disable-scroll');
+      wrapper.style.display = 'none';
+    }, 600);
+  }
+
+  // Popin open
+  document.querySelectorAll('.module-gallery .js_open-popin').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var popinId = this.getAttribute('data-popin');
+      var slide = parseInt(this.getAttribute('data-slide'), 10) || 1;
+      openGalleryPopin(popinId, slide);
+    });
+  });
+
+  // Popin close
+  document.querySelectorAll('.popin-gallery-wrapper .js_close-popin').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      closeGalleryPopin(this.closest('.popin-wrapper'));
+    });
+  });
+
+  // Close on click outside
+  document.querySelectorAll('.popin-gallery-wrapper').forEach(function(wrapper) {
+    wrapper.addEventListener('click', function(e) {
+      if (e.target === this) closeGalleryPopin(this);
+    });
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var active = document.querySelector('.popin-gallery-wrapper.active');
+      if (active) closeGalleryPopin(active);
+    }
+  });
+})();
+</script>

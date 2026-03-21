@@ -1,4 +1,5 @@
 import { Page } from '../models/Page.js';
+import db from '../db.js';
 
 export async function getAllPages(req, res) {
   try {
@@ -112,7 +113,10 @@ export async function updatePage(req, res) {
 
 export async function deletePage(req, res) {
   try {
-    await Page.delete(req.params.id);
+    const pageId = req.params.id;
+    // Remove menu items referencing this page
+    await db.query('DELETE FROM menu_items WHERE page_id = ? AND type = ?', [pageId, 'page']);
+    await Page.delete(pageId);
     res.json({ message: 'Page deleted successfully' });
   } catch (error) {
     console.error('Error deleting page:', error);

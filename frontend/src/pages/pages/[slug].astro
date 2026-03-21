@@ -28,12 +28,12 @@ function extractLcpImages(blocks: any[] | null): { desktop: string; mobile: stri
     const slide = first.data.hero_sliders[0];
     const mobileUrl = slide.image_mobile?.url || slide.image.url;
     return {
-      desktop: optimizedImageUrl(slide.image.url, 1920, 70),
+      desktop: optimizedImageUrl(slide.image.url, 1440, 55),
       mobile: optimizedImageUrl(mobileUrl, 600, 50),
     };
   }
   if (first.type === 'banner' && first.data?.image?.url) {
-    const url = optimizedImageUrl(first.data.image.url, 1920, 70);
+    const url = optimizedImageUrl(first.data.image.url, 1440, 55);
     return { desktop: url, mobile: url };
   }
   return { desktop: '', mobile: '' };
@@ -41,7 +41,7 @@ function extractLcpImages(blocks: any[] | null): { desktop: string; mobile: stri
 
 const { slug } = Astro.params;
 // Fetch page + bootstrap data in parallel (2 HTTP calls instead of 4+)
-const [page, { siteInfo, styleSettings, siteSettings, navigation: navigationData }] = await Promise.all([
+const [page, { siteInfo, styleSettings, siteSettings, navigation: navigationData, secondaryNavigation }] = await Promise.all([
   getPageBySlug(slug as string),
   getFrontendBootstrap(),
 ]);
@@ -55,6 +55,12 @@ if (!page || page.status !== 'published') {
 const blocks = parseBlocks(page.content);
 const isBlockPage = blocks !== null;
 const lcpImages = extractLcpImages(blocks as any[] | null);
+
+// Body classes from identity settings
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ');
 ---
 
 <!doctype html>
@@ -65,8 +71,8 @@ const lcpImages = extractLcpImages(blocks as any[] | null);
 		{lcpImages.desktop && <link rel="preload" as="image" href={lcpImages.desktop} media="(min-width: 601px)" fetchpriority="high" />}
 		<ModuleStyles blocks={blocks} />
 	</head>
-	<body>
-		<Header siteName={siteName} navigation={navigationData} siteSettings={siteSettings} />
+	<body class={bodyClasses || undefined}>
+		<Header siteName={siteName} navigation={navigationData} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
 		<main class={isBlockPage ? 'main-page' : ''}>
 			<article>
 				{!isBlockPage && (

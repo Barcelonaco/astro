@@ -14,13 +14,13 @@
 .module-clickable {
     // Informations visibles au survol
     &.style-2 {
-        .item-content {
+        .item {
             &:hover, &:focus {
                 .illus-wrapper::before, .video-wrapper::before {
                     opacity: 1;
                 }
                 .desc {
-                    top: 0;
+                    transform: translateY(0);
                     opacity: 1;
                 }
             }
@@ -30,7 +30,7 @@
             transition: $transition-default;
         }
         .desc {
-            top: rem(10px);
+            transform: translateY(rem(10px));
             opacity: 0;
             transition: $transition-default;
         }
@@ -39,7 +39,7 @@
     /* Tuiles imbriquées */
     .cols-wrapper {
         @include flex(flex-start, stretch);
-        gap: rem(20px) rem(28px);
+        gap: rem(28px);
         .col-1, &.items-2 .col-2 {
             .item::before {
                 padding-top: rem(650px);
@@ -64,20 +64,55 @@
                 flex-basis: 100%;
             }
         }
+        &.items-6, &.items-7 {
+            .col-1, .col-1-bis {
+                flex-basis: calc(100% / 4 - 0.9375rem);
+            }
+        }
+        &.items-7 {
+            .col-2 {
+                flex-basis: calc(75% - .875rem);
+                .item {
+                    flex-basis: calc((100% / 3) - 1.16667rem);
+                }
+            }
+        }
+        &.items-8 {
+            .items {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 1.75rem;
+            }
+            .item:nth-child(2),
+            .item:nth-child(7) {
+                flex-basis: calc(30% - 1.3125rem);
+            }
+
+            .item:nth-child(1),
+            .item:nth-child(3),
+            .item:nth-child(6),
+            .item:nth-child(8) {
+                flex-basis: calc(25% - 1.3125rem);
+            }
+            .item:nth-child(4),
+            .item:nth-child(5) {
+                flex-basis: calc(20% - 1.3125rem);
+            }
+        }
     }
     .col {
         flex-basis: calc((100% - #{rem(28px)}) / 2);
         @include flex(flex-start, stretch, wrap);
         flex-grow: 1;
         &-2 {
-            gap: rem(20px) rem(28px);
+            gap: rem(28px);
         }
     }
 
     /* Tuiles non imbriqué */
     .list {
         @include flex(flex-start, stretch, wrap);
-        gap: rem(20px) rem(28px);
+        gap: rem(28px);
         &.items-1 .item {
             flex-grow: 1;
         }
@@ -98,11 +133,11 @@
             flex: 1 1 10%;
         }
         .item::before {
-            padding-top: rem(650px);  
+            padding-top: rem(650px);
         }
         .item.landscape::before {
-            padding-top: rem(300px);                
-        }      
+            padding-top: rem(300px);
+        }
         .desc {
             padding: rem(40px) rem(63px);
         }
@@ -111,6 +146,25 @@
         }
         .txt {
             margin-top: 0;
+        }
+        &.items-6, &.items-7, &.items-8 {
+            flex-wrap: nowrap;
+            .item {
+                transition: $transition-default;
+                .desc {
+                    padding: 2rem;
+                    width: calc(0.25 * (min(100vw, 120rem) - 10vw) - 1.75rem);
+                    min-width: calc(0.25 * (min(100vw, 120rem) - 10vw) - 1.75rem);
+                    opacity: 0;
+                    transition: $transition-default;
+                }
+                &:hover {
+                    flex-basis: 25%!important;
+                    .desc {
+                        opacity: 1;
+                    }
+                }
+            }
         }
     }
 
@@ -354,6 +408,20 @@
             min-height: 73%;
             &::before {
                 padding-top: 73%;
+            }
+        }
+        .list {
+            &.items-6, &.items-7, &.items-8 {
+                flex-wrap: wrap;
+                .item {
+                    .desc {
+                        opacity: 1;
+                        width: 100%;
+                    }
+                    &:hover {
+                        flex-basis: 100%!important;
+                    }
+                }
             }
         }
         .item::before {
