@@ -63,6 +63,18 @@ img {
 	max-width: 100%;
 	height: auto;
 }
+/* Prevent CLS for module images that lack explicit width/height attributes */
+.module .illus,
+.module .illus-video {
+	aspect-ratio: 16/9;
+	object-fit: cover;
+	width: 100%;
+}
+.block-image img {
+	aspect-ratio: 3/2;
+	object-fit: cover;
+	width: 100%;
+}
 hr {
 	border: none;
 	border-top: 1px solid rgb(var(--gray-light));

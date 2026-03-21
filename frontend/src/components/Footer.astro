@@ -114,7 +114,7 @@ const today = new Date();
         <div class="col col-1">
           {logoUrl && (
             <div class="logo-wrapper">
-              <img src={logoUrl} alt={siteName} title={siteName} class="logo" />
+              <img src={logoUrl} alt={siteName} title={siteName} class="logo" width="200" height="100" loading="lazy" />
             </div>
           )}
           {phone && (
@@ -157,7 +157,7 @@ const today = new Date();
             <ul class="social-networks">
               {socialNetworks.map(item => (
                 <li class="item-social">
-                  <a href={s[item.key]} title={item.label} target="_blank" rel="noopener noreferrer" class="link">
+                  <a href={s[item.key]} title={item.label} aria-label={item.label} target="_blank" rel="noopener noreferrer" class="link">
                     <span class="icon" aria-hidden="true" set:html={socialSvgs[item.key]} />
                   </a>
                 </li>

@@ -98,5 +98,10 @@ if (!isNaN(logoHeight)) cssVars.push(`--logo-height:${logoHeight}px`);
 {/* Inline CSS variables — no client-side fetch needed */}
 <style set:html={`:root{${cssVars.join(';')}}`} />
 
-{/* Google Fonts URL exposed as meta tag for the unified deferred loader */}
-{googleFontsUrl && <meta name="x-google-fonts" content={googleFontsUrl} />}
+{/* Google Fonts — preload for faster LCP, loaded via DeferredLoader */}
+{googleFontsUrl && (
+  <>
+    <link rel="preload" as="style" href={googleFontsUrl} />
+    <meta name="x-google-fonts" content={googleFontsUrl} />
+  </>
+)}
