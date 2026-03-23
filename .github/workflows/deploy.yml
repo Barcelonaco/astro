@@ -1,0 +1,30 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 162.19.56.20
+          username: bcnco
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/astro.bcnco.site/httpdocs
+
+            # Pull les derniers changements
+            git pull origin main
+
+            # Install des dépendances et build
+            npm run install:all
+            npm run build
+
+            # Redémarrer le backend (adapter selon ton process manager)
+            pm2 restart cms-astro || pm2 start backend/src/server.js --name cms-astro
