@@ -16,6 +16,7 @@ jobs:
           host: 162.19.56.20
           username: bcnco
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: |
             cd ~/astro.bcnco.site/httpdocs
 
