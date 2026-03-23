@@ -1,0 +1,394 @@
+{
+  "app": {
+    "js": [
+      "js/runtime.js",
+      "js/app.js"
+    ],
+    "css": [
+      "css/app.css"
+    ],
+    "dependencies": [
+      "jquery"
+    ]
+  },
+  "admin": {
+    "js": [
+      "js/runtime.js",
+      "js/admin.js"
+    ],
+    "css": [
+      "css/admin.css"
+    ],
+    "dependencies": []
+  },
+  "ajaxRefs": {
+    "js": [
+      "js/runtime.js",
+      "js/ajaxRefs.js"
+    ],
+    "dependencies": []
+  },
+  "ajaxNews": {
+    "js": [
+      "js/runtime.js",
+      "js/ajaxNews.js"
+    ],
+    "dependencies": []
+  },
+  "ajaxEvents": {
+    "js": [
+      "js/runtime.js",
+      "js/ajaxEvents.js"
+    ],
+    "dependencies": []
+  },
+  "autoload": {
+    "js": [
+      "js/runtime.js",
+      "js/autoload.js"
+    ],
+    "dependencies": []
+  },
+  "accordion": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/accordion.css"
+    ],
+    "dependencies": []
+  },
+  "banner": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/banner.css"
+    ],
+    "dependencies": []
+  },
+  "hero": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/hero.css"
+    ],
+    "dependencies": []
+  },
+  "clickable-tiles": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/clickable-tiles.css"
+    ],
+    "dependencies": []
+  },
+  "columns-tab": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/columns-tab.css"
+    ],
+    "dependencies": []
+  },
+  "contact": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/contact.css"
+    ],
+    "dependencies": []
+  },
+  "events-slider": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/events-slider.css"
+    ],
+    "dependencies": []
+  },
+  "featured_products": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/featured_products.css"
+    ],
+    "dependencies": []
+  },
+  "files": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/files.css"
+    ],
+    "dependencies": []
+  },
+  "form": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/form.css"
+    ],
+    "dependencies": []
+  },
+  "gallery": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/gallery.css"
+    ],
+    "dependencies": []
+  },
+  "head-text": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/head-text.css"
+    ],
+    "dependencies": []
+  },
+  "icons": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/icons.css"
+    ],
+    "dependencies": []
+  },
+  "illustration-video": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/illustration-video.css"
+    ],
+    "dependencies": []
+  },
+  "images-videos-parallax": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/images-videos-parallax.css"
+    ],
+    "dependencies": []
+  },
+  "images-slider": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/images-slider.css"
+    ],
+    "dependencies": []
+  },
+  "insta-slider": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/insta-slider.css"
+    ],
+    "dependencies": []
+  },
+  "key-figures": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/key-figures.css"
+    ],
+    "dependencies": []
+  },
+  "link": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/link.css"
+    ],
+    "dependencies": []
+  },
+  "logos-slider": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/logos-slider.css"
+    ],
+    "dependencies": []
+  },
+  "map": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/map.css"
+    ],
+    "dependencies": []
+  },
+  "news-slider": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/news-slider.css"
+    ],
+    "dependencies": []
+  },
+  "newsletter-form": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/newsletter-form.css"
+    ],
+    "dependencies": []
+  },
+  "ornament": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/ornament.css"
+    ],
+    "dependencies": []
+  },
+  "plansite": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/plansite.css"
+    ],
+    "dependencies": []
+  },
+  "free-post": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/free-post.css"
+    ],
+    "dependencies": []
+  },
+  "quote": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/quote.css"
+    ],
+    "dependencies": []
+  },
+  "references": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/references.css"
+    ],
+    "dependencies": []
+  },
+  "review": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/review.css"
+    ],
+    "dependencies": []
+  },
+  "separator": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/separator.css"
+    ],
+    "dependencies": []
+  },
+  "share": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/share.css"
+    ],
+    "dependencies": []
+  },
+  "summary": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/summary.css"
+    ],
+    "dependencies": []
+  },
+  "team": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/team.css"
+    ],
+    "dependencies": []
+  },
+  "text": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/text.css"
+    ],
+    "dependencies": []
+  },
+  "text-image": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/text-image.css"
+    ],
+    "dependencies": []
+  },
+  "text-scrolling": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/text-scrolling.css"
+    ],
+    "dependencies": []
+  },
+  "text-video-slider": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/text-video-slider.css"
+    ],
+    "dependencies": []
+  },
+  "video": {
+    "js": [
+      "js/runtime.js"
+    ],
+    "css": [
+      "css/video.css"
+    ],
+    "dependencies": []
+  }
+}
