@@ -26,5 +26,5 @@ jobs:
             npm run install:all
             npm run build
 
-            # Redémarrer le backend (adapter selon ton process manager)
-            pm2 restart cms-astro || pm2 start backend/src/server.js --name cms-astro
+            # Redémarrer le backend via Plesk
+            touch backend/tmp/restart.txt
