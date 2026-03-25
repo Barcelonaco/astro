@@ -60,6 +60,11 @@ import {
   getAllReusableBlocs, getReusableBlocById,
   createReusableBloc, updateReusableBloc, deleteReusableBloc
 } from '../controllers/reusableBlocController.js';
+import {
+  getAllForms, getFormById, createForm, updateForm, deleteForm,
+  getFormEntries, getEntryById, updateEntryStatus, deleteEntry, exportEntries,
+  getPublicForm, submitForm
+} from '../controllers/formController.js';
 import { authenticateToken, isAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -165,6 +170,24 @@ router.put('/menus/:id/items', authenticateToken, isAdmin, saveMenuItems);
 // Page ↔ Menu assignments (admin)
 router.get('/pages/:pageId/menus', authenticateToken, isAdmin, getPageMenus);
 router.put('/pages/:pageId/menus', authenticateToken, isAdmin, syncPageMenus);
+
+// Forms — public (frontend rendering & submission)
+router.get('/forms/public/:id', getPublicForm);
+router.post('/forms/:id/submit', submitForm);
+
+// Forms — admin CRUD
+router.get('/forms', authenticateToken, isAdmin, getAllForms);
+router.get('/forms/:id', authenticateToken, isAdmin, getFormById);
+router.post('/forms', authenticateToken, isAdmin, createForm);
+router.put('/forms/:id', authenticateToken, isAdmin, updateForm);
+router.delete('/forms/:id', authenticateToken, isAdmin, deleteForm);
+
+// Form entries — admin
+router.get('/forms/:id/entries', authenticateToken, isAdmin, getFormEntries);
+router.get('/forms/:id/entries/export', authenticateToken, isAdmin, exportEntries);
+router.get('/forms/entries/:entryId', authenticateToken, isAdmin, getEntryById);
+router.put('/forms/entries/:entryId/status', authenticateToken, isAdmin, updateEntryStatus);
+router.delete('/forms/entries/:entryId', authenticateToken, isAdmin, deleteEntry);
 
 // Custom Post Types (dynamic, from plugins)
 // NOTE: categories route must come before :slug to avoid conflict

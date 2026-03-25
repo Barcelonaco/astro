@@ -34,13 +34,13 @@ export const Page = {
   },
 
   async create(pageData) {
-    const { title, slug, content, author_id, status, show_in_menu, menu_order, parent_id } = pageData;
+    const { title, slug, content, author_id, status, show_in_menu, menu_order, parent_id, color_overrides, seo_meta } = pageData;
     const query = `
-      INSERT INTO pages (title, slug, content, author_id, status, show_in_menu, menu_order, parent_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO pages (title, slug, content, color_overrides, seo_meta, author_id, status, show_in_menu, menu_order, parent_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await db.query(query, [
-      title, slug, content, author_id, status,
+      title, slug, content, color_overrides || null, seo_meta || null, author_id, status,
       show_in_menu !== undefined ? show_in_menu : true,
       menu_order || 0,
       parent_id || null
@@ -49,14 +49,14 @@ export const Page = {
   },
 
   async update(id, pageData) {
-    const { title, slug, content, status, show_in_menu, menu_order, parent_id } = pageData;
+    const { title, slug, content, status, show_in_menu, menu_order, parent_id, color_overrides, seo_meta } = pageData;
     const query = `
       UPDATE pages
-      SET title = ?, slug = ?, content = ?, status = ?, show_in_menu = ?, menu_order = ?, parent_id = ?
+      SET title = ?, slug = ?, content = ?, color_overrides = ?, seo_meta = ?, status = ?, show_in_menu = ?, menu_order = ?, parent_id = ?
       WHERE id = ?
     `;
     await db.query(query, [
-      title, slug, content, status,
+      title, slug, content, color_overrides || null, seo_meta || null, status,
       show_in_menu !== undefined ? show_in_menu : true,
       menu_order || 0,
       parent_id || null,

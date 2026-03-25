@@ -1,13 +1,14 @@
 /* Import du CSS Nickl principal */
 @import url('/nickl-assets/css/app.css');
 
-/* Surcharges spécifiques au back-office pour la prévisualisation des modules Nickl */
+/* Surcharges spécifiques au back-office pour la prévisualisation des modules Nickl.
+   Principe : laisser le CSS Nickl (app.css) gérer les couleurs de texte de chaque module.
+   L'admin ne force que les backgrounds et quelques corrections de contexte. */
 
-/* Contexte du builder : les modules doivent se comporter comme sur le front */
+/* 1. LAYOUT : positionnement et z-index des modules dans le builder */
 .builder-canvas-inner .module {
   position: relative;
   overflow: hidden;
-  background: transparent !important; /* laisser la couleur de fond Nickl ou l'image de fond s'exprimer */
 }
 
 .builder-canvas-inner .module .background {
@@ -20,7 +21,6 @@
   display: block !important;
 }
 
-/* Pour les modules avec parallax : laisser top: -25% et height: 125% (depuis app.css) s'appliquer */
 .builder-canvas-inner .module.background-parallax .background {
   top: -25%;
   bottom: auto;
@@ -38,24 +38,52 @@
   background: transparent;
 }
 
-/* Assurer que la couleur de fond du bloc (has-background-*) se voit dans le builder,
-   même si certaines règles Nickl fixent d'autres backgrounds.
-   Fallbacks requis car les variables Nickl peuvent ne pas être définies dans le contexte admin. */
+/* 2. COULEURS DE BASE : cascadent depuis le canvas vers les modules */
+.builder-canvas-inner {
+  color: var(--color-default, #001527);
+  background-color: var(--color-background, #ffffff);
+}
+
+/* 3. FONDS COLORÉS : assurer la bonne couleur de fond dans le builder */
 .builder-canvas-inner .module.has-background-primary {
   background-color: var(--color-primary, #006a9b) !important;
+  color: #fff;
 }
-
 .builder-canvas-inner .module.has-background-secondary {
   background-color: var(--color-secondary, #ea644e) !important;
+  color: #fff;
 }
-
 .builder-canvas-inner .module.has-background-tertiary {
   background-color: var(--color-tertiary, #d0d0d0) !important;
+  color: var(--color-default, #001527);
 }
-
 .builder-canvas-inner .module.has-background-dark {
   background-color: var(--color-default, #001527) !important;
+  color: #fff;
 }
 
+/* 4. FOND BLANC pour les modules sans fond coloré (séparation visuelle entre blocs) */
+.builder-canvas-inner .module:not(.has-background-primary):not(.has-background-secondary):not(.has-background-tertiary):not(.has-background-dark) {
+  background-color: var(--color-background, #ffffff) !important;
+}
 
+/* 5. MODULES IMBRIQUÉS dans un parent coloré (ex: modules enfants dans colonnes) :
+   transparent pour laisser le fond coloré du parent visible,
+   comme sur le frontend. Spécificité 0,8,0 surcharge la règle 4 (0,6,0). */
+.builder-canvas-inner .module.has-background-primary .module:not(.has-background-primary):not(.has-background-secondary):not(.has-background-tertiary):not(.has-background-dark),
+.builder-canvas-inner .module.has-background-secondary .module:not(.has-background-primary):not(.has-background-secondary):not(.has-background-tertiary):not(.has-background-dark),
+.builder-canvas-inner .module.has-background-dark .module:not(.has-background-primary):not(.has-background-secondary):not(.has-background-tertiary):not(.has-background-dark) {
+  background-color: transparent !important;
+}
 
+/* 6. LIENS : reset pour hériter la couleur du parent (idem au reset Nickl) */
+.builder-canvas-inner .module a:not(.btn):not(.btn-primary):not(.btn-secondary):not(.btn-tertiary) {
+  color: inherit;
+}
+
+/* 7. FORMULAIRES */
+.builder-canvas-inner .module input:not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="color"]),
+.builder-canvas-inner .module textarea,
+.builder-canvas-inner .module select {
+  background-color: var(--color-form, #e3f3fc);
+}

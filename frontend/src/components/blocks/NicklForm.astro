@@ -1,7 +1,8 @@
 ---
 /**
- * Module Form — Reproduit form.blade.php
- * Stub — Gravity Forms n'est pas disponible hors WordPress.
+ * Module Form — Système de formulaires intégré
+ * Récupère la structure du formulaire via l'API et rend les champs HTML.
+ * La soumission est gérée côté client (fetch + reCAPTCHA v3).
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 
@@ -10,10 +11,554 @@ interface Props {
 }
 
 const { data } = Astro.props;
+const formId = data.form_id;
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+
+let form: any = null;
+if (formId) {
+  try {
+    const res = await fetch(`${API_URL}/forms/public/${formId}`);
+    if (res.ok) form = await res.json();
+  } catch (e) {
+    console.error('Error fetching form:', e);
+  }
+}
+
+const settings = form?.settings || {};
+const submitText = settings.submit_text || 'Envoyer';
+const recaptchaSiteKey = form?.recaptcha_site_key || null;
 ---
 
 <NicklModuleWrapper data={data} moduleName="form">
-  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
-    Le formulaire n'est pas disponible en mode statique (Gravity Forms requis).
-  </p>
+  {form ? (
+    <div class="nickl-form-container" data-form-id={formId} data-api-url={API_URL} data-recaptcha-key={recaptchaSiteKey || ''} data-redirect-url={settings.redirect_url || ''}>
+      <form class="nickl-form" novalidate>
+        <div class="nickl-form-fields">
+          {form.fields.map((field: any) => {
+            const width = field.settings?.width || '100';
+            const cssClass = field.settings?.css_class || '';
+            const req = field.required;
+
+            if (field.type === 'hidden') {
+              return <input type="hidden" name={field.name} value={field.settings?.default_value || ''} />;
+            }
+
+            if (field.type === 'html') {
+              return (
+                <div class={`nickl-form-field nickl-form-field--html w-${width} ${cssClass}`}>
+                  <Fragment set:html={field.settings?.html_content || ''} />
+                </div>
+              );
+            }
+
+            if (field.type === 'name') {
+              const firstLabel = field.settings?.first_label || 'Prénom';
+              const lastLabel = field.settings?.last_label || 'Nom';
+              return (
+                <div class={`nickl-form-field nickl-form-field--name w-${width} ${cssClass}`}>
+                  <div class="nickl-form-name-row">
+                    <div class="nickl-form-name-col">
+                      <div class="nickl-form-floating">
+                        <input type="text" name={`${field.name}_first`} id={`field-${formId}-${field.name}_first`} class="nickl-form-input" placeholder=" " required={req} />
+                        <label class="nickl-form-label" for={`field-${formId}-${field.name}_first`}>{firstLabel}{req && <span class="required">*</span>}</label>
+                      </div>
+                    </div>
+                    <div class="nickl-form-name-col">
+                      <div class="nickl-form-floating">
+                        <input type="text" name={`${field.name}_last`} id={`field-${formId}-${field.name}_last`} class="nickl-form-input" placeholder=" " required={req} />
+                        <label class="nickl-form-label" for={`field-${formId}-${field.name}_last`}>{lastLabel}{req && <span class="required">*</span>}</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="nickl-form-error" data-field={field.name}></div>
+                </div>
+              );
+            }
+
+            /* Floating label for text-like inputs and textarea */
+            const isFloatable = ['text', 'email', 'phone', 'number', 'url', 'date', 'time', 'textarea'].includes(field.type);
+
+            return (
+              <div class={`nickl-form-field nickl-form-field--${field.type} w-${width} ${cssClass}`}>
+
+                {isFloatable ? (
+                  <div class="nickl-form-floating">
+                    {field.type === 'textarea' ? (
+                      <textarea
+                        name={field.name}
+                        id={`field-${formId}-${field.name}`}
+                        class="nickl-form-textarea"
+                        placeholder=" "
+                        rows={field.settings?.rows || 4}
+                        required={req}
+                      />
+                    ) : (
+                      <input
+                        type={field.type === 'phone' ? 'tel' : field.type}
+                        name={field.name}
+                        id={`field-${formId}-${field.name}`}
+                        class="nickl-form-input"
+                        placeholder=" "
+                        required={req}
+                        min={field.settings?.min}
+                        max={field.settings?.max}
+                      />
+                    )}
+                    <label class="nickl-form-label" for={`field-${formId}-${field.name}`}>
+                      {field.label}{req && <span class="required">*</span>}
+                    </label>
+                  </div>
+                ) : (
+                  <>
+                    <label class="nickl-form-label nickl-form-label--static" for={`field-${formId}-${field.name}`}>
+                      {field.label}{req && <span class="required">*</span>}
+                    </label>
+
+                    {field.type === 'select' ? (
+                      <select name={field.name} id={`field-${formId}-${field.name}`} class="nickl-form-select" required={req}>
+                        <option value="">{field.placeholder || '— Choisir —'}</option>
+                        {(field.options || []).map((opt: string) => {
+                          const [label, val] = opt.includes('|') ? opt.split('|') : [opt, opt];
+                          return <option value={val}>{label}</option>;
+                        })}
+                      </select>
+                    ) : field.type === 'radio' ? (
+                      <div class="nickl-form-radio-group">
+                        {(field.options || []).map((opt: string, i: number) => {
+                          const [label, val] = opt.includes('|') ? opt.split('|') : [opt, opt];
+                          return (
+                            <label class="nickl-form-radio-label">
+                              <input type="radio" name={field.name} value={val} required={req && i === 0} />
+                              <span>{label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : field.type === 'checkbox' ? (
+                      <div class="nickl-form-checkbox-group">
+                        {(field.options || []).map((opt: string) => {
+                          const [label, val] = opt.includes('|') ? opt.split('|') : [opt, opt];
+                          return (
+                            <label class="nickl-form-checkbox-label">
+                              <input type="checkbox" name={field.name} value={val} />
+                              <span>{label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : field.type === 'file' ? (
+                      <input
+                        type="file"
+                        name={field.name}
+                        id={`field-${formId}-${field.name}`}
+                        class="nickl-form-input"
+                        accept={field.settings?.accept || ''}
+                        required={req}
+                      />
+                    ) : null}
+                  </>
+                )}
+
+                <div class="nickl-form-error" data-field={field.name}></div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div class="nickl-form-submit">
+          <button type="submit" class="nickl-form-btn">{submitText}</button>
+        </div>
+
+        <div class="nickl-form-message" style="display:none"></div>
+      </form>
+    </div>
+  ) : (
+    <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+      {formId ? 'Formulaire introuvable.' : 'Aucun formulaire sélectionné.'}
+    </p>
+  )}
 </NicklModuleWrapper>
+
+<style is:global>
+  /* ── Layout ── */
+  .nickl-form-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .nickl-form-field { width: 100%; }
+  .nickl-form-field.w-50 { width: calc(50% - 10px); }
+  .nickl-form-field.w-33 { width: calc(33.333% - 14px); }
+  @media (max-width: 600px) {
+    .nickl-form-field.w-50,
+    .nickl-form-field.w-33 { width: 100%; }
+  }
+
+  /* ── Floating label wrapper ── */
+  .nickl-form-floating {
+    position: relative;
+  }
+
+  /* ── Inputs ── */
+  .nickl-form-input,
+  .nickl-form-textarea,
+  .nickl-form-select {
+    width: 100%;
+    padding: 22px 22px 10px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 50px;
+    font-size: 15px;
+    font-family: inherit;
+    background: white;
+    color: #1a1a2e;
+    transition: border-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                background-color 0.35s ease,
+                transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    -webkit-appearance: none;
+  }
+  .nickl-form-textarea {
+    padding-top: 28px;
+    border-radius: 24px;
+    resize: vertical;
+  }
+  .nickl-form-select {
+    padding-top: 14px;
+    padding-bottom: 14px;
+    cursor: pointer;
+  }
+
+  /* Hover */
+  .nickl-form-input:hover,
+  .nickl-form-textarea:hover,
+  .nickl-form-select:hover {
+    border-color: #a0aec0;
+    background-color: #fafbff;
+  }
+
+  /* Focus */
+  .nickl-form-input:focus,
+  .nickl-form-textarea:focus,
+  .nickl-form-select:focus {
+    outline: none;
+    border-color: var(--color-primary, #667eea);
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.12),
+                0 2px 8px rgba(102, 126, 234, 0.08);
+    background-color: #fff;
+    transform: translateY(-1px);
+  }
+
+  /* Error */
+  .nickl-form-input.is-error,
+  .nickl-form-textarea.is-error,
+  .nickl-form-select.is-error {
+    border-color: #e53e3e;
+    box-shadow: 0 0 0 4px rgba(229, 62, 62, 0.1);
+    animation: nickl-form-shake 0.4s ease;
+  }
+
+  /* ── Floating label ── */
+  .nickl-form-floating .nickl-form-label {
+    position: absolute;
+    left: 22px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 15px;
+    font-weight: 500;
+    color: #9ca3af;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: left center;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+  }
+  /* Textarea: label top-anchored */
+  .nickl-form-floating .nickl-form-textarea ~ .nickl-form-label {
+    top: 18px;
+    transform: translateY(0);
+  }
+
+  /* Label floats up on focus or when filled (placeholder-shown trick) */
+  .nickl-form-floating .nickl-form-input:focus ~ .nickl-form-label,
+  .nickl-form-floating .nickl-form-input:not(:placeholder-shown) ~ .nickl-form-label,
+  .nickl-form-floating .nickl-form-textarea:focus ~ .nickl-form-label,
+  .nickl-form-floating .nickl-form-textarea:not(:placeholder-shown) ~ .nickl-form-label {
+    top: 8px;
+    transform: translateY(0);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-primary, #667eea);
+    letter-spacing: 0.02em;
+  }
+
+  /* Static label (for select, radio, checkbox, file) */
+  .nickl-form-label--static {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #374151;
+  }
+
+  .nickl-form-label .required {
+    color: #e53e3e;
+    margin-left: 2px;
+  }
+
+  /* ── Error ── */
+  .nickl-form-error {
+    color: #e53e3e;
+    font-size: 12px;
+    margin-top: 6px;
+    min-height: 0;
+    padding-left: 4px;
+  }
+
+  /* ── Radio & Checkbox ── */
+  .nickl-form-radio-group,
+  .nickl-form-checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 0;
+  }
+  .nickl-form-radio-label,
+  .nickl-form-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 10px 18px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 50px;
+    transition: border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                background 0.3s ease,
+                transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s ease;
+  }
+  .nickl-form-radio-label:hover,
+  .nickl-form-checkbox-label:hover {
+    border-color: var(--color-primary, #667eea);
+    background: rgba(102, 126, 234, 0.04);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+  }
+  .nickl-form-radio-label:has(input:checked),
+  .nickl-form-checkbox-label:has(input:checked) {
+    border-color: var(--color-primary, #667eea);
+    background: rgba(102, 126, 234, 0.08);
+    box-shadow: 0 2px 10px rgba(102, 126, 234, 0.15);
+  }
+
+  /* ── Name (first + last) ── */
+  .nickl-form-name-row {
+    display: flex;
+    gap: 16px;
+  }
+  .nickl-form-name-col { flex: 1; }
+  @media (max-width: 480px) {
+    .nickl-form-name-row { flex-direction: column; }
+  }
+
+  /* ── Submit button ── */
+  .nickl-form-submit {
+    margin-top: 28px;
+  }
+  .nickl-form-btn {
+    display: inline-block;
+    padding: 16px 44px;
+    background: var(--color-primary, #667eea);
+    color: white;
+    border: none;
+    border-radius: 50px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    letter-spacing: 0.02em;
+  }
+  .nickl-form-btn:active {
+    transform: scale(0.97);
+  }
+  .nickl-form-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* ── Messages ── */
+  .nickl-form-message {
+    margin-top: 20px;
+    padding: 16px 20px;
+    border-radius: 14px;
+    font-size: 15px;
+    animation: nickl-form-fadeIn 0.4s ease;
+  }
+  .nickl-form-message.success {
+    background: #f0fff4;
+    color: #276749;
+    border: 1.5px solid #c6f6d5;
+  }
+  .nickl-form-message.error {
+    background: #fff5f5;
+    color: #c53030;
+    border: 1.5px solid #fed7d7;
+  }
+
+  /* ── Field entrance animation ── */
+  .nickl-form-field {
+    animation: nickl-form-fieldIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+  .nickl-form-field:nth-child(1) { animation-delay: 0s; }
+  .nickl-form-field:nth-child(2) { animation-delay: 0.06s; }
+  .nickl-form-field:nth-child(3) { animation-delay: 0.12s; }
+  .nickl-form-field:nth-child(4) { animation-delay: 0.18s; }
+  .nickl-form-field:nth-child(5) { animation-delay: 0.24s; }
+  .nickl-form-field:nth-child(6) { animation-delay: 0.30s; }
+  .nickl-form-field:nth-child(7) { animation-delay: 0.36s; }
+  .nickl-form-field:nth-child(8) { animation-delay: 0.42s; }
+
+  .nickl-form-submit {
+    animation: nickl-form-fieldIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.5s both;
+  }
+
+  @keyframes nickl-form-fieldIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes nickl-form-fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes nickl-form-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.nickl-form-container').forEach((container) => {
+      const formEl = container.querySelector('.nickl-form') as HTMLFormElement;
+      if (!formEl) return;
+
+      const formId = container.getAttribute('data-form-id');
+      const apiUrl = container.getAttribute('data-api-url');
+      const recaptchaKey = container.getAttribute('data-recaptcha-key');
+      const redirectUrl = container.getAttribute('data-redirect-url');
+      const messageEl = container.querySelector('.nickl-form-message') as HTMLElement;
+      const submitBtn = formEl.querySelector('.nickl-form-btn') as HTMLButtonElement;
+
+      // Load reCAPTCHA v3 if enabled
+      if (recaptchaKey) {
+        const script = document.createElement('script');
+        script.src = `https://www.google.com/recaptcha/api.js?render=${recaptchaKey}`;
+        script.async = true;
+        document.head.appendChild(script);
+      }
+
+      formEl.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        // Clear errors
+        container.querySelectorAll('.nickl-form-error').forEach(el => el.textContent = '');
+        container.querySelectorAll('.is-error').forEach(el => el.classList.remove('is-error'));
+        messageEl.style.display = 'none';
+
+        // Collect data
+        const formData = new FormData(formEl);
+        const payload: Record<string, any> = {};
+
+        // Handle checkboxes (multiple values)
+        const checkboxNames = new Set<string>();
+        formEl.querySelectorAll('input[type="checkbox"]').forEach((cb: any) => {
+          checkboxNames.add(cb.name);
+        });
+
+        for (const [key, value] of formData.entries()) {
+          if (checkboxNames.has(key)) {
+            if (!payload[key]) payload[key] = [];
+            payload[key].push(value);
+          } else {
+            payload[key] = value;
+          }
+        }
+
+        // Name fields: combine first + last
+        formEl.querySelectorAll('.nickl-form-field--name').forEach(nameField => {
+          const firstInput = nameField.querySelector('input[name$="_first"]') as HTMLInputElement;
+          const lastInput = nameField.querySelector('input[name$="_last"]') as HTMLInputElement;
+          if (firstInput && lastInput) {
+            const baseName = firstInput.name.replace('_first', '');
+            payload[baseName] = `${firstInput.value} ${lastInput.value}`.trim();
+            delete payload[firstInput.name];
+            delete payload[lastInput.name];
+          }
+        });
+
+        // reCAPTCHA token (non-bloquant si le script n'a pas chargé)
+        if (recaptchaKey && (window as any).grecaptcha) {
+          try {
+            await new Promise(resolve => (window as any).grecaptcha.ready(resolve));
+            const token = await (window as any).grecaptcha.execute(recaptchaKey, { action: 'submit' });
+            payload._recaptcha_token = token;
+          } catch (err) {
+            console.warn('reCAPTCHA token failed, submitting without it');
+          }
+        }
+
+        // Submit
+        submitBtn.disabled = true;
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Envoi en cours…';
+
+        try {
+          const res = await fetch(`${apiUrl}/forms/${formId}/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          const result = await res.json();
+
+          if (res.ok) {
+            messageEl.textContent = result.message || 'Envoyé avec succès !';
+            messageEl.className = 'nickl-form-message success';
+            messageEl.style.display = 'block';
+            formEl.reset();
+
+            if (redirectUrl) {
+              setTimeout(() => { window.location.href = redirectUrl; }, 1500);
+            }
+          } else {
+            // Field-specific error
+            if (result.field) {
+              const errorEl = container.querySelector(`.nickl-form-error[data-field="${result.field}"]`);
+              if (errorEl) errorEl.textContent = result.error;
+              const input = formEl.querySelector(`[name="${result.field}"]`);
+              if (input) input.classList.add('is-error');
+            }
+            messageEl.textContent = result.error || 'Une erreur est survenue.';
+            messageEl.className = 'nickl-form-message error';
+            messageEl.style.display = 'block';
+          }
+        } catch (err) {
+          messageEl.textContent = 'Erreur réseau. Veuillez réessayer.';
+          messageEl.className = 'nickl-form-message error';
+          messageEl.style.display = 'block';
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+      });
+    });
+  });
+</script>

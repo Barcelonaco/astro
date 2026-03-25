@@ -342,6 +342,9 @@ export async function updateSettings(req, res) {
       'aw_code',
       'gtm_code',
       'meta_pixel_code',
+      // reCAPTCHA
+      'recaptcha_site_key',
+      'recaptcha_secret_key',
       // Technique (admin)
       'is_onepage',
       'is_activate_schemas',

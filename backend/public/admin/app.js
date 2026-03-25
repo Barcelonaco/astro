@@ -175,6 +175,7 @@ async function loadSection(section) {
     case 'site-settings':
       content.innerHTML = await renderSiteSettings();
       attachSiteSettingsTabs();
+      initFontPreview();
       break;
     case 'theme':
       content.innerHTML = await renderTheme();
@@ -184,6 +185,9 @@ async function loadSection(section) {
       break;
     case 'users':
       content.innerHTML = await renderUsers();
+      break;
+    case 'forms':
+      content.innerHTML = await renderFormsList();
       break;
     default:
       if (section.startsWith('cpt-add:')) {
@@ -203,6 +207,18 @@ async function loadSection(section) {
         const slug = section.split(':')[1];
         const ptDef = findPostTypeDef(slug);
         if (ptDef) { content.innerHTML = await renderCPTOptionsPage(ptDef); attachCPTOptionsEvents(); }
+      } else if (section.startsWith('form-edit:')) {
+        const formId = parseInt(section.split(':')[1]) || null;
+        content.innerHTML = await renderFormBuilder(formId);
+        attachFormBuilderEvents();
+      } else if (section.startsWith('form-entries:')) {
+        const formId = parseInt(section.split(':')[1]);
+        content.innerHTML = await renderFormEntries(formId);
+      } else if (section.startsWith('form-entry-detail:')) {
+        const parts = section.split(':');
+        const formId = parseInt(parts[1]);
+        const entryId = parseInt(parts[2]);
+        content.innerHTML = await renderFormEntryDetail(formId, entryId);
       } else if (section.startsWith('cpt:')) {
         const slug = section.split(':')[1];
         const ptDef = findPostTypeDef(slug);
@@ -298,6 +314,14 @@ async function renderPosts() {
 
 const _svgEdit = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 const _svgDelete = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+const _svgEye = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+const _svgStar = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+const _svgStarFill = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+const _svgInbox = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>';
+const _svgCopy = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const _svgDownload = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+const _svgTrash = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+const _svgX = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 
 function renderPostsTable(posts) {
   return `
@@ -1065,7 +1089,7 @@ async function renderCPTEditPage(ptDef, itemId) {
   try { if (cf.link) linkObj = typeof cf.link === 'string' ? JSON.parse(cf.link) : cf.link; } catch { /* keep defaults */ }
 
   const featuredImgPreview = fi
-    ? `<img src="${escapeHtml(fi.sizes?.thumbnail || fi.url || '')}" alt="" style="max-width:200px;max-height:150px;object-fit:cover;border-radius:8px;">`
+    ? `<img src="${escapeHtml(getOptimizedUrl(fi.sizes?.thumbnail || fi.url || '', 200, 60))}" alt="" style="max-width:200px;max-height:150px;object-fit:cover;border-radius:8px;">`
     : '<div style="width:200px;height:150px;background:#f5f5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#999;">Aucune image</div>';
 
   const photosPreview = photos.length > 0
@@ -1785,7 +1809,7 @@ async function saveCPTOptions(event, postTypeSlug) {
   }
 }
 
-let pageBuilderState = { editingPageId: null, blocks: [], meta: { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null } };
+let pageBuilderState = { editingPageId: null, blocks: [], meta: { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null }, colorOverrides: { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' }, seoMeta: { enabled: false, meta_title: '', meta_description: '', schema_org: '' } };
 let selectedBlockId = null;
 let reusableBlocBuilderMode = false;
 let _inlineEditingBlockId = null;
@@ -1909,6 +1933,8 @@ async function openPageBuilder(pageId) {
   pageBuilderState.editingPageId = pageId;
   pageBuilderState.blocks = [];
   pageBuilderState.meta = { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null };
+  pageBuilderState.colorOverrides = { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' };
+  pageBuilderState.seoMeta = { enabled: false, meta_title: '', meta_description: '' };
   pageBuilderState.pageMenus = [];       // menus with per-menu toggle/position state
   selectedBlockId = null;
   // Mémoriser la dernière vue comme "builder" pour restaurer après rafraîchissement
@@ -1926,6 +1952,16 @@ async function openPageBuilder(pageId) {
       if (page) {
         pageBuilderState.blocks = parsePageContent(page.content);
         pageBuilderState.meta = { title: page.title, slug: page.slug, status: page.status, show_in_menu: page.show_in_menu !== false, menu_order: page.menu_order || 0, parent_id: page.parent_id || null };
+        // Load color overrides
+        try {
+          const co = page.color_overrides ? JSON.parse(page.color_overrides) : null;
+          if (co) pageBuilderState.colorOverrides = { enabled: !!co.enabled, primary_color: co.primary_color || '', secondary_color: co.secondary_color || '', tertiary_color: co.tertiary_color || '', text_color: co.text_color || '', background_color: co.background_color || '', bg_form_field: co.bg_form_field || '' };
+        } catch (e) {}
+        // Load SEO meta
+        try {
+          const seo = page.seo_meta ? JSON.parse(page.seo_meta) : null;
+          if (seo) pageBuilderState.seoMeta = { enabled: !!seo.enabled, meta_title: seo.meta_title || '', meta_description: seo.meta_description || '', schema_org: seo.schema_org || '' };
+        } catch (e) {}
       }
       pageBuilderState.pageMenus = pageMenus?.menus || [];
     } catch (e) {}
@@ -1996,9 +2032,120 @@ async function renderPageBuilder() {
               ${pageBuilderState.pageMenus.length === 0 ? '<p class="text-muted" style="font-size:0.85rem">Aucun menu créé. <a href="#" onclick="loadSection(\'menus\');return false">Créer un menu</a></p>' : ''}
             </div>
           </div>
+          <!-- Color overrides panel (collapsible) -->
+          <div class="builder-color-overrides-panel" id="builderColorOverridesPanel" style="display:none">
+            <div class="builder-menu-settings-header">
+              <h3>Surcharge des couleurs</h3>
+              <button type="button" class="btn btn-xs" onclick="toggleColorOverridesPanel(false)">&times;</button>
+            </div>
+            <div class="builder-color-overrides-body">
+              <div class="form-group" style="margin-bottom:12px">
+                <label class="toggle-switch-label" style="display:flex;align-items:center;cursor:pointer">
+                  <span class="toggle-switch">
+                    <input type="checkbox" id="colorOverrideEnabled" ${pageBuilderState.colorOverrides.enabled ? 'checked' : ''} onchange="onColorOverrideToggle(this.checked)" />
+                    <span class="toggle-slider"></span>
+                  </span>
+                  <span style="margin-left:8px;font-weight:600;font-size:14px">Activer la surcharge</span>
+                </label>
+              </div>
+              <div id="colorOverrideFields" style="${pageBuilderState.colorOverrides.enabled ? '' : 'display:none'}">
+                <div class="color-override-grid">
+                  <div class="form-group">
+                    <label class="form-label">Couleur Primaire</label>
+                    <div class="color-picker-wrapper">
+                      <input type="color" class="form-color" id="co_primary_color" value="${pageBuilderState.colorOverrides.primary_color || '#006a9b'}" onchange="onColorOverrideChange()" />
+                      <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.primary_color || ''}" oninput="syncColorFromText(this, 'co_primary_color')" placeholder="Défaut thème" />
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Couleur Secondaire</label>
+                    <div class="color-picker-wrapper">
+                      <input type="color" class="form-color" id="co_secondary_color" value="${pageBuilderState.colorOverrides.secondary_color || '#ea644e'}" onchange="onColorOverrideChange()" />
+                      <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.secondary_color || ''}" oninput="syncColorFromText(this, 'co_secondary_color')" placeholder="Défaut thème" />
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Couleur Tertiaire</label>
+                    <div class="color-picker-wrapper">
+                      <input type="color" class="form-color" id="co_tertiary_color" value="${pageBuilderState.colorOverrides.tertiary_color || '#d0d0d0'}" onchange="onColorOverrideChange()" />
+                      <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.tertiary_color || ''}" oninput="syncColorFromText(this, 'co_tertiary_color')" placeholder="Défaut thème" />
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Couleur des textes</label>
+                    <div class="color-picker-wrapper">
+                      <input type="color" class="form-color" id="co_text_color" value="${pageBuilderState.colorOverrides.text_color || '#001527'}" onchange="onColorOverrideChange()" />
+                      <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.text_color || ''}" oninput="syncColorFromText(this, 'co_text_color')" placeholder="Défaut thème" />
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Couleur de fond</label>
+                    <div class="color-picker-wrapper">
+                      <input type="color" class="form-color" id="co_background_color" value="${pageBuilderState.colorOverrides.background_color || '#ffffff'}" onchange="onColorOverrideChange()" />
+                      <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.background_color || ''}" oninput="syncColorFromText(this, 'co_background_color')" placeholder="Défaut thème" />
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Fond champs formulaire</label>
+                    <div class="color-picker-wrapper">
+                      <input type="color" class="form-color" id="co_bg_form_field" value="${pageBuilderState.colorOverrides.bg_form_field || '#e3f3fc'}" onchange="onColorOverrideChange()" />
+                      <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.bg_form_field || ''}" oninput="syncColorFromText(this, 'co_bg_form_field')" placeholder="Défaut thème" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- SEO Meta panel (collapsible) -->
+          <div class="builder-seo-panel" id="builderSeoPanel" style="display:none">
+            <div class="builder-menu-settings-header">
+              <h3>SEO Meta</h3>
+              <button type="button" class="btn btn-xs" onclick="toggleSeoPanel(false)">&times;</button>
+            </div>
+            <div class="builder-seo-body" style="padding:12px">
+              <div class="form-group" style="margin-bottom:12px">
+                <label class="toggle-switch-label" style="display:flex;align-items:center;cursor:pointer">
+                  <span class="toggle-switch">
+                    <input type="checkbox" id="seoEnabled" ${pageBuilderState.seoMeta.enabled ? 'checked' : ''} onchange="onSeoToggle(this.checked)" />
+                    <span class="toggle-slider"></span>
+                  </span>
+                  <span style="margin-left:8px;font-weight:600;font-size:14px">Activer les meta SEO</span>
+                </label>
+              </div>
+              <div id="seoFields" style="${pageBuilderState.seoMeta.enabled ? '' : 'display:none'}">
+                <button type="button" class="btn btn-sm btn-primary" onclick="analyzeSeoPage()" style="margin-bottom:14px;width:100%">Analyser la page</button>
+                <div class="form-group" style="margin-bottom:10px">
+                  <label class="form-label">Meta Title <span id="seoTitleCount" style="font-weight:normal;color:#888;font-size:12px">(${pageBuilderState.seoMeta.meta_title.length}/60)</span></label>
+                  <input type="text" class="form-input" id="seo_meta_title" value="${(pageBuilderState.seoMeta.meta_title || '').replace(/"/g, '&quot;')}" oninput="onSeoFieldChange()" maxlength="60" placeholder="Titre SEO de la page (max 60 car.)" />
+                  <div class="seo-preview-bar" style="margin-top:4px;height:4px;border-radius:2px;background:#e0e0e0;overflow:hidden"><div id="seoTitleBar" style="height:100%;border-radius:2px;transition:width .2s,background .2s;width:${Math.min(100, (pageBuilderState.seoMeta.meta_title.length / 60) * 100)}%;background:${pageBuilderState.seoMeta.meta_title.length <= 60 ? '#22c55e' : '#ef4444'}"></div></div>
+                </div>
+                <div class="form-group" style="margin-bottom:10px">
+                  <label class="form-label">Meta Description <span id="seoDescCount" style="font-weight:normal;color:#888;font-size:12px">(${pageBuilderState.seoMeta.meta_description.length}/160)</span></label>
+                  <textarea class="form-input" id="seo_meta_description" oninput="onSeoFieldChange()" maxlength="160" rows="3" placeholder="Description SEO de la page (max 160 car.)" style="resize:vertical">${(pageBuilderState.seoMeta.meta_description || '').replace(/</g, '&lt;')}</textarea>
+                  <div class="seo-preview-bar" style="margin-top:4px;height:4px;border-radius:2px;background:#e0e0e0;overflow:hidden"><div id="seoDescBar" style="height:100%;border-radius:2px;transition:width .2s,background .2s;width:${Math.min(100, (pageBuilderState.seoMeta.meta_description.length / 160) * 100)}%;background:${pageBuilderState.seoMeta.meta_description.length <= 160 ? '#22c55e' : '#ef4444'}"></div></div>
+                </div>
+                <div style="margin-top:14px;display:flex;gap:6px;margin-bottom:10px">
+                  <button type="button" class="btn btn-xs seo-tab-btn active" id="seoTabPreview" onclick="switchSeoTab('preview')">Apercu Google</button>
+                  <button type="button" class="btn btn-xs btn-outline seo-tab-btn" id="seoTabSchema" onclick="switchSeoTab('schema')">Schema.org</button>
+                </div>
+                <div id="seoPreview" style="padding:12px;background:#f8f9fa;border-radius:8px;font-family:Arial,sans-serif">
+                  <div style="font-size:18px;color:#1a0dab;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || 'Titre de la page'}</div>
+                  <div style="font-size:13px;color:#006621;margin:2px 0">example.com/pages/${pageBuilderState.meta.slug || 'slug'}</div>
+                  <div style="font-size:13px;color:#545454;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${pageBuilderState.seoMeta.meta_description || 'Description de la page...'}</div>
+                </div>
+                <div id="seoSchemaPanel" style="display:none">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="generateSchemaOrg()" style="margin-bottom:10px;width:100%">Generer depuis le contenu</button>
+                  <textarea class="form-input" id="seo_schema_org" oninput="onSchemaOrgChange()" rows="14" placeholder='{"@context":"https://schema.org",...}' style="resize:vertical;font-family:monospace;font-size:12px;line-height:1.4;tab-size:2">${(pageBuilderState.seoMeta.schema_org || '').replace(/</g, '&lt;')}</textarea>
+                  <p class="form-help" style="margin-top:4px;font-size:11px;color:#888">JSON-LD injecte dans &lt;head&gt;. Genere automatiquement selon les blocs de la page.</p>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="builder-modules-panel" id="builderModulesPanel" style="${selectedBlockId ? 'display:none' : ''}">
-            <button type="button" class="btn btn-sm btn-outline builder-menu-settings-btn" onclick="toggleMenuSettingsPanel(true)" style="${m.status === 'draft' ? 'display:none' : ''}">⚙ Paramètres menu</button>
-            <h3>Modules</h3>
+            <button type="button" class="btn btn-sm btn-outline builder-menu-settings-btn" onclick="toggleMenuSettingsPanel(true)" style="${m.status === 'draft' ? 'display:none' : ''}">Parametres menu</button>
+            <button type="button" class="btn btn-sm btn-outline builder-color-overrides-btn" onclick="toggleColorOverridesPanel(true)">Surcharge des couleurs</button>
+            <button type="button" class="btn btn-sm btn-outline builder-seo-btn" onclick="toggleSeoPanel(true)">SEO Meta</button>
+            <h3 style="margin-top:18px">Modules</h3>
             <p class="form-help">Glissez un module dans la zone de droite.</p>
             <div class="builder-modules-list">
               ${MODULE_CATEGORIES.map(category => `
@@ -2027,7 +2174,7 @@ async function renderPageBuilder() {
           </div>
         </aside>
         <main class="builder-canvas" id="builderCanvas" data-drop-zone="true">
-          <div class="builder-canvas-inner">
+          <div class="builder-canvas-inner" id="builderCanvasInner" style="${buildColorOverrideStyle()}">
             <div class="builder-canvas-placeholder" id="builderPlaceholder">Glissez des modules ici ou cliquez sur un module à gauche pour l'ajouter.</div>
             <div class="builder-blocks" id="builderBlocks">
               ${pageBuilderState.blocks.map(block => renderBlockCard(block)).join('')}
@@ -2197,7 +2344,8 @@ function renderColumnsTabPreviewHtml(data) {
       const subLayout = moduleFieldSchema?.modules?.[subModuleName]?.layout || null;
       if (subLayout) ensureSubModuleTemplates(subLayout);
       // Create a fake block and recursively render the sub-module preview
-      const subBlock = { id: 'sub-' + Math.random().toString(36).slice(2), type: layout, data: subModule };
+      // Mark as inside columns so templates can suppress title/background
+      const subBlock = { id: 'sub-' + Math.random().toString(36).slice(2), type: layout, data: { ...subModule, columns: 1 } };
       return `<div class="module-in-column">${renderBlockPreviewHtml(subBlock)}</div>`;
     }).filter(Boolean);
     return `<div class="col">${subHtmlParts.join('')}</div>`;
@@ -2213,12 +2361,7 @@ function renderColumnsTabPreviewHtml(data) {
 
   // Inline styles pour garantir le rendu visuel (contourne les conflits de cascade CSS)
   const inlineStyles = [];
-  const site = siteSettingsCache || {};
-  const COLOR_VALUES = {
-    'has-background-primary': site.primary_color || 'var(--color-primary, #006a9b)',
-    'has-background-secondary': site.secondary_color || 'var(--color-secondary, #ea644e)',
-    'has-background-tertiary': site.tertiary_color || 'var(--color-tertiary, #d6d6d6)',
-  };
+  const COLOR_VALUES = getResolvedColorMap();
   const bc = data.bloc_color || '';
   if (bc && COLOR_VALUES[bc]) {
     inlineStyles.push(`background-color: ${COLOR_VALUES[bc]} !important`);
@@ -2330,6 +2473,200 @@ function renderBlockPreviewHtml(block) {
     const iconsLayout = moduleFieldSchema?.modules?.IconLogo?.layout || 'icons';
     if (!moduleTemplateCache[iconsLayout]) queueModuleTemplateLoad(iconsLayout);
     return `<div class="module module-icons ${extraCls.join(' ')}">${bgHtml}<div class="container">${titleHtml}${logos.length > 0 ? `<ul class="${listCls}">${itemsHtml}</ul>` : ''}</div></div>`;
+  }
+  // Contact — custom preview (Blade template uses @php blocks that JS engine strips)
+  const _socialSvg = {
+    instagram: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><path d="M7.64,25.92a9.47,9.47,0,0,1-3.16-.6,6.5,6.5,0,0,1-2.3-1.5,6.41,6.41,0,0,1-1.5-2.3,9.73,9.73,0,0,1-.6-3.16C0,17,0,16.52,0,13S0,9,.08,7.64a9.73,9.73,0,0,1,.6-3.16A6.66,6.66,0,0,1,4.48.68,9.73,9.73,0,0,1,7.64.08C9,0,9.48,0,13,0s4,0,5.36.08a9.78,9.78,0,0,1,3.16.6,6.66,6.66,0,0,1,3.8,3.8,10,10,0,0,1,.6,3.16C26,9,26,9.46,26,13s0,4-.08,5.36a9.52,9.52,0,0,1-.6,3.16,6.65,6.65,0,0,1-3.8,3.8,10,10,0,0,1-3.15.6C17,26,16.54,26,13,26S9,26,7.64,25.92Zm.11-23.5a7.15,7.15,0,0,0-2.42.45,4.09,4.09,0,0,0-1.49,1,4.07,4.07,0,0,0-1,1.5,7.34,7.34,0,0,0-.44,2.41C2.36,9.12,2.34,9.53,2.34,13s0,3.88.08,5.25a7.15,7.15,0,0,0,.45,2.42,4,4,0,0,0,1,1.49,4,4,0,0,0,1.49,1,7.15,7.15,0,0,0,2.42.45c1.36.07,1.77.08,5.25.08s3.89,0,5.25-.08a7.11,7.11,0,0,0,2.42-.45,4.26,4.26,0,0,0,2.46-2.46,7.15,7.15,0,0,0,.45-2.42c.07-1.36.08-1.77.08-5.25s0-3.89-.08-5.25a7.15,7.15,0,0,0-.45-2.42,4,4,0,0,0-1-1.49,4.11,4.11,0,0,0-1.49-1,7.4,7.4,0,0,0-2.42-.44c-1.37-.06-1.79-.08-5.25-.08s-3.88,0-5.25.08ZM6.32,13A6.68,6.68,0,1,1,13,19.67,6.68,6.68,0,0,1,6.32,13Zm2.35,0A4.33,4.33,0,1,0,13,8.67h0A4.33,4.33,0,0,0,8.67,13Zm9.71-6.94a1.56,1.56,0,1,1,1.56,1.56h0A1.56,1.56,0,0,1,18.38,6.06Z"/></svg>',
+    facebook: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 25.73 25.74"><path d="M24.31,0H1.42A1.43,1.43,0,0,0,0,1.42H0V24.31a1.42,1.42,0,0,0,1.42,1.42H13.75v-10H10.4v-3.9h3.35V9c0-3.32,2-5.13,5-5.13a24.85,24.85,0,0,1,3,.15V7.51h-2c-1.61,0-1.93.76-1.93,1.89v2.48h3.86l-.5,3.9H17.75v10h6.56a1.42,1.42,0,0,0,1.42-1.42h0V1.42A1.42,1.42,0,0,0,24.31,0Z"/></svg>',
+    threads: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><path d="M18.9,11.9c.1,0,.2.1.3.2,1.6.8,2.7,1.9,3.3,3.3.9,2,.9,5.2-1.6,7.8-2,2-4.3,2.8-7.7,2.9h0c-3.8,0-6.7-1.3-8.7-3.8-1.7-2.2-2.6-5.3-2.7-9.2h0c0-3.9.9-7,2.7-9.2C6.5,1.3,9.4,0,13.2,0h0c3.8,0,6.8,1.3,8.8,3.8,1,1.2,1.7,2.7,2.2,4.4l-2.2.6c-.4-1.4-1-2.6-1.7-3.5-1.6-1.9-4-2.9-7.1-3-3.1,0-5.4,1-6.9,2.9-1.4,1.8-2.2,4.4-2.2,7.8,0,3.3.8,6,2.2,7.8,1.5,1.9,3.9,2.9,6.9,2.9,2.8,0,4.6-.7,6.2-2.2,1.7-1.7,1.7-3.9,1.2-5.2-.3-.8-.9-1.4-1.7-1.9-.2,1.5-.6,2.6-1.3,3.5-.9,1.2-2.2,1.8-3.9,1.9-1.3,0-2.5-.2-3.5-.9-1.1-.7-1.8-1.9-1.9-3.2-.1-2.6,1.9-4.5,5.2-4.7,1.1,0,2.2,0,3.2.2-.1-.8-.4-1.4-.8-1.9-.5-.6-1.4-1-2.5-1h0c-.9,0-2.1.2-2.9,1.4l-1.9-1.3c1-1.6,2.7-2.4,4.8-2.4h0c3.4,0,5.4,2.1,5.6,5.8h0s0,0,0,0ZM10.4,15.6c0,1.4,1.5,2,3,1.9,1.4,0,3-.6,3.2-4-.7-.2-1.5-.2-2.4-.2s-.5,0-.8,0c-2.3.1-3.1,1.3-3,2.3h0s0,0,0,0Z"/></svg>',
+    tiktok: '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="26" viewBox="0 0 25.152 29.022"><path d="M22.02,6.207a6.609,6.609,0,0,1-.571-.333,8.033,8.033,0,0,1-1.467-1.247,6.921,6.921,0,0,1-1.653-3.412h.006A4.2,4.2,0,0,1,18.268,0H13.284V19.273c0,.259,0,.515-.011.767,0,.031,0,.06,0,.094a.206.206,0,0,1,0,.043v.011a4.232,4.232,0,0,1-2.129,3.359,4.159,4.159,0,0,1-2.062.544,4.232,4.232,0,0,1,0-8.464,4.164,4.164,0,0,1,1.294.2l.006-5.075A9.258,9.258,0,0,0,3.24,12.845a9.782,9.782,0,0,0-2.134,2.632,9.121,9.121,0,0,0-1.1,4.186,9.88,9.88,0,0,0,.535,3.309v.012a9.74,9.74,0,0,0,1.353,2.468,10.129,10.129,0,0,0,2.159,2.037v-.012l.012.012a9.326,9.326,0,0,0,5.088,1.532,9.007,9.007,0,0,0,3.776-.835A9.477,9.477,0,0,0,16,25.881,9.58,9.58,0,0,0,17.667,23.1a10.4,10.4,0,0,0,.6-3.176V9.7c.06.036.866.569.866.569A11.527,11.527,0,0,0,22.1,11.5a17.1,17.1,0,0,0,3.048.417V6.969a6.463,6.463,0,0,1-3.132-.762"/></svg>',
+    linkedin: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24"><path d="M22.224,24H1.77A1.753,1.753,0,0,1,0,22.268V1.731A1.753,1.753,0,0,1,1.77,0H22.224A1.756,1.756,0,0,1,24,1.731V22.268A1.756,1.756,0,0,1,22.224,24ZM9.353,9V20.451h3.555V14.786c0-1.454.254-2.941,2.134-2.941,1.85,0,1.85,1.755,1.85,3.036v5.571h3.559V14.17a7.2,7.2,0,0,0-.784-3.886,3.764,3.764,0,0,0-3.487-1.571,3.763,3.763,0,0,0-3.368,1.849h-.049V9Zm-5.8,0V20.451H7.118V9ZM5.339,3.3A2.065,2.065,0,1,0,7.4,5.368,2.068,2.068,0,0,0,5.339,3.3Z"/></svg>',
+    twitter: '<svg xmlns="http://www.w3.org/2000/svg" width="25" height="23" viewBox="0 0 25 22.6"><path d="M19.7,0h3.8l-8.4,9.6L25,22.6h-7.7l-6-7.9-6.9,7.9H0.5l8.9-10.2L0,0h7.9l5.5,7.2L19.7,0z M18.4,20.3h2.1L6.8,2.2H4.4 L18.4,20.3z"/></svg>',
+    tripadvisor: '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="22" viewBox="0 0 39.932 25.64"><path d="M36.668,7.468l3.264-3.551H32.695a22.612,22.612,0,0,0-25.439,0H0L3.264,7.468a9.977,9.977,0,1,0,13.5,14.691l3.2,3.481,3.2-3.478A9.98,9.98,0,1,0,36.668,7.468M9.988,21.593a6.751,6.751,0,1,1,6.751-6.751,6.75,6.75,0,0,1-6.751,6.751m9.978-6.948c0-4.443-3.23-8.256-7.494-9.885a19.477,19.477,0,0,1,14.986,0C23.2,6.392,19.966,10.2,19.966,14.645m9.976,6.948a6.751,6.751,0,1,1,6.751-6.751,6.75,6.75,0,0,1-6.751,6.751m0-10.293a3.539,3.539,0,1,0,3.539,3.539A3.538,3.538,0,0,0,29.942,11.3M13.526,14.842A3.539,3.539,0,1,1,9.988,11.3a3.538,3.538,0,0,1,3.539,3.539"/></svg>',
+    pinterest: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 25.75 25.74"><path d="M12.87,0A12.87,12.87,0,0,0,8.18,24.85a12.34,12.34,0,0,1,0-3.69c.24-1,1.51-6.4,1.51-6.4a4.69,4.69,0,0,1-.38-1.91c0-1.79,1-3.13,2.32-3.13a1.61,1.61,0,0,1,1.64,1.6,1.7,1.7,0,0,1,0,.22,25.28,25.28,0,0,1-1.07,4.28,1.87,1.87,0,0,0,1.35,2.27,1.78,1.78,0,0,0,.56.06c2.29,0,4-2.41,4-5.89A5.09,5.09,0,0,0,13.27,7h-.46A5.58,5.58,0,0,0,7,12.34v.27a5,5,0,0,0,1,2.93.41.41,0,0,1,.09.37c-.1.41-.32,1.28-.36,1.46s-.19.28-.43.17c-1.61-.75-2.61-3.1-2.61-5,0-4.06,2.95-7.79,8.5-7.79,4.46,0,7.93,3.18,7.93,7.43,0,4.44-2.8,8-6.68,8a3.43,3.43,0,0,1-3-1.48s-.64,2.46-.8,3.06a14.14,14.14,0,0,1-1.6,3.38A12.87,12.87,0,1,0,16.69.58,12.73,12.73,0,0,0,12.87,0"/></svg>',
+    youtube: '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="24" viewBox="0 0 40.402 28.283"><path d="M39.558,4.417A5.059,5.059,0,0,0,35.986.845C32.836,0,20.2,0,20.2,0S7.566,0,4.417.845A5.06,5.06,0,0,0,.845,4.417C0,7.566,0,14.142,0,14.142s0,6.575.845,9.725a5.06,5.06,0,0,0,3.572,3.572c3.15.845,15.784.845,15.784.845s12.635,0,15.784-.845a5.059,5.059,0,0,0,3.572-3.572c.845-3.15.845-9.725.845-9.725s0-6.575-.845-9.725M16.157,20.2V8.083l10.5,6.06Z"/></svg>',
+  };
+  if (block.type === 'contact' || block.type === 'Contact') {
+    const addresses = Array.isArray(d.addresses) ? d.addresses : [];
+    const isMapMode = d.is_map === true || d.is_map === 1 || d.is_map === '1';
+    const contactExtraCls = [];
+    if (d.bloc_color) contactExtraCls.push(d.bloc_color);
+    if (d.padding_top) contactExtraCls.push(d.padding_top);
+    if (d.padding_bottom) contactExtraCls.push(d.padding_bottom);
+    let contactBgHtml = '';
+    const contactBgImg = d.bg_img;
+    if (contactBgImg) {
+      const bgUrl = typeof contactBgImg === 'string' ? contactBgImg : (contactBgImg.url || '');
+      const bgOpacity = (d.bg_opacity ?? 10) / 100;
+      if (bgUrl) {
+        contactBgHtml = `<div class="background" style="background-image: url(${escapeHtml(bgUrl)}); opacity: ${bgOpacity}; background-size: cover; background-position: center; position: absolute; inset: 0;"></div>`;
+        contactExtraCls.push('has-background-image');
+      }
+    }
+    let contactTitleHtml = '';
+    const contactTitle = d.title_bloc || d.title || '';
+    if (contactTitle) {
+      const ts = d.title_style || 2;
+      const ta = d.title_align || 'center';
+      contactTitleHtml = `<h${ts} class="title-module title-section-${ts} align-${escapeHtml(String(ta))}">${escapeHtml(String(contactTitle))}</h${ts}>`;
+    }
+    const cMarkers = [];
+    let cCenterLat = 0, cCenterLng = 0;
+    const cItemsHtml = addresses.map(contact => {
+      const addr = contact.address || {};
+      const lat = parseFloat(addr.lat) || 0;
+      const lng = parseFloat(addr.lng) || 0;
+      if (lat && lng) { cMarkers.push([lng, lat]); cCenterLat += lat; cCenterLng += lng; }
+      const streetNumber = addr.street_number || '';
+      const streetName = addr.street_name || '';
+      const postCode = addr.post_code || '';
+      const city = addr.city || '';
+      const addressName = addr.name || addr.address || '';
+      const addressStreet = `${streetNumber} ${streetName}`.trim();
+      const addressStreetShort = `${streetNumber} ${addr.street_name_short || ''}`.trim();
+      const placeId = addr.place_id || '';
+      const logoObj = contact.logo || {};
+      const logoUrl = typeof logoObj === 'string' ? logoObj : (logoObj.url || '');
+      let h = '';
+      if (logoUrl) h += `<div class="logo-wrapper"><img src="${escapeHtml(logoUrl)}" alt="" class="logo"></div>`;
+      if (contact.name) h += `<p class="title title-section-4">${escapeHtml(contact.name)}</p>`;
+      if (lat) {
+        h += '<address class="address">';
+        if (addressName && addressName !== addressStreet && addressName !== addressStreetShort && !addressName.includes(addressStreet)) h += `${escapeHtml(addressName)}<br>`;
+        if (streetName) h += `${escapeHtml(addressStreet)}<br>`;
+        h += escapeHtml(`${postCode} ${city}`.trim());
+        h += '</address>';
+        if (addresses.length > 1 && placeId) h += `<a href="https://www.google.com/maps/place/?q=place_id:${escapeHtml(placeId)}" class="btn btn-tertiary" title="Itin\u00e9raire" target="_blank">Itin\u00e9raire</a>`;
+      }
+      if (contact.phone) h += `<p class="phone-wrapper">Tel. <a href="tel:${escapeHtml(String(contact.phone).replace(/\s/g, ''))}" class="phone">${escapeHtml(contact.phone)}</a></p>`;
+      if (contact.mail) h += `<div class="mail-wrapper"><a href="mailto:${escapeHtml(contact.mail)}">${escapeHtml(contact.mail)}</a></div>`;
+      if (contact.schedule) h += `<div class="editor txt"><p><b>Horaires d\u2019ouverture</b></p><p>${escapeHtml(contact.schedule).replace(/\n/g, '<br>')}</p></div>`;
+      const socialKeys = ['instagram','facebook','threads','tiktok','linkedin','twitter','tripadvisor','pinterest','youtube'];
+      const socials = socialKeys.filter(k => contact[k]);
+      if (socials.length > 0) {
+        h += '<ul class="social-networks">' + socials.map(k => {
+          const ttl = k === 'twitter' ? 'X (Twitter)' : k.charAt(0).toUpperCase() + k.slice(1);
+          const svgMarkup = _socialSvg[k] || '';
+          return `<li class="item-social"><a href="${escapeHtml(contact[k])}" title="${ttl}" target="_blank" class="link"><span class="icon" aria-hidden="true">${svgMarkup}</span></a></li>`;
+        }).join('') + '</ul>';
+      }
+      return `<li class="item">${h}</li>`;
+    }).join('');
+    if (cMarkers.length > 0) { cCenterLat /= cMarkers.length; cCenterLng /= cMarkers.length; }
+    let col2Html = '';
+    if (!isMapMode) {
+      const photoObj = d.photo || {};
+      const photoUrl = typeof photoObj === 'string' ? photoObj : (photoObj.url || '');
+      if (photoUrl) col2Html = `<img src="${escapeHtml(photoUrl)}" alt="" class="illus">`;
+    } else if (cMarkers.length > 0) {
+      const contactMapId = 'contact-map-preview-' + (block.id || Math.random().toString(36).slice(2));
+      let gpsHtml = '';
+      if (addresses.length === 1 && addresses[0]?.address?.place_id) {
+        gpsHtml = `<a href="https://www.google.com/maps/place/?q=place_id:${escapeHtml(addresses[0].address.place_id)}" class="btn btn-primary" title="Itin\u00e9raire" target="_blank" style="position:absolute;z-index:99;top:97px;right:10px;">\ud83d\udccd</a>`;
+      }
+      col2Html = `<div class="map-wrapper js_show-content"><div id="${contactMapId}" class="map js_load-map" data-markers='${JSON.stringify(cMarkers)}' data-lng="${cCenterLng}" data-lat="${cCenterLat}">${gpsHtml}</div></div>`;
+      setTimeout(async () => {
+        const el = document.getElementById(contactMapId);
+        if (!el || el.dataset.mapInit) return;
+        el.dataset.mapInit = '1';
+        await ensureMapboxGL();
+        if (!window.mapboxgl) return;
+        mapboxgl.accessToken = MAPBOX_TOKEN;
+        const map = new mapboxgl.Map({ container: el, style: 'mapbox://styles/mapbox/streets-v12', center: [cCenterLng, cCenterLat], zoom: 16, pitch: 50 });
+        map.scrollZoom.disable();
+        map.addControl(new mapboxgl.NavigationControl());
+        cMarkers.forEach(coord => {
+          const markerEl = document.createElement('div');
+          const pin = document.createElement('div');
+          pin.classList.add('container-pin');
+          const img = document.createElement('div');
+          img.classList.add('img-pin');
+          img.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/></svg>';
+          pin.append(img);
+          markerEl.append(pin);
+          markerEl.classList.add('marker');
+          new mapboxgl.Marker(markerEl).setLngLat(coord).addTo(map);
+        });
+        const bounds = new mapboxgl.LngLatBounds();
+        cMarkers.forEach(c => bounds.extend(c));
+        map.fitBounds(bounds, { padding: 100 });
+        if (cMarkers.length === 1) { map.on('load', () => { map.setZoom(17); map.setPitch(65); }); }
+        map.on('load', () => map.resize());
+        setTimeout(() => map.resize(), 300);
+        setTimeout(() => map.resize(), 800);
+      }, 100);
+    }
+    const contactLayout = moduleFieldSchema?.modules?.Contact?.layout || 'contact';
+    if (!moduleTemplateCache[contactLayout]) queueModuleTemplateLoad(contactLayout);
+    return `<div class="module module-contact ${contactExtraCls.join(' ')}" style="position:relative;">${contactBgHtml}<div class="container">${contactTitleHtml}<div class="cols-wrapper"><div class="col col-1">${addresses.length > 0 ? '<ul class="list">' + cItemsHtml + '</ul>' : ''}</div><div class="col col-2">${col2Html}</div></div></div></div>`;
+  }
+  // Map — custom preview (Blade template uses PHP assignment in @if which JS engine can't parse)
+  if (block.type === 'map' || block.type === 'Map') {
+    const address = d.address || null;
+    const lat = address ? parseFloat(address.lat) : 0;
+    const lng = address ? parseFloat(address.lng) : 0;
+    const placeId = address?.place_id || '';
+    const addrText = address?.address || '';
+    const isFs = d.is_fullscreen === true || d.is_fullscreen === 1 || d.is_fullscreen === '1';
+    const mapExtraCls = [];
+    if (d.bloc_color) mapExtraCls.push(d.bloc_color);
+    if (d.padding_top) mapExtraCls.push(d.padding_top);
+    if (d.padding_bottom) mapExtraCls.push(d.padding_bottom);
+    if (isFs) mapExtraCls.push('full-width');
+    // Background image
+    let mapBgHtml = '';
+    const mapBgImg = d.bg_img;
+    if (mapBgImg) {
+      const bgUrl = typeof mapBgImg === 'string' ? mapBgImg : (mapBgImg.url || '');
+      const bgOpacity = (d.bg_opacity ?? 10) / 100;
+      if (bgUrl) {
+        mapBgHtml = `<div class="background" style="background-image: url(${escapeHtml(bgUrl)}); opacity: ${bgOpacity}; background-size: cover; background-position: center; position: absolute; inset: 0;"></div>`;
+        mapExtraCls.push('has-background-image');
+      }
+    }
+    // Bloc title
+    let mapTitleHtml = '';
+    const mapTitle = d.title_bloc || d.title || '';
+    if (mapTitle) {
+      const ts = d.title_style || 4;
+      const ta = d.title_align || 'center';
+      mapTitleHtml = `<div class="container"><h${ts} class="title-module title-section-${ts} align-${escapeHtml(String(ta))}">${escapeHtml(String(mapTitle))}</h${ts}></div>`;
+    }
+    let mapContentHtml = '';
+    const mapPreviewId = 'map-live-preview-' + (block.id || Math.random().toString(36).slice(2));
+    if (lat && lng) {
+      const gpsLink = placeId ? `<a href="https://www.google.com/maps/place/?q=place_id:${escapeHtml(placeId)}" title="Itinéraire" target="_blank" style="position:absolute;z-index:99;bottom:12px;left:12px;padding:6px 12px;background:var(--color-primary,#333);color:#fff;border:none;border-radius:4px;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:4px;">📍 Itinéraire</a>` : '';
+      const containerPad = isFs ? 'padding:0;' : '';
+      mapContentHtml = `<div class="container-large container-1" style="${containerPad}"><div class="map-wrapper" style="position:relative;height:400px;background:#e5e3df;border-radius:${isFs ? '0' : 'var(--border-radius,8px)'};overflow:hidden;"><div id="${mapPreviewId}" class="map" style="position:absolute;inset:0;">${gpsLink}</div></div></div>`;
+      // Initialize live Mapbox map in the preview after DOM insert
+      setTimeout(async () => {
+        const el = document.getElementById(mapPreviewId);
+        if (!el || el.dataset.mapInit) return;
+        el.dataset.mapInit = '1';
+        await ensureMapboxGL();
+        if (!window.mapboxgl) return;
+        mapboxgl.accessToken = MAPBOX_TOKEN;
+        const map = new mapboxgl.Map({
+          container: el,
+          style: 'mapbox://styles/mapbox/streets-v12',
+          center: [lng, lat],
+          zoom: 16,
+          pitch: 50,
+        });
+        map.scrollZoom.disable();
+        map.addControl(new mapboxgl.NavigationControl());
+        new mapboxgl.Marker().setLngLat([lng, lat]).addTo(map);
+        map.on('load', () => map.resize());
+        setTimeout(() => map.resize(), 300);
+        setTimeout(() => map.resize(), 800);
+      }, 100);
+    } else {
+      mapContentHtml = `<div class="container"><p style="color:#999;text-align:center;padding:2em 0;">Aucune adresse configurée.</p></div>`;
+    }
+    // Ensure map CSS is loaded
+    const mapLayout = moduleFieldSchema?.modules?.Map?.layout || 'map';
+    if (!moduleTemplateCache[mapLayout]) queueModuleTemplateLoad(mapLayout);
+    return `<div class="module module-map ${mapExtraCls.join(' ')}" style="position:relative;">${mapBgHtml}${mapTitleHtml}${mapContentHtml}</div>`;
   }
   const layout = getModuleLayout(block);
   if (!layout) return '';
@@ -2568,6 +2905,8 @@ function buildTemplateContext(block) {
     const mainRight = data['main-bloc-position'] === true || data['main-bloc-position'] === 1 || data['main-bloc-position'] === '1';
     if (mainRight) extraClasses.push('main-bloc-right');
     else extraClasses.push('main-bloc-left');
+    const styleChoice = data.style_choice || 'style-1';
+    extraClasses.push(styleChoice);
     ctx.module = { ...ctx.module, clickable_block: ctx.clickable_block };
   }
   // Separator : largeur divisée par 2 si texte présent + classe separator-with-text
@@ -3790,6 +4129,391 @@ function toggleMenuSettingsPanel(show) {
   }
 }
 
+function toggleColorOverridesPanel(show) {
+  const panel = document.getElementById('builderColorOverridesPanel');
+  const modules = document.getElementById('builderModulesPanel');
+  if (!panel) return;
+  if (show) {
+    panel.style.display = '';
+    if (modules) modules.style.display = 'none';
+    const settings = document.getElementById('builderSettings');
+    if (settings) settings.style.display = 'none';
+    // Also hide menu settings panel and SEO panel
+    const menuPanel = document.getElementById('builderMenuSettingsPanel');
+    if (menuPanel) menuPanel.style.display = 'none';
+    const seoPanel = document.getElementById('builderSeoPanel');
+    if (seoPanel) seoPanel.style.display = 'none';
+  } else {
+    panel.style.display = 'none';
+    if (modules && !selectedBlockId) modules.style.display = '';
+    const settings = document.getElementById('builderSettings');
+    if (settings && selectedBlockId) settings.style.display = '';
+  }
+}
+
+function buildColorOverrideStyle() {
+  const co = pageBuilderState.colorOverrides;
+  if (!co || !co.enabled) return '';
+  const vars = [];
+  if (co.primary_color) { vars.push(`--color-primary:${co.primary_color}`); vars.push(`--color-primary-bis:${co.primary_color}`); }
+  if (co.secondary_color) { vars.push(`--color-secondary:${co.secondary_color}`); vars.push(`--color-secondary-bis:${co.secondary_color}`); }
+  if (co.tertiary_color) vars.push(`--color-tertiary:${co.tertiary_color}`);
+  if (co.text_color) vars.push(`--color-default:${co.text_color}`);
+  if (co.background_color) vars.push(`--color-background:${co.background_color}`);
+  if (co.bg_form_field) vars.push(`--color-form:${co.bg_form_field}`);
+  return vars.join(';');
+}
+
+function applyColorOverridesToCanvas() {
+  const inner = document.getElementById('builderCanvasInner');
+  if (inner) inner.style.cssText = buildColorOverrideStyle();
+  // Re-apply inline background colors on all block previews to pick up override values
+  pageBuilderState.blocks.forEach(block => {
+    const card = document.querySelector(`.builder-block-card[data-block-id="${block.id}"]`);
+    if (!card) return;
+    const richEl = card.querySelector('.builder-block-render');
+    if (richEl) syncModuleBlocColorClasses(richEl, block.data);
+  });
+}
+
+function getResolvedColorMap() {
+  const site = siteSettingsCache || {};
+  const co = pageBuilderState.colorOverrides;
+  const useOverride = co && co.enabled;
+  return {
+    'has-background-primary': (useOverride && co.primary_color) || site.primary_color || 'var(--color-primary, #006a9b)',
+    'has-background-secondary': (useOverride && co.secondary_color) || site.secondary_color || 'var(--color-secondary, #ea644e)',
+    'has-background-tertiary': (useOverride && co.tertiary_color) || site.tertiary_color || 'var(--color-tertiary, #d6d6d6)',
+  };
+}
+
+function onColorOverrideToggle(enabled) {
+  pageBuilderState.colorOverrides.enabled = enabled;
+  const fields = document.getElementById('colorOverrideFields');
+  if (fields) fields.style.display = enabled ? '' : 'none';
+  applyColorOverridesToCanvas();
+}
+
+function onColorOverrideChange() {
+  const keys = ['primary_color', 'secondary_color', 'tertiary_color', 'text_color', 'background_color', 'bg_form_field'];
+  keys.forEach(key => {
+    const input = document.getElementById('co_' + key);
+    if (input) pageBuilderState.colorOverrides[key] = input.value;
+  });
+  applyColorOverridesToCanvas();
+}
+
+function syncColorFromText(textInput, colorInputId) {
+  const colorInput = document.getElementById(colorInputId);
+  if (!colorInput) return;
+  const val = textInput.value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+    colorInput.value = val;
+  }
+  // Update state
+  const key = colorInputId.replace('co_', '');
+  pageBuilderState.colorOverrides[key] = val;
+  applyColorOverridesToCanvas();
+}
+
+// ── SEO Meta panel ──
+
+function toggleSeoPanel(show) {
+  const panel = document.getElementById('builderSeoPanel');
+  const modules = document.getElementById('builderModulesPanel');
+  if (!panel) return;
+  if (show) {
+    panel.style.display = '';
+    if (modules) modules.style.display = 'none';
+    const settings = document.getElementById('builderSettings');
+    if (settings) settings.style.display = 'none';
+    const menuPanel = document.getElementById('builderMenuSettingsPanel');
+    if (menuPanel) menuPanel.style.display = 'none';
+    const colorPanel = document.getElementById('builderColorOverridesPanel');
+    if (colorPanel) colorPanel.style.display = 'none';
+  } else {
+    panel.style.display = 'none';
+    if (modules && !selectedBlockId) modules.style.display = '';
+    const settings = document.getElementById('builderSettings');
+    if (settings && selectedBlockId) settings.style.display = '';
+  }
+}
+
+function onSeoToggle(enabled) {
+  pageBuilderState.seoMeta.enabled = enabled;
+  const fields = document.getElementById('seoFields');
+  if (fields) fields.style.display = enabled ? '' : 'none';
+}
+
+function onSeoFieldChange() {
+  const titleInput = document.getElementById('seo_meta_title');
+  const descInput = document.getElementById('seo_meta_description');
+  if (titleInput) pageBuilderState.seoMeta.meta_title = titleInput.value;
+  if (descInput) pageBuilderState.seoMeta.meta_description = descInput.value;
+  // Update counters
+  const titleCount = document.getElementById('seoTitleCount');
+  const descCount = document.getElementById('seoDescCount');
+  const tLen = (titleInput?.value || '').length;
+  const dLen = (descInput?.value || '').length;
+  if (titleCount) titleCount.textContent = `(${tLen}/60)`;
+  if (descCount) descCount.textContent = `(${dLen}/160)`;
+  // Update progress bars
+  const titleBar = document.getElementById('seoTitleBar');
+  const descBar = document.getElementById('seoDescBar');
+  if (titleBar) { titleBar.style.width = Math.min(100, (tLen / 60) * 100) + '%'; titleBar.style.background = tLen <= 60 ? '#22c55e' : '#ef4444'; }
+  if (descBar) { descBar.style.width = Math.min(100, (dLen / 160) * 100) + '%'; descBar.style.background = dLen <= 160 ? '#22c55e' : '#ef4444'; }
+  // Update preview
+  updateSeoPreview();
+}
+
+function updateSeoPreview() {
+  const preview = document.getElementById('seoPreview');
+  if (!preview) return;
+  const title = pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || 'Titre de la page';
+  const slug = pageBuilderState.meta.slug || 'slug';
+  const desc = pageBuilderState.seoMeta.meta_description || 'Description de la page...';
+  preview.innerHTML = `
+    <div style="font-size:18px;color:#1a0dab;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(title)}</div>
+    <div style="font-size:13px;color:#006621;margin:2px 0">example.com/pages/${escapeHtml(slug)}</div>
+    <div style="font-size:13px;color:#545454;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${escapeHtml(desc)}</div>
+  `;
+}
+
+function analyzeSeoPage() {
+  const title = pageBuilderState.meta.title || '';
+  const blocks = pageBuilderState.blocks || [];
+  // Extract text content from blocks
+  let textParts = [];
+  for (const block of blocks) {
+    const d = block.data || {};
+    // Collect text from common fields
+    if (d.text) textParts.push(stripHtml(d.text));
+    if (d.title) textParts.push(stripHtml(d.title));
+    if (d.subtitle) textParts.push(stripHtml(d.subtitle));
+    if (d.description) textParts.push(stripHtml(d.description));
+    if (d.body) textParts.push(stripHtml(d.body));
+    if (d.content) textParts.push(stripHtml(d.content));
+    if (d.bloc_title) textParts.push(stripHtml(d.bloc_title));
+    // Repeater items
+    if (d.items && Array.isArray(d.items)) {
+      for (const item of d.items) {
+        if (item.text) textParts.push(stripHtml(item.text));
+        if (item.title) textParts.push(stripHtml(item.title));
+        if (item.description) textParts.push(stripHtml(item.description));
+      }
+    }
+    // Hero sliders
+    if (d.hero_sliders && Array.isArray(d.hero_sliders)) {
+      for (const s of d.hero_sliders) {
+        if (s.title) textParts.push(stripHtml(s.title));
+        if (s.subtitle) textParts.push(stripHtml(s.subtitle));
+        if (s.text) textParts.push(stripHtml(s.text));
+      }
+    }
+  }
+  // Build meta_title: page title truncated to 60 chars
+  const metaTitle = title.substring(0, 60);
+  // Build meta_description: first meaningful text, truncated to 160 chars
+  const allText = textParts.filter(t => t && t.trim().length > 10).join('. ').replace(/\s+/g, ' ').trim();
+  const metaDesc = allText.substring(0, 160);
+  // Set values
+  pageBuilderState.seoMeta.meta_title = metaTitle;
+  pageBuilderState.seoMeta.meta_description = metaDesc;
+  const titleInput = document.getElementById('seo_meta_title');
+  const descInput = document.getElementById('seo_meta_description');
+  if (titleInput) titleInput.value = metaTitle;
+  if (descInput) descInput.value = metaDesc;
+  onSeoFieldChange();
+  showToast('Analyse SEO terminée — vérifiez et ajustez les textes', 'success');
+}
+
+function stripHtml(html) {
+  if (!html) return '';
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
+}
+
+function switchSeoTab(tab) {
+  const preview = document.getElementById('seoPreview');
+  const schema = document.getElementById('seoSchemaPanel');
+  const btnPreview = document.getElementById('seoTabPreview');
+  const btnSchema = document.getElementById('seoTabSchema');
+  if (tab === 'schema') {
+    if (preview) preview.style.display = 'none';
+    if (schema) schema.style.display = '';
+    if (btnPreview) { btnPreview.classList.remove('active'); btnPreview.classList.add('btn-outline'); }
+    if (btnSchema) { btnSchema.classList.add('active'); btnSchema.classList.remove('btn-outline'); }
+  } else {
+    if (preview) preview.style.display = '';
+    if (schema) schema.style.display = 'none';
+    if (btnPreview) { btnPreview.classList.add('active'); btnPreview.classList.remove('btn-outline'); }
+    if (btnSchema) { btnSchema.classList.remove('active'); btnSchema.classList.add('btn-outline'); }
+  }
+}
+
+function onSchemaOrgChange() {
+  const textarea = document.getElementById('seo_schema_org');
+  if (textarea) pageBuilderState.seoMeta.schema_org = textarea.value;
+}
+
+function generateSchemaOrg() {
+  const title = pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || '';
+  const description = pageBuilderState.seoMeta.meta_description || '';
+  const slug = pageBuilderState.meta.slug || '';
+  const blocks = pageBuilderState.blocks || [];
+
+  // Detect block types present
+  const types = blocks.map(b => {
+    const def = BLOCK_TYPES[b.type] || {};
+    return def.moduleName || b.type;
+  });
+
+  // Base WebPage schema
+  const schema = {
+    '@context': 'https://schema.org',
+    '@graph': []
+  };
+
+  // WebPage — always present
+  const webPage = {
+    '@type': 'WebPage',
+    'name': title,
+    'url': `{{site_url}}/pages/${slug}`
+  };
+  if (description) webPage.description = description;
+  schema['@graph'].push(webPage);
+
+  // FAQPage if Accordion blocks exist
+  const accordionBlocks = blocks.filter(b => (BLOCK_TYPES[b.type]?.moduleName || b.type) === 'Accordion');
+  if (accordionBlocks.length > 0) {
+    const faqItems = [];
+    for (const block of accordionBlocks) {
+      const items = block.data?.items || block.data?.accordions || [];
+      for (const item of items) {
+        const q = stripHtml(item.title || item.question || '');
+        const a = stripHtml(item.text || item.content || item.answer || '');
+        if (q && a) faqItems.push({ '@type': 'Question', 'name': q, 'acceptedAnswer': { '@type': 'Answer', 'text': a } });
+      }
+    }
+    if (faqItems.length > 0) {
+      schema['@graph'].push({ '@type': 'FAQPage', 'mainEntity': faqItems });
+    }
+  }
+
+  // LocalBusiness / Organization if Contact block
+  const contactBlocks = blocks.filter(b => (BLOCK_TYPES[b.type]?.moduleName || b.type) === 'Contact');
+  if (contactBlocks.length > 0) {
+    const c = contactBlocks[0].data || {};
+    const org = { '@type': 'LocalBusiness', 'name': title };
+    if (c.address || c.adresse) org.address = { '@type': 'PostalAddress', 'streetAddress': stripHtml(c.address || c.adresse || '') };
+    if (c.phone || c.telephone) org.telephone = stripHtml(c.phone || c.telephone || '');
+    if (c.email || c.mail) org.email = stripHtml(c.email || c.mail || '');
+    schema['@graph'].push(org);
+  }
+
+  // Product if Product block
+  const productBlocks = blocks.filter(b => (BLOCK_TYPES[b.type]?.moduleName || b.type) === 'Product');
+  if (productBlocks.length > 0) {
+    for (const block of productBlocks) {
+      const d = block.data || {};
+      const product = { '@type': 'Product', 'name': stripHtml(d.title || d.name || title) };
+      if (d.description) product.description = stripHtml(d.description);
+      if (d.image?.url) product.image = d.image.url;
+      if (d.price) product.offers = { '@type': 'Offer', 'price': d.price, 'priceCurrency': 'EUR' };
+      schema['@graph'].push(product);
+    }
+  }
+
+  // ImageGallery if Gallery block
+  const galleryBlocks = blocks.filter(b => (BLOCK_TYPES[b.type]?.moduleName || b.type) === 'Gallery');
+  if (galleryBlocks.length > 0) {
+    for (const block of galleryBlocks) {
+      const images = block.data?.images || block.data?.gallery || [];
+      if (images.length > 0) {
+        schema['@graph'].push({
+          '@type': 'ImageGallery',
+          'name': stripHtml(block.data?.bloc_title || block.data?.title || 'Galerie'),
+          'image': images.slice(0, 10).map(img => img.url || img.image?.url || '').filter(Boolean)
+        });
+      }
+    }
+  }
+
+  // VideoObject if Video block
+  const videoBlocks = blocks.filter(b => ['Video', 'IllusVideo'].includes(BLOCK_TYPES[b.type]?.moduleName || b.type));
+  if (videoBlocks.length > 0) {
+    for (const block of videoBlocks) {
+      const d = block.data || {};
+      const url = d.video_url || d.url || d.video || '';
+      if (url) {
+        schema['@graph'].push({
+          '@type': 'VideoObject',
+          'name': stripHtml(d.title || d.bloc_title || title),
+          'contentUrl': url
+        });
+      }
+    }
+  }
+
+  // Event if EventsSlider block
+  const eventBlocks = blocks.filter(b => (BLOCK_TYPES[b.type]?.moduleName || b.type) === 'EventsSlider');
+  if (eventBlocks.length > 0) {
+    for (const block of eventBlocks) {
+      const events = block.data?.events || block.data?.items || [];
+      for (const ev of events) {
+        const event = { '@type': 'Event', 'name': stripHtml(ev.title || '') };
+        if (ev.date) event.startDate = ev.date;
+        if (ev.location || ev.lieu) event.location = { '@type': 'Place', 'name': stripHtml(ev.location || ev.lieu || '') };
+        if (event.name) schema['@graph'].push(event);
+      }
+    }
+  }
+
+  // Team / Person if Team block
+  const teamBlocks = blocks.filter(b => (BLOCK_TYPES[b.type]?.moduleName || b.type) === 'Team');
+  if (teamBlocks.length > 0) {
+    for (const block of teamBlocks) {
+      const members = block.data?.members || block.data?.items || block.data?.team || [];
+      for (const m of members) {
+        const person = { '@type': 'Person', 'name': stripHtml(m.name || m.title || m.nom || '') };
+        if (m.role || m.poste || m.job) person.jobTitle = stripHtml(m.role || m.poste || m.job || '');
+        if (m.image?.url) person.image = m.image.url;
+        if (person.name) schema['@graph'].push(person);
+      }
+    }
+  }
+
+  // Review if GoogleReviews or Review block
+  const reviewBlocks = blocks.filter(b => ['GoogleReviews', 'Review'].includes(BLOCK_TYPES[b.type]?.moduleName || b.type));
+  if (reviewBlocks.length > 0) {
+    for (const block of reviewBlocks) {
+      const reviews = block.data?.reviews || block.data?.items || [];
+      for (const r of reviews) {
+        const review = { '@type': 'Review', 'author': { '@type': 'Person', 'name': stripHtml(r.author || r.name || r.nom || 'Anonyme') } };
+        if (r.text || r.content) review.reviewBody = stripHtml(r.text || r.content || '');
+        if (r.rating || r.note) review.reviewRating = { '@type': 'Rating', 'ratingValue': r.rating || r.note };
+        schema['@graph'].push(review);
+      }
+    }
+  }
+
+  // BreadcrumbList
+  schema['@graph'].push({
+    '@type': 'BreadcrumbList',
+    'itemListElement': [
+      { '@type': 'ListItem', 'position': 1, 'name': 'Accueil', 'item': '{{site_url}}/' },
+      { '@type': 'ListItem', 'position': 2, 'name': title, 'item': `{{site_url}}/pages/${slug}` }
+    ]
+  });
+
+  const json = JSON.stringify(schema, null, 2);
+  pageBuilderState.seoMeta.schema_org = json;
+  const textarea = document.getElementById('seo_schema_org');
+  if (textarea) textarea.value = json;
+  showToast('Schema.org genere depuis le contenu de la page', 'success');
+}
+
 function onBuilderStatusChange(status) {
   const btn = document.querySelector('.builder-menu-settings-btn');
   if (btn) {
@@ -4064,10 +4788,14 @@ function selectBlock(id) {
   selectedBlockId = id;
   renderBlockSettings();
   updateSelectedBlockCard();
-  // Show settings, hide modules list
+  // Show settings, hide modules list and color overrides panel
   const modulesPanel = document.getElementById('builderModulesPanel');
   const settingsPanel = document.getElementById('builderSettings');
+  const colorPanel = document.getElementById('builderColorOverridesPanel');
+  const seoPanel = document.getElementById('builderSeoPanel');
   if (modulesPanel) modulesPanel.style.display = 'none';
+  if (colorPanel) colorPanel.style.display = 'none';
+  if (seoPanel) seoPanel.style.display = 'none';
   if (settingsPanel) settingsPanel.style.display = '';
   // Auto-enable inline editing for TextSimple
   const block = pageBuilderState.blocks.find(b => b.id === id);
@@ -4197,12 +4925,21 @@ function renderKeyValueForm(block) {
   `;
 }
 
+// BlockParams field names — shared parameters across all Nickl modules
+const BLOCK_PARAMS_FIELDS = new Set([
+  'title', 'id_bloc', 'title_align', 'title_style',
+  'bloc_color', 'padding_top', 'padding_bottom',
+  'is_visible', 'bg_img', 'bg_opacity', 'bg_parallax',
+  'is_fullscreen', 'is_small_marged'
+]);
+
 function renderSchemaForm(block, schemaFields) {
   const data = block.data && typeof block.data === 'object' ? block.data : {};
   const def = BLOCK_TYPES[block.type] || {};
   const moduleName = def.moduleName || block.type;
   const isInlineEditable = (moduleName === 'TextSimple' || moduleName === 'TextImage' || moduleName === 'HeadText');
-  const fields = schemaFields.map(field => {
+
+  const renderField = (field) => {
     // Hide the accordions repeater for Accordion — managed from the preview
     if (moduleName === 'Accordion' && field.type === 'Repeater' && field.name === 'accordions') {
       return `<div class="form-group inline-edit-hint">
@@ -4225,12 +4962,59 @@ function renderSchemaForm(block, schemaFields) {
     // Normalize false to '' for padding fields (PHP default(false) = "Normal" = empty string value)
     if ((field.name === 'padding_top' || field.name === 'padding_bottom') && (val === false || val === 'false' || val === undefined)) val = '';
     return renderSchemaField(field, val, block.id, data);
-  }).join('');
+  };
+
+  // Split fields into content vs params tabs
+  const contentFields = [];
+  const paramFields = [];
+  schemaFields.forEach(field => {
+    if (BLOCK_PARAMS_FIELDS.has(field.name)) {
+      paramFields.push(field);
+    } else {
+      contentFields.push(field);
+    }
+  });
+
+  const contentHtml = contentFields.map(renderField).join('');
+  const paramHtml = paramFields.map(renderField).join('');
+  const hasParams = paramFields.length > 0;
+  const tabId = `block-tabs-${block.id}`;
+
+  if (!hasParams) {
+    // No params tab needed — render flat like before
+    return `
+      <form class="builder-block-form" onsubmit="saveSchemaData('${block.id}', event)">
+        <div class="settings-fields">${contentHtml}</div>
+      </form>
+    `;
+  }
+
   return `
     <form class="builder-block-form" onsubmit="saveSchemaData('${block.id}', event)">
-      <div class="settings-fields">${fields}</div>
+      <div class="settings-tabs" id="${tabId}">
+        <button type="button" class="settings-tab is-active" data-target="#${block.id}-tab-params" onclick="switchBlockTab(this)">Paramètres</button>
+        <button type="button" class="settings-tab" data-target="#${block.id}-tab-content" onclick="switchBlockTab(this)">Contenu</button>
+      </div>
+      <div class="settings-section is-active" id="${block.id}-tab-params">
+        <div class="settings-fields">${paramHtml}</div>
+      </div>
+      <div class="settings-section" id="${block.id}-tab-content">
+        <div class="settings-fields">${contentHtml}</div>
+      </div>
     </form>
   `;
+}
+
+function switchBlockTab(tabBtn) {
+  const tabsContainer = tabBtn.parentElement;
+  const form = tabsContainer.closest('.builder-block-form');
+  // Deactivate all tabs and sections
+  tabsContainer.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('is-active'));
+  form.querySelectorAll(':scope > .settings-section').forEach(s => s.classList.remove('is-active'));
+  // Activate clicked tab and its target section
+  tabBtn.classList.add('is-active');
+  const target = form.querySelector(tabBtn.getAttribute('data-target'));
+  if (target) target.classList.add('is-active');
 }
 
 function normalizeBoolVal(val) {
@@ -4261,6 +5045,29 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
   const label = field.label || field.name;
   const name = field.name;
   const type = field.type || 'Text';
+  // Dynamic select for form module: populate form_id from API
+  if (name === 'form_id') {
+    const selectId = `form-select-${blockId}`;
+    setTimeout(async () => {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      try {
+        const forms = await apiFetch('/forms');
+        sel.innerHTML = '<option value="">— Sélectionner un formulaire —</option>' +
+          (forms || []).filter(f => f.status === 'active').map(f =>
+            `<option value="${f.id}" ${String(value ?? '') === String(f.id) ? 'selected' : ''}>${escapeHtml(f.title)}</option>`
+          ).join('');
+      } catch (e) {}
+    }, 0);
+    return `
+      <div class="form-group">
+        <label class="form-label">${escapeHtml(label)}</label>
+        <select class="form-select" name="${escapeHtml(name)}" id="${selectId}">
+          <option value="">Chargement…</option>
+        </select>
+      </div>
+    `;
+  }
   // Dynamic select for reusable-bloc module: populate bloc_id from API
   if (name === 'bloc_id') {
     const selectId = `rb-select-${blockId}`;
@@ -4352,11 +5159,11 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
   // Rendu spécial pour les champs de couleur de fond de bloc
   const COLOR_FIELDS = ['bloc_color', 'footer_color', 'pdv_footer_color', 'bloc_color_alert'];
   if ((type === 'ButtonGroup' || type === 'RadioButton') && choices && choices.length > 0 && COLOR_FIELDS.includes(name)) {
-    const site = siteSettingsCache || {};
+    const resolvedColors = getResolvedColorMap();
     const COLOR_MAP = {
-      'has-background-primary':   { label: 'Primaire',   color: site.primary_color   || 'var(--color-primary)'   },
-      'has-background-secondary': { label: 'Secondaire', color: site.secondary_color || 'var(--color-secondary)' },
-      'has-background-tertiary':  { label: 'Tertiaire',  color: site.tertiary_color  || 'var(--color-tertiary)'  },
+      'has-background-primary':   { label: 'Primaire',   color: resolvedColors['has-background-primary']   },
+      'has-background-secondary': { label: 'Secondaire', color: resolvedColors['has-background-secondary'] },
+      'has-background-tertiary':  { label: 'Tertiaire',  color: resolvedColors['has-background-tertiary']  },
       'no-background-color':      { label: 'Aucune',     color: null },
     };
     const options = choices.map((choice, idx) => {
@@ -4494,7 +5301,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
         <label class="form-label">${escapeHtml(label)}</label>
         <div class="media-field" data-field="${escapeHtml(inputName)}">
           <div class="media-preview">
-            ${url ? (isVideo ? `<div class="media-preview-icon">🎬</div>` : `<img src="${escapeHtml(url)}" alt="${escapeHtml(meta)}">`) : ''}
+            ${url ? (isVideo ? `<div class="media-preview-icon">🎬</div>` : `<img src="${escapeHtml(getOptimizedUrl(url, 400, 70))}" alt="${escapeHtml(meta)}">`) : ''}
           </div>
           <div class="media-preview-meta">${escapeHtml(meta)}</div>
           <input type="hidden" name="${escapeHtml(inputName)}"${rfieldAttr} value="${escapeHtml(media ? JSON.stringify(media) : '')}">
@@ -4519,6 +5326,54 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
       <div class="form-group">
         <label class="form-label">${escapeHtml(label)}</label>
         <input type="password" class="form-input" name="${escapeHtml(inputName)}"${rfieldAttr} value="${safeValue}">
+      </div>
+    `;
+  }
+  if (type === 'GoogleMap') {
+    const mapObj = (value && typeof value === 'object') ? value : {};
+    const mapLat = mapObj.lat || '';
+    const mapLng = mapObj.lng || '';
+    const mapPlaceId = mapObj.place_id || '';
+    const mapAddress = mapObj.address || mapObj.name || '';
+    const mapStreetNumber = mapObj.street_number || '';
+    const mapStreetName = mapObj.street_name || '';
+    const mapStreetNameShort = mapObj.street_name_short || '';
+    const mapPostCode = mapObj.post_code || '';
+    const mapCity = mapObj.city || '';
+    const mapName = mapObj.name || '';
+    const uid = `gmap-${blockId}-${inputName}`.replace(/[^a-zA-Z0-9_-]/g, '-');
+    // Defer initialization to next tick so the DOM is ready
+    setTimeout(() => initGoogleMapField(uid), 0);
+    return `
+      <div class="form-group googlemap-field-group" id="${uid}">
+        <label class="form-label">${escapeHtml(label)}</label>
+        <div class="googlemap-field" data-field="${escapeHtml(inputName)}">
+          <div class="googlemap-search-wrapper">
+            <input type="text" class="form-input googlemap-search" name="${escapeHtml(inputName)}__search" placeholder="Rechercher une adresse…" value="${escapeHtml(mapAddress)}" autocomplete="off">
+            <div class="googlemap-suggestions"></div>
+          </div>
+          <div class="googlemap-coords">
+            <div class="googlemap-coord-field">
+              <label class="form-label form-label-sm">Latitude</label>
+              <input type="text" class="form-input form-input-sm" name="${escapeHtml(inputName)}__lat" value="${escapeHtml(String(mapLat))}" placeholder="ex: 48.8566">
+            </div>
+            <div class="googlemap-coord-field">
+              <label class="form-label form-label-sm">Longitude</label>
+              <input type="text" class="form-input form-input-sm" name="${escapeHtml(inputName)}__lng" value="${escapeHtml(String(mapLng))}" placeholder="ex: 2.3522">
+            </div>
+            <div class="googlemap-coord-field">
+              <label class="form-label form-label-sm">Place ID</label>
+              <input type="text" class="form-input form-input-sm" name="${escapeHtml(inputName)}__place_id" value="${escapeHtml(mapPlaceId)}" placeholder="(optionnel)">
+            </div>
+          </div>
+          <input type="hidden" name="${escapeHtml(inputName)}__street_number" value="${escapeHtml(mapStreetNumber)}">
+          <input type="hidden" name="${escapeHtml(inputName)}__street_name" value="${escapeHtml(mapStreetName)}">
+          <input type="hidden" name="${escapeHtml(inputName)}__street_name_short" value="${escapeHtml(mapStreetNameShort)}">
+          <input type="hidden" name="${escapeHtml(inputName)}__post_code" value="${escapeHtml(mapPostCode)}">
+          <input type="hidden" name="${escapeHtml(inputName)}__city" value="${escapeHtml(mapCity)}">
+          <input type="hidden" name="${escapeHtml(inputName)}__name" value="${escapeHtml(mapName)}">
+          <div class="googlemap-preview"></div>
+        </div>
       </div>
     `;
   }
@@ -4642,8 +5497,8 @@ function renderFlexibleContentFieldHTML(field, value, blockId, rowCtx) {
       <label class="form-label">${escapeHtml(field.label || field.name)}</label>
       <div class="flexible-content-field" data-field-name="${escapeHtml(fcCompoundName)}" data-block-id="${escapeHtml(blockId)}">
         <div class="flexible-content-items">${itemsHtml}</div>
-        <div class="flexible-content-add" style="display:flex;gap:8px;margin-top:8px;">
-          <select class="form-select flexible-content-type-select" style="flex:1;">
+        <div class="flexible-content-add">
+          <select class="form-select flexible-content-type-select">
             <option value="">— Choisir un module —</option>
             ${dropdownOptions}
           </select>
@@ -4884,13 +5739,54 @@ function toggleGroupField(header) {
   group.classList.toggle('is-open', !open);
 }
 
-function _getRepeaterSchema(blockId, fieldName) {
+function _getRepeaterSchema(blockId, fieldName, domContext) {
   const block = pageBuilderState.blocks.find(b => b.id === blockId);
   if (!block) return null;
-  const def = BLOCK_TYPES[block.type] || {};
-  const moduleName = def.moduleName || block.type;
+
+  let moduleName;
+  // When inside a flexible content sub-module, look up the sub-module's schema
+  if (domContext) {
+    const fcItem = domContext.closest('.flexible-content-item');
+    if (fcItem) {
+      const layout = fcItem.dataset.layout || '';
+      const subDef = BLOCK_TYPES[layout] || {};
+      moduleName = subDef.moduleName || layout;
+    }
+  }
+  if (!moduleName) {
+    const def = BLOCK_TYPES[block.type] || {};
+    moduleName = def.moduleName || block.type;
+  }
   const schemaFields = moduleFieldSchema?.modules?.[moduleName]?.fields || [];
   return schemaFields.find(f => f.name === fieldName && f.type === 'Repeater') || null;
+}
+
+// Collect repeater data directly from a container element (avoids form-wide search ambiguity)
+function _collectRepeaterFromContainer(container, fieldName, subFields) {
+  const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
+  return Array.from(rows).map((row, i) =>
+    collectContainerData(row, fieldName, subFields, i)
+  );
+}
+
+// Sync repeater data to block.data — handles nested sub-module context
+function _syncRepeaterToBlock(container, blockId) {
+  const block = pageBuilderState.blocks.find(b => b.id === blockId);
+  if (!block) return;
+  // If inside a flexible content sub-module, re-collect the entire block data
+  const fcItem = container.closest('.flexible-content-item');
+  if (fcItem) {
+    const form = container.closest('form');
+    if (form) liveUpdateFromSettingsForm(form);
+  } else {
+    // Direct field — collect from container
+    const fieldName = container.dataset.fieldName;
+    const repeaterField = _getRepeaterSchema(blockId, fieldName, container);
+    if (!repeaterField?.subFields) return;
+    if (!block.data || typeof block.data !== 'object') block.data = {};
+    block.data[fieldName] = _collectRepeaterFromContainer(container, fieldName, repeaterField.subFields);
+  }
+  updateBlockCardPreview(blockId);
 }
 
 function collectContainerData(scope, parentName, subFields, rowIndex) {
@@ -4921,6 +5817,31 @@ function collectContainerData(scope, parentName, subFields, rowIndex) {
       const targetInput = scope.querySelector(`[name="${CSS.escape(compoundName + '__target')}"]`);
       const url = urlInput ? urlInput.value : '';
       rowData[f.name] = url ? { url, title: titleInput ? titleInput.value : '', target: targetInput ? targetInput.value : '_self' } : '';
+    } else if (f.type === 'GoogleMap') {
+      const latInput = scope.querySelector(`[name="${CSS.escape(compoundName + '__lat')}"]`);
+      const lngInput = scope.querySelector(`[name="${CSS.escape(compoundName + '__lng')}"]`);
+      const placeIdInput = scope.querySelector(`[name="${CSS.escape(compoundName + '__place_id')}"]`);
+      const searchInput = scope.querySelector(`[name="${CSS.escape(compoundName + '__search')}"]`);
+      const streetNumberInput = scope.querySelector(`[name="${CSS.escape(compoundName + '__street_number')}"]`);
+      const streetNameInput = scope.querySelector(`[name="${CSS.escape(compoundName + '__street_name')}"]`);
+      const streetNameShortInput = scope.querySelector(`[name="${CSS.escape(compoundName + '__street_name_short')}"]`);
+      const postCodeInput = scope.querySelector(`[name="${CSS.escape(compoundName + '__post_code')}"]`);
+      const cityInput = scope.querySelector(`[name="${CSS.escape(compoundName + '__city')}"]`);
+      const nameInput = scope.querySelector(`[name="${CSS.escape(compoundName + '__name')}"]`);
+      const lat = latInput ? parseFloat(latInput.value) : 0;
+      const lng = lngInput ? parseFloat(lngInput.value) : 0;
+      rowData[f.name] = (lat || lng) ? {
+        lat: lat || 0,
+        lng: lng || 0,
+        place_id: placeIdInput ? placeIdInput.value : '',
+        address: searchInput ? searchInput.value : '',
+        name: nameInput ? nameInput.value : (searchInput ? searchInput.value : ''),
+        street_number: streetNumberInput ? streetNumberInput.value : '',
+        street_name: streetNameInput ? streetNameInput.value : '',
+        street_name_short: streetNameShortInput ? streetNameShortInput.value : '',
+        post_code: postCodeInput ? postCodeInput.value : '',
+        city: cityInput ? cityInput.value : '',
+      } : null;
     } else if (f.type === 'FlexibleContent') {
       const form = scope.closest('form') || scope;
       rowData[f.name] = collectFlexibleContentData(form, compoundName);
@@ -4957,10 +5878,9 @@ function reRenderRepeaterRows(container, subFields, allData, blockId, repeaterNa
 function addRepeaterRow(button, blockId, fieldName) {
   const container = button.closest('.repeater-field');
   if (!container) return;
-  const repeaterField = _getRepeaterSchema(blockId, fieldName);
+  const repeaterField = _getRepeaterSchema(blockId, fieldName, container);
   if (!repeaterField?.subFields) return;
-  const form = container.closest('form');
-  const existingData = form ? collectRepeaterData(form, fieldName, repeaterField.subFields) : [];
+  const existingData = _collectRepeaterFromContainer(container, fieldName, repeaterField.subFields);
   // Initialize new row: default TrueFalse sub-fields to true so image/visibility fields start ON
   const newRowDefaults = {};
   for (const f of repeaterField.subFields) {
@@ -4968,13 +5888,7 @@ function addRepeaterRow(button, blockId, fieldName) {
   }
   existingData.push(newRowDefaults);
   reRenderRepeaterRows(container, repeaterField.subFields, existingData, blockId, fieldName);
-  // Sync data to block.data immediately so it's never stale
-  const block = pageBuilderState.blocks.find(b => b.id === blockId);
-  if (block) {
-    if (!block.data || typeof block.data !== 'object') block.data = {};
-    block.data[fieldName] = existingData;
-    updateBlockCardPreview(blockId);
-  }
+  _syncRepeaterToBlock(container, blockId);
   // Expand the last row
   const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
   const lastRow = rows[rows.length - 1];
@@ -4983,6 +5897,7 @@ function addRepeaterRow(button, blockId, fieldName) {
     if (body) body.style.display = '';
     lastRow.classList.add('is-open');
   }
+  const form = container.closest('form');
   if (form) updateSchemaConditionals(form);
 }
 
@@ -4992,19 +5907,13 @@ function removeRepeaterRow(button) {
   if (!container) return;
   const blockId = container.dataset.blockId;
   const fieldName = container.dataset.fieldName;
-  const repeaterField = _getRepeaterSchema(blockId, fieldName);
+  const repeaterField = _getRepeaterSchema(blockId, fieldName, container);
   if (!repeaterField?.subFields) return;
-  const form = container.closest('form');
-  const allData = form ? collectRepeaterData(form, fieldName, repeaterField.subFields) : [];
+  const allData = _collectRepeaterFromContainer(container, fieldName, repeaterField.subFields);
   const rowIndex = parseInt(row.dataset.rowIndex, 10);
   allData.splice(rowIndex, 1);
   reRenderRepeaterRows(container, repeaterField.subFields, allData, blockId, fieldName);
-  const block = pageBuilderState.blocks.find(b => b.id === blockId);
-  if (block) {
-    if (!block.data || typeof block.data !== 'object') block.data = {};
-    block.data[fieldName] = allData;
-    updateBlockCardPreview(blockId);
-  }
+  _syncRepeaterToBlock(container, blockId);
 }
 
 function moveRepeaterRow(button, direction) {
@@ -5013,21 +5922,15 @@ function moveRepeaterRow(button, direction) {
   if (!container) return;
   const blockId = container.dataset.blockId;
   const fieldName = container.dataset.fieldName;
-  const repeaterField = _getRepeaterSchema(blockId, fieldName);
+  const repeaterField = _getRepeaterSchema(blockId, fieldName, container);
   if (!repeaterField?.subFields) return;
-  const form = container.closest('form');
-  const allData = form ? collectRepeaterData(form, fieldName, repeaterField.subFields) : [];
+  const allData = _collectRepeaterFromContainer(container, fieldName, repeaterField.subFields);
   const rowIndex = parseInt(row.dataset.rowIndex, 10);
   const targetIndex = rowIndex + direction;
   if (targetIndex < 0 || targetIndex >= allData.length) return;
   [allData[rowIndex], allData[targetIndex]] = [allData[targetIndex], allData[rowIndex]];
   reRenderRepeaterRows(container, repeaterField.subFields, allData, blockId, fieldName);
-  const block = pageBuilderState.blocks.find(b => b.id === blockId);
-  if (block) {
-    if (!block.data || typeof block.data !== 'object') block.data = {};
-    block.data[fieldName] = allData;
-    updateBlockCardPreview(blockId);
-  }
+  _syncRepeaterToBlock(container, blockId);
   // Expand the moved row
   const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
   const movedRow = rows[targetIndex];
@@ -5112,6 +6015,32 @@ function saveSchemaData(blockId, event) {
     // éviter d'écraser les données (et donc de perdre l'image de fond)
     // à chaque changement d'un autre paramètre.
     if (type === 'Image' || type === 'File' || type === 'Video') return;
+    if (type === 'GoogleMap') {
+      const latInput = form.querySelector(`[name="${CSS.escape(name + '__lat')}"]`);
+      const lngInput = form.querySelector(`[name="${CSS.escape(name + '__lng')}"]`);
+      const placeIdInput = form.querySelector(`[name="${CSS.escape(name + '__place_id')}"]`);
+      const searchInput = form.querySelector(`[name="${CSS.escape(name + '__search')}"]`);
+      const lat = latInput ? parseFloat(latInput.value) : 0;
+      const lng = lngInput ? parseFloat(lngInput.value) : 0;
+      const streetNumberInput = form.querySelector(`[name="${CSS.escape(name + '__street_number')}"]`);
+      const streetNameInput = form.querySelector(`[name="${CSS.escape(name + '__street_name')}"]`);
+      const streetNameShortInput = form.querySelector(`[name="${CSS.escape(name + '__street_name_short')}"]`);
+      const postCodeInput = form.querySelector(`[name="${CSS.escape(name + '__post_code')}"]`);
+      const cityInput = form.querySelector(`[name="${CSS.escape(name + '__city')}"]`);
+      const nameInput = form.querySelector(`[name="${CSS.escape(name + '__name')}"]`);
+      data[name] = (lat || lng) ? {
+        lat: lat || 0, lng: lng || 0,
+        place_id: placeIdInput ? placeIdInput.value : '',
+        address: searchInput ? searchInput.value : '',
+        name: nameInput ? nameInput.value : (searchInput ? searchInput.value : ''),
+        street_number: streetNumberInput ? streetNumberInput.value : '',
+        street_name: streetNameInput ? streetNameInput.value : '',
+        street_name_short: streetNameShortInput ? streetNameShortInput.value : '',
+        post_code: postCodeInput ? postCodeInput.value : '',
+        city: cityInput ? cityInput.value : '',
+      } : null;
+      return;
+    }
     if (type === 'URL' || type === 'Url' || type === 'Link') {
       const urlInput = form.querySelector(`[name="${CSS.escape(name + '__url')}"]`);
       const titleInput = form.querySelector(`[name="${CSS.escape(name + '__title')}"]`);
@@ -5273,6 +6202,32 @@ function liveUpdateFromSettingsForm(form) {
     // clic sur un bouton (couleur, padding, etc.) et la photo disparaît.
     if (name === 'bg_img' || name === 'backgroundImage') return;
     if (type === 'Image' || type === 'File' || type === 'Video') return;
+    if (type === 'GoogleMap') {
+      const latInput = form.querySelector(`[name="${CSS.escape(name + '__lat')}"]`);
+      const lngInput = form.querySelector(`[name="${CSS.escape(name + '__lng')}"]`);
+      const placeIdInput = form.querySelector(`[name="${CSS.escape(name + '__place_id')}"]`);
+      const searchInput = form.querySelector(`[name="${CSS.escape(name + '__search')}"]`);
+      const lat = latInput ? parseFloat(latInput.value) : 0;
+      const lng = lngInput ? parseFloat(lngInput.value) : 0;
+      const streetNumberInput = form.querySelector(`[name="${CSS.escape(name + '__street_number')}"]`);
+      const streetNameInput = form.querySelector(`[name="${CSS.escape(name + '__street_name')}"]`);
+      const streetNameShortInput = form.querySelector(`[name="${CSS.escape(name + '__street_name_short')}"]`);
+      const postCodeInput = form.querySelector(`[name="${CSS.escape(name + '__post_code')}"]`);
+      const cityInput = form.querySelector(`[name="${CSS.escape(name + '__city')}"]`);
+      const nameInput = form.querySelector(`[name="${CSS.escape(name + '__name')}"]`);
+      data[name] = (lat || lng) ? {
+        lat: lat || 0, lng: lng || 0,
+        place_id: placeIdInput ? placeIdInput.value : '',
+        address: searchInput ? searchInput.value : '',
+        name: nameInput ? nameInput.value : (searchInput ? searchInput.value : ''),
+        street_number: streetNumberInput ? streetNumberInput.value : '',
+        street_name: streetNameInput ? streetNameInput.value : '',
+        street_name_short: streetNameShortInput ? streetNameShortInput.value : '',
+        post_code: postCodeInput ? postCodeInput.value : '',
+        city: cityInput ? cityInput.value : '',
+      } : null;
+      return;
+    }
     if (type === 'URL' || type === 'Url' || type === 'Link') {
       const urlInput = form.querySelector(`[name="${CSS.escape(name + '__url')}"]`);
       const titleInput = form.querySelector(`[name="${CSS.escape(name + '__title')}"]`);
@@ -5331,12 +6286,7 @@ function syncModuleBlocColorClasses(richEl, data) {
     moduleEl.classList.add(bgClass);
   }
   // Inline background-color to override CSS cascade (background: transparent !important)
-  const site = siteSettingsCache || {};
-  const COLOR_MAP = {
-    'has-background-primary': site.primary_color || 'var(--color-primary, #006a9b)',
-    'has-background-secondary': site.secondary_color || 'var(--color-secondary, #ea644e)',
-    'has-background-tertiary': site.tertiary_color || 'var(--color-tertiary, #d6d6d6)',
-  };
+  const COLOR_MAP = getResolvedColorMap();
   if (bgClass && COLOR_MAP[bgClass]) {
     moduleEl.style.setProperty('background-color', COLOR_MAP[bgClass], 'important');
   } else {
@@ -5818,13 +6768,15 @@ async function savePageBuilder() {
   const show_in_menu = assignments.length > 0;
 
   const content = JSON.stringify(pageBuilderState.blocks);
+  const color_overrides = pageBuilderState.colorOverrides.enabled ? JSON.stringify(pageBuilderState.colorOverrides) : null;
+  const seo_meta = pageBuilderState.seoMeta.enabled ? JSON.stringify(pageBuilderState.seoMeta) : null;
   showLoading();
   try {
     if (pageBuilderState.editingPageId) {
-      await apiFetch(`/pages/${pageBuilderState.editingPageId}`, { method: 'PUT', body: JSON.stringify({ title, slug, content, status, show_in_menu, menu_order: 0, parent_id: parent_id || null }) });
+      await apiFetch(`/pages/${pageBuilderState.editingPageId}`, { method: 'PUT', body: JSON.stringify({ title, slug, content, color_overrides, seo_meta, status, show_in_menu, menu_order: 0, parent_id: parent_id || null }) });
       showToast('Page mise à jour', 'success');
     } else {
-      const res = await apiFetch('/pages', { method: 'POST', body: JSON.stringify({ title, slug, content, status, show_in_menu, menu_order: 0, parent_id: parent_id || null }) });
+      const res = await apiFetch('/pages', { method: 'POST', body: JSON.stringify({ title, slug, content, color_overrides, seo_meta, status, show_in_menu, menu_order: 0, parent_id: parent_id || null }) });
       showToast('Page créée', 'success');
       if (res && res.id) {
         pageBuilderState.editingPageId = res.id;
@@ -5870,20 +6822,29 @@ let _pagesCache = [];
 let _pagesSearch = '';
 let _pagesCurrentPage = 1;
 const PAGES_PER_PAGE = 10;
+let _pagesActiveMenu = null; // null = flat view, menuId = show hierarchy for that menu
+let _pagesSortField = 'title'; // 'title' | 'updated_at'
+let _pagesSortDir = 'asc';     // 'asc' | 'desc'
+let _pagesMenusList = []; // [{id, name, location}] all menus with a location
+let _pagesMenuItems = {}; // menuId → [{id, title, page_id, parent_id, menu_order}]
 
 let _pagesMenuInfo = {}; // { pageId: { menus: [{id,name,location}], primaryParent: {title,page_id}|null } }
 
 async function renderPages() {
   showLoading();
   try {
-    const [pages, menuInfo] = await Promise.all([
+    const [pages, menuInfo, menus] = await Promise.all([
       apiFetch('/pages'),
       apiFetch('/pages/menu-info'),
+      apiFetch('/menus'),
     ]);
     _pagesCache = pages;
     _pagesMenuInfo = menuInfo || {};
+    _pagesMenusList = (menus || []).filter(m => m.location);
     _pagesSearch = '';
     _pagesCurrentPage = 1;
+    _pagesActiveMenu = null;
+    _pagesMenuItems = {};
     hideLoading();
     return renderPagesView();
   } catch (error) {
@@ -5903,9 +6864,126 @@ function getFilteredPages() {
   );
 }
 
+function renderPagesMenuButtons() {
+  const allBtn = `<button type="button" class="pages-menu-btn ${_pagesActiveMenu === null ? 'active' : ''}" onclick="setActiveMenu(null)">Toutes les pages</button>`;
+  const menuBtns = _pagesMenusList.map(m => {
+    const loc = MENU_LOCATIONS.find(l => l.value === m.location);
+    const label = loc && loc.value ? loc.label : m.name;
+    return `<button type="button" class="pages-menu-btn ${_pagesActiveMenu === m.id ? 'active' : ''}" onclick="setActiveMenu(${m.id})">${escapeHtml(label)}</button>`;
+  }).join('');
+  return `<div class="pages-menu-buttons">${allBtn}${menuBtns}</div>`;
+}
+
+async function setActiveMenu(menuId) {
+  _pagesActiveMenu = menuId;
+  _pagesSearch = '';
+  _pagesCurrentPage = 1;
+  if (menuId !== null && !_pagesMenuItems[menuId]) {
+    showLoading();
+    try {
+      const menu = await apiFetch('/menus/' + menuId);
+      _pagesMenuItems[menuId] = menu.items || [];
+    } catch (e) {
+      _pagesMenuItems[menuId] = [];
+    }
+    hideLoading();
+  }
+  refreshPagesView();
+}
+
+function flattenMenuHierarchy(items, depth) {
+  const result = [];
+  (items || []).forEach(item => {
+    result.push({ ...item, _depth: depth || 0 });
+    if (item.children && item.children.length > 0) {
+      result.push(...flattenMenuHierarchy(item.children, (depth || 0) + 1));
+    }
+  });
+  return result;
+}
+
+function renderMenuHierarchyTable(menuId) {
+  const items = _pagesMenuItems[menuId] || [];
+  if (items.length === 0) return renderEmptyState('📋', 'Menu vide', 'Aucune page dans ce menu');
+  const hierarchy = flattenMenuHierarchy(items, 0);
+  return `
+    <div class="pages-list">
+      <div class="pages-list-header">
+        <span class="page-item__info">Page</span>
+        <span class="page-item__meta">Modifié</span>
+        <span class="page-item__badges">Statut</span>
+        <span class="page-item__actions" style="opacity:1">Actions</span>
+      </div>
+      ${hierarchy.map(item => {
+        const page = item.page_id ? _pagesCache.find(p => p.id === item.page_id) : null;
+        const title = item.title || (page ? page.title : 'Sans titre');
+        const slug = page ? page.slug : (item.url || '');
+        const indent = item._depth * 28;
+        const isChild = item._depth > 0;
+        const safeTitle = title.replace(/'/g, "\\'");
+        return '<div class="page-item" style="padding-left: ' + (20 + indent) + 'px">'
+          + '<div class="page-item__info">'
+          +   '<div class="page-item__title">'
+          +     (isChild ? '<span class="page-item__child-icon">↳</span>' : '') + escapeHtml(title)
+          +   '</div>'
+          +   '<div class="page-item__slug">/' + escapeHtml(slug) + '</div>'
+          + '</div>'
+          + '<div class="page-item__meta">'
+          +   (page && page.author?.name ? '<span class="page-item__author">' + escapeHtml(page.author.name) + '</span>' : '')
+          +   (page ? '<span class="page-item__date">' + new Date(page.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span>' : '')
+          + '</div>'
+          + '<div class="page-item__badges">'
+          +   (page ? '<span class="badge ' + (page.status === 'published' ? 'badge-success' : 'badge-warning') + '">' + (page.status === 'published' ? 'Publié' : 'Brouillon') + '</span>' : '<span class="badge badge-muted">Lien externe</span>')
+          + '</div>'
+          + '<div class="page-item__actions">'
+          +   (page ? '<button class="btn-icon-action" onclick="editPage(' + page.id + ')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+          +     '<button class="btn-icon-action" onclick="duplicatePage(' + page.id + ')" title="Dupliquer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+          +     '<button class="btn-icon-action btn-icon-action--danger" onclick="deletePage(' + page.id + ', \'' + safeTitle + '\')" title="Supprimer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
+          :   '')
+          + '</div>'
+        + '</div>';
+      }).join('')}
+    </div>
+  `;
+}
+
 function renderPagesView() {
+  const isMenuView = _pagesActiveMenu !== null;
+  const menuButtons = _pagesMenusList.length > 0 ? renderPagesMenuButtons() : '';
+
+  if (isMenuView) {
+    const menuId = _pagesActiveMenu;
+    const menu = _pagesMenusList.find(m => m.id === menuId);
+    const loc = menu ? (MENU_LOCATIONS.find(l => l.value === menu.location)?.label || menu.name) : '';
+    const items = _pagesMenuItems[menuId] || [];
+    return `
+      <div class="page-header">
+        <h1>Pages</h1>
+        <button class="btn btn-primary" onclick="openPageBuilder(null)">
+          <span class="icon">➕</span>
+          Nouvelle page
+        </button>
+      </div>
+      <div class="card">
+        ${menuButtons}
+        <div class="pages-toolbar">
+          <span class="pages-count">${flattenMenuHierarchy(items, 0).length} élément${flattenMenuHierarchy(items, 0).length > 1 ? 's' : ''} dans ${escapeHtml(loc)}</span>
+        </div>
+        ${renderMenuHierarchyTable(menuId)}
+      </div>
+    `;
+  }
+
   const filtered = getFilteredPages();
-  const sorted = sortPagesHierarchically(filtered);
+  const sorted = filtered.slice().sort((a, b) => {
+    let cmp = 0;
+    if (_pagesSortField === 'updated_at') {
+      cmp = new Date(a.updated_at) - new Date(b.updated_at);
+    } else {
+      cmp = (a.title || '').localeCompare(b.title || '');
+    }
+    return _pagesSortDir === 'desc' ? -cmp : cmp;
+  });
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGES_PER_PAGE));
   if (_pagesCurrentPage > totalPages) _pagesCurrentPage = totalPages;
   const start = (_pagesCurrentPage - 1) * PAGES_PER_PAGE;
@@ -5919,8 +6997,8 @@ function renderPagesView() {
         Nouvelle page
       </button>
     </div>
-
     <div class="card">
+      ${menuButtons}
       <div class="pages-toolbar">
         <div class="search-box">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -6171,7 +7249,7 @@ async function renderReusableBlocBuilder() {
           </div>
         </aside>
         <main class="builder-canvas" id="builderCanvas" data-drop-zone="true">
-          <div class="builder-canvas-inner">
+          <div class="builder-canvas-inner" id="builderCanvasInner" style="${buildColorOverrideStyle()}">
             <div class="builder-canvas-placeholder" id="builderPlaceholder">Glissez des modules ici ou cliquez sur un module à gauche pour l'ajouter.</div>
             <div class="builder-blocks" id="builderBlocks">
               ${pageBuilderState.blocks.map(block => renderBlockCard(block)).join('')}
@@ -6361,13 +7439,24 @@ async function renderMediaLibrary() {
   `;
 }
 
+function getOptimizedUrl(url, width = 400, quality = 70) {
+  if (!url) return url;
+  if (url.startsWith('http') || !url.includes('/uploads/media/')) return url;
+  const filename = url.split('/').pop();
+  if (!filename) return url;
+  const ext = filename.split('.').pop().toLowerCase();
+  if (['svg', 'gif', 'webp', 'avif'].includes(ext)) return url;
+  return `/uploads/media/_optimized/${encodeURIComponent(filename)}?w=${width}&q=${quality}&f=webp`;
+}
+
 function renderMediaCard(item, forPicker = false) {
   const isImage = item.type === 'image';
   const isSelected = forPicker && mediaPickerState.multiple && Array.isArray(mediaPickerState.selectedIds)
     ? mediaPickerState.selectedIds.includes(String(item.id))
     : (!forPicker && Array.isArray(mediaState.selectedIds) && mediaState.selectedIds.includes(String(item.id)));
+  const thumbUrl = isImage ? getOptimizedUrl(item.url, 400, 70) : item.url;
   const thumb = isImage
-    ? `<img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.original_name)}">`
+    ? `<img src="${escapeHtml(thumbUrl)}" alt="${escapeHtml(item.original_name)}" loading="lazy">`
     : `<video src="${escapeHtml(item.url)}#t=0.5" preload="metadata" muted></video>`;
   const meta = `${isImage ? 'Image' : 'Vidéo'} · ${formatBytes(item.size)}`;
   const folderSelect = forPicker ? '' : `
@@ -6840,7 +7929,7 @@ function selectMediaFromPicker(id) {
     const field = document.querySelector(`.settings-media-field[data-setting="${settingName}"]`);
     if (field) {
       field.querySelector('input[type="hidden"]').value = item.url;
-      field.querySelector('.settings-media-preview').innerHTML = `<img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.original_name || '')}">`;
+      field.querySelector('.settings-media-preview').innerHTML = `<img src="${escapeHtml(getOptimizedUrl(item.url, 400, 70))}" alt="${escapeHtml(item.original_name || '')}">`;
       // Add remove button if not present
       const actions = field.querySelector('.settings-media-actions');
       if (actions && !actions.querySelector('.btn-danger-outline')) {
@@ -6862,7 +7951,7 @@ function selectMediaFromPicker(id) {
   if (mediaPickerState.blockId === '__cpt_featured__') {
     const payload = { id: item.id, url: item.url, alt: item.original_name || '', sizes: { thumbnail: item.url, half: item.url, banner: item.url } };
     document.getElementById('cptFeaturedInput').value = JSON.stringify(payload);
-    document.getElementById('cptFeaturedPreview').innerHTML = `<img src="${escapeHtml(item.url)}" style="max-width:200px;max-height:150px;object-fit:cover;border-radius:8px;">`;
+    document.getElementById('cptFeaturedPreview').innerHTML = `<img src="${escapeHtml(getOptimizedUrl(item.url, 400, 70))}" style="max-width:200px;max-height:150px;object-fit:cover;border-radius:8px;">`;
     closeMediaPicker();
     return;
   }
@@ -6872,7 +7961,7 @@ function selectMediaFromPicker(id) {
     const input = document.getElementById('cptOptionsImgInput');
     const preview = document.getElementById('cptOptionsImgPreview');
     if (input) input.value = item.url;
-    if (preview) preview.innerHTML = `<img src="${escapeHtml(item.url)}" style="max-width:100%;max-height:200px;object-fit:cover;border-radius:8px;">`;
+    if (preview) preview.innerHTML = `<img src="${escapeHtml(getOptimizedUrl(item.url, 400, 70))}" style="max-width:100%;max-height:200px;object-fit:cover;border-radius:8px;">`;
     closeMediaPicker();
     return;
   }
@@ -6884,27 +7973,29 @@ function selectMediaFromPicker(id) {
 /** Update block.data for a (possibly compound) field name, handling repeater/group nesting. */
 function setBlockDataField(block, fieldName, value) {
   if (!block || !block.data || typeof block.data !== 'object') return;
-  if (fieldName.includes('::')) {
-    const parts = fieldName.split('::');
-    if (parts.length === 3) {
-      // Repeater: repeaterName::rowIndex::subFieldName
-      const [repeaterName, rowIndexStr, subFieldName] = parts;
-      const rowIndex = parseInt(rowIndexStr, 10);
-      if (Array.isArray(block.data[repeaterName]) && !isNaN(rowIndex) && block.data[repeaterName][rowIndex]) {
-        const rows = block.data[repeaterName].map((r, i) =>
-          i === rowIndex ? { ...r, [subFieldName]: value } : r
-        );
-        block.data = { ...block.data, [repeaterName]: rows };
-      }
-    } else if (parts.length === 2) {
-      // Group: groupName::subFieldName
-      const [groupName, subFieldName] = parts;
-      if (block.data[groupName] && typeof block.data[groupName] === 'object') {
-        block.data = { ...block.data, [groupName]: { ...block.data[groupName], [subFieldName]: value } };
-      }
-    }
-  } else {
+  if (!fieldName.includes('::')) {
     block.data = { ...block.data, [fieldName]: value };
+    return;
+  }
+  const parts = fieldName.split('::');
+  // Navigate to the deepest container and set the value
+  let target = block.data;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    if (/^\d+$/.test(part)) {
+      const idx = parseInt(part, 10);
+      if (!Array.isArray(target) || !target[idx]) return;
+      target = target[idx];
+    } else {
+      if (!target[part] || typeof target[part] !== 'object') return;
+      target = target[part];
+    }
+  }
+  const lastKey = parts[parts.length - 1];
+  if (/^\d+$/.test(lastKey)) {
+    if (Array.isArray(target)) target[parseInt(lastKey, 10)] = value;
+  } else {
+    target[lastKey] = value;
   }
 }
 
@@ -6927,7 +8018,7 @@ function applyMediaSelection(blockId, fieldName, item) {
     const preview = wrapper.querySelector('.media-preview');
     if (preview) {
       preview.innerHTML = item.type === 'image'
-        ? `<img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.original_name)}">`
+        ? `<img src="${escapeHtml(getOptimizedUrl(item.url, 400, 70))}" alt="${escapeHtml(item.original_name)}">`
         : `<div class="media-preview-icon">🎬</div>`;
     }
     const meta = wrapper.querySelector('.media-preview-meta');
@@ -6936,10 +8027,15 @@ function applyMediaSelection(blockId, fieldName, item) {
   // Synchroniser avec les données du bloc pour la sauvegarde et la prévisualisation
   const block = pageBuilderState.blocks.find(b => b.id === blockId);
   setBlockDataField(block, fieldName, payload);
-  updateBlockCardPreview(blockId);
   // Mettre à jour les champs conditionnels (ex: bg_opacity/bg_parallax dépendent de bg_img)
   const form = document.querySelector('#builderSettings form');
-  if (form) updateSchemaConditionals(form);
+  if (form) {
+    updateSchemaConditionals(form);
+    // Full sync pour les champs profondément imbriqués (sub-modules dans colonnes)
+    liveUpdateFromSettingsForm(form);
+  } else {
+    updateBlockCardPreview(blockId);
+  }
 }
 
 function openMediaPickerMulti(type, blockId, fieldName) {
@@ -7007,7 +8103,7 @@ function applyMediaSelectionMultiple(blockId, fieldName, items) {
     if (grid) {
       grid.innerHTML = payloadItems.map(item => `
         <div class="media-multi-thumb">
-          <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.original_name || item.url)}">
+          <img src="${escapeHtml(getOptimizedUrl(item.url, 200, 60))}" alt="${escapeHtml(item.original_name || item.url)}">
         </div>
       `).join('');
     }
@@ -7021,7 +8117,157 @@ function applyMediaSelectionMultiple(blockId, fieldName, items) {
   // Synchroniser avec les données du bloc pour la sauvegarde et la prévisualisation
   const block = pageBuilderState.blocks.find(b => b.id === blockId);
   setBlockDataField(block, fieldName, payload);
-  updateBlockCardPreview(blockId);
+  const form = document.querySelector('#builderSettings form');
+  if (form) {
+    liveUpdateFromSettingsForm(form);
+  } else {
+    updateBlockCardPreview(blockId);
+  }
+}
+
+// ── GoogleMap field: Mapbox geocoding + mini-map preview ──────────────────
+const MAPBOX_TOKEN = 'pk.eyJ1IjoiYmFyY2Vsb25hLWNvIiwiYSI6ImNsbm9mZmN3bzBpM2Yya29kcWYxbnZpcGkifQ.gsHaJQAk_Ua4vBbt3DxNGQ';
+let _mapboxGLLoaded = false;
+
+function ensureMapboxGL() {
+  if (_mapboxGLLoaded || window.mapboxgl) { _mapboxGLLoaded = true; return Promise.resolve(); }
+  return new Promise((resolve) => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css';
+    document.head.appendChild(link);
+    const script = document.createElement('script');
+    script.src = 'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js';
+    script.onload = () => { _mapboxGLLoaded = true; resolve(); };
+    document.head.appendChild(script);
+  });
+}
+
+function initGoogleMapField(uid) {
+  const root = document.getElementById(uid);
+  if (!root) return;
+  const searchInput = root.querySelector('.googlemap-search');
+  const suggestionsEl = root.querySelector('.googlemap-suggestions');
+  const latInput = root.querySelector('[name$="__lat"]');
+  const lngInput = root.querySelector('[name$="__lng"]');
+  const placeIdInput = root.querySelector('[name$="__place_id"]');
+  const streetNumberInput = root.querySelector('[name$="__street_number"]');
+  const streetNameInput = root.querySelector('[name$="__street_name"]');
+  const streetNameShortInput = root.querySelector('[name$="__street_name_short"]');
+  const postCodeInput = root.querySelector('[name$="__post_code"]');
+  const cityInput = root.querySelector('[name$="__city"]');
+  const nameInput = root.querySelector('[name$="__name"]');
+  const previewEl = root.querySelector('.googlemap-preview');
+  let debounceTimer = null;
+  let miniMap = null;
+  let miniMarker = null;
+
+  // Show existing preview if lat/lng already set
+  const existingLat = parseFloat(latInput?.value);
+  const existingLng = parseFloat(lngInput?.value);
+  if (existingLat && existingLng) {
+    showMiniMap(existingLat, existingLng);
+  }
+
+  // Geocoding search with debounce
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const query = searchInput.value.trim();
+    if (query.length < 3) { suggestionsEl.innerHTML = ''; suggestionsEl.style.display = 'none'; return; }
+    debounceTimer = setTimeout(() => geocodeSearch(query), 300);
+  });
+
+  // Close suggestions on click outside
+  document.addEventListener('click', (e) => {
+    if (!root.contains(e.target)) { suggestionsEl.innerHTML = ''; suggestionsEl.style.display = 'none'; }
+  });
+
+  async function geocodeSearch(query) {
+    try {
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&limit=5&language=fr`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data.features || data.features.length === 0) {
+        suggestionsEl.innerHTML = '<div class="googlemap-suggestion-empty">Aucun résultat</div>';
+        suggestionsEl.style.display = 'block';
+        return;
+      }
+      suggestionsEl.innerHTML = data.features.map((f, i) =>
+        `<div class="googlemap-suggestion" data-idx="${i}">${escapeHtml(f.place_name)}</div>`
+      ).join('');
+      suggestionsEl.style.display = 'block';
+
+      // Click handlers for suggestions
+      suggestionsEl.querySelectorAll('.googlemap-suggestion').forEach((el) => {
+        el.addEventListener('click', () => {
+          const idx = parseInt(el.dataset.idx);
+          const feature = data.features[idx];
+          if (!feature) return;
+          const [lng, lat] = feature.center;
+          searchInput.value = feature.place_name;
+          latInput.value = lat;
+          lngInput.value = lng;
+          placeIdInput.value = feature.id || '';
+          // Extract structured address components from Mapbox response
+          const ctx = feature.context || [];
+          const getCtx = (prefix) => { const c = ctx.find(c => c.id && c.id.startsWith(prefix)); return c ? c.text : ''; };
+          if (streetNumberInput) streetNumberInput.value = feature.address || '';
+          if (streetNameInput) streetNameInput.value = feature.text || '';
+          if (streetNameShortInput) streetNameShortInput.value = feature.text || '';
+          if (postCodeInput) postCodeInput.value = getCtx('postcode');
+          if (cityInput) cityInput.value = getCtx('place');
+          if (nameInput) nameInput.value = feature.place_name || '';
+          suggestionsEl.innerHTML = '';
+          suggestionsEl.style.display = 'none';
+          showMiniMap(lat, lng);
+          // Trigger live update
+          searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      });
+    } catch (err) {
+      console.warn('Geocoding error:', err);
+    }
+  }
+
+  async function showMiniMap(lat, lng) {
+    // Destroy previous map instance to avoid WebGL context leaks
+    if (miniMap) { try { miniMap.remove(); } catch(e) {} miniMap = null; miniMarker = null; }
+    previewEl.innerHTML = '';
+    previewEl.style.height = '200px';
+    await ensureMapboxGL();
+    if (!window.mapboxgl) { previewEl.innerHTML = `<div style="text-align:center;padding:20px;">📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>`; return; }
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+    miniMap = new mapboxgl.Map({
+      container: previewEl,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [lng, lat],
+      zoom: 15,
+      interactive: true,
+    });
+    miniMap.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    miniMarker = new mapboxgl.Marker({ draggable: true }).setLngLat([lng, lat]).addTo(miniMap);
+    // Force resize after layout settles — Mapbox needs correct container dimensions
+    miniMap.on('load', () => { miniMap.resize(); });
+    setTimeout(() => { if (miniMap) miniMap.resize(); }, 200);
+    setTimeout(() => { if (miniMap) miniMap.resize(); }, 600);
+    // Update lat/lng when marker is dragged
+    miniMarker.on('dragend', () => {
+      const lngLat = miniMarker.getLngLat();
+      latInput.value = lngLat.lat.toFixed(6);
+      lngInput.value = lngLat.lng.toFixed(6);
+      latInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+
+  // Update mini-map when lat/lng inputs change manually
+  [latInput, lngInput].forEach(inp => {
+    if (!inp) return;
+    inp.addEventListener('change', () => {
+      const lat = parseFloat(latInput.value);
+      const lng = parseFloat(lngInput.value);
+      if (lat && lng) showMiniMap(lat, lng);
+    });
+  });
 }
 
 function clearMediaSelection(blockId, fieldName) {
@@ -7042,7 +8288,12 @@ function clearMediaSelection(blockId, fieldName) {
   // Mettre à jour les données du bloc pour refléter la suppression
   const block = pageBuilderState.blocks.find(b => b.id === blockId);
   setBlockDataField(block, fieldName, null);
-  updateBlockCardPreview(blockId);
+  const form = document.querySelector('#builderSettings form');
+  if (form) {
+    liveUpdateFromSettingsForm(form);
+  } else {
+    updateBlockCardPreview(blockId);
+  }
 }
 
 function toggleMediaSelection(id, isChecked) {
@@ -7254,29 +8505,35 @@ function renderPageMenuBadges(pageId) {
   }).join(' ');
 }
 
+function togglePagesSort(field) {
+  if (_pagesSortField === field) {
+    _pagesSortDir = _pagesSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _pagesSortField = field;
+    _pagesSortDir = field === 'updated_at' ? 'desc' : 'asc';
+  }
+  _pagesCurrentPage = 1;
+  document.querySelector('.main-content').innerHTML = renderPagesView();
+}
+
 function renderPagesTable(pages) {
+  const arrow = (field) => _pagesSortField === field ? (_pagesSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+  const activeStyle = (field) => _pagesSortField === field ? 'font-weight:700;' : '';
   return `
     <div class="pages-list">
       <div class="pages-list-header">
-        <span class="page-item__info">Page</span>
-        <span class="page-item__parent">Parent</span>
-        <span class="page-item__meta">Modifié</span>
+        <span class="page-item__info sortable-header" style="cursor:pointer;${activeStyle('title')}" onclick="togglePagesSort('title')">Page${arrow('title')}</span>
+        <span class="page-item__meta sortable-header" style="cursor:pointer;${activeStyle('updated_at')}" onclick="togglePagesSort('updated_at')">Modifié${arrow('updated_at')}</span>
         <span class="page-item__badges">Statut</span>
         <span class="page-item__actions" style="opacity:1">Actions</span>
       </div>
       ${pages.map(page => {
-        const primaryParent = getPagePrimaryParent(page.id);
-        const isChild = !!primaryParent;
-        const parentHtml = primaryParent ? '<div class="page-item__parent"><span class="page-item__parent-tag">' + escapeHtml(primaryParent.title) + '</span></div>' : '<div class="page-item__parent"></div>';
         const safeTitle = page.title.replace(/'/g, "\\'");
-        return '<div class="page-item ' + (isChild ? 'page-item--child' : '') + '">'
+        return '<div class="page-item">'
           + '<div class="page-item__info">'
-          +   '<div class="page-item__title">'
-          +     (isChild ? '<span class="page-item__child-icon">↳</span>' : '') + escapeHtml(page.title)
-          +   '</div>'
+          +   '<div class="page-item__title">' + escapeHtml(page.title) + '</div>'
           +   '<div class="page-item__slug">/' + escapeHtml(page.slug) + '</div>'
           + '</div>'
-          + parentHtml
           + '<div class="page-item__meta">'
           +   (page.author?.name ? '<span class="page-item__author">' + escapeHtml(page.author.name) + '</span>' : '')
           +   '<span class="page-item__date">' + new Date(page.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span>'
@@ -7615,6 +8872,8 @@ async function renderSiteSettings() {
     const awCode = settings.aw_code || '';
     const gtmCode = settings.gtm_code || '';
     const metaPixelCode = settings.meta_pixel_code || '';
+    const recaptchaSiteKey = settings.recaptcha_site_key || '';
+    const recaptchaSecretKey = settings.recaptcha_secret_key || '';
 
     // Technique (admin)
     const isOnepage = settings.is_onepage === '1';
@@ -7639,6 +8898,7 @@ async function renderSiteSettings() {
           <button type="button" class="settings-tab" data-target="#settings-floating">Bouton flottant</button>
           <button type="button" class="settings-tab" data-target="#settings-maintenance">Mode maintenance</button>
           <button type="button" class="settings-tab" data-target="#settings-tracking">Tracking & Analytics</button>
+          <button type="button" class="settings-tab" data-target="#settings-recaptcha">reCAPTCHA</button>
           <button type="button" class="settings-tab" data-target="#settings-technical">Technique</button>
         </div>
 
@@ -7834,6 +9094,11 @@ async function renderSiteSettings() {
                 `).join('')}
               </select>
             </div>
+          </div>
+          <div id="font-preview-box" style="margin-top:16px;padding:24px 28px;border:1px solid var(--admin-border, #e0e0e0);border-radius:8px;background:#fff;">
+            <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;">Apercu</p>
+            <h3 id="font-preview-title" style="margin:0 0 10px;font-size:26px;line-height:1.3;transition:font-family .3s;"></h3>
+            <p id="font-preview-body" style="margin:0;font-size:15px;line-height:1.7;color:#555;transition:font-family .3s;"></p>
           </div>
           </div>
 
@@ -8288,6 +9553,20 @@ async function renderSiteSettings() {
           </div>
 
           </div>
+          <div class="settings-section" id="settings-recaptcha">
+          <h2 class="builder-settings-title" style="margin-top: 0;">reCAPTCHA v3</h2>
+          <p style="margin-bottom:16px;color:var(--gray-500);font-size:13px">Ces clés sont utilisées par le système de formulaires. Obtenez-les sur <a href="https://www.google.com/recaptcha/admin" target="_blank" rel="noopener">Google reCAPTCHA</a>.</p>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Clé du site (site key)</label>
+              <input type="text" class="form-input" name="recaptcha_site_key" value="${escapeHtml(recaptchaSiteKey)}" placeholder="6Le...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Clé secrète (secret key)</label>
+              <input type="text" class="form-input" name="recaptcha_secret_key" value="${escapeHtml(recaptchaSecretKey)}" placeholder="6Le...">
+            </div>
+          </div>
+          </div>
           <div class="settings-section" id="settings-technical">
           <h2 class="builder-settings-title" style="margin-top: 0;">Technique</h2>
           <div class="form-row">
@@ -8426,6 +9705,8 @@ async function saveSiteSettings(event) {
     aw_code: formData.get('aw_code') || '',
     gtm_code: formData.get('gtm_code') || '',
     meta_pixel_code: formData.get('meta_pixel_code') || '',
+    recaptcha_site_key: formData.get('recaptcha_site_key') || '',
+    recaptcha_secret_key: formData.get('recaptcha_secret_key') || '',
     is_onepage: formData.get('is_onepage') ? '1' : '0',
     is_activate_schemas: formData.get('is_activate_schemas') ? '1' : '0',
     custom_balise: formData.get('custom_balise') || '',
@@ -8506,6 +9787,43 @@ function attachSiteSettingsTabs() {
       subtab.classList.add('is-active');
     });
   });
+}
+
+function initFontPreview() {
+  const titleSelect = document.querySelector('select[name="font_title"]');
+  const generalSelect = document.querySelector('select[name="font_general"]');
+  const previewTitle = document.getElementById('font-preview-title');
+  const previewBody = document.getElementById('font-preview-body');
+  if (!titleSelect || !generalSelect || !previewTitle || !previewBody) return;
+
+  const loadedFonts = new Set();
+  function loadGoogleFont(fontName) {
+    if (loadedFonts.has(fontName)) return;
+    loadedFonts.add(fontName);
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:wght@400;600;700&display=swap`;
+    document.head.appendChild(link);
+  }
+
+  function getSelectedLabel(select) {
+    return select.options[select.selectedIndex]?.text || '';
+  }
+
+  function updatePreview() {
+    const titleFont = getSelectedLabel(titleSelect);
+    const bodyFont = getSelectedLabel(generalSelect);
+    loadGoogleFont(titleFont);
+    loadGoogleFont(bodyFont);
+    previewTitle.style.fontFamily = `'${titleFont}', sans-serif`;
+    previewTitle.textContent = `Titre en ${titleFont}`;
+    previewBody.style.fontFamily = `'${bodyFont}', sans-serif`;
+    previewBody.textContent = `Ceci est un exemple de texte courant en ${bodyFont}. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.`;
+  }
+
+  titleSelect.addEventListener('change', updatePreview);
+  generalSelect.addEventListener('change', updatePreview);
+  updatePreview();
 }
 
 // ========== THÈME ==========
@@ -9484,4 +10802,776 @@ function attachMenuEditorEvents() {
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   });
+}
+
+// ========== FORMS SYSTEM ==========
+
+const FORM_FIELD_TYPES = [
+  { type: 'text', label: 'Texte', icon: 'Aa' },
+  { type: 'email', label: 'Email', icon: '@' },
+  { type: 'phone', label: 'Téléphone', icon: '#' },
+  { type: 'number', label: 'Nombre', icon: '123' },
+  { type: 'textarea', label: 'Zone de texte', icon: '¶' },
+  { type: 'select', label: 'Liste déroulante', icon: '▼' },
+  { type: 'radio', label: 'Boutons radio', icon: '◉' },
+  { type: 'checkbox', label: 'Cases à cocher', icon: '☑' },
+  { type: 'date', label: 'Date', icon: '📅' },
+  { type: 'time', label: 'Heure', icon: '🕐' },
+  { type: 'url', label: 'URL', icon: '🔗' },
+  { type: 'file', label: 'Fichier', icon: '📎' },
+  { type: 'hidden', label: 'Champ caché', icon: '👁' },
+  { type: 'html', label: 'Contenu HTML', icon: '</>' },
+  { type: 'name', label: 'Nom complet', icon: '👤' },
+];
+
+let _formsCache = [];
+let _formBuilderFields = [];
+let _formBuilderSelectedIdx = -1;
+let _formBuilderSettings = {};
+let _formBuilderData = null;
+
+// ── Forms List ──
+
+async function renderFormsList() {
+  showLoading();
+  try {
+    _formsCache = await apiFetch('/forms');
+    hideLoading();
+  } catch (e) {
+    hideLoading();
+    return `<div class="card"><p>Erreur: ${e.message}</p></div>`;
+  }
+
+  return `
+    <div class="page-header">
+      <h1>Formulaires</h1>
+      <button class="btn btn-primary" onclick="loadSection('form-edit:new')">+ Nouveau formulaire</button>
+    </div>
+    <div class="card">
+      ${_formsCache.length > 0 ? renderFormsTable() : renderEmptyState('📝', 'Aucun formulaire', 'Créez votre premier formulaire')}
+    </div>
+  `;
+}
+
+function renderFormsTable() {
+  const gridCols = '1fr 80px 120px 80px 140px';
+  return `
+    <div class="pages-list">
+      <div class="pages-list-header" style="display:grid; grid-template-columns:${gridCols}; align-items:center;">
+        <span>Titre</span>
+        <span style="text-align:center">Champs</span>
+        <span style="text-align:center">Entrées</span>
+        <span style="text-align:center">Statut</span>
+        <span style="text-align:right">Actions</span>
+      </div>
+      ${_formsCache.map(f => {
+        const safeName = escapeHtml(f.title).replace(/'/g, "\\'");
+        return `
+        <div class="page-item" style="display:grid; grid-template-columns:${gridCols}; align-items:center;">
+          <div onclick="loadSection('form-edit:${f.id}')" style="cursor:pointer; overflow:hidden;">
+            <strong>${escapeHtml(f.title)}</strong>
+            <span class="page-item__slug" style="display:block; font-size:12px; color:var(--gray-400)">${escapeHtml(f.slug)}</span>
+          </div>
+          <div style="text-align:center">${f.field_count || 0}</div>
+          <div style="text-align:center">
+            <a href="#" onclick="event.preventDefault(); loadSection('form-entries:${f.id}')" style="text-decoration:underline">${f.entry_count || 0} entrée(s)</a>
+            ${f.unread_count > 0 ? `<span class="badge badge-warning" style="margin-top:4px;display:inline-block">${f.unread_count} non lue(s)</span>` : ''}
+          </div>
+          <div style="text-align:center">
+            <span class="badge ${f.status === 'active' ? 'badge-success' : 'badge-muted'}">${f.status === 'active' ? 'Actif' : 'Inactif'}</span>
+          </div>
+          <div style="display:flex; gap:4px; justify-content:flex-end;">
+            <button class="btn-icon-action" onclick="loadSection('form-edit:${f.id}')" title="Modifier">${_svgEdit}</button>
+            <button class="btn-icon-action" onclick="loadSection('form-entries:${f.id}')" title="Entrées">${_svgInbox}</button>
+            <button class="btn-icon-action" onclick="duplicateForm(${f.id})" title="Dupliquer">${_svgCopy}</button>
+            <button class="btn-icon-action btn-icon-action--danger" onclick="deleteFormConfirm(${f.id}, '${safeName}')" title="Supprimer">${_svgDelete}</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+async function deleteFormConfirm(id, title) {
+  const ok = await confirmModal(`Voulez-vous vraiment supprimer le formulaire "${title}" et toutes ses entrées ?`);
+  if (!ok) return;
+  showLoading();
+  try {
+    await apiFetch(`/forms/${id}`, { method: 'DELETE' });
+    showToast('Formulaire supprimé', 'success');
+    loadSection('forms');
+  } catch (e) {
+    hideLoading();
+    showToast('Erreur: ' + e.message, 'error');
+  }
+}
+
+async function duplicateForm(id) {
+  showLoading();
+  try {
+    const form = await apiFetch(`/forms/${id}`);
+    const newSlug = form.slug + '-copie-' + Date.now().toString(36);
+    await apiFetch('/forms', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: form.title + ' (copie)',
+        slug: newSlug,
+        description: form.description,
+        settings: typeof form.settings === 'string' ? JSON.parse(form.settings) : form.settings,
+        status: form.status,
+        fields: form.fields,
+      }),
+    });
+    showToast('Formulaire dupliqué', 'success');
+    loadSection('forms');
+  } catch (e) {
+    hideLoading();
+    showToast('Erreur: ' + e.message, 'error');
+  }
+}
+
+// ── Form Builder ──
+
+async function renderFormBuilder(formId) {
+  showLoading();
+  try {
+    if (formId && formId !== 'new') {
+      _formBuilderData = await apiFetch(`/forms/${formId}`);
+      _formBuilderFields = _formBuilderData.fields || [];
+      const s = typeof _formBuilderData.settings === 'string' ? JSON.parse(_formBuilderData.settings) : (_formBuilderData.settings || {});
+      _formBuilderSettings = s;
+    } else {
+      _formBuilderData = null;
+      _formBuilderFields = [];
+      _formBuilderSettings = {};
+    }
+    _formBuilderSelectedIdx = -1;
+    hideLoading();
+  } catch (e) {
+    hideLoading();
+    return `<div class="card"><p>Erreur: ${e.message}</p></div>`;
+  }
+
+  const isEdit = _formBuilderData && _formBuilderData.id;
+  const title = isEdit ? escapeHtml(_formBuilderData.title) : '';
+  const slug = isEdit ? escapeHtml(_formBuilderData.slug) : '';
+  const desc = isEdit ? escapeHtml(_formBuilderData.description || '') : '';
+  const status = isEdit ? _formBuilderData.status : 'active';
+
+  return `
+    <div class="page-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="btn btn-outline btn-sm" onclick="loadSection('forms')">← Retour</button>
+        <h1>${isEdit ? 'Modifier le formulaire' : 'Nouveau formulaire'}</h1>
+      </div>
+      <div style="display:flex;gap:8px">
+        ${isEdit ? `<button class="btn btn-outline" onclick="loadSection('form-entries:${_formBuilderData.id}')">${_svgInbox} Entrées</button>` : ''}
+        <button class="btn btn-primary" onclick="saveFormBuilder()">Enregistrer</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:16px;margin-bottom:16px">
+      <div class="form-group" style="flex:1;margin:0"><label class="form-label">Titre *</label><input type="text" class="form-input" id="formTitle" value="${title}" oninput="autoFormSlug()"></div>
+      <div class="form-group" style="flex:1;margin:0"><label class="form-label">Slug *</label><input type="text" class="form-input" id="formSlug" value="${slug}"></div>
+      <div class="form-group" style="width:140px;margin:0"><label class="form-label">Statut</label><select class="form-select" id="formStatus"><option value="active" ${status === 'active' ? 'selected' : ''}>Actif</option><option value="inactive" ${status !== 'active' ? 'selected' : ''}>Inactif</option></select></div>
+    </div>
+
+    <div class="form-group" style="margin-bottom:16px">
+      <label class="form-label">Description</label>
+      <textarea class="form-textarea" id="formDescription" rows="2">${desc}</textarea>
+    </div>
+
+    <!-- Tabs -->
+    <div class="form-builder-tabs" style="display:flex;gap:0;margin-bottom:0;border-bottom:2px solid var(--gray-200)">
+      <button class="form-builder-tab active" data-tab="fields" onclick="switchFormTab('fields')" style="padding:10px 20px;border:none;background:none;cursor:pointer;font-weight:600;border-bottom:2px solid var(--primary);margin-bottom:-2px">Champs</button>
+      <button class="form-builder-tab" data-tab="settings" onclick="switchFormTab('settings')" style="padding:10px 20px;border:none;background:none;cursor:pointer;color:var(--gray-500);border-bottom:2px solid transparent;margin-bottom:-2px">Réglages</button>
+    </div>
+
+    <!-- Fields Tab -->
+    <div id="formTabFields" style="display:flex;gap:16px;margin-top:16px">
+      <!-- Field Types Sidebar -->
+      <div class="card" style="width:200px;flex-shrink:0;padding:12px">
+        <p style="font-weight:600;margin-bottom:8px;font-size:13px">Ajouter un champ</p>
+        ${FORM_FIELD_TYPES.map(ft => `
+          <button class="btn btn-outline btn-sm" onclick="addFormField('${ft.type}')" style="width:100%;text-align:left;margin-bottom:4px;font-size:12px">
+            <span style="display:inline-block;width:24px;text-align:center">${ft.icon}</span> ${ft.label}
+          </button>
+        `).join('')}
+      </div>
+
+      <!-- Fields Canvas -->
+      <div class="card" style="flex:1;padding:16px;min-height:300px" id="formFieldsCanvas">
+        ${renderFormFieldsList()}
+      </div>
+
+      <!-- Field Settings Panel -->
+      <div class="card" style="width:320px;flex-shrink:0;padding:16px" id="formFieldSettings">
+        <p style="color:var(--gray-400);text-align:center;margin-top:40px">Sélectionnez un champ pour modifier ses propriétés</p>
+      </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div id="formTabSettings" style="display:none;margin-top:16px">
+      <div class="card" style="padding:24px">
+        ${renderFormSettingsPanel()}
+      </div>
+    </div>
+  `;
+}
+
+function switchFormTab(tab) {
+  document.querySelectorAll('.form-builder-tab').forEach(t => {
+    t.classList.remove('active');
+    t.style.borderBottomColor = 'transparent';
+    t.style.color = 'var(--gray-500)';
+  });
+  const activeTab = document.querySelector(`.form-builder-tab[data-tab="${tab}"]`);
+  if (activeTab) {
+    activeTab.classList.add('active');
+    activeTab.style.borderBottomColor = 'var(--primary)';
+    activeTab.style.color = '';
+  }
+  document.getElementById('formTabFields').style.display = tab === 'fields' ? 'flex' : 'none';
+  document.getElementById('formTabSettings').style.display = tab === 'settings' ? 'block' : 'none';
+}
+
+function renderFormFieldsList() {
+  if (_formBuilderFields.length === 0) {
+    return '<p style="text-align:center;color:var(--gray-400);margin-top:40px">Ajoutez des champs depuis le panneau de gauche</p>';
+  }
+
+  return `<div class="form-fields-list">
+    ${_formBuilderFields.map((f, idx) => {
+      const isSelected = idx === _formBuilderSelectedIdx;
+      const ft = FORM_FIELD_TYPES.find(t => t.type === f.type) || { icon: '?', label: f.type };
+      return `
+        <div class="form-field-item ${isSelected ? 'is-selected' : ''}" data-idx="${idx}" onclick="selectFormField(${idx})" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid ${isSelected ? 'var(--primary)' : 'var(--gray-200)'};border-radius:8px;margin-bottom:6px;cursor:pointer;background:${isSelected ? 'var(--gray-50)' : 'white'}">
+          <span style="cursor:grab;color:var(--gray-400)" class="form-field-drag" data-idx="${idx}">☰</span>
+          <span style="width:28px;text-align:center;font-size:14px">${ft.icon}</span>
+          <div style="flex:1">
+            <strong style="font-size:13px">${escapeHtml(f.label)}</strong>
+            <span style="font-size:11px;color:var(--gray-400);margin-left:6px">${ft.label}${f.required ? ' *' : ''}</span>
+          </div>
+          <div style="display:flex;gap:4px">
+            <button class="btn-icon-action btn-icon-action--danger" onclick="event.stopPropagation(); removeFormField(${idx})" title="Supprimer" style="font-size:12px">✕</button>
+          </div>
+        </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function renderFormFieldSettings(idx) {
+  const f = _formBuilderFields[idx];
+  if (!f) return '<p style="color:var(--gray-400);text-align:center;margin-top:40px">Sélectionnez un champ</p>';
+
+  const ft = FORM_FIELD_TYPES.find(t => t.type === f.type) || { label: f.type };
+  const hasOptions = ['select', 'radio', 'checkbox'].includes(f.type);
+  const optionsStr = hasOptions && f.options ? (Array.isArray(f.options) ? f.options.join('\n') : f.options) : '';
+  const settings = f.settings || {};
+
+  return `
+    <h3 style="margin-bottom:16px;font-size:15px">${ft.label}</h3>
+
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label" style="font-size:12px">Label *</label>
+      <input type="text" class="form-input" value="${escapeHtml(f.label)}" onchange="updateFormField(${idx}, 'label', this.value)">
+    </div>
+
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label" style="font-size:12px">Nom du champ (name) *</label>
+      <input type="text" class="form-input" value="${escapeHtml(f.name)}" onchange="updateFormField(${idx}, 'name', this.value)">
+    </div>
+
+    ${f.type !== 'html' && f.type !== 'hidden' ? `
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label" style="font-size:12px">Placeholder</label>
+      <input type="text" class="form-input" value="${escapeHtml(f.placeholder || '')}" onchange="updateFormField(${idx}, 'placeholder', this.value)">
+    </div>
+
+    <div class="form-group" style="margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" ${f.required ? 'checked' : ''} onchange="updateFormField(${idx}, 'required', this.checked)">
+        <span style="font-size:13px">Champ requis</span>
+      </label>
+    </div>
+    ` : ''}
+
+    ${hasOptions ? `
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label" style="font-size:12px">Options (une par ligne)</label>
+      <textarea class="form-textarea" rows="5" onchange="updateFormFieldOptions(${idx}, this.value)">${escapeHtml(optionsStr)}</textarea>
+      <div class="form-help">Chaque ligne = une option. Format: valeur ou label|valeur</div>
+    </div>
+    ` : ''}
+
+    ${f.type === 'html' ? `
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label" style="font-size:12px">Contenu HTML</label>
+      <textarea class="form-textarea" rows="5" onchange="updateFormFieldSetting(${idx}, 'html_content', this.value)">${escapeHtml(settings.html_content || '')}</textarea>
+    </div>
+    ` : ''}
+
+    ${f.type === 'hidden' ? `
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label" style="font-size:12px">Valeur par défaut</label>
+      <input type="text" class="form-input" value="${escapeHtml(settings.default_value || '')}" onchange="updateFormFieldSetting(${idx}, 'default_value', this.value)">
+    </div>
+    ` : ''}
+
+    ${f.type === 'textarea' ? `
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label" style="font-size:12px">Nombre de lignes</label>
+      <input type="number" class="form-input" value="${settings.rows || 4}" min="2" max="20" onchange="updateFormFieldSetting(${idx}, 'rows', parseInt(this.value))">
+    </div>
+    ` : ''}
+
+    ${f.type === 'file' ? `
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label" style="font-size:12px">Types acceptés</label>
+      <input type="text" class="form-input" value="${escapeHtml(settings.accept || '')}" placeholder=".pdf,.jpg,.png" onchange="updateFormFieldSetting(${idx}, 'accept', this.value)">
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label" style="font-size:12px">Taille max (Mo)</label>
+      <input type="number" class="form-input" value="${settings.max_size || 10}" min="1" max="50" onchange="updateFormFieldSetting(${idx}, 'max_size', parseInt(this.value))">
+    </div>
+    ` : ''}
+
+    ${f.type === 'number' ? `
+    <div style="display:flex;gap:8px">
+      <div class="form-group" style="margin-bottom:12px;flex:1">
+        <label class="form-label" style="font-size:12px">Min</label>
+        <input type="number" class="form-input" value="${settings.min ?? ''}" onchange="updateFormFieldSetting(${idx}, 'min', this.value)">
+      </div>
+      <div class="form-group" style="margin-bottom:12px;flex:1">
+        <label class="form-label" style="font-size:12px">Max</label>
+        <input type="number" class="form-input" value="${settings.max ?? ''}" onchange="updateFormFieldSetting(${idx}, 'max', this.value)">
+      </div>
+    </div>
+    ` : ''}
+
+    ${f.type === 'name' ? `
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label" style="font-size:12px">Label prénom</label>
+      <input type="text" class="form-input" value="${escapeHtml(settings.first_label || 'Prénom')}" onchange="updateFormFieldSetting(${idx}, 'first_label', this.value)">
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label" style="font-size:12px">Label nom</label>
+      <input type="text" class="form-input" value="${escapeHtml(settings.last_label || 'Nom')}" onchange="updateFormFieldSetting(${idx}, 'last_label', this.value)">
+    </div>
+    ` : ''}
+
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label" style="font-size:12px">Largeur</label>
+      <select class="form-select" onchange="updateFormFieldSetting(${idx}, 'width', this.value)">
+        <option value="100" ${(settings.width || '100') === '100' ? 'selected' : ''}>Pleine largeur</option>
+        <option value="50" ${settings.width === '50' ? 'selected' : ''}>Demi</option>
+        <option value="33" ${settings.width === '33' ? 'selected' : ''}>Tiers</option>
+      </select>
+    </div>
+
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label" style="font-size:12px">Classes CSS</label>
+      <input type="text" class="form-input" value="${escapeHtml(settings.css_class || '')}" onchange="updateFormFieldSetting(${idx}, 'css_class', this.value)">
+    </div>
+  `;
+}
+
+function renderFormSettingsPanel() {
+  const s = _formBuilderSettings;
+  return `
+    <h3 style="margin-bottom:20px">Réglages du formulaire</h3>
+
+    <fieldset style="border:1px solid var(--gray-200);border-radius:8px;padding:16px;margin-bottom:20px">
+      <legend style="font-weight:600;padding:0 8px">Confirmation</legend>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Message de confirmation</label>
+        <textarea class="form-textarea" id="fsConfirmMsg" rows="3">${escapeHtml(s.confirmation_message || 'Votre message a bien été envoyé. Merci !')}</textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Redirection après envoi (URL optionnelle)</label>
+        <input type="text" class="form-input" id="fsRedirectUrl" value="${escapeHtml(s.redirect_url || '')}" placeholder="https://...">
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid var(--gray-200);border-radius:8px;padding:16px;margin-bottom:20px">
+      <legend style="font-weight:600;padding:0 8px">Notifications email</legend>
+      <div class="form-group" style="margin-bottom:12px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="fsNotifEnabled" ${s.notification_enabled ? 'checked' : ''}>
+          <span>Activer les notifications par email</span>
+        </label>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Email(s) destinataire(s)</label>
+        <input type="text" class="form-input" id="fsNotifEmail" value="${escapeHtml(s.notification_email || '')}" placeholder="admin@example.com">
+        <div class="form-help">Séparer plusieurs emails par des virgules</div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Objet de l'email</label>
+        <input type="text" class="form-input" id="fsNotifSubject" value="${escapeHtml(s.notification_subject || 'Nouveau message depuis le formulaire')}" placeholder="Nouveau message…">
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid var(--gray-200);border-radius:8px;padding:16px;margin-bottom:20px">
+      <legend style="font-weight:600;padding:0 8px">reCAPTCHA</legend>
+      <div class="form-group" style="margin-bottom:12px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="fsRecaptcha" ${s.recaptcha_enabled ? 'checked' : ''}>
+          <span>Activer reCAPTCHA v3</span>
+        </label>
+        <div class="form-help">Les clés reCAPTCHA sont configurées dans Paramètres du site → reCAPTCHA</div>
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid var(--gray-200);border-radius:8px;padding:16px;margin-bottom:20px">
+      <legend style="font-weight:600;padding:0 8px">Bouton d'envoi</legend>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Texte du bouton</label>
+        <input type="text" class="form-input" id="fsSubmitText" value="${escapeHtml(s.submit_text || 'Envoyer')}">
+      </div>
+    </fieldset>
+  `;
+}
+
+// ── Field operations ──
+
+function addFormField(type) {
+  const ft = FORM_FIELD_TYPES.find(t => t.type === type);
+  const baseName = type + '_' + (_formBuilderFields.length + 1);
+  const newField = {
+    type,
+    label: ft ? ft.label : type,
+    name: baseName,
+    placeholder: '',
+    required: false,
+    options: ['select', 'radio', 'checkbox'].includes(type) ? ['Option 1', 'Option 2', 'Option 3'] : null,
+    settings: {},
+  };
+
+  if (type === 'name') {
+    newField.label = 'Nom complet';
+    newField.name = 'name';
+    newField.settings = { first_label: 'Prénom', last_label: 'Nom' };
+  }
+
+  _formBuilderFields.push(newField);
+  _formBuilderSelectedIdx = _formBuilderFields.length - 1;
+  refreshFormFieldsUI();
+}
+
+function removeFormField(idx) {
+  _formBuilderFields.splice(idx, 1);
+  if (_formBuilderSelectedIdx >= _formBuilderFields.length) {
+    _formBuilderSelectedIdx = _formBuilderFields.length - 1;
+  }
+  refreshFormFieldsUI();
+}
+
+function selectFormField(idx) {
+  _formBuilderSelectedIdx = idx;
+  refreshFormFieldsUI();
+}
+
+function updateFormField(idx, key, value) {
+  if (_formBuilderFields[idx]) {
+    _formBuilderFields[idx][key] = value;
+    if (key === 'label') {
+      refreshFormFieldsCanvas();
+    }
+  }
+}
+
+function updateFormFieldOptions(idx, raw) {
+  if (_formBuilderFields[idx]) {
+    _formBuilderFields[idx].options = raw.split('\n').filter(l => l.trim());
+  }
+}
+
+function updateFormFieldSetting(idx, key, value) {
+  if (_formBuilderFields[idx]) {
+    if (!_formBuilderFields[idx].settings) _formBuilderFields[idx].settings = {};
+    _formBuilderFields[idx].settings[key] = value;
+  }
+}
+
+function refreshFormFieldsUI() {
+  refreshFormFieldsCanvas();
+  const panel = document.getElementById('formFieldSettings');
+  if (panel) panel.innerHTML = renderFormFieldSettings(_formBuilderSelectedIdx);
+}
+
+function refreshFormFieldsCanvas() {
+  const canvas = document.getElementById('formFieldsCanvas');
+  if (canvas) canvas.innerHTML = renderFormFieldsList();
+}
+
+function collectFormSettings() {
+  return {
+    confirmation_message: document.getElementById('fsConfirmMsg')?.value || '',
+    redirect_url: document.getElementById('fsRedirectUrl')?.value || '',
+    notification_enabled: document.getElementById('fsNotifEnabled')?.checked || false,
+    notification_email: document.getElementById('fsNotifEmail')?.value || '',
+    notification_subject: document.getElementById('fsNotifSubject')?.value || '',
+    recaptcha_enabled: document.getElementById('fsRecaptcha')?.checked || false,
+    submit_text: document.getElementById('fsSubmitText')?.value || 'Envoyer',
+  };
+}
+
+async function saveFormBuilder() {
+  const title = document.getElementById('formTitle')?.value?.trim();
+  const slug = document.getElementById('formSlug')?.value?.trim();
+  const description = document.getElementById('formDescription')?.value?.trim();
+  const status = document.getElementById('formStatus')?.value || 'active';
+
+  if (!title || !slug) {
+    showToast('Le titre et le slug sont requis', 'error');
+    return;
+  }
+
+  const settings = collectFormSettings();
+
+  const payload = {
+    title,
+    slug,
+    description,
+    status,
+    settings,
+    fields: _formBuilderFields,
+  };
+
+  showLoading();
+  try {
+    if (_formBuilderData && _formBuilderData.id) {
+      await apiFetch(`/forms/${_formBuilderData.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      showToast('Formulaire mis à jour', 'success');
+    } else {
+      const created = await apiFetch('/forms', { method: 'POST', body: JSON.stringify(payload) });
+      showToast('Formulaire créé', 'success');
+      loadSection('form-edit:' + created.id);
+      return;
+    }
+    hideLoading();
+  } catch (e) {
+    hideLoading();
+    showToast('Erreur: ' + e.message, 'error');
+  }
+}
+
+function autoFormSlug() {
+  const titleInput = document.getElementById('formTitle');
+  const slugInput = document.getElementById('formSlug');
+  if (!_formBuilderData || !_formBuilderData.id) {
+    slugInput.value = slugify(titleInput.value);
+  }
+}
+
+function attachFormBuilderEvents() {
+  const canvas = document.getElementById('formFieldsCanvas');
+  if (!canvas) return;
+
+  canvas.addEventListener('mousedown', (e) => {
+    const dragHandle = e.target.closest('.form-field-drag');
+    if (!dragHandle) return;
+
+    e.preventDefault();
+    const idx = parseInt(dragHandle.dataset.idx);
+    const items = canvas.querySelectorAll('.form-field-item');
+    const dragItem = items[idx];
+    if (!dragItem) return;
+
+    dragItem.style.opacity = '0.5';
+    let currentIdx = idx;
+
+    const onMove = (ev) => {
+      const currentItems = canvas.querySelectorAll('.form-field-item');
+      currentItems.forEach((item, i) => {
+        if (i === currentIdx) return;
+        const rect = item.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (ev.clientY < midY && i < currentIdx) {
+          const moved = _formBuilderFields.splice(currentIdx, 1)[0];
+          _formBuilderFields.splice(i, 0, moved);
+          if (_formBuilderSelectedIdx === currentIdx) _formBuilderSelectedIdx = i;
+          currentIdx = i;
+          refreshFormFieldsCanvas();
+        } else if (ev.clientY > midY && i > currentIdx) {
+          const moved = _formBuilderFields.splice(currentIdx, 1)[0];
+          _formBuilderFields.splice(i, 0, moved);
+          if (_formBuilderSelectedIdx === currentIdx) _formBuilderSelectedIdx = i;
+          currentIdx = i;
+          refreshFormFieldsCanvas();
+        }
+      });
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+// ── Form Entries ──
+
+let _formEntriesPage = 1;
+let _formEntriesFilter = 'all';
+
+async function renderFormEntries(formId) {
+  showLoading();
+  try {
+    const form = await apiFetch(`/forms/${formId}`);
+    const result = await apiFetch(`/forms/${formId}/entries?page=${_formEntriesPage}&status=${_formEntriesFilter}`);
+    hideLoading();
+
+    const { entries, total, page, totalPages, counts } = result;
+
+    return `
+      <div class="page-header">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn btn-outline btn-sm" onclick="_formEntriesPage=1;_formEntriesFilter='all';loadSection('forms')">← Formulaires</button>
+          <h1>Entrées — ${escapeHtml(form.title)}</h1>
+          <span class="badge badge-muted">${total} entrée(s)</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <a href="${API_BASE}/forms/${formId}/entries/export" target="_blank" class="btn btn-outline">${_svgDownload} Exporter CSV</a>
+          <button class="btn btn-outline" onclick="loadSection('form-edit:${formId}')">${_svgEdit} Modifier</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        ${['all', 'unread', 'read', 'starred', 'trash'].map(s => {
+          const labels = { all: 'Toutes', unread: 'Non lues', read: 'Lues', starred: 'Favoris', trash: 'Corbeille' };
+          const count = s === 'all' ? (counts.total - (counts.trash || 0)) : (counts[s] || 0);
+          return `<button class="btn btn-sm ${_formEntriesFilter === s ? 'btn-primary' : 'btn-outline'}" onclick="_formEntriesFilter='${s}';_formEntriesPage=1;loadSection('form-entries:${formId}')">${labels[s]} (${count})</button>`;
+        }).join('')}
+      </div>
+
+      <div class="card">
+        ${entries.length > 0 ? `
+          <div class="pages-list">
+            <div class="pages-list-header" style="grid-template-columns: 50px 1fr 150px 80px 110px; display:grid; align-items:center;">
+              <span>#</span>
+              <span>Résumé</span>
+              <span>Date</span>
+              <span>Statut</span>
+              <span style="text-align:right">Actions</span>
+            </div>
+            ${entries.map(entry => {
+              const summary = (entry.values || []).slice(0, 3).map(v => `${v.field_label}: ${(v.field_value || '').substring(0, 30)}`).join(' | ');
+              const dateStr = new Date(entry.created_at).toLocaleString('fr-FR');
+              const statusBadge = entry.status === 'unread' ? 'badge-warning' : entry.status === 'starred' ? 'badge-success' : 'badge-muted';
+              const statusLabel = { unread: 'Non lu', read: 'Lu', starred: 'Favori', trash: 'Corbeille' }[entry.status];
+              return `
+              <div class="page-item" style="display:grid; grid-template-columns: 50px 1fr 150px 80px 110px; align-items:center;${entry.status === 'unread' ? ' font-weight:600' : ''}">
+                <div onclick="loadSection('form-entry-detail:${formId}:${entry.id}')" style="cursor:pointer">
+                  <strong>#${entry.id}</strong>
+                </div>
+                <div onclick="loadSection('form-entry-detail:${formId}:${entry.id}')" style="cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:12px;">
+                  <span style="font-size:13px;color:var(--gray-600)">${escapeHtml(summary)}</span>
+                </div>
+                <div style="font-size:13px;color:var(--gray-500)">${dateStr}</div>
+                <div><span class="badge ${statusBadge}">${statusLabel}</span></div>
+                <div style="display:flex; gap:4px; justify-content:flex-end;">
+                  <button class="btn-icon-action" onclick="loadSection('form-entry-detail:${formId}:${entry.id}')" title="Voir">${_svgEye}</button>
+                  ${entry.status !== 'starred' ? `<button class="btn-icon-action" onclick="changeEntryStatus(${formId}, ${entry.id}, 'starred')" title="Favori">${_svgStar}</button>` : `<button class="btn-icon-action" onclick="changeEntryStatus(${formId}, ${entry.id}, 'read')" title="Retirer favori">${_svgStarFill}</button>`}
+                  ${entry.status !== 'trash' ? `<button class="btn-icon-action btn-icon-action--danger" onclick="changeEntryStatus(${formId}, ${entry.id}, 'trash')" title="Corbeille">${_svgTrash}</button>` : `<button class="btn-icon-action btn-icon-action--danger" onclick="deleteEntryConfirm(${formId}, ${entry.id})" title="Supprimer définitivement">${_svgX}</button>`}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+
+          ${totalPages > 1 ? `
+          <div style="display:flex;justify-content:center;gap:4px;margin-top:16px">
+            ${Array.from({ length: totalPages }, (_, i) => i + 1).map(p => `
+              <button class="btn btn-sm ${p === page ? 'btn-primary' : 'btn-outline'}" onclick="_formEntriesPage=${p};loadSection('form-entries:${formId}')">${p}</button>
+            `).join('')}
+          </div>` : ''}
+        ` : renderEmptyState('📭', 'Aucune entrée', 'Les soumissions du formulaire apparaîtront ici')}
+      </div>
+    `;
+  } catch (e) {
+    hideLoading();
+    return `<div class="card"><p>Erreur: ${e.message}</p></div>`;
+  }
+}
+
+async function renderFormEntryDetail(formId, entryId) {
+  showLoading();
+  try {
+    const [form, entry] = await Promise.all([
+      apiFetch(`/forms/${formId}`),
+      apiFetch(`/forms/entries/${entryId}`),
+    ]);
+    hideLoading();
+
+    const dateStr = new Date(entry.created_at).toLocaleString('fr-FR');
+
+    return `
+      <div class="page-header">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn btn-outline btn-sm" onclick="loadSection('form-entries:${formId}')">← Entrées</button>
+          <h1>Entrée #${entry.id}</h1>
+          <span class="badge badge-muted">${escapeHtml(form.title)}</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          ${entry.status !== 'starred' ? `<button class="btn btn-outline" onclick="changeEntryStatus(${formId}, ${entry.id}, 'starred')">${_svgStar} Favori</button>` : ''}
+          <button class="btn btn-outline" style="color:var(--danger)" onclick="deleteEntryConfirm(${formId}, ${entry.id})">Supprimer</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:24px">
+        <div style="display:flex;gap:24px;margin-bottom:20px;color:var(--gray-500);font-size:13px">
+          <span>Date: ${dateStr}</span>
+          <span>IP: ${entry.ip_address || 'N/A'}</span>
+          <span>Statut: ${entry.status}</span>
+        </div>
+
+        <table style="width:100%;border-collapse:collapse">
+          ${(entry.values || []).map(v => `
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:12px 16px;font-weight:600;width:200px;vertical-align:top;color:var(--gray-700)">${escapeHtml(v.field_label)}</td>
+              <td style="padding:12px 16px;white-space:pre-wrap">${escapeHtml(v.field_value || '—')}</td>
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+
+      <div class="card" style="padding:16px;margin-top:16px">
+        <p style="font-size:12px;color:var(--gray-400)"><strong>User Agent:</strong> ${escapeHtml(entry.user_agent || 'N/A')}</p>
+      </div>
+    `;
+  } catch (e) {
+    hideLoading();
+    return `<div class="card"><p>Erreur: ${e.message}</p></div>`;
+  }
+}
+
+async function changeEntryStatus(formId, entryId, status) {
+  try {
+    await apiFetch(`/forms/entries/${entryId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+    showToast('Statut mis à jour', 'success');
+    loadSection('form-entries:' + formId);
+  } catch (e) {
+    showToast('Erreur: ' + e.message, 'error');
+  }
+}
+
+async function deleteEntryConfirm(formId, entryId) {
+  const ok = await confirmModal('Voulez-vous vraiment supprimer définitivement cette entrée ?');
+  if (!ok) return;
+  showLoading();
+  try {
+    await apiFetch(`/forms/entries/${entryId}`, { method: 'DELETE' });
+    showToast('Entrée supprimée', 'success');
+    loadSection('form-entries:' + formId);
+  } catch (e) {
+    hideLoading();
+    showToast('Erreur: ' + e.message, 'error');
+  }
 }

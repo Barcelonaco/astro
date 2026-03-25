@@ -6,6 +6,7 @@
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { isTruthy } from '../../lib/module-classes';
 import { resolveImageUrl, resolveImageAlt } from '../../lib/module-helpers';
+import { socialIcons, socialLabels, socialOrder } from '../../lib/social-icons';
 
 interface Props {
   data: Record<string, any>;
@@ -37,7 +38,8 @@ if (markers.length > 0) {
   centerLng /= markers.length;
 }
 
-const socialKeys = ['instagram', 'facebook', 'threads', 'tiktok', 'linkedin', 'twitter', 'tripadvisor', 'pinterest', 'youtube'] as const;
+const MAPBOX_TOKEN = 'pk.eyJ1IjoiYmFyY2Vsb25hLWNvIiwiYSI6ImNsbm9mZmN3bzBpM2Yya29kcWYxbnZpcGkifQ.gsHaJQAk_Ua4vBbt3DxNGQ';
+const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
 ---
 
 <NicklModuleWrapper data={data} moduleName="contact">
@@ -57,7 +59,7 @@ const socialKeys = ['instagram', 'facebook', 'threads', 'tiktok', 'linkedin', 't
             const placeId = addr.place_id || '';
             const logoUrl = resolveImageUrl(contact.logo, apiOrigin, 'logo');
 
-            const socials = socialKeys.filter((key) => contact[key]);
+            const socials = socialOrder.filter((key) => contact[key]);
 
             return (
               <li class="item">
@@ -72,7 +74,7 @@ const socialKeys = ['instagram', 'facebook', 'threads', 'tiktok', 'linkedin', 't
                 {addr.lat && (
                   <>
                     <address class="address">
-                      {addressName !== addressStreet && addressName !== addressStreetShort && (
+                      {addressName && addressName !== addressStreet && addressName !== addressStreetShort && !addressName.includes(addressStreet) && (
                         <>{addressName}<br /></>
                       )}
                       {streetName && (
@@ -115,9 +117,9 @@ const socialKeys = ['instagram', 'facebook', 'threads', 'tiktok', 'linkedin', 't
                   <ul class="social-networks">
                     {socials.map((key) => (
                       <li class="item-social">
-                        <a href={contact[key]} title={key === 'twitter' ? 'X (Twitter)' : key.charAt(0).toUpperCase() + key.slice(1)} target="_blank" class="link">
+                        <a href={contact[key]} title={socialLabels[key]} target="_blank" class="link">
                           <span class="icon" aria-hidden="true">
-                            <img src={`/nickl-assets/images/svg/${key === 'twitter' ? 'x' : key}.svg`} alt={key} />
+                            <Fragment set:html={socialIcons[key]} />
                           </span>
                         </a>
                       </li>
@@ -137,26 +139,144 @@ const socialKeys = ['instagram', 'facebook', 'threads', 'tiktok', 'linkedin', 't
           <img src={photoUrl} alt={photoAlt} class="illus" loading="lazy" />
         )
       ) : (
-        <div class="map-wrapper js_show-content">
-          <div
-            class="map js_load-map"
-            data-markers={JSON.stringify(markers)}
-            data-lng={String(centerLng)}
-            data-lat={String(centerLat)}
-          >
-            {addresses.length === 1 && addresses[0]?.address?.place_id && (
-              <a
-                href={`https://www.google.com/maps/place/?q=place_id:${addresses[0].address.place_id}`}
-                class="btn btn-primary"
-                title="Itinéraire"
-                target="_blank"
-              >
-                Itinéraire
-              </a>
-            )}
+        <>
+          <div class="map-wrapper js_show-content">
+            <div
+              class="map js_load-map"
+              data-markers={JSON.stringify(markers)}
+              data-lng={String(centerLng)}
+              data-lat={String(centerLat)}
+            >
+              {addresses.length === 1 && addresses[0]?.address?.place_id && (
+                <a
+                  href={`https://www.google.com/maps/place/?q=place_id:${addresses[0].address.place_id}`}
+                  class="btn btn-primary"
+                  title="Itinéraire"
+                  target="_blank"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30" height="30" fill="currentColor">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/>
+                  </svg>
+                </a>
+              )}
+            </div>
           </div>
-        </div>
+          <div class="no-cookies-wrapper js_show-cookies" style="display:none;">
+            <div class="no-cookies">
+              <p class="no-cookies-txt">
+                Pour afficher ce contenu vous devez<br />accepter les cookies
+                <button type="button" data-cc="show-preferencesModal" aria-haspopup="dialog">publicitaires</button> puis <button type="button" onclick="location.href = location.pathname + '?t=' + Date.now()">recharger la page</button>.
+              </p>
+            </div>
+          </div>
+        </>
       )}
     </div>
   </div>
 </NicklModuleWrapper>
+
+{isMap && markers.length > 0 && (
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" />
+  <script is:inline define:vars={{ MAPBOX_TOKEN, MAPBOX_STYLE }}>
+    (function() {
+      if (window.mapboxgl) {
+        initContactMaps();
+        return;
+      }
+      var script = document.createElement('script');
+      script.src = 'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js';
+      script.onload = initContactMaps;
+      document.head.appendChild(script);
+
+      function initContactMaps() {
+        mapboxgl.accessToken = MAPBOX_TOKEN;
+
+        document.querySelectorAll('.module-contact .js_load-map').forEach(function(elt) {
+          if (elt.dataset.mapInit) return;
+          elt.dataset.mapInit = '1';
+
+          var markersData = elt.getAttribute('data-markers');
+          if (!markersData) return;
+
+          var markers = JSON.parse(markersData);
+          var lat = parseFloat(elt.getAttribute('data-lat'));
+          var lng = parseFloat(elt.getAttribute('data-lng'));
+
+          var map = new mapboxgl.Map({
+            container: elt,
+            style: MAPBOX_STYLE,
+            center: [lng, lat],
+            zoom: 17,
+            pitch: 65,
+          });
+
+          map.scrollZoom.disable();
+          map.addControl(new mapboxgl.NavigationControl());
+
+          var bounds = new mapboxgl.LngLatBounds();
+
+          markers.forEach(function(coord) {
+            var el = document.createElement('div');
+            var containerLogo = document.createElement('div');
+            containerLogo.classList.add('container-pin');
+
+            var logo = document.createElement('div');
+            logo.classList.add('img-pin');
+            logo.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/></svg>';
+
+            containerLogo.append(logo);
+            el.append(containerLogo);
+            el.classList.add('marker');
+
+            new mapboxgl.Marker(el).setLngLat(coord).addTo(map);
+            bounds.extend(coord);
+          });
+
+          map.fitBounds(bounds, { padding: 100 });
+
+          if (markers.length === 1) {
+            map.on('load', function() {
+              map.setZoom(17);
+              map.setPitch(65);
+            });
+          }
+
+          setTimeout(function() { map.resize(); }, 750);
+        });
+      }
+    })();
+  </script>
+)}
+
+<style is:global>
+  .module-contact .social-networks {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 1.25rem;
+    gap: 0;
+  }
+  .module-contact .social-networks .link {
+    display: flex;
+    width: 2.625rem;
+    aspect-ratio: 1;
+    justify-content: center;
+    align-items: center;
+  }
+  .module-contact .social-networks .icon {
+    display: block;
+  }
+  .module-contact .social-networks svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  .module-contact .social-networks svg * {
+    fill: var(--color-primary, #333);
+  }
+  .module-contact .social-networks .link:hover svg * {
+    fill: var(--color-secondary, #666);
+  }
+  .module-contact .social-networks .item-social {
+    list-style: none;
+  }
+</style>

@@ -1538,7 +1538,7 @@ tr:hover {
 }
 
 .media-thumb {
-  height: 140px;
+  height: 220px;
   background: var(--gray-100);
   display: flex;
   align-items: center;
@@ -2129,6 +2129,12 @@ tr:hover {
   margin-bottom: 16px;
   border-bottom: 1px solid var(--gray-200);
   padding-bottom: 6px;
+  margin-left: 5px;
+}
+
+.builder-block-form > .settings-tabs {
+  margin-top: 10px;
+  flex-shrink: 0;
 }
 
 .settings-tab {
@@ -2156,7 +2162,11 @@ tr:hover {
 }
 
 .settings-section.is-active {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Sub-tabs (inside sections like Identité) */
@@ -2490,6 +2500,56 @@ body.sidebar-collapsed .builder-settings {
   background: color-mix(in srgb, var(--primary) 4%, white);
 }
 
+/* ── Flexible content (sub-modules inside columns, etc.) ─────────────────── */
+.flexible-content-field {
+  margin-top: 4px;
+}
+.flexible-content-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.flexible-content-items:not(:empty) {
+  margin-bottom: 8px;
+}
+.flexible-content-items > .repeater-row {
+  border-color: var(--gray-200);
+  background: var(--gray-50);
+}
+.flexible-content-items > .repeater-row .repeater-row-header {
+  background: var(--gray-50);
+}
+.flexible-content-items > .repeater-row .repeater-row-header:hover {
+  background: var(--gray-100);
+}
+.flexible-content-items > .repeater-row .repeater-row-number {
+  background: var(--gray-100);
+}
+.flexible-content-items > .repeater-row.is-open .repeater-row-number {
+  background: color-mix(in srgb, var(--primary) 10%, white);
+}
+.flexible-content-items > .repeater-row .repeater-row-title {
+  font-weight: 600;
+  color: var(--gray-800);
+}
+.flexible-content-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: stretch;
+}
+.flexible-content-add .form-select {
+  flex: 1;
+  min-width: 0;
+}
+.flexible-content-add .repeater-add-btn {
+  width: auto;
+  margin-top: 0;
+  padding: 10px 16px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* ── Group field ──────────────────────────────────────────────────────────── */
 .group-field {
   border: 1px solid var(--gray-200);
@@ -2626,6 +2686,33 @@ body.sidebar-collapsed .builder-settings {
 }
 
 /* Pages toolbar & pagination */
+.pages-menu-buttons {
+  display: flex;
+  gap: 6px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  flex-wrap: wrap;
+}
+.pages-menu-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border-color, #d0d5dd);
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-600, #475569);
+  transition: all .15s;
+}
+.pages-menu-btn:hover {
+  background: var(--gray-50, #f9fafb);
+  border-color: var(--gray-300, #d1d5db);
+}
+.pages-menu-btn.active {
+  background: var(--primary, #667ee4);
+  color: #fff;
+  border-color: var(--primary, #667ee4);
+}
 .pages-toolbar {
   display: flex;
   align-items: center;
@@ -3120,6 +3207,56 @@ body.sidebar-collapsed .builder-settings {
 .builder-menu-settings-body .form-group {
   margin-bottom: 12px;
 }
+
+/* Color overrides panel */
+.builder-color-overrides-btn {
+  width: 100%;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.builder-color-overrides-panel {
+  padding: 16px;
+  border-bottom: 1px solid var(--gray-200);
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+.builder-color-overrides-body .form-group {
+  margin-bottom: 12px;
+}
+.color-override-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.color-override-grid .form-group {
+  margin-bottom: 0;
+}
+.color-override-grid .form-label {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.color-picker-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.color-picker-wrapper .form-color {
+  width: 36px;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.color-picker-wrapper .form-input-sm {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: monospace;
+}
+
 .modal-footer {
   display: flex;
   justify-content: flex-end;
@@ -3303,4 +3440,171 @@ body.sidebar-collapsed .builder-settings {
   line-height: 1;
   border-radius: 4px;
   pointer-events: none;
+}
+
+/* GoogleMap field */
+.googlemap-field-group .googlemap-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.googlemap-field-group .googlemap-search {
+  width: 100%;
+}
+.googlemap-field-group .googlemap-coords {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+.googlemap-field-group .googlemap-coord-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.googlemap-field-group .form-label-sm {
+  font-size: 11px;
+  color: var(--gray-500, #888);
+  margin: 0;
+}
+.googlemap-field-group .form-input-sm {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+.googlemap-field-group .googlemap-search-wrapper {
+  position: relative;
+}
+.googlemap-field-group .googlemap-suggestions {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: #fff;
+  border: 1px solid var(--gray-200, #e5e5e5);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.googlemap-field-group .googlemap-suggestion {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 1px solid var(--gray-100, #f5f5f5);
+}
+.googlemap-field-group .googlemap-suggestion:last-child {
+  border-bottom: none;
+}
+.googlemap-field-group .googlemap-suggestion:hover {
+  background: var(--gray-50, #fafafa);
+}
+.googlemap-field-group .googlemap-suggestion-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--gray-400, #aaa);
+  font-size: 13px;
+}
+.googlemap-field-group .googlemap-preview {
+  height: 0;
+  background: var(--gray-100, #f5f5f5);
+  border-radius: 8px;
+  border: 1px solid var(--gray-200, #e5e5e5);
+  overflow: hidden;
+  transition: height 0.2s ease;
+}
+.googlemap-field-group .googlemap-preview canvas {
+  border-radius: 8px;
+}
+
+/* Map module preview in builder */
+.builder-block-render .module-map {
+  overflow: hidden;
+}
+.builder-block-render .module-map .container-large,
+.builder-block-render .module-map .container-1 {
+  max-width: 100%;
+  padding-left: 20px;
+  padding-right: 20px;
+  box-sizing: border-box;
+}
+.builder-block-render .module-map.full-width .container-large,
+.builder-block-render .module-map.full-width .container-1 {
+  padding-left: 0;
+  padding-right: 0;
+}
+.builder-block-render .module-map .map-wrapper {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+}
+.builder-block-render .module-map .map-wrapper .map {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+.builder-block-render .module-map .mapboxgl-ctrl-top-right {
+  right: 0;
+}
+.builder-block-render .module-map .mapboxgl-canvas-container,
+.builder-block-render .module-map .mapboxgl-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ── Module Contact preview ─────────────────────────────────── */
+.builder-block-render .module-contact .social-networks {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  list-style: none;
+  padding: 0;
+  margin: 1.25rem 0 0;
+  gap: 0;
+}
+.builder-block-render .module-contact .social-networks .item-social {
+  list-style: none;
+}
+.builder-block-render .module-contact .social-networks .link {
+  display: flex;
+  width: 2.625rem;
+  aspect-ratio: 1;
+  justify-content: center;
+  align-items: center;
+  text-decoration: none;
+}
+.builder-block-render .module-contact .social-networks .icon {
+  display: block;
+}
+.builder-block-render .module-contact .social-networks svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.builder-block-render .module-contact .social-networks svg * {
+  fill: var(--color-primary, #333);
+}
+.builder-block-render .module-contact .social-networks .link:hover svg * {
+  fill: var(--color-secondary, #666);
+}
+/* Contact map in preview */
+.builder-block-render .module-contact .map-wrapper {
+  position: relative;
+  width: 100%;
+  padding-top: 54.8%;
+  overflow: hidden;
+}
+.builder-block-render .module-contact .map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.builder-block-render .module-contact .mapboxgl-canvas-container,
+.builder-block-render .module-contact .mapboxgl-canvas {
+  width: 100% !important;
+  height: 100% !important;
 }

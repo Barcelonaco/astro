@@ -111,6 +111,8 @@ const setup = async () => {
         title VARCHAR(255) NOT NULL,
         slug VARCHAR(255) UNIQUE NOT NULL,
         content LONGTEXT,
+        color_overrides TEXT,
+        seo_meta TEXT,
         status ENUM('draft', 'published') DEFAULT 'draft',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -214,6 +216,77 @@ const setup = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Menu items table created');
+
+    // Create forms table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS forms (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        slug VARCHAR(255) UNIQUE NOT NULL,
+        description TEXT,
+        settings JSON,
+        status ENUM('active', 'inactive') DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_slug (slug),
+        INDEX idx_status (status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Forms table created');
+
+    // Create form_fields table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS form_fields (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        form_id INT NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        label VARCHAR(255) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        placeholder VARCHAR(255) DEFAULT NULL,
+        required BOOLEAN DEFAULT FALSE,
+        options JSON,
+        validation JSON,
+        field_order INT DEFAULT 0,
+        settings JSON,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (form_id) REFERENCES forms(id) ON DELETE CASCADE,
+        INDEX idx_form (form_id),
+        INDEX idx_order (field_order)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Form fields table created');
+
+    // Create form_entries table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS form_entries (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        form_id INT NOT NULL,
+        ip_address VARCHAR(45) DEFAULT NULL,
+        user_agent VARCHAR(500) DEFAULT NULL,
+        status ENUM('unread', 'read', 'starred', 'trash') DEFAULT 'unread',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (form_id) REFERENCES forms(id) ON DELETE CASCADE,
+        INDEX idx_form (form_id),
+        INDEX idx_status (status),
+        INDEX idx_created (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Form entries table created');
+
+    // Create form_entry_values table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS form_entry_values (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        entry_id INT NOT NULL,
+        field_id INT DEFAULT NULL,
+        field_label VARCHAR(255) NOT NULL,
+        field_value LONGTEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (entry_id) REFERENCES form_entries(id) ON DELETE CASCADE,
+        INDEX idx_entry (entry_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Form entry values table created');
 
     // Create default admin user
     const hashedPassword = await bcrypt.hash('admin123', 10);

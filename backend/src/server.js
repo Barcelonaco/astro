@@ -111,6 +111,11 @@ app.use((err, req, res, next) => {
 // Migrate plugin tables before starting
 migratePluginTables().catch(err => console.warn('⚠️  Plugin migration:', err.message));
 
+// Auto-migrate: add color_overrides column to pages if missing
+import pool from './db.js';
+pool.query(`ALTER TABLE pages ADD COLUMN color_overrides TEXT AFTER content`).catch(() => {});
+pool.query(`ALTER TABLE pages ADD COLUMN seo_meta TEXT AFTER color_overrides`).catch(() => {});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`

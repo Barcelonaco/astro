@@ -4,7 +4,6 @@
  * Carte Mapbox GL JS avec marqueur et lien itinéraire.
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
-import { isTruthy } from '../../lib/module-classes';
 
 interface Props {
   data: Record<string, any>;
@@ -17,41 +16,116 @@ const lat = address?.lat || 0;
 const lng = address?.lng || 0;
 const placeId = address?.place_id || '';
 const markers = lat && lng ? [[lng, lat]] : [];
+
+const MAPBOX_TOKEN = 'pk.eyJ1IjoiYmFyY2Vsb25hLWNvIiwiYSI6ImNsbm9mZmN3bzBpM2Yya29kcWYxbnZpcGkifQ.gsHaJQAk_Ua4vBbt3DxNGQ';
+const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
 ---
 
 <NicklModuleWrapper data={data} moduleName="map" noContainer>
   {address && lat && lng ? (
-    <>
-      {data.title_bloc && (
-        <div class="container">
-          <Fragment set:html={`<h${data.title_style || 4} class="title-module title-section-${data.title_style || 4} align-${data.title_align || 'center'}">${data.title_bloc}</h${data.title_style || 4}>`} />
-        </div>
-      )}
-      <div class="container-large container-1">
-        <div class="map-wrapper js_show-content">
-          <div
-            class="map js_load-map"
-            data-markers={JSON.stringify(markers)}
-            data-lng={String(lng)}
-            data-lat={String(lat)}
-          >
-            {placeId && (
-              <a
-                href={`https://www.google.com/maps/place/?q=place_id:${placeId}`}
-                class="btn btn-primary"
-                title="Itinéraire"
-                target="_blank"
-              >
-                Itinéraire
-              </a>
-            )}
-          </div>
+    <div class="container-large container-1">
+      <div class="map-wrapper js_show-content">
+        <div
+          class="map js_load-map"
+          data-markers={JSON.stringify(markers)}
+          data-lng={String(lng)}
+          data-lat={String(lat)}
+        >
+          {placeId && (
+            <a
+              href={`https://www.google.com/maps/place/?q=place_id:${placeId}`}
+              class="btn btn-primary"
+              title="Itinéraire"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30" height="30" fill="currentColor">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/>
+              </svg>
+            </a>
+          )}
         </div>
       </div>
-    </>
+    </div>
   ) : (
     <div class="container">
       <p>Aucune adresse configurée.</p>
     </div>
   )}
 </NicklModuleWrapper>
+
+{address && lat && lng && (
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" />
+  <script is:inline define:vars={{ MAPBOX_TOKEN, MAPBOX_STYLE }}>
+    (function() {
+      // Load Mapbox GL JS dynamically
+      if (window.mapboxgl) {
+        initMaps();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js';
+      script.onload = initMaps;
+      document.head.appendChild(script);
+
+      function initMaps() {
+        mapboxgl.accessToken = MAPBOX_TOKEN;
+
+        document.querySelectorAll('.module-map .js_load-map').forEach(function(elt) {
+          // Skip already-initialized maps
+          if (elt.dataset.mapInit) return;
+          elt.dataset.mapInit = '1';
+
+          const markersData = elt.getAttribute('data-markers');
+          if (!markersData) return;
+
+          const markers = JSON.parse(markersData);
+          const lat = parseFloat(elt.getAttribute('data-lat'));
+          const lng = parseFloat(elt.getAttribute('data-lng'));
+
+          const map = new mapboxgl.Map({
+            container: elt,
+            style: MAPBOX_STYLE,
+            center: [lng, lat],
+            zoom: 17,
+            pitch: 65,
+          });
+
+          map.scrollZoom.disable();
+          map.addControl(new mapboxgl.NavigationControl());
+
+          const bounds = new mapboxgl.LngLatBounds();
+
+          markers.forEach(function(coord) {
+            const el = document.createElement('div');
+            const containerLogo = document.createElement('div');
+            containerLogo.classList.add('container-pin');
+
+            const logo = document.createElement('div');
+            logo.classList.add('img-pin');
+            logo.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/></svg>';
+
+            containerLogo.append(logo);
+            el.append(containerLogo);
+            el.classList.add('marker');
+
+            new mapboxgl.Marker(el).setLngLat(coord).addTo(map);
+            bounds.extend(coord);
+          });
+
+          map.fitBounds(bounds, { padding: 100 });
+
+          if (markers.length === 1) {
+            map.on('load', function() {
+              map.setZoom(17);
+              map.setPitch(65);
+            });
+          }
+
+          // Ensure map resizes correctly after layout
+          setTimeout(function() { map.resize(); }, 750);
+        });
+      }
+    })();
+  </script>
+)}

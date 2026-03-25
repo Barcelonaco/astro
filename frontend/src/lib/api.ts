@@ -37,6 +37,7 @@ export interface Page {
   title: string
   slug: string
   content: string
+  color_overrides?: string
   status: 'draft' | 'published'
   show_in_menu: boolean
   menu_order: number

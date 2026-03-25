@@ -9,6 +9,8 @@ export async function getAllPages(req, res) {
       title: page.title,
       slug: page.slug,
       content: page.content,
+      color_overrides: page.color_overrides,
+      seo_meta: page.seo_meta,
       status: page.status,
       show_in_menu: page.show_in_menu,
       menu_order: page.menu_order,
@@ -39,6 +41,8 @@ export async function getPageBySlug(req, res) {
       title: page.title,
       slug: page.slug,
       content: page.content,
+      color_overrides: page.color_overrides,
+      seo_meta: page.seo_meta,
       status: page.status,
       show_in_menu: page.show_in_menu,
       menu_order: page.menu_order,
@@ -60,7 +64,7 @@ export async function getPageBySlug(req, res) {
 
 export async function createPage(req, res) {
   try {
-    const { title, slug, content, status = 'draft', show_in_menu = true, menu_order = 0, parent_id = null } = req.body;
+    const { title, slug, content, color_overrides, seo_meta, status = 'draft', show_in_menu = true, menu_order = 0, parent_id = null } = req.body;
 
     if (!title || !slug) {
       return res.status(400).json({ error: 'Title and slug are required' });
@@ -71,6 +75,8 @@ export async function createPage(req, res) {
       title,
       slug,
       content: contentValue,
+      color_overrides: color_overrides || null,
+      seo_meta: seo_meta || null,
       author_id: req.user.id,
       status,
       show_in_menu,
@@ -87,7 +93,7 @@ export async function createPage(req, res) {
 
 export async function updatePage(req, res) {
   try {
-    const { title, slug, content, status, show_in_menu, menu_order, parent_id } = req.body;
+    const { title, slug, content, color_overrides, seo_meta, status, show_in_menu, menu_order, parent_id } = req.body;
 
     if (!title || !slug) {
       return res.status(400).json({ error: 'Title and slug are required' });
@@ -98,6 +104,8 @@ export async function updatePage(req, res) {
       title,
       slug,
       content: contentValue,
+      color_overrides: color_overrides || null,
+      seo_meta: seo_meta || null,
       status,
       show_in_menu,
       menu_order,

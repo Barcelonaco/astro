@@ -50,6 +50,39 @@ const blocks = hasPage ? parseBlocks(page.content) : null;
 const isBlockPage = blocks !== null;
 const lcpImages = extractLcpImages(blocks as any[] | null);
 
+// Parse color overrides for this page
+let colorOverrideStyle = '';
+try {
+  const co = page?.color_overrides ? JSON.parse(page.color_overrides) : null;
+  if (co?.enabled) {
+    const vars: string[] = [];
+    if (co.primary_color) { vars.push(`--color-primary:${co.primary_color}`); vars.push(`--color-primary-bis:${co.primary_color}`); }
+    if (co.secondary_color) { vars.push(`--color-secondary:${co.secondary_color}`); vars.push(`--color-secondary-bis:${co.secondary_color}`); }
+    if (co.tertiary_color) vars.push(`--color-tertiary:${co.tertiary_color}`);
+    if (co.text_color) vars.push(`--color-default:${co.text_color}`);
+    if (co.background_color) vars.push(`--color-background:${co.background_color}`);
+    if (co.bg_form_field) vars.push(`--color-form:${co.bg_form_field}`);
+    if (vars.length) colorOverrideStyle = vars.join(';');
+  }
+} catch {}
+const hasColorOverrides = !!colorOverrideStyle;
+
+// Parse SEO meta for front page
+let seoTitle = siteName;
+let seoDescription = siteDescription;
+let schemaOrg = '';
+try {
+  const seo = page?.seo_meta ? JSON.parse(page.seo_meta) : null;
+  if (seo?.enabled) {
+    if (seo.meta_title) seoTitle = seo.meta_title;
+    if (seo.meta_description) seoDescription = seo.meta_description;
+    if (seo.schema_org) {
+      const siteUrl = Astro.site ? Astro.site.origin : '';
+      schemaOrg = seo.schema_org.replace(/\{\{site_url\}\}/g, siteUrl);
+    }
+  }
+} catch {}
+
 // Body classes from identity settings
 const bodyClasses = [
   siteSettings.rounded === '1' ? 'border-rounded' : '',
@@ -60,14 +93,15 @@ const bodyClasses = [
 <!doctype html>
 <html lang="fr">
 	<head>
-		<BaseHead title={siteName} description={siteDescription} styleSettings={styleSettings} siteSettings={siteSettings} />
+		<BaseHead title={seoTitle} description={seoDescription} styleSettings={styleSettings} siteSettings={siteSettings} />
+		{schemaOrg && <script type="application/ld+json" set:html={schemaOrg} />}
 		{lcpImages.mobile && <link rel="preload" as="image" href={lcpImages.mobile} media="(max-width: 600px)" fetchpriority="high" />}
 		{lcpImages.desktop && <link rel="preload" as="image" href={lcpImages.desktop} media="(min-width: 601px)" fetchpriority="high" />}
 		<ModuleStyles blocks={blocks} />
 	</head>
 	<body class={bodyClasses || undefined}>
 		<Header siteName={siteName} navigation={navigationData} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
-		<main class={isBlockPage ? 'main-page' : ''}>
+		<main class={`${isBlockPage ? 'main-page' : ''} ${hasColorOverrides ? 'has-color-overrides' : ''}`.trim()} style={colorOverrideStyle || undefined}>
 			{hasPage ? (
 				<article>
 					{!isBlockPage && (
