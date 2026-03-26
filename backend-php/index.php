@@ -65,6 +65,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // ─── Static file routes (handled before JSON content-type) ───────────────────
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
+// DEBUG: temporary endpoint to check what PHP receives (remove after testing)
+if ($uri === '/debug' || $uri === '/api/debug') {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'REQUEST_URI' => $_SERVER['REQUEST_URI'],
+        'SCRIPT_NAME' => $_SERVER['SCRIPT_NAME'] ?? null,
+        'DOCUMENT_ROOT' => $_SERVER['DOCUMENT_ROOT'] ?? null,
+        'parsed_uri' => $uri,
+        '__DIR__' => __DIR__,
+        'admin_exists' => is_dir(__DIR__ . '/admin'),
+        'login_exists' => file_exists(__DIR__ . '/admin/login.html'),
+    ]);
+    exit;
+}
+
 // Serve admin interface files
 if (preg_match('#^/admin(?:/(.*))?$#', $uri, $m)) {
     $path = $m[1] ?? '';
