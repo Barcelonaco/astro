@@ -1,0 +1,16 @@
+{
+  "name": "cms-astro/backend-php",
+  "description": "PHP backend for CMS Astro",
+  "require": {
+    "php": ">=8.1",
+    "firebase/php-jwt": "^6.10",
+    "vlucas/phpdotenv": "^5.6"
+  },
+  "autoload": {
+    "files": [
+      "helpers/response.php",
+      "helpers/request.php",
+      "helpers/slug.php"
+    ]
+  }
+}

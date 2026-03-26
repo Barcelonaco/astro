@@ -1,0 +1,53 @@
+Options +FollowSymLinks
+RewriteEngine On
+
+# Serve existing files/directories directly (backend-php own files)
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# Uploads: all go through index.php (symlinks + image optimization)
+RewriteRule ^uploads/ index.php [QSA,L]
+RewriteRule ^admin/ - [L]
+
+# API and special routes go through index.php
+RewriteRule ^api/ index.php [QSA,L]
+RewriteRule ^nickl-assets/ index.php [QSA,L]
+RewriteRule ^plugin-assets/ index.php [QSA,L]
+
+# Frontend static files: serve from dist/ if the file exists
+RewriteCond %{DOCUMENT_ROOT}/dist%{REQUEST_URI} -f
+RewriteRule ^(.*)$ dist/$1 [L]
+
+# Frontend: /pages/slug → dist/pages/slug/index.html
+RewriteCond %{DOCUMENT_ROOT}/dist%{REQUEST_URI}/index.html -f
+RewriteRule ^(.*)$ dist/$1/index.html [L]
+
+# Frontend: / → dist/index.html
+RewriteRule ^$ dist/index.html [L]
+
+# Fallback: everything else goes through index.php (API 404, etc.)
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Compression
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE application/json text/html text/css application/javascript
+</IfModule>
+
+# PHP limits
+<IfModule mod_php.c>
+  php_value upload_max_filesize 200M
+  php_value post_max_size 210M
+  php_value max_execution_time 120
+  php_value memory_limit 256M
+</IfModule>
+
+# Cache static assets
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType image/avif "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 7 days"
+  ExpiresByType image/png "access plus 7 days"
+  ExpiresByType text/css "access plus 30 days"
+  ExpiresByType application/javascript "access plus 30 days"
+</IfModule>

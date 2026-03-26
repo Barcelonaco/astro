@@ -1,0 +1,1 @@
+Je veux que tu reprennes le module colonnes. Tous les modules que je mets doivent marcher en front et en back-office dans le preview. Il faut que les parametres des modules marchent. Il faut que les parametres du module colonnes marchent. Il faut que tout soit dynamique dans le preview.

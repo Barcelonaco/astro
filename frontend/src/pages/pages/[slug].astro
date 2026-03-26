@@ -1,6 +1,4 @@
 ---
-export const prerender = false;
-
 import BaseHead from '../../components/BaseHead.astro';
 import ModuleStyles from '../../components/ModuleStyles.astro';
 import Header from '../../components/Header.astro';
@@ -9,8 +7,15 @@ import BlockRenderer from '../../components/BlockRenderer.astro';
 import DeferredLoader from '../../components/DeferredLoader.astro';
 import SiteOverlays from '../../components/SiteOverlays.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
-import { getPageBySlug, formatContent, getFrontendBootstrap } from '../../lib/api';
+import { getAllPages, getPageBySlug, formatContent, getFrontendBootstrap } from '../../lib/api';
 import { optimizedImageUrl } from '../../lib/module-helpers';
+
+export async function getStaticPaths() {
+  const pages = await getAllPages();
+  return pages
+    .filter((p: any) => p.status === 'published')
+    .map((p: any) => ({ params: { slug: p.slug } }));
+}
 
 function parseBlocks(content: string): unknown[] | null {
   if (!content || !content.trim()) return null;
@@ -48,8 +53,8 @@ const [page, { siteInfo, styleSettings, siteSettings, navigation: navigationData
 const siteName = siteInfo.siteName || SITE_TITLE;
 const siteDescription = siteInfo.siteDescription || SITE_DESCRIPTION;
 
-if (!page || page.status !== 'published') {
-  return Astro.redirect('/404');
+if (!page) {
+  throw new Error(`Page not found: ${slug}`);
 }
 
 const blocks = parseBlocks(page.content);
