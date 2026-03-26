@@ -49,3 +49,8 @@ backend/uploads/media/
 # Misc
 .turbo/
 coverage/
+
+CLAUDE.md
+COMMANDES.md
+GUIDE_DEMARRAGE.md
+MULTISITE.md
