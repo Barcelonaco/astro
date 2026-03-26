@@ -86,8 +86,9 @@ if (strpos($uri, 'debug') !== false || strpos($_SERVER['REQUEST_URI'], 'debug') 
 if (preg_match('#^/admin(?:/(.*))?$#', $uri, $m)) {
     $path = $m[1] ?? '';
     if (empty($path) || $path === '/') {
-        // /admin → redirect to login
-        header('Location: /admin/login.html');
+        // /admin → serve index.html (app.js handles auth check)
+        header('Content-Type: text/html; charset=utf-8');
+        readfile(__DIR__ . '/admin/index.html');
         exit;
     }
     $file = __DIR__ . '/admin/' . $path;
@@ -109,9 +110,12 @@ if (preg_match('#^/uploads/media/_optimized/(.+)$#', $uri, $m)) {
     exit;
 }
 
-// Serve uploads from backend/uploads (symlink may not work with Apache)
+// Serve uploads: try local first, then fallback to old backend/uploads
 if (preg_match('#^/uploads/(.+)$#', $uri, $m)) {
     $file = __DIR__ . '/uploads/' . $m[1];
+    if (!file_exists($file)) {
+        $file = __DIR__ . '/../backend/uploads/' . $m[1];
+    }
     if (file_exists($file) && !is_dir($file)) {
         $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
         $mimeMap = [
