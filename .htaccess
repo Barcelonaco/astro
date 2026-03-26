@@ -1,0 +1,6 @@
+Options +FollowSymLinks
+RewriteEngine On
+
+# Redirect everything to backend-php/
+RewriteCond %{REQUEST_URI} !^/backend-php/
+RewriteRule ^(.*)$ backend-php/$1 [L]
