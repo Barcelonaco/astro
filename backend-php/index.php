@@ -65,6 +65,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // ─── Static file routes (handled before JSON content-type) ───────────────────
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
+// Serve admin interface files
+if (preg_match('#^/admin(?:/(.*))?$#', $uri, $m)) {
+    $path = $m[1] ?? '';
+    if (empty($path) || $path === '/') {
+        // /admin → redirect to login
+        header('Location: /admin/login.html');
+        exit;
+    }
+    $file = __DIR__ . '/admin/' . $path;
+    if (file_exists($file) && !is_dir($file)) {
+        $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+        $mimeMap = ['html' => 'text/html', 'css' => 'text/css', 'js' => 'application/javascript', 'json' => 'application/json', 'svg' => 'image/svg+xml', 'png' => 'image/png', 'jpg' => 'image/jpeg', 'ico' => 'image/x-icon'];
+        $mime = $mimeMap[$ext] ?? mime_content_type($file);
+        header("Content-Type: $mime; charset=utf-8");
+        readfile($file);
+        exit;
+    }
+    http_response_code(404);
+    exit;
+}
+
 // Image optimization: /uploads/media/_optimized/{filename}?w=&q=&f=
 if (preg_match('#^/uploads/media/_optimized/(.+)$#', $uri, $m)) {
     serve_optimized_image($m[1]);

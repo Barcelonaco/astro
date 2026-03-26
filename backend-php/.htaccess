@@ -5,11 +5,9 @@ RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 
-# Uploads: all go through index.php (symlinks + image optimization)
+# All dynamic routes go through index.php
 RewriteRule ^uploads/ index.php [QSA,L]
-RewriteRule ^admin/ - [L]
-
-# API and special routes go through index.php
+RewriteRule ^admin/ index.php [QSA,L]
 RewriteRule ^api/ index.php [QSA,L]
 RewriteRule ^nickl-assets/ index.php [QSA,L]
 RewriteRule ^plugin-assets/ index.php [QSA,L]
