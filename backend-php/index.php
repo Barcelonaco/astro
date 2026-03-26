@@ -65,8 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // ─── Static file routes (handled before JSON content-type) ───────────────────
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// DEBUG: temporary endpoint to check what PHP receives (remove after testing)
-if ($uri === '/debug' || $uri === '/api/debug') {
+// DEBUG: temporary (remove after testing)
+if (strpos($uri, 'debug') !== false || strpos($_SERVER['REQUEST_URI'], 'debug') !== false) {
     header('Content-Type: application/json');
     echo json_encode([
         'REQUEST_URI' => $_SERVER['REQUEST_URI'],
@@ -76,6 +76,8 @@ if ($uri === '/debug' || $uri === '/api/debug') {
         '__DIR__' => __DIR__,
         'admin_exists' => is_dir(__DIR__ . '/admin'),
         'login_exists' => file_exists(__DIR__ . '/admin/login.html'),
+        'dist_exists' => is_dir(__DIR__ . '/dist'),
+        'htaccess_exists' => file_exists(__DIR__ . '/.htaccess'),
     ]);
     exit;
 }
