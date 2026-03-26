@@ -19,11 +19,12 @@ jobs:
           script: |
             cd ~/astro.bcnco.site/httpdocs
 
-            # Pull les derniers changements
-            git pull origin main
+            # Pull les derniers changements (force reset si historique réécrit)
+            git fetch origin main
+            git reset --hard origin/main
 
             # Install dépendances frontend et build
             cd frontend && npm install && npm run build && cd ..
 
-            # Install dépendances PHP (si nécessaire)
+            # Install dépendances PHP
             cd backend-php && composer install --no-dev --optimize-autoloader 2>/dev/null; cd ..
