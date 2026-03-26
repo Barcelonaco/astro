@@ -20,6 +20,7 @@ jobs:
             cd ~/astro.bcnco.site/httpdocs
 
             # Pull les derniers changements (force reset si historique réécrit)
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/Barcelonaco/astro.git
             git fetch origin main
             git reset --hard origin/main
 
