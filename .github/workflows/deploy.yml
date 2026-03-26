@@ -22,9 +22,8 @@ jobs:
             # Pull les derniers changements
             git pull origin main
 
-            # Install des dépendances et build
-            npm run install:all
-            npm run build
+            # Install dépendances frontend et build
+            cd frontend && npm install && npm run build && cd ..
 
-            # Redémarrer le backend via Plesk
-            touch backend/tmp/restart.txt
+            # Install dépendances PHP (si nécessaire)
+            cd backend-php && composer install --no-dev --optimize-autoloader 2>/dev/null; cd ..
