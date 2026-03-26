@@ -1,29 +1,12 @@
 Options +FollowSymLinks
 RewriteEngine On
 
-# Serve existing files/directories directly (backend-php own files)
+# Only serve real CSS/JS/image files directly (assets in dist/_astro/)
+RewriteCond %{REQUEST_URI} \.(css|js|woff2?|ttf|eot|ico|svg|png|jpg|jpeg|gif|webp|avif|mp4|webm)$
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 
-# All dynamic routes go through index.php
-RewriteRule ^uploads/ index.php [QSA,L]
-RewriteRule ^admin/ index.php [QSA,L]
-RewriteRule ^api/ index.php [QSA,L]
-RewriteRule ^nickl-assets/ index.php [QSA,L]
-RewriteRule ^plugin-assets/ index.php [QSA,L]
-
-# Frontend static files: serve from dist/ if the file exists
-RewriteCond %{DOCUMENT_ROOT}/dist%{REQUEST_URI} -f
-RewriteRule ^(.*)$ dist/$1 [L]
-
-# Frontend: /pages/slug → dist/pages/slug/index.html
-RewriteCond %{DOCUMENT_ROOT}/dist%{REQUEST_URI}/index.html -f
-RewriteRule ^(.*)$ dist/$1/index.html [L]
-
-# Frontend: / → dist/index.html
-RewriteRule ^$ dist/index.html [L]
-
-# Fallback: everything else goes through index.php (API 404, etc.)
+# Everything else goes through index.php
 RewriteRule ^(.*)$ index.php [QSA,L]
 
 # Compression
