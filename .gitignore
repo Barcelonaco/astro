@@ -31,9 +31,11 @@ Thumbs.db
 *.sublime-workspace
 *.sublime-project
 
-# Media uploads (backend)
+# Media uploads
 backend/media/*
 !backend/media/.gitkeep
+backend-php/uploads/media/
+backend/uploads/media/
 
 # Database
 *.db
