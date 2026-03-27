@@ -91,7 +91,7 @@ const Component = componentMap[type];
 ---
 
 {Component ? (
-  <Component data={data} />
+  <Component data={{ ...data, columns: 'module-in-column' }} />
 ) : (
   <div class={`module module-${type}`} style="padding: 1rem 0;">
     {/* Module non supporté en mode colonne */}

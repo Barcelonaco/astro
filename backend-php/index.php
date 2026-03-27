@@ -4,6 +4,21 @@
  * Front controller + Router
  */
 
+// Enable gzip compression for all PHP output (HTML, JSON, etc.)
+if (!ini_get('zlib.output_compression') && extension_loaded('zlib')) {
+    ob_start('ob_gzhandler');
+}
+
+// ─── Static file routes (handled before JSON content-type) ───────────────────
+$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+// Image optimization fast-path: Handle before Composer/DB loading to save 100-300ms overhead
+if (preg_match('#^/uploads/media/_optimized/(.+)$#', $uri, $m)) {
+    // We need to define the serve_optimized_image function here if it's placed early
+    serve_optimized_image($m[1]);
+    exit;
+}
+
 require_once __DIR__ . '/vendor/autoload.php';
 
 // Load environment
@@ -688,6 +703,16 @@ function serve_optimized_image(string $filename): void {
 
     imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $srcW, $srcH);
     imagedestroy($src);
+
+    // Sharpen after downscale to restore lost detail
+    if ($newW < $srcW && function_exists('imageconvolution')) {
+        $sharpen = [
+            [-1, -1, -1],
+            [-1, 20, -1],
+            [-1, -1, -1],
+        ];
+        imageconvolution($dst, $sharpen, 12, 0);
+    }
 
     // Ensure cache dir exists
     if (!is_dir($cacheDir)) {

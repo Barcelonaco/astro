@@ -10,12 +10,7 @@
 window.addEventListener('load',function(){
   var r=window.requestIdleCallback||function(c){setTimeout(c,50)};
 
-  // Google Fonts (deferred)
-  r(function(){
-    function a(h){var l=document.createElement('link');l.rel='stylesheet';l.href=h;document.head.appendChild(l)}
-    var g=document.querySelector('meta[name="x-google-fonts"]');
-    if(g)a(g.getAttribute('content'));
-  });
+  // Google Fonts now loaded via <link preload> in ThemeInjector — no JS needed
 
   // ── Hero slider — lightweight, no Swiper needed ──
   document.querySelectorAll('.module-hero.mode-slider .js_slider-hero').forEach(function(e){
@@ -31,16 +26,14 @@ window.addEventListener('load',function(){
       cur.style.opacity='0';
       next.style.transition='opacity 1s ease';
       next.style.opacity='1';
-      next.style.zIndex='2';
-      cur.style.zIndex='1';
       idx=n;
     }
-    // Init: show first, hide rest
+    // Init: show first, hide rest — all slides stacked via absolute, opacity only (composited)
     slides.forEach(function(s,i){
       s.style.position=i===0?'relative':'absolute';
       s.style.top='0';s.style.left='0';s.style.width='100%';s.style.height='100%';
       s.style.opacity=i===0?'1':'0';
-      s.style.zIndex=i===0?'2':'1';
+      s.style.willChange='opacity';
     });
     // Wrapper needs relative positioning
     var wrapper=e.querySelector('.swiper-wrapper');
@@ -88,7 +81,7 @@ window.addEventListener('load',function(){
         });
       };
       document.head.appendChild(s);
-    },1500);
+    },100);
   }
 });
 </script>

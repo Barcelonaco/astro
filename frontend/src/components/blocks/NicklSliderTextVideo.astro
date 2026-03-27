@@ -83,7 +83,7 @@ const hasMultipleSlides = slider.length > 1;
                     {hasVideo && youtubeId ? (
                       <div class="video">
                         {preview && previewType === 'image' && (
-                          <img src={previewUrl} alt={previewAlt} class="illus" loading="lazy" />
+                          <img src={previewUrl} alt={previewAlt} class="illus" width="800" height="450" loading="lazy" />
                         )}
                         {preview && previewType === 'video' && (
                           <video class="background-video js-lazy-video" autoplay loop muted playsinline>
@@ -101,7 +101,7 @@ const hasMultipleSlides = slider.length > 1;
                     ) : preview ? (
                       <div class="video">
                         {previewType === 'image' ? (
-                          <img src={previewUrl} alt={previewAlt} class="illus" loading="lazy" />
+                          <img src={previewUrl} alt={previewAlt} class="illus" width="800" height="450" loading="lazy" />
                         ) : (
                           <video class="background-video js-lazy-video" autoplay loop muted playsinline>
                             <source src={previewUrl} type="video/mp4" />

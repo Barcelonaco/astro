@@ -72,3 +72,65 @@ const isVisible = (data.is_visible as string) ?? 'yes';
   </div>
 </div>
 )}
+
+<style is:global>
+/*
+ * Fix CSS cascade conflict: the Nickl SCSS for ColumnsTab uses descendant
+ * selectors (.module-columns .cols-wrapper, .module-columns .cols-wrapper .col)
+ * that leak into nested sub-module layouts. These overrides use higher
+ * specificity to restore each sub-module's own styling.
+ */
+
+/* ── General resets for sub-modules inside columns ────────────────────────── */
+
+/* Prevent .module-columns .cols-wrapper .col > * { flex: 0 1 auto } from
+   shrinking sub-modules. Direct .module children must fill the column. */
+.module-columns > .container > .cols-wrapper > .col > .module,
+.module-columns > .container-large > .cols-wrapper > .col > .module {
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+/* ── ClickableTiles: restore interlocking .cols-wrapper layout ────────────── */
+
+.module-columns .module-clickable .cols-wrapper {
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 1.75rem;
+  column-gap: 1.75rem;
+}
+.module-columns .module-clickable .cols-wrapper.items-3 .col-1 {
+  flex-basis: 61.74%;
+}
+.module-columns .module-clickable .cols-wrapper.items-3 .col-2 {
+  flex-basis: 38.26%;
+}
+.module-columns .module-clickable .col {
+  flex-basis: calc((100% - 1.75rem) / 2);
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
+  flex-wrap: wrap;
+  flex-grow: 1;
+  flex-direction: row;
+  row-gap: 0;
+  width: auto;
+}
+.module-columns .module-clickable .col-2 {
+  gap: 1.75rem;
+}
+
+/* ClickableTiles flat list (non-interlocking) */
+.module-columns .module-clickable .list {
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 1.75rem;
+}
+.module-columns .module-clickable .list .item {
+  flex: 1 1 10%;
+}
+</style>

@@ -99,7 +99,7 @@ if (ref.content) {
                       {photos.map((photo) => (
                         <div class="swiper-slide">
                           <div class="illus-wrapper">
-                            <img src={optimizedImageUrl(photo, 800, 80)} alt={ref.title} class="illus" loading="lazy" />
+                            <img src={optimizedImageUrl(photo, 1200, 80)} alt={ref.title} class="illus" loading="lazy" />
                           </div>
                         </div>
                       ))}
@@ -110,7 +110,7 @@ if (ref.content) {
                   </div>
                 ) : photos.length === 1 ? (
                   <div class="illus-wrapper">
-                    <img src={optimizedImageUrl(photos[0], 800, 80)} alt={ref.title} class="illus" loading="lazy" />
+                    <img src={optimizedImageUrl(photos[0], 1200, 80)} alt={ref.title} class="illus" loading="lazy" />
                   </div>
                 ) : null}
               </div>

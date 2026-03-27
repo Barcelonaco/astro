@@ -30,6 +30,7 @@ Thumbs.db
 .vscode/
 .claude/
 .idea/
+.agent/
 *.sublime-workspace
 *.sublime-project
 

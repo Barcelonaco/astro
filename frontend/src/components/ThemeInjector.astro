@@ -62,7 +62,7 @@ const fontGeneral = FONT_GENERALS[fontGeneralKey] || 'Plus Jakarta Sans';
 // Logo
 const logoHeight = parseInt(settings.logo_height || '100', 10);
 
-// Google Fonts URL
+// Google Fonts — fetch CSS at build time and inline it to avoid external requests
 const fontsToLoad = new Set<string>();
 if (fontTitle) fontsToLoad.add(fontTitle);
 if (fontGeneral) fontsToLoad.add(fontGeneral);
@@ -71,6 +71,15 @@ const googleFontsUrl = fontsToLoad.size > 0
     Array.from(fontsToLoad).map(f => `family=${f.replace(/ /g, '+')}:wght@300;400;500;600;700`).join('&') +
     '&display=swap'
   : '';
+
+// Fetch @font-face CSS at build time so we can inline it (eliminates blocking request)
+let googleFontsCss = '';
+if (googleFontsUrl) {
+  try {
+    const res = await fetch(googleFontsUrl);
+    if (res.ok) googleFontsCss = await res.text();
+  } catch {}
+}
 
 // Build CSS variables string
 const cssVars: string[] = [];
@@ -98,5 +107,9 @@ if (!isNaN(logoHeight)) cssVars.push(`--logo-height:${logoHeight}px`);
 {/* Inline CSS variables — no client-side fetch needed */}
 <style set:html={`:root{${cssVars.join(';')}}`} />
 
-{/* Google Fonts URL exposed as meta tag for the unified deferred loader */}
-{googleFontsUrl && <meta name="x-google-fonts" content={googleFontsUrl} />}
+{/* Google Fonts — inlined at build time to avoid external blocking request */}
+{googleFontsCss ? (
+  <style set:html={googleFontsCss} />
+) : googleFontsUrl ? (
+  <link rel="stylesheet" href={googleFontsUrl} media="print" onload="this.media='all'" />
+) : null}

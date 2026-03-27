@@ -26,12 +26,12 @@ function extractLcpImages(blocks: any[] | null): { desktop: string; mobile: stri
     const slide = first.data.hero_sliders[0];
     const mobileUrl = slide.image_mobile?.url || slide.image.url;
     return {
-      desktop: optimizedImageUrl(slide.image.url, 1440, 55),
-      mobile: optimizedImageUrl(mobileUrl, 600, 50),
+      desktop: optimizedImageUrl(slide.image.url, 1440, 80),
+      mobile: optimizedImageUrl(mobileUrl, 600, 70),
     };
   }
   if (first.type === 'banner' && first.data?.image?.url) {
-    const url = optimizedImageUrl(first.data.image.url, 1440, 55);
+    const url = optimizedImageUrl(first.data.image.url, 1440, 80);
     return { desktop: url, mobile: url };
   }
   return { desktop: '', mobile: '' };

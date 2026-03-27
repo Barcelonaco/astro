@@ -55,11 +55,11 @@ const list = (data.list as any[]) ?? [];
 <div id={id} class={`module module-gallery ${classes}`}>
 
   {backgroundImage && backgroundImage.url && (
-    <div
-      class="background"
-      style={`background-image: url(${backgroundImage.url}); opacity: ${backgroundImage.opacity};`}
-    />
-  )}
+        <div
+          class="background"
+          style={`background-image: url(${optimizedImageUrl(backgroundImage.url, 1200, 80)}); opacity: ${backgroundImage.opacity};`}
+        />
+      )}
 
   <div class={`container${width}`}>
 
@@ -80,15 +80,11 @@ const list = (data.list as any[]) ?? [];
             <button
               type="button"
               class="link js_open-popin"
-              data-popin={`gallery-${indexPopin}`}
+              data-popin={"gallery-" + indexPopin}
               data-slide={String(index + 1)}
             >
               <div class="illus-wrapper">
-                {typeImg === 'img-fluid' ? (
-                  <img src={imgUrl} alt={image.alt ?? ''} class="illus" no-lazy />
-                ) : (
-                  <img src={imgUrl} alt={image.alt ?? ''} class="illus" loading="lazy" />
-                )}
+                <img src={optimizedImageUrl(imgUrl, 600, 80)} alt={image.alt ?? ''} class="illus" width="600" height="450" loading="lazy" fetchpriority="low" />
                 <div class="overlay">
                   <span class="icon" aria-hidden="true">
                     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>
@@ -119,7 +115,7 @@ const list = (data.list as any[]) ?? [];
 
   </div>
 
-  <div class="popin-wrapper popin-gallery-wrapper" style="display: none;" data-popin={`gallery-${indexPopin}`}>
+  <div class="popin-wrapper popin-gallery-wrapper" style="display: none;" data-popin={"gallery-" + indexPopin}>
     <div class="popin">
 
       <button type="button" class="btn-close js_close-popin" title="Fermer la popin">
@@ -140,7 +136,7 @@ const list = (data.list as any[]) ?? [];
                   return (
                     <div class={`swiper-slide item ${hasDesc ? 'has-desc' : 'no-desc'}`}>
                       <div class="illus-wrapper">
-                        <img src={optimizedImageUrl(image.url || '', 800, 70)} alt={image.alt ?? ''} class="illus" loading="lazy" />
+                        <img src={optimizedImageUrl(image.url || '', 1200, 80)} alt={image.alt ?? ''} class="illus" width="600" height="450" loading="lazy" />
                       </div>
                       {hasDesc && (
                         <div class="container-large container-2">

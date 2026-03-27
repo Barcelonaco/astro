@@ -33,11 +33,11 @@ const logos = (data.logos as any[]) || [];
               <div class="swiper-slide item">
                 {link ? (
                   <a href={link.url} class="link" target={link.target}>
-                    <img src={logoUrl} alt={logoAlt} class="illus" loading="lazy" />
+                    <img src={logoUrl} alt={logoAlt} class="illus" width="200" height="100" loading="lazy" />
                   </a>
                 ) : (
                   <div class="link">
-                    <img src={logoUrl} alt={logoAlt} class="illus" loading="lazy" />
+                    <img src={logoUrl} alt={logoAlt} class="illus" width="200" height="100" loading="lazy" />
                   </div>
                 )}
               </div>

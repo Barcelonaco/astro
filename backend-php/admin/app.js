@@ -1817,6 +1817,7 @@ let _inlineEditingFieldName = null;
 let _inlineEditingDataRef = null;  // direct ref to the data object (block.data or sub-module data)
 let _inlineEditingElement = null;  // the .txt.editor DOM element being edited
 let moduleFieldSchema = null;
+let _layoutToModuleName = null; // reverse map: layout slug → module class name
 const moduleTemplateCache = {};
 const moduleTemplatePromises = {};
 const moduleStylesLoaded = new Set();
@@ -1912,6 +1913,7 @@ async function loadModuleFieldSchema() {
   } catch (e) {
     moduleFieldSchema = { modules: {} };
   }
+  _layoutToModuleName = null; // invalidate reverse map cache
   return moduleFieldSchema;
 }
 
@@ -2287,6 +2289,61 @@ function renderHeroPreviewHtml(data) {
   return `<div class="preview-hero-list">${parts.join('')}</div>`;
 }
 
+/**
+ * Fallback preview for sub-modules inside ColumnsTab when the Blade template
+ * engine produces empty output. Extracts key visual data (images, text, titles)
+ * and renders a simple but meaningful preview.
+ */
+function renderSubModuleFallback(layout, data) {
+  const def = BLOCK_TYPES[layout] || {};
+  const label = def.label || MODULE_LABELS[layout] || layout;
+  const parts = [];
+
+  // Try to find and display an image from common field names
+  const imgFields = ['image', 'file', 'video', 'bg_img', 'preview'];
+  for (const key of imgFields) {
+    const val = data[key];
+    if (val) {
+      const url = typeof val === 'string' ? val : (val.url || val.sizes?.['medium-large'] || val.sizes?.large || '');
+      if (url) { parts.push(`<img src="${escapeHtml(url)}" alt="" style="max-width:100%;height:auto;border-radius:4px;">`); break; }
+    }
+  }
+  // Try to find images inside common repeater fields
+  if (parts.length === 0) {
+    const repeaterFields = ['list', 'list_interlocking', 'sliders', 'logos', 'images', 'slider', 'items'];
+    for (const key of repeaterFields) {
+      const arr = data[key];
+      if (Array.isArray(arr) && arr.length > 0) {
+        const item = arr[0];
+        for (const imgKey of ['file', 'image', 'logo', 'slide']) {
+          const val = item[imgKey];
+          if (val) {
+            const url = typeof val === 'string' ? val : (val.url || '');
+            if (url) { parts.push(`<img src="${escapeHtml(url)}" alt="" style="max-width:100%;height:auto;border-radius:4px;">`); break; }
+          }
+        }
+        if (parts.length > 0) break;
+      }
+    }
+  }
+
+  // Try to extract text content
+  const textFields = ['text', 'title', 'title_bloc', 'catchphrase', 'description', 'desc'];
+  for (const key of textFields) {
+    const val = data[key];
+    if (val && typeof val === 'string' && val.trim()) {
+      parts.push(`<div style="font-size:0.9em;">${escapeHtml(val.replace(/<[^>]*>/g, '').slice(0, 150))}</div>`);
+      break;
+    }
+  }
+
+  if (parts.length === 0) {
+    parts.push(`<span style="opacity:0.5">${escapeHtml(label)}</span>`);
+  }
+
+  return `<div class="module" style="padding:1em 0;">${parts.join('')}</div>`;
+}
+
 function renderColumnsTabPreviewHtml(data) {
   // Ensure columns-tab CSS is loaded (display:flex, column widths, etc.)
   const colsLayout = moduleFieldSchema?.modules?.ColumnsTab?.layout || 'columns-tab';
@@ -2341,12 +2398,26 @@ function renderColumnsTabPreviewHtml(data) {
       // Ensure sub-module template & CSS are loaded
       const subDef = BLOCK_TYPES[layout] || {};
       const subModuleName = subDef.moduleName || layout;
-      const subLayout = moduleFieldSchema?.modules?.[subModuleName]?.layout || null;
+      let subLayout = moduleFieldSchema?.modules?.[subModuleName]?.layout || null;
+      // Fallback: layout slug may itself be the layout (e.g. 'text' from acf_fc_layout)
+      if (!subLayout) {
+        const map = getLayoutToModuleNameMap();
+        if (map[layout]) subLayout = layout;
+      }
       if (subLayout) ensureSubModuleTemplates(subLayout);
       // Create a fake block and recursively render the sub-module preview
       // Mark as inside columns so templates can suppress title/background
-      const subBlock = { id: 'sub-' + Math.random().toString(36).slice(2), type: layout, data: { ...subModule, columns: 1 } };
-      return `<div class="module-in-column">${renderBlockPreviewHtml(subBlock)}</div>`;
+      // _isSubModule bypasses the legacy block check (e.g. layout slug 'text'
+      // is both a legacy block AND the Nickl TextSimple module slug)
+      const subBlock = { id: 'sub-' + Math.random().toString(36).slice(2), type: layout, data: { ...subModule, columns: 1 }, _isSubModule: true };
+      let subHtml = '';
+      try { subHtml = renderBlockPreviewHtml(subBlock); } catch (e) { console.warn('Sub-module render error:', layout, e); }
+      // If template rendering produced empty/whitespace-only output (no text
+      // AND no images), show a meaningful fallback so the column isn't invisible.
+      if (!subHtml || (!subHtml.replace(/<[^>]*>/g, '').trim() && !/<img\s/i.test(subHtml) && !/<video\s/i.test(subHtml))) {
+        subHtml = renderSubModuleFallback(layout, subModule);
+      }
+      return `<div class="module-in-column" style="width:100%">${subHtml}</div>`;
     }).filter(Boolean);
     return `<div class="col">${subHtmlParts.join('')}</div>`;
   }).join('');
@@ -2389,7 +2460,11 @@ function renderColumnsTabPreviewHtml(data) {
 
 function renderBlockPreviewHtml(block) {
   const d = block.data || {};
-  if (LEGACY_BLOCK_TYPES[block.type]) {
+  // Sub-modules inside ColumnsTab may have layout slugs that collide with
+  // legacy block types (e.g. 'text' is both a legacy type AND the Nickl
+  // TextSimple layout slug). Skip the legacy path for sub-modules so they
+  // are rendered through the Blade template engine instead.
+  if (LEGACY_BLOCK_TYPES[block.type] && !block._isSubModule) {
     if (block.type === 'heading') return `<div class="preview-heading">${escapeHtml(d.text || '')}</div>`;
     if (block.type === 'text') return `<div class="preview-title">${escapeHtml(d.title || '')}</div><div class="preview-text">${escapeHtml(d.body || '')}</div>`;
     if (block.type === 'hero') return `<div class="preview-hero"><div class="preview-title">${escapeHtml(d.title || '')}</div><div class="preview-text">${escapeHtml(d.subtitle || '')}</div></div>`;
@@ -2706,10 +2781,30 @@ function pickFirstString(data, keys) {
   return '';
 }
 
+// Reverse map: layout slug → module class name (e.g. 'text' → 'TextSimple')
+// Built lazily from moduleFieldSchema (declared near other module-level vars).
+
+function getLayoutToModuleNameMap() {
+  if (_layoutToModuleName) return _layoutToModuleName;
+  _layoutToModuleName = {};
+  if (moduleFieldSchema?.modules) {
+    for (const [className, mod] of Object.entries(moduleFieldSchema.modules)) {
+      if (mod.layout) _layoutToModuleName[mod.layout] = className;
+    }
+  }
+  return _layoutToModuleName;
+}
+
 function getModuleLayout(block) {
   const def = BLOCK_TYPES[block.type] || {};
   const moduleName = def.moduleName || block.type;
-  return moduleFieldSchema?.modules?.[moduleName]?.layout || null;
+  const mod = moduleFieldSchema?.modules?.[moduleName];
+  if (mod?.layout) return mod.layout;
+  // Fallback: block.type may be a layout slug (e.g. 'text' from acf_fc_layout
+  // inside ColumnsTab). Resolve via reverse lookup.
+  const map = getLayoutToModuleNameMap();
+  if (map[block.type]) return block.type; // block.type IS the layout slug
+  return null;
 }
 
 function queueModuleTemplateLoad(layout) {
@@ -2798,7 +2893,12 @@ function buildTemplateContext(block) {
   const baseClasses = data.classes || moduleData.classes || '';
   ctx.classes = [baseClasses, ...extraClasses].filter(Boolean).join(' ');
   const def = BLOCK_TYPES[block.type] || {};
-  const moduleName = def.moduleName || block.type;
+  let moduleName = def.moduleName || block.type;
+  // Fallback: block.type may be a layout slug (e.g. 'text' for TextSimple inside ColumnsTab)
+  if (!moduleFieldSchema?.modules?.[moduleName]) {
+    const map = getLayoutToModuleNameMap();
+    if (map[block.type]) moduleName = map[block.type];
+  }
   const schemaFields = moduleFieldSchema?.modules?.[moduleName]?.fields || [];
   schemaFields.forEach((field) => {
     if (!['Image', 'File', 'Video'].includes(field.type)) return;
@@ -4925,7 +5025,7 @@ function renderKeyValueForm(block) {
   `;
 }
 
-// BlockParams field names — shared parameters across all Nickl modules
+// BlockParams field names — fallback set for modules parsed without isBlockParam flag
 const BLOCK_PARAMS_FIELDS = new Set([
   'title', 'id_bloc', 'title_align', 'title_style',
   'bloc_color', 'padding_top', 'padding_bottom',
@@ -4965,10 +5065,13 @@ function renderSchemaForm(block, schemaFields) {
   };
 
   // Split fields into content vs params tabs
+  // Use the isBlockParam flag from the PHP parser when available; fall back to static set
+  const hasBlockParamFlag = schemaFields.some(f => f.isBlockParam === true);
   const contentFields = [];
   const paramFields = [];
   schemaFields.forEach(field => {
-    if (BLOCK_PARAMS_FIELDS.has(field.name)) {
+    const isParam = hasBlockParamFlag ? (field.isBlockParam === true) : BLOCK_PARAMS_FIELDS.has(field.name);
+    if (isParam) {
       paramFields.push(field);
     } else {
       contentFields.push(field);
@@ -5485,10 +5588,11 @@ function renderFlexibleContentFieldHTML(field, value, blockId, rowCtx) {
     renderFlexibleContentItemHTML(item, i, blockId, fcCompoundName)
   ).join('');
 
-  // Build the module type dropdown — exclude ColumnsTab to prevent infinite nesting
+  // Build the module type dropdown — exclude ColumnsTab (infinite nesting) and legacy blocks
+  // (legacy types like 'text' collide with Nickl layout slugs and aren't meant for sub-modules)
   const excludeTypes = new Set(['columns-tab', 'ColumnsTab']);
   const dropdownOptions = Object.entries(BLOCK_TYPES)
-    .filter(([key, def]) => !def.aliasFor && !excludeTypes.has(key))
+    .filter(([key, def]) => !def.aliasFor && !def.legacy && !excludeTypes.has(key))
     .map(([key, def]) => `<option value="${escapeHtml(key)}">${escapeHtml(def.label || key)}</option>`)
     .join('');
 
@@ -5516,7 +5620,12 @@ function renderFlexibleContentFieldHTML(field, value, blockId, rowCtx) {
 function renderFlexibleContentItemHTML(item, index, blockId, fcCompoundName) {
   const layout = item.acf_fc_layout || '';
   const def = BLOCK_TYPES[layout] || {};
-  const moduleName = def.moduleName || layout;
+  let moduleName = def.moduleName || layout;
+  // Fallback: layout may be a slug (e.g. 'text' for TextSimple) — resolve via reverse map
+  if (!moduleFieldSchema?.modules?.[moduleName]) {
+    const map = getLayoutToModuleNameMap();
+    if (map[layout]) moduleName = map[layout];
+  }
   const moduleLabel = def.label || MODULE_LABELS[moduleName] || layout;
 
   // Get schema fields for this module type
@@ -5565,7 +5674,12 @@ function collectFlexibleContentData(form, fcCompoundName) {
   return Array.from(items).map((itemEl, idx) => {
     const layout = itemEl.dataset.layout || '';
     const def = BLOCK_TYPES[layout] || {};
-    const moduleName = def.moduleName || layout;
+    let moduleName = def.moduleName || layout;
+    // Fallback: layout may be a slug (e.g. 'text' for TextSimple) — resolve via reverse map
+    if (!moduleFieldSchema?.modules?.[moduleName]) {
+      const map = getLayoutToModuleNameMap();
+      if (map[layout]) moduleName = map[layout];
+    }
     const schemaFields = moduleFieldSchema?.modules?.[moduleName]?.fields || [];
     const skipFields = new Set(['title_bloc', 'title_style', 'title_align', 'bloc_color', 'padding_top', 'padding_bottom', 'is_visible', 'bg_img', 'bg_opacity', 'bg_parallax']);
     const itemFields = schemaFields.filter(f => !skipFields.has(f.name));

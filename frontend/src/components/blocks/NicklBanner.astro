@@ -1,9 +1,10 @@
 ---
 /**
  * Module Banner — Reproduit banner.blade.php
- * En-tête de page avec image de fond, titre H1 ou P.
+ * En-tete de page avec image de fond, titre H1 ou P.
  * Hauteurs : small, medium, large, none.
  */
+import { buildModuleClasses, resolveBackgroundImage } from '../../lib/module-classes';
 import { resolveImageUrl, optimizedImageUrl } from '../../lib/module-helpers';
 
 interface Props {
@@ -15,7 +16,13 @@ const { data } = Astro.props;
 const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
 const apiOrigin = new URL(API_URL).origin;
 
-const number = (data.id_bloc as string) || 'section_0';
+/* --- BlockParams standard --- */
+const id = (data.id_bloc as string) || 'section_0';
+const isVisible = (data.is_visible ?? 'yes') !== 'no';
+const classes = buildModuleClasses(data);
+const backgroundImage = resolveBackgroundImage(data, apiOrigin);
+
+/* --- Champs specifiques banner --- */
 const heightBanner = (data.banner_height as string) || 'small';
 const titleInHeader = data.title_in_header !== 'hideTitle' ? 'showTitle' : 'hideTitle';
 const h1InHeader = (data.h1_in_header as string) || 'yes';
@@ -29,61 +36,63 @@ const heightClass = heightBanner ? ` ${heightBanner}` : ' small';
 const titleSizeClass = titleSize ? ` h1-${titleSize}` : '';
 ---
 
-<div
-  id={number}
-  class={`module module-banner-page${hideTitleClass}${heightClass}${titleSizeClass}`}
->
-  {heightBanner !== 'none' && imgUrl && (
-    <div class="background">
-      <img src={optimizedImageUrl(imgUrl, 1440, 55)} width="1440" height="600" fetchpriority="high" loading="eager" decoding="sync" alt="" class="illus" />
-    </div>
-  )}
+{isVisible && (
+  <div
+    id={id}
+    class={`module module-banner-page${hideTitleClass}${heightClass}${titleSizeClass} ${classes}`}
+  >
+    {/* Background image BlockParams (bg_img + opacity) */}
+    {backgroundImage && backgroundImage.url && (
+      <div
+        class="background background-overlay"
+        style={`background-image: url(${backgroundImage.url}); opacity: ${Number(backgroundImage.opacity ?? 10) / 100};`}
+      />
+    )}
 
-  <div class="container-large">
-    <div class="desc">
-      {titleInHeader !== 'hideTitle' && (
-        h1InHeader === 'yes' ? (
-          <h1 class="title title-section-1">
-            <Fragment set:html={title} />
-          </h1>
-        ) : (
-          <p class="title title-section-1">
-            <Fragment set:html={title} />
-          </p>
-        )
-      )}
+    {/* Image banner principale */}
+    {heightBanner !== 'none' && imgUrl && (
+      <div class="background">
+        <img src={optimizedImageUrl(imgUrl, 1440, 80)} width="1440" height="600" fetchpriority="high" loading="eager" decoding="sync" alt="" class="illus" />
+      </div>
+    )}
+
+    <div class="container-large">
+      <div class="desc">
+        {titleInHeader !== 'hideTitle' && (
+          h1InHeader === 'yes' ? (
+            <h1 class="title title-section-1">
+              <Fragment set:html={title} />
+            </h1>
+          ) : (
+            <p class="title title-section-1">
+              <Fragment set:html={title} />
+            </p>
+          )
+        )}
+      </div>
     </div>
   </div>
-</div>
+)}
 
-<script is:inline>
-(function(){
-  var banner = document.querySelector('.module-banner-page');
-  if (!banner) return;
-  var header = document.getElementById('header');
-  if (!header) return;
-  var isTransparent = header.classList.contains('background-transparent');
-  var size = banner.classList.contains('large') ? 'large'
-           : banner.classList.contains('medium') ? 'medium'
-           : banner.classList.contains('small') ? 'small' : null;
-  if (!size) return;
-  var hh = isTransparent ? 0 : header.offsetHeight;
-  var vh = window.innerHeight;
-  var heights = { large: vh - hh, medium: Math.round(vh * 0.7), small: Math.round(vh * 0.5) };
-  banner.style.height = heights[size] + 'px';
-  banner.style.overflow = 'hidden';
-  // Positionner le titre en bas via absolute positioning
-  var container = banner.querySelector('.container-large');
-  if (container) {
-    container.style.position = 'absolute';
-    container.style.bottom = '0';
-    container.style.left = '0';
-    container.style.width = '100%';
-    container.style.zIndex = '10';
+<style is:global>
+  /* Banner heights — pure CSS, no JS layout shift */
+  .module-banner-page { position: relative; overflow: hidden; }
+  .module-banner-page.large  { height: 100vh; }
+  .module-banner-page.medium { height: 70vh; }
+  .module-banner-page.small  { height: 50vh; }
+  /* Offset for non-transparent header */
+  body:not(.scroll-down):not(.scroll-up) #header:not(.background-transparent) ~ main .module-banner-page.large {
+    height: calc(100vh - var(--header-height, 80px));
   }
-  // Neutraliser le ::before CSS qui crée une hauteur parasite
-  var s = document.createElement('style');
-  s.textContent = '.module-banner-page .desc::before{padding-top:0!important;min-height:0!important}';
-  document.head.appendChild(s);
-})();
-</script>
+  .module-banner-page .container-large {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 10;
+  }
+  .module-banner-page .desc::before {
+    padding-top: 0 !important;
+    min-height: 0 !important;
+  }
+</style>

@@ -11,10 +11,11 @@ const { data } = Astro.props as Props;
 const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
 const apiOrigin = new URL(API_URL).origin;
 
-const id = (data.id_bloc as string) ?? '';
-const classes = buildModuleClasses(data);
-const backgroundImage = (data.backgroundImage as any) ?? null;
-const titleBloc = (data.title_bloc as string) ?? (data.title as string) ?? '';
+const inColumns = !!data.columns;
+const id = inColumns ? '' : ((data.id_bloc as string) ?? '');
+const classes = inColumns ? '' : buildModuleClasses(data);
+const backgroundImage = inColumns ? null : ((data.backgroundImage as any) ?? null);
+const titleBloc = inColumns ? '' : ((data.title_bloc as string) ?? (data.title as string) ?? '');
 const titleStyle = (data.title_style as number | string) ?? 2;
 const titleAlign = (data.title_align as string) ?? 'center';
 
@@ -46,7 +47,7 @@ function resolveFileUrl(file: any): string {
   const url = typeof file === 'string' ? file : (file.url || '');
   if (!url) return '';
   const fullUrl = url.startsWith('http') ? url : apiOrigin + url;
-  return optimizedImageUrl(fullUrl, 400, 65);
+  return optimizedImageUrl(fullUrl, 1400, 80);
 }
 
 function isVideo(file: any): boolean {
@@ -96,7 +97,7 @@ function hasDesc(item: any): boolean {
                     </div>
                   ) : (
                     <div class="illus-wrapper">
-                      <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                      <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
                     </div>
                   )}
                   {hasDesc(item) && (
@@ -116,7 +117,7 @@ function hasDesc(item: any): boolean {
                     </div>
                   ) : (
                     <div class="illus-wrapper">
-                      <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                      <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
                     </div>
                   )}
                   {hasDesc(item) && (
@@ -162,7 +163,7 @@ function hasDesc(item: any): boolean {
                         </div>
                       ) : (
                         <div class="illus-wrapper">
-                          <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                          <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
                         </div>
                       )}
                       {hasDesc(item) && (
@@ -182,7 +183,7 @@ function hasDesc(item: any): boolean {
                         </div>
                       ) : (
                         <div class="illus-wrapper">
-                          <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                          <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
                         </div>
                       )}
                       {hasDesc(item) && (
@@ -226,7 +227,7 @@ function hasDesc(item: any): boolean {
                       </div>
                     ) : (
                       <div class="illus-wrapper">
-                        <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                        <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
                       </div>
                     )}
                     {hasDesc(item) && (
@@ -246,7 +247,7 @@ function hasDesc(item: any): boolean {
                       </div>
                     ) : (
                       <div class="illus-wrapper">
-                        <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                        <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
                       </div>
                     )}
                     {hasDesc(item) && (
@@ -290,7 +291,7 @@ function hasDesc(item: any): boolean {
                         </div>
                       ) : (
                         <div class="illus-wrapper">
-                          <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                          <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
                         </div>
                       )}
                       {hasDesc(item) && (
@@ -310,7 +311,7 @@ function hasDesc(item: any): boolean {
                         </div>
                       ) : (
                         <div class="illus-wrapper">
-                          <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                          <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
                         </div>
                       )}
                       {hasDesc(item) && (
@@ -355,7 +356,7 @@ function hasDesc(item: any): boolean {
                         </div>
                       ) : (
                         <div class="illus-wrapper">
-                          <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                          <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
                         </div>
                       )}
                       {hasDesc(item) && (
@@ -375,7 +376,7 @@ function hasDesc(item: any): boolean {
                         </div>
                       ) : (
                         <div class="illus-wrapper">
-                          <img src={resolveFileUrl(item.file)} alt="" class="illus" loading="lazy" />
+                          <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
                         </div>
                       )}
                       {hasDesc(item) && (

@@ -314,7 +314,7 @@ class ModuleFieldsController {
 
         $directFields = self::parseFieldList($content);
 
-        // BlockParams shared fields
+        // BlockParams shared fields — tag them so the admin UI can split params vs content
         $dedup = [];
         $seenRefs = [];
         preg_match_all(self::BLOCK_PARAMS_REF_PATTERN, $content, $refMatches);
@@ -322,7 +322,10 @@ class ModuleFieldsController {
             if (isset($seenRefs[$ref])) continue;
             $seenRefs[$ref] = true;
             foreach ($blockParamsMap[$ref] ?? [] as $field) {
-                if (!isset($dedup[$field['name']])) $dedup[$field['name']] = $field;
+                if (!isset($dedup[$field['name']])) {
+                    $field['isBlockParam'] = true;
+                    $dedup[$field['name']] = $field;
+                }
             }
         }
 

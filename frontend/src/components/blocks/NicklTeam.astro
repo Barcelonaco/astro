@@ -54,7 +54,7 @@ const isSingle = teamMembers.length === 1;
           {link && (
             <div class="btn-wrapper">
               <a href={link.url} class="btn btn-tertiary" target={link.target}>
-                {iconLinkUrl && <img src={iconLinkUrl} alt="" class="illus" loading="lazy" />}
+                {iconLinkUrl && <img src={iconLinkUrl} alt="" class="illus" width="40" height="40" loading="lazy" />}
                 {link.title}
               </a>
             </div>
@@ -81,7 +81,7 @@ const isSingle = teamMembers.length === 1;
           <>
             <li class="item">
               <div class="illus-wrapper">
-                {pictureUrl && <img src={pictureUrl} alt={pictureAlt} class="illus" loading="lazy" />}
+                {pictureUrl && <img src={pictureUrl} alt={pictureAlt} class="illus" width="300" height="300" loading="lazy" />}
               </div>
             </li>
             <li class="item">
@@ -94,7 +94,7 @@ const isSingle = teamMembers.length === 1;
       return (
         <li class="item">
           <div class="illus-wrapper">
-            {pictureUrl && <img src={pictureUrl} alt={pictureAlt} class="illus" loading="lazy" />}
+            {pictureUrl && <img src={pictureUrl} alt={pictureAlt} class="illus" width="300" height="300" loading="lazy" />}
           </div>
           {descBlock}
         </li>

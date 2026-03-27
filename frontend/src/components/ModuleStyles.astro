@@ -1,15 +1,19 @@
 ---
 /**
- * Loads Nickl module CSS directly (non-deferred) via <link> tags.
- * CSS files live in /nickl-assets/css/ (copied from nickl/public/css/).
- * This ensures styles are available before first paint — no FOUC.
+ * Inlines Nickl module CSS directly into the HTML at build time.
+ * This eliminates render-blocking external CSS requests while keeping CLS at 0.
+ * CSS files are read from public/nickl-assets/css/ during Astro's build phase.
  */
+import fs from 'node:fs';
+import path from 'node:path';
 
 interface Props {
-  blocks: { type: string }[] | null;
+  blocks: { type: string; data?: any }[] | null;
+  /** Skip app.css when rendered outside <head> (e.g. Footer) to avoid duplicates */
+  skipAppCss?: boolean;
 }
 
-const { blocks } = Astro.props;
+const { blocks, skipAppCss = false } = Astro.props;
 
 /** Correspondance type de bloc → nom du fichier CSS (sans extension) */
 const blockToCss: Record<string, string> = {
@@ -50,6 +54,7 @@ const blockToCss: Record<string, string> = {
   share: 'share',
   summary: 'summary',
   team: 'team',
+  text: 'text',
   'text-simple': 'text',
   'text-image': 'text-image',
   'text-scrolling': 'text-scrolling',
@@ -57,15 +62,55 @@ const blockToCss: Record<string, string> = {
   video: 'video',
 };
 
-const cssFiles = blocks
-  ? [...new Set(
-      blocks
-        .map((b) => blockToCss[b.type])
-        .filter((name): name is string => !!name),
-    )]
-  : [];
+/**
+ * Collect all block types including sub-modules nested inside ColumnsTab.
+ */
+function collectAllBlockTypes(blocks: { type: string; data?: any }[]): string[] {
+  const types: string[] = [];
+  for (const b of blocks) {
+    types.push(b.type);
+    if (b.type === 'columns-tab' && b.data?.columns_list) {
+      for (const col of b.data.columns_list as any[]) {
+        const subModules = (col.columns_module as any[]) ?? [];
+        for (const sub of subModules) {
+          const layout = sub.acf_fc_layout || sub.type || '';
+          if (layout) types.push(layout);
+        }
+      }
+    }
+  }
+  return types;
+}
 
-/** Plugin blocks: types not in blockToCss */
+/** Read a CSS file from public/nickl-assets/css/ at build time */
+const cssDir = path.join(process.cwd(), 'public', 'nickl-assets', 'css');
+function readCss(filename: string): string {
+  try {
+    return fs.readFileSync(path.join(cssDir, filename), 'utf-8');
+  } catch {
+    return '';
+  }
+}
+
+const allTypes = blocks ? collectAllBlockTypes(blocks as any) : [];
+
+const cssFileNames = [
+  ...new Set(
+    allTypes
+      .map((t) => blockToCss[t])
+      .filter((name): name is string => !!name),
+  ),
+];
+
+// Read and concatenate all module CSS at build time
+const cssChunks: string[] = [];
+for (const name of cssFileNames) {
+  cssChunks.push(readCss(`${name}.css`));
+}
+
+const inlinedCss = cssChunks.filter(Boolean).join('\n');
+
+/** Plugin blocks: types not in blockToCss — must stay as <link> (external) */
 const pluginBlockTypes = blocks
   ? [...new Set(
       blocks
@@ -75,16 +120,13 @@ const pluginBlockTypes = blocks
   : [];
 ---
 
-{/* Base Nickl styles — loaded async to avoid render-blocking (1.4MB) */}
-<link rel="stylesheet" href="/nickl-assets/css/app.css" media="print" onload="this.media='all'" />
-<noscript><link rel="stylesheet" href="/nickl-assets/css/app.css" /></noscript>
+{/* Main CSS — external, preloaded in BaseHead for some cases but always requested here */}
+{!skipAppCss && <link rel="stylesheet" href="/nickl-assets/css/app.css" />}
 
-{/* Module-specific CSS (only for blocks used on this page) */}
-{cssFiles.map((name) => (
-  <link rel="stylesheet" href={`/nickl-assets/css/${name}.css`} />
-))}
+{/* All Nickl module CSS inlined — zero external render-blocking requests for module specifics */}
+{inlinedCss && <style set:html={inlinedCss} />}
 
-{/* Plugin CSS */}
+{/* Plugin CSS — external (can't inline, lives in plugins/) */}
 {pluginBlockTypes.map((type) => (
   <link rel="stylesheet" href={`/plugin-assets/${type}/css/${type}.css`} />
 ))}

@@ -198,13 +198,20 @@
 
       // Anime tous les éléments qui ont un data-animDelay
       var animated = mod.querySelectorAll('[data-anim-delay]');
-      animated.forEach(function(el) {
-        var delay = parseInt(el.getAttribute('data-anim-delay') || '0', 10);
-        setTimeout(function() {
-          el.style.transition = 'opacity 0.7s ease, transform 0.7s ease';
+      // Use rAF to batch all animation starts in a single frame
+      requestAnimationFrame(function() {
+        animated.forEach(function(el) {
+          var delay = parseInt(el.getAttribute('data-anim-delay') || '0', 10);
+          // Set transition + delay via CSS — no setTimeout, fully composited
+          el.style.transition = 'opacity 0.7s ease ' + delay + 'ms, transform 0.7s ease ' + delay + 'ms';
           el.style.opacity = '1';
           el.style.transform = 'translate(0, 0)';
-        }, delay);
+          // Clean up will-change after animation to free GPU memory
+          el.addEventListener('transitionend', function handler() {
+            el.style.willChange = 'auto';
+            el.removeEventListener('transitionend', handler);
+          });
+        });
       });
     });
   }, { threshold: 0, rootMargin: '0px 0px -20% 0px' });

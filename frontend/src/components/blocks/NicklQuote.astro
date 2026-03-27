@@ -33,7 +33,7 @@ const photoAlt = resolveImageAlt(photo);
     <div class="author">
       {photoUrl && (
         <div class="illus-wrapper">
-          <img src={photoUrl} alt={photoAlt} class="illus" loading="lazy" />
+          <img src={photoUrl} alt={photoAlt} class="illus" width="120" height="120" loading="lazy" />
         </div>
       )}
       {name && <p class="name">{name}</p>}

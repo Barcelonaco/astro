@@ -53,7 +53,7 @@ function resolveImage(img: any): { url: string; alt: string } | null {
   if (!img) return null;
   const url = typeof img === 'string' ? img : img.url || img.sizes?.half || '';
   const alt = typeof img === 'string' ? '' : img.alt || '';
-  return url ? { url: optimizedImageUrl(resolveUrl(url), 400, 65), alt } : null;
+  return url ? { url: optimizedImageUrl(resolveUrl(url), 1200, 80), alt } : null;
 }
 ---
 
@@ -79,7 +79,7 @@ function resolveImage(img: any): { url: string; alt: string } | null {
             <li class={hasDesc ? 'item has-desc' : 'item no-desc'}>
               {image && (
                 <div class="background-item">
-                  <img src={image.url} alt={image.alt} class="illus" loading="lazy" />
+                  <img src={image.url} alt={image.alt} class="illus" width="600" height="400" loading="lazy" />
                 </div>
               )}
               {hasDesc && (

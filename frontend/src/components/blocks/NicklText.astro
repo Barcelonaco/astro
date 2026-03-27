@@ -10,11 +10,12 @@ const { data } = Astro.props as NicklTextProps;
 const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
 const apiOrigin = new URL(API_URL).origin;
 
-const id = (data.id as string) ?? (data.id_bloc as string) ?? '';
+const inColumns = !!data.columns;
+const id = inColumns ? '' : ((data.id as string) ?? (data.id_bloc as string) ?? '');
 const isVisible = (data.is_visible as string) ?? 'yes';
-const classes = buildModuleClasses(data);
+const classes = inColumns ? '' : buildModuleClasses(data);
 
-const bgImg = (data.bg_img as any) ?? null;
+const bgImg = inColumns ? null : ((data.bg_img as any) ?? null);
 const rawBgOpacity = data.bg_opacity as number | string | undefined;
 const opacityPercent =
   rawBgOpacity === undefined || rawBgOpacity === null || rawBgOpacity === ''

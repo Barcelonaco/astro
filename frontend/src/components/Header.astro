@@ -499,6 +499,13 @@ const headerClasses = [
       }
     }
 
+    // Set --header-height CSS variable for banner height calculations (avoids JS in banner)
+    function setHeaderHeight() {
+      document.documentElement.style.setProperty('--header-height', header.offsetHeight + 'px');
+    }
+    setHeaderHeight();
+    window.addEventListener('resize', setHeaderHeight, { passive: true });
+
     window.addEventListener('scroll', posHeader, { passive: true });
     posHeader();
   })();

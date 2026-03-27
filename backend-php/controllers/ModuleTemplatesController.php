@@ -41,8 +41,12 @@ class ModuleTemplatesController {
         // Resolve CSS
         $cssUrl = null;
         $nicklCssPath = $repoRoot . '/nickl/public/css/' . $layout . '.css';
+        $adminModuleCssPath = __DIR__ . '/../admin/modules/' . $layout . '.css';
         if (file_exists($nicklCssPath)) {
             $cssUrl = '/nickl-assets/css/' . $layout . '.css';
+        } elseif (file_exists($adminModuleCssPath)) {
+            // Fallback: use admin compiled CSS when nickl/public/css is not built
+            $cssUrl = '/admin/modules/' . $layout . '.css';
         } elseif ($pluginDir) {
             $pluginCssPath = $repoRoot . '/plugins/' . $pluginDir . '/css/' . $layout . '.css';
             if (file_exists($pluginCssPath)) {
@@ -52,8 +56,7 @@ class ModuleTemplatesController {
 
         // Resolve admin CSS
         $adminCssUrl = null;
-        $adminCssPath = __DIR__ . '/../public/admin/modules/' . $layout . '.css';
-        if (file_exists($adminCssPath)) {
+        if (file_exists($adminModuleCssPath)) {
             $adminCssUrl = '/admin/modules/' . $layout . '.css';
         } elseif ($pluginDir) {
             $pluginAdminCssPath = $repoRoot . '/plugins/' . $pluginDir . '/admin-css/' . $layout . '.css';
