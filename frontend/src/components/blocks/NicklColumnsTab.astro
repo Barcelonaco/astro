@@ -30,6 +30,7 @@ const columnsList = (data.columns_list as any[]) || [];
 const columnsCount = columnsList.length;
 const columnsDisplay = (data.columns_display as string) || 'columns-2_2-2';
 const columnsBackground = (data.columns_background as string) || '';
+const colsHaveBackground = columnsBackground && columnsBackground !== 'no-background' ? 'cols_have_background' : '';
 const containerWidth = isTruthy(data.container_width);
 const colsJustifyCenter = isTruthy(data.cols_justify_items);
 const containerClass = containerWidth ? 'container-large' : 'container';
@@ -37,7 +38,7 @@ const isVisible = (data.is_visible as string) ?? 'yes';
 ---
 
 {isVisible !== 'no' && (
-<div id={id || undefined} class={`module module-columns ${classes}`}>
+<div id={id || undefined} class={`module module-columns ${classes} ${colsHaveBackground}`.trim()}>
   {backgroundImage && backgroundImage.url && (
     <div
       class="background"
@@ -91,6 +92,13 @@ const isVisible = (data.is_visible as string) ?? 'yes';
   flex: 1 1 auto;
 }
 
+/* When vertical centering is active, sub-modules must not stretch
+   so that justify-content: center can actually center them. */
+.module-columns > .container > .cols-wrapper.cols_justify_center > .col > .module,
+.module-columns > .container-large > .cols-wrapper.cols_justify_center > .col > .module {
+  flex: 0 1 auto;
+}
+
 /* ── ClickableTiles: restore interlocking .cols-wrapper layout ────────────── */
 
 .module-columns .module-clickable .cols-wrapper {
@@ -133,4 +141,284 @@ const isVisible = (data.is_visible as string) ?? 'yes';
 .module-columns .module-clickable .list .item {
   flex: 1 1 10%;
 }
+
+/* ── Rounded corners on column cards when border-rounded is active ───────── */
+.border-rounded .module-columns .cols-wrapper.cols-background-light > .col,
+.border-rounded .module-columns .cols-wrapper.cols-background-primary > .col,
+.border-rounded .module-columns .cols-wrapper.cols-background-secondary > .col,
+.border-rounded .module-columns .cols-wrapper.cols-background-tertiary > .col {
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * RESPONSIVE — Sub-modules inside columns
+ * Modules in columns are ~50% width on desktop, so their "mobile" layout
+ * must kick in earlier than when standalone. The compiled Nickl CSS already
+ * handles the main columns stacking at 960px. Below we adapt each
+ * sub-module's responsive rules for the narrower column context.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── TextImage ──────────────────────────────────────────────────────────── */
+.module-columns .module-text-image .cols-wrapper {
+  display: block;
+}
+.module-columns .module-text-image .col-1 {
+  max-width: 100% !important;
+  margin-right: auto;
+  margin-left: auto;
+}
+.module-columns .module-text-image .col-2 {
+  margin-top: 2.25rem;
+}
+.module-columns .module-text-image .illus-wrapper.default .illus {
+  height: auto;
+  margin-top: 0;
+  transform: translateY(0) !important;
+}
+
+/* ── ClickableTiles in columns ──────────────────────────────────────────── */
+.module-columns .module-clickable .list .title {
+  font-size: 2.1875rem;
+}
+.module-columns .module-clickable .list .desc {
+  padding-right: 2.125rem;
+  padding-left: 2.125rem;
+}
+.module-columns .module-clickable .item::before {
+  padding-top: 73%;
+}
+
+/* ── LogosSlider in columns ─────────────────────────────────────────────── */
+.module-columns .module-logos-slider .slider-navigation {
+  display: none;
+}
+.module-columns .module-logos-slider .link {
+  max-width: 90%;
+}
+
+/* ── Accordion in columns ───────────────────────────────────────────────── */
+.module-columns .module-accordion .title {
+  font-size: 1.75rem;
+}
+
+/* ── KeyFigures in columns ──────────────────────────────────────────────── */
+.module-columns .module-key-figures .item {
+  flex-basis: calc(50% - 2.5rem);
+}
+.module-columns .module-key-figures .txt {
+  max-width: 100%;
+}
+
+/* ── Icons in columns ───────────────────────────────────────────────────── */
+.module-columns .module-icons .list .item {
+  flex-basis: calc(50% - 2.5rem);
+}
+.module-columns .module-icons .txt {
+  max-width: 100%;
+}
+
+/* ── Team in columns ────────────────────────────────────────────────────── */
+.module-columns .module-team .list.columns .item {
+  flex-basis: calc(50% - 1.875rem);
+}
+
+/* ── ImagesSlider in columns ────────────────────────────────────────────── */
+.module-columns .module-images-slider:not(.full-width) .slider-navigation.prev {
+  left: calc(0.5rem + 5vw);
+}
+.module-columns .module-images-slider:not(.full-width) .slider-navigation.next {
+  right: calc(0.5rem + 5vw);
+}
+
+/* ── HeadText in columns ────────────────────────────────────────────────── */
+.module-columns .module-head-text.columns-2 .cols-wrapper {
+  display: block;
+}
+.module-columns .module-head-text.columns-2 .col-2 {
+  margin-top: 2.1875rem;
+}
+
+/* ── Gallery in columns ─────────────────────────────────────────────────── */
+.module-columns .module-gallery .list.img-fixe .item {
+  flex-basis: calc(50% - 1.25rem);
+}
+.module-columns .module-gallery .list.img-fluid.columns-3,
+.module-columns .module-gallery .list.img-fluid.columns-4,
+.module-columns .module-gallery .list.img-fluid.columns-5 {
+  columns: 2;
+}
+
+/* ── FreePost in columns ────────────────────────────────────────────────── */
+.module-columns .module-posts-list .item {
+  flex-basis: 100%;
+}
+
+/* ── Files in columns ───────────────────────────────────────────────────── */
+.module-columns .module-files .item {
+  flex-basis: calc(50% - 2.5rem);
+}
+
+/* ── TextVideoSlider in columns ─────────────────────────────────────────── */
+.module-columns .module-text-video-slider .slider-wrapper > .slider-navigation {
+  display: none !important;
+}
+.module-columns .module-text-video-slider .cols-wrapper {
+  display: block;
+}
+.module-columns .module-text-video-slider .col-1 {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.module-columns .module-text-video-slider .col-2 {
+  margin-top: 1.75rem;
+}
+.module-columns .module-text-video-slider .slider-navigation-mobile-wrapper {
+  display: flex;
+}
+.module-columns .module-text-video-slider .btn-scroll {
+  display: none;
+}
+
+/* ── NewsSlider in columns ──────────────────────────────────────────────── */
+.module-columns .module-news-slider .link {
+  display: block;
+}
+.module-columns .module-news-slider .illus-wrapper {
+  margin-right: 0;
+}
+.module-columns .module-news-slider .illus-wrapper::before {
+  padding-top: 57%;
+}
+.module-columns .module-news-slider .desc {
+  max-width: 100%;
+  margin-top: 1.25rem;
+}
+.module-columns .module-news-slider .title {
+  margin-top: 0.75rem;
+}
+
+/* ── Contact in columns ─────────────────────────────────────────────────── */
+.module-columns .module-contact .cols-wrapper {
+  display: block;
+}
+.module-columns .module-contact .col-1 {
+  display: block;
+}
+.module-columns .module-contact .col-2 {
+  margin-top: 2.25rem;
+  margin-left: 0;
+}
+.module-columns .module-contact .phone {
+  font-size: 2rem;
+}
+.module-columns .module-contact .map-wrapper::before {
+  padding-top: 75%;
+}
+
+/* ── Video in columns ───────────────────────────────────────────────────── */
+.module-columns .module-video .illus-wrapper.default .illus {
+  margin-top: 0;
+  transform: translateY(0) !important;
+}
+
+/* ── TextScrolling in columns ───────────────────────────────────────────── */
+.module-columns .module-text-scrolling .list.size-s { font-size: 2.06rem; }
+.module-columns .module-text-scrolling .list.size-m { font-size: 3.3rem; }
+.module-columns .module-text-scrolling .list.size-l { font-size: 5rem; }
+.module-columns .module-text-scrolling .list.size-xl { font-size: 6.93rem; }
+
+
+/* ── 960px: Columns stack — sub-modules go full width ───────────────────── */
+@media screen and (max-width: 960px) {
+
+  /* Fix: Nickl CSS only resets columns-2/3 to 100% width, not columns-4 */
+  .module-columns .cols-wrapper.columns-4 .col {
+    width: 100%;
+  }
+
+  /* Background columns: reduce padding on small screens */
+  .module-columns .cols-wrapper.cols-background-light.columns-3 .col,
+  .module-columns .cols-wrapper.cols-background-light.columns-4 .col,
+  .module-columns .cols-wrapper.cols-background-primary.columns-3 .col,
+  .module-columns .cols-wrapper.cols-background-primary.columns-4 .col,
+  .module-columns .cols-wrapper.cols-background-secondary.columns-3 .col,
+  .module-columns .cols-wrapper.cols-background-secondary.columns-4 .col,
+  .module-columns .cols-wrapper.cols-background-tertiary.columns-3 .col,
+  .module-columns .cols-wrapper.cols-background-tertiary.columns-4 .col {
+    padding: 1.5rem;
+  }
+
+  /* TextImage: restore default layout when stacked */
+  .module-columns .module-text-image .col-2 {
+    margin-top: 2.25rem;
+  }
+
+  /* ClickableTiles: full-width items */
+  .module-columns .module-clickable .cols-wrapper {
+    flex-direction: column;
+  }
+  .module-columns .module-clickable .list .item {
+    flex-basis: 100%;
+  }
+  .module-columns .module-clickable .desc {
+    padding: 5vw !important;
+  }
+
+  /* Team: full-width items */
+  .module-columns .module-team .list.columns .item {
+    flex-basis: 100%;
+  }
+  .module-columns .module-team .list.columns.columns-1 .desc > * {
+    text-align: center;
+  }
+
+  /* Gallery: single column */
+  .module-columns .module-gallery .list.img-fixe .item {
+    flex-basis: 100%;
+  }
+  .module-columns .module-gallery .list.img-fluid.columns-2,
+  .module-columns .module-gallery .list.img-fluid.columns-3 {
+    columns: 1;
+  }
+
+  /* KeyFigures + Icons: 2 per row (already set above, remains valid) */
+
+  /* FreePost: already full-width */
+
+  /* Files: full-width */
+  .module-columns .module-files .item {
+    flex-basis: 100%;
+  }
+
+  /* Contact: left-align on mobile */
+  .module-columns .module-contact {
+    text-align: left;
+  }
+  .module-columns .module-contact .list {
+    display: block;
+  }
+}
+
+/* ── 600px: Small screens ───────────────────────────────────────────────── */
+@media screen and (max-width: 600px) {
+
+  /* Accordion: tighter padding */
+  .module-columns .module-accordion .title {
+    padding-left: 5vw;
+    font-size: 1.5rem;
+  }
+  .module-columns .module-accordion .txt {
+    padding-right: 1.42rem;
+    padding-left: 5vw;
+  }
+
+  /* KeyFigures + Icons: still 2 per row in stacked column */
+
+  /* Team: center text */
+  .module-columns .module-team .list.columns .social-networks {
+    justify-content: center;
+  }
+}
+
 </style>

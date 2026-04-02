@@ -1,8 +1,9 @@
 ---
 /**
- * Module Summary — Reproduit summary.blade.php
- * Mode custom uniquement (pas de menu WordPress).
- * custom_menu repeater avec sous-menus et liens.
+ * Module Summary — Plan du site / Sommaire
+ * Deux modes :
+ * - Menu existant (links_type = true) : récupère un menu CMS par ID
+ * - Liens personnalisés (links_type = false) : repeater custom_menu
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { isTruthy } from '../../lib/module-classes';
@@ -12,17 +13,67 @@ interface Props {
 }
 
 const { data } = Astro.props;
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
 
 const linksType = isTruthy(data.links_type);
 const customMenu = (data.custom_menu as any[]) || [];
+
+// Fetch menu items from API when using an existing menu
+let menuItems: any[] = [];
+if (linksType && data.menu_id) {
+  try {
+    const res = await fetch(`${API_URL}/menus/${data.menu_id}/navigation`);
+    if (res.ok) {
+      menuItems = await res.json();
+    }
+  } catch (e) {
+    // silently fail
+  }
+}
 ---
 
 <NicklModuleWrapper data={data} moduleName="summary">
   {linksType ? (
-    /* Mode WordPress menu — non disponible en mode statique */
-    <p class="placeholder-message">Menu WordPress non disponible en mode statique.</p>
+    menuItems.length > 0 ? (
+      <ul class="menu">
+        {menuItems.map((item: any) => (
+          <li class={`menu-item${item.children?.length ? ' sub' : ''}`}>
+            {item.children?.length ? (
+              <>
+                <p class="title">{item.title}</p>
+                <ul class="sub-menu">
+                  {item.children.map((child: any) => (
+                    <li class="menu-item">
+                      <a href={child.url || '#'} target={child.open_in_new_tab ? '_blank' : '_self'}>
+                        {child.title}
+                      </a>
+                      {child.children?.length > 0 && (
+                        <ul class="sub-menu">
+                          {child.children.map((sub: any) => (
+                            <li class="menu-item">
+                              <a href={sub.url || '#'} target={sub.open_in_new_tab ? '_blank' : '_self'}>
+                                {sub.title}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <a href={item.url || '#'} target={item.open_in_new_tab ? '_blank' : '_self'}>
+                {item.title}
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p class="placeholder-message">Aucun menu sélectionné ou menu vide.</p>
+    )
   ) : (
-    /* Mode custom */
     <ul class="menu">
       {customMenu.map((menu) => (
         <li class="menu-item sub">

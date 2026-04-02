@@ -169,6 +169,7 @@ const { blocks = [] } = Astro.props as { blocks: Block[] };
       case 'newsletter-form':
         return <NicklNewsletterForm data={data} />;
       case 'plansite':
+      case 'plan-site':
         return <NicklPlanSite data={data} />;
       case 'review':
         return <NicklReview data={data} />;

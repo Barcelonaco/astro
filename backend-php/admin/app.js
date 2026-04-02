@@ -2743,6 +2743,74 @@ function renderBlockPreviewHtml(block) {
     if (!moduleTemplateCache[mapLayout]) queueModuleTemplateLoad(mapLayout);
     return `<div class="module module-map ${mapExtraCls.join(' ')}" style="position:relative;">${mapBgHtml}${mapTitleHtml}${mapContentHtml}</div>`;
   }
+  // PlanSite — custom preview (Blade calls do_shortcode which JS can't process)
+  if (block.type === 'plansite' || block.type === 'plan-site' || block.type === 'PlanSite') {
+    const psCls = [d.bloc_color || '', d.padding_top || '', d.padding_bottom || ''].filter(Boolean).join(' ');
+    let psTitleHtml = '';
+    if (d.title_bloc || d.title) {
+      const t = d.title_bloc || d.title;
+      const s = d.title_style || '2';
+      const a = d.title_align || 'center';
+      psTitleHtml = `<h${s} class="title-module title-section-${s} align-${a}">${escapeHtml(t)}</h${s}>`;
+    }
+    if (!moduleTemplateCache['plansite']) queueModuleTemplateLoad('plansite');
+    return `<div class="module module-plansite ${psCls}" style="position:relative;">` +
+      `<div class="container">${psTitleHtml}` +
+      `<div class="list">` +
+      `<div class="item"><h2>Les pages</h2><ul><li style="color:#999;">Toutes les pages publiées…</li></ul></div>` +
+      `<div class="item"><h2>Les articles</h2><ul><li style="color:#999;">Tous les articles publiés…</li></ul></div>` +
+      `<div class="item"><h2>Références</h2><ul><li style="color:#999;">Toutes les références…</li></ul></div>` +
+      `</div></div></div>`;
+  }
+  // Summary — custom preview (Blade uses wp_nav_menu which JS can't render)
+  if (block.type === 'summary' || block.type === 'Summary') {
+    const sumCls = [d.bloc_color || '', d.padding_top || '', d.padding_bottom || ''].filter(Boolean).join(' ');
+    let sumTitleHtml = '';
+    if (d.title_bloc || d.title) {
+      const t = d.title_bloc || d.title;
+      const s = d.title_style || '2';
+      const a = d.title_align || 'center';
+      sumTitleHtml = `<h${s} class="title-module title-section-${s} align-${a}">${escapeHtml(t)}</h${s}>`;
+    }
+    const useMenu = d.links_type === true || d.links_type === 1 || d.links_type === '1';
+    let sumContent = '';
+    if (useMenu && d.menu_id) {
+      const sumMenuId = 'summary-menu-preview-' + (block.id || '');
+      setTimeout(async () => {
+        const el = document.getElementById(sumMenuId);
+        if (!el) return;
+        try {
+          const items = await apiFetch(`/menus/${d.menu_id}/navigation`);
+          if (!items || !items.length) { el.innerHTML = '<p style="color:#999">Menu vide</p>'; return; }
+          el.innerHTML = '<ul class="menu">' + items.map(item => {
+            const children = item.children || [];
+            if (children.length) {
+              return `<li class="menu-item sub"><p class="title">${escapeHtml(item.title)}</p><ul class="sub-menu">${children.map(c => `<li class="menu-item"><a href="#">${escapeHtml(c.title)}</a></li>`).join('')}</ul></li>`;
+            }
+            return `<li class="menu-item"><a href="#">${escapeHtml(item.title)}</a></li>`;
+          }).join('') + '</ul>';
+        } catch (e) { el.innerHTML = '<p style="color:#999">Erreur de chargement du menu</p>'; }
+      }, 0);
+      sumContent = `<div id="${sumMenuId}"><p style="color:#999">Chargement du menu…</p></div>`;
+    } else if (useMenu) {
+      sumContent = '<p style="color:#999">Aucun menu sélectionné</p>';
+    } else {
+      const customItems = Array.isArray(d.custom_menu) ? d.custom_menu : [];
+      if (customItems.length) {
+        sumContent = '<ul class="menu">' + customItems.map(item => {
+          const links = Array.isArray(item.links) ? item.links : [];
+          return `<li class="menu-item sub">${item.title ? `<p class="title">${escapeHtml(item.title)}</p>` : ''}${links.length ? '<ul class="sub-menu">' + links.map(l => {
+            const lk = l.link || {};
+            return `<li class="menu-item"><a href="#">${escapeHtml(lk.title || lk.url || '')}</a></li>`;
+          }).join('') + '</ul>' : ''}</li>`;
+        }).join('') + '</ul>';
+      } else {
+        sumContent = '<p style="color:#999">Aucun lien personnalisé</p>';
+      }
+    }
+    if (!moduleTemplateCache['summary']) queueModuleTemplateLoad('summary');
+    return `<div class="module module-summary ${sumCls}" style="position:relative;"><div class="container">${sumTitleHtml}${sumContent}</div></div>`;
+  }
   const layout = getModuleLayout(block);
   if (!layout) return '';
   const cached = moduleTemplateCache[layout];
@@ -5034,7 +5102,13 @@ const BLOCK_PARAMS_FIELDS = new Set([
 ]);
 
 function renderSchemaForm(block, schemaFields) {
-  const data = block.data && typeof block.data === 'object' ? block.data : {};
+  const data = block.data && typeof block.data === 'object' ? { ...block.data } : {};
+  // Seed missing fields with their schema defaults so conditionals evaluate correctly on new blocks
+  for (const sf of schemaFields) {
+    if (data[sf.name] === undefined && sf.defaultValue !== undefined) {
+      data[sf.name] = sf.defaultValue;
+    }
+  }
   const def = BLOCK_TYPES[block.type] || {};
   const moduleName = def.moduleName || block.type;
   const isInlineEditable = (moduleName === 'TextSimple' || moduleName === 'TextImage' || moduleName === 'HeadText');
@@ -5183,6 +5257,29 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
         sel.innerHTML = '<option value="">— Sélectionner un bloc —</option>' +
           (blocs || []).filter(b => b.status === 'published').map(b =>
             `<option value="${b.id}" ${String(value ?? '') === String(b.id) ? 'selected' : ''}>${escapeHtml(b.title)}</option>`
+          ).join('');
+      } catch (e) {}
+    }, 0);
+    return `
+      <div class="form-group">
+        <label class="form-label">${escapeHtml(label)}</label>
+        <select class="form-select" name="${escapeHtml(name)}" id="${selectId}">
+          <option value="">Chargement…</option>
+        </select>
+      </div>
+    `;
+  }
+  // Dynamic select for summary module: populate menu_id from API
+  if (name === 'menu_id') {
+    const selectId = `menu-select-${blockId}`;
+    setTimeout(async () => {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      try {
+        const menus = await apiFetch('/menus');
+        sel.innerHTML = '<option value="">— Sélectionner un menu —</option>' +
+          (menus || []).map(m =>
+            `<option value="${m.id}" ${String(value ?? '') === String(m.id) ? 'selected' : ''}>${escapeHtml(m.name)}</option>`
           ).join('');
       } catch (e) {}
     }, 0);
@@ -10438,6 +10535,7 @@ let _menusCache = [];
 let _menuEditId = null;
 let _menuItems = [];
 let _menuAvailablePages = [];
+let _menuCptSections = [];
 let _menuTempIdCounter = 1;
 
 async function renderMenus() {
@@ -10559,12 +10657,14 @@ async function deleteMenu(id, name) {
 async function openMenuEditor(menuId) {
   showLoading();
   try {
-    const [menu, pages] = await Promise.all([
+    const [menu, pages, cptSections] = await Promise.all([
       apiFetch(`/menus/${menuId}`),
-      apiFetch('/menus/pages')
+      apiFetch('/menus/pages'),
+      apiFetch('/menus/cpt-items').catch(() => [])
     ]);
     _menuEditId = menuId;
     _menuAvailablePages = pages;
+    _menuCptSections = cptSections;
     _menuTempIdCounter = 1;
 
     // Convert flatItems to our working format
@@ -10592,6 +10692,25 @@ async function openMenuEditor(menuId) {
 }
 
 function renderMenuEditor(menu) {
+  const cptSectionsHtml = _menuCptSections.map(section => {
+    if (!section.items || section.items.length === 0) return '';
+    return `
+      <div class="menu-add-section">
+        <h4>${section.icon ? section.icon + ' ' : ''}${escapeHtml(section.label)}</h4>
+        <input type="text" class="form-input form-input-sm menu-search-input" placeholder="Rechercher…" oninput="filterMenuCptList(this, '${escapeHtml(section.slug)}')">
+        <div class="menu-pages-list" id="menuCptList_${escapeHtml(section.slug)}">
+          ${section.items.map(item => `
+            <label class="menu-page-checkbox" data-search="${escapeHtml(item.title.toLowerCase())}">
+              <input type="checkbox" value="${item.id}" data-title="${escapeHtml(item.title)}" data-slug="${escapeHtml(item.slug)}" data-cpt="${escapeHtml(section.slug)}">
+              ${escapeHtml(item.title)}
+            </label>
+          `).join('')}
+        </div>
+        <button class="btn btn-sm" onclick="addSelectedCptItems('${escapeHtml(section.slug)}')" style="margin-top:8px">Ajouter au menu</button>
+      </div>
+    `;
+  }).join('');
+
   return `
     <div class="page-header">
       <div>
@@ -10609,9 +10728,10 @@ function renderMenuEditor(menu) {
         <!-- Add page -->
         <div class="menu-add-section">
           <h4>Pages</h4>
+          <input type="text" class="form-input form-input-sm menu-search-input" placeholder="Rechercher une page…" oninput="filterMenuPagesList(this)">
           <div class="menu-pages-list" id="menuPagesList">
             ${_menuAvailablePages.map(p => `
-              <label class="menu-page-checkbox">
+              <label class="menu-page-checkbox" data-search="${escapeHtml(p.title.toLowerCase())}">
                 <input type="checkbox" value="${p.id}" data-title="${escapeHtml(p.title)}" data-slug="${escapeHtml(p.slug)}">
                 ${escapeHtml(p.title)}${p.parent_title ? ` <small>(${escapeHtml(p.parent_title)})</small>` : ''}
               </label>
@@ -10620,8 +10740,10 @@ function renderMenuEditor(menu) {
           <button class="btn btn-sm" onclick="addSelectedPages()" style="margin-top:8px">Ajouter au menu</button>
         </div>
 
+        ${cptSectionsHtml}
+
         <!-- Add custom link -->
-        <div class="menu-add-section" style="margin-top:16px">
+        <div class="menu-add-section">
           <h4>Lien personnalisé</h4>
           <div class="form-group">
             <label class="form-label">URL</label>
@@ -10635,7 +10757,7 @@ function renderMenuEditor(menu) {
         </div>
 
         <!-- Menu settings -->
-        <div class="menu-add-section" style="margin-top:16px">
+        <div class="menu-add-section">
           <h4>Paramètres du menu</h4>
           <div class="form-group">
             <label class="form-label">Nom</label>
@@ -10662,25 +10784,55 @@ function renderMenuEditor(menu) {
   `;
 }
 
-function renderMenuItemsList() {
-  // Sort by menu_order
+function _flattenMenuTree() {
+  // Build flat ordered list from parent_id tree
   const sorted = [..._menuItems].sort((a, b) => a.menu_order - b.menu_order);
-  const roots = sorted.filter(i => !i.parent_id);
   const childrenOf = (parentId) => sorted.filter(i => {
     const pid = i.parent_id;
+    if (!parentId) return !pid;
     return pid === parentId || (typeof pid === 'string' && typeof parentId === 'number' && parseInt(pid) === parentId);
   });
+  const flat = [];
+  function walk(parentId, depth) {
+    for (const item of childrenOf(parentId)) {
+      const itemId = item.id || item.temp_id;
+      flat.push({ item, itemId, depth });
+      walk(itemId, depth + 1);
+    }
+  }
+  walk(null, 0);
+  return flat;
+}
 
-  function renderItem(item, depth = 0) {
-    const itemId = item.id || item.temp_id;
-    const children = childrenOf(itemId);
-    const indent = depth * 24;
+function _syncParentsFromDOM() {
+  const rows = [...document.querySelectorAll('#menuItemsList .menu-item-row')];
+  const stack = []; // stack of { id, depth }
+  rows.forEach((row, idx) => {
+    const itemId = row.getAttribute('data-item-id');
+    const depth = parseInt(row.getAttribute('data-depth')) || 0;
+    const item = _menuItems.find(i => String(i.id) === String(itemId) || String(i.temp_id) === String(itemId));
+    if (!item) return;
+
+    // Find parent: nearest previous item with depth = depth - 1
+    while (stack.length > 0 && stack[stack.length - 1].depth >= depth) stack.pop();
+    const parentId = stack.length > 0 ? stack[stack.length - 1].id : null;
+    item.parent_id = parentId && !String(parentId).startsWith('temp_') ? parseInt(parentId) : parentId;
+    item.menu_order = idx;
+    stack.push({ id: itemId, depth });
+  });
+}
+
+function renderMenuItemsList() {
+  const flat = _flattenMenuTree();
+
+  return flat.map(({ item, itemId, depth }) => {
+    const indent = depth * 30;
     const typeLabel = item.type === 'page' ? 'Page' : item.type === 'category' ? 'Catégorie' : 'Lien';
 
     return `
       <div class="menu-item-row" data-item-id="${itemId}" data-depth="${depth}" style="margin-left:${indent}px">
         <div class="menu-item-header">
-          <span class="menu-item-drag" title="Réordonner">☰</span>
+          <span class="menu-item-drag" title="Glisser pour réordonner / indenter">☰</span>
           <span class="menu-item-title">${escapeHtml(item.title || '(sans titre)')}</span>
           <span class="menu-item-type">${typeLabel}</span>
           <button class="btn btn-xs" onclick="toggleMenuItemEdit('${itemId}')">▼</button>
@@ -10698,17 +10850,6 @@ function renderMenuItemsList() {
             </div>
           ` : ''}
           <div class="form-group">
-            <label class="form-label">Parent</label>
-            <select class="form-input" onchange="updateMenuItemField('${itemId}', 'parent_id', this.value || null)">
-              <option value="">— Aucun (racine) —</option>
-              ${_menuItems.filter(mi => (mi.id || mi.temp_id) !== itemId).map(mi => {
-                const miId = mi.id || mi.temp_id;
-                const selected = item.parent_id && (item.parent_id == miId) ? 'selected' : '';
-                return `<option value="${miId}" ${selected}>${escapeHtml(mi.title || '(sans titre)')}</option>`;
-              }).join('')}
-            </select>
-          </div>
-          <div class="form-group">
             <label class="menu-page-checkbox">
               <input type="checkbox" ${item.open_in_new_tab ? 'checked' : ''} onchange="updateMenuItemField('${itemId}', 'open_in_new_tab', this.checked)">
               Ouvrir dans un nouvel onglet
@@ -10716,11 +10857,8 @@ function renderMenuItemsList() {
           </div>
         </div>
       </div>
-      ${children.map(c => renderItem(c, depth + 1)).join('')}
     `;
-  }
-
-  return roots.map(r => renderItem(r)).join('');
+  }).join('');
 }
 
 function toggleMenuItemEdit(itemId) {
@@ -10731,9 +10869,7 @@ function toggleMenuItemEdit(itemId) {
 function updateMenuItemField(itemId, field, value) {
   const item = _menuItems.find(i => String(i.id) === String(itemId) || String(i.temp_id) === String(itemId));
   if (!item) return;
-  if (field === 'parent_id') {
-    item.parent_id = value ? (isNaN(value) ? value : parseInt(value)) : null;
-  } else if (field === 'open_in_new_tab') {
+  if (field === 'open_in_new_tab') {
     item.open_in_new_tab = !!value;
   } else {
     item[field] = value;
@@ -10808,6 +10944,52 @@ function addCustomLink() {
   refreshMenuItemsList();
 }
 
+function filterMenuPagesList(input) {
+  const query = input.value.toLowerCase().trim();
+  const labels = document.querySelectorAll('#menuPagesList .menu-page-checkbox');
+  labels.forEach(label => {
+    const text = label.getAttribute('data-search') || '';
+    label.style.display = !query || text.includes(query) ? '' : 'none';
+  });
+}
+
+function filterMenuCptList(input, cptSlug) {
+  const query = input.value.toLowerCase().trim();
+  const labels = document.querySelectorAll(`#menuCptList_${cptSlug} .menu-page-checkbox`);
+  labels.forEach(label => {
+    const text = label.getAttribute('data-search') || '';
+    label.style.display = !query || text.includes(query) ? '' : 'none';
+  });
+}
+
+function addSelectedCptItems(cptSlug) {
+  const container = document.getElementById('menuCptList_' + cptSlug);
+  if (!container) return;
+  const checks = container.querySelectorAll('input[type="checkbox"]:checked');
+  if (checks.length === 0) { showToast('Sélectionnez au moins un élément', 'error'); return; }
+
+  const maxOrder = _menuItems.length > 0 ? Math.max(..._menuItems.map(i => i.menu_order || 0)) : -1;
+
+  checks.forEach((cb, i) => {
+    const title = cb.getAttribute('data-title');
+    const slug = cb.getAttribute('data-slug');
+    const tempId = 'temp_' + (_menuTempIdCounter++);
+    _menuItems.push({
+      id: null,
+      temp_id: tempId,
+      title: title,
+      url: `/${cptSlug}/${slug}`,
+      type: 'custom',
+      page_id: null,
+      parent_id: null,
+      menu_order: maxOrder + 1 + i,
+      open_in_new_tab: false,
+    });
+    cb.checked = false;
+  });
+  refreshMenuItemsList();
+}
+
 function refreshMenuItemsList() {
   const container = document.getElementById('menuItemsList');
   if (container) container.innerHTML = renderMenuItemsList();
@@ -10823,13 +11005,8 @@ async function saveCurrentMenu() {
   const location = document.getElementById('menuEditorLocation').value;
   if (!name) { showToast('Le nom du menu est obligatoire', 'error'); return; }
 
-  // Reindex menu_order based on DOM order
-  const rows = document.querySelectorAll('.menu-item-row');
-  rows.forEach((row, idx) => {
-    const itemId = row.getAttribute('data-item-id');
-    const item = _menuItems.find(i => String(i.id) === String(itemId) || String(i.temp_id) === String(itemId));
-    if (item) item.menu_order = idx;
-  });
+  // Sync parent_ids and menu_order from DOM
+  _syncParentsFromDOM();
 
   // Build flat items array for API
   const itemsPayload = _menuItems.map(item => ({
@@ -10871,46 +11048,119 @@ function attachMenuEvents() {
 }
 
 function attachMenuEditorEvents() {
-  // Enable drag-and-drop reordering
   const list = document.getElementById('menuItemsList');
   if (!list) return;
 
+  const INDENT_PX = 30; // pixels per depth level
+  const INDENT_THRESHOLD = 20; // min horizontal px to trigger indent change
   let dragItem = null;
+  let startX = 0;
+  let startDepth = 0;
+  let currentDepth = 0;
+  let placeholder = null;
 
   list.addEventListener('mousedown', function(e) {
     const handle = e.target.closest('.menu-item-drag');
     if (!handle) return;
+    e.preventDefault();
+
     dragItem = handle.closest('.menu-item-row');
     if (!dragItem) return;
+
+    startX = e.clientX;
+    startDepth = parseInt(dragItem.getAttribute('data-depth')) || 0;
+    currentDepth = startDepth;
+
+    // Create placeholder
+    placeholder = document.createElement('div');
+    placeholder.className = 'menu-item-placeholder';
+    placeholder.style.marginLeft = (currentDepth * INDENT_PX) + 'px';
+    dragItem.parentNode.insertBefore(placeholder, dragItem);
+
+    // Float the dragged item
     dragItem.classList.add('dragging');
+    dragItem.style.position = 'fixed';
+    dragItem.style.width = (list.offsetWidth - currentDepth * INDENT_PX) + 'px';
+    dragItem.style.zIndex = '9999';
+    dragItem.style.left = list.getBoundingClientRect().left + 'px';
+    dragItem.style.top = (e.clientY - 20) + 'px';
+    dragItem.style.marginLeft = '0';
+    document.body.style.userSelect = 'none';
 
     const onMove = (ev) => {
+      // Move dragged item visually
+      dragItem.style.top = (ev.clientY - 20) + 'px';
+
+      // Compute new depth from horizontal delta
+      const deltaX = ev.clientX - startX;
+      let newDepth = startDepth + Math.round(deltaX / INDENT_PX);
+      if (newDepth < 0) newDepth = 0;
+
+      // Max depth = previous sibling's depth + 1
       const rows = [...list.querySelectorAll('.menu-item-row:not(.dragging)')];
+      const placeholderIdx = [...list.children].indexOf(placeholder);
+
+      // Find the row just before the placeholder
+      let prevRow = null;
+      for (let i = placeholderIdx - 1; i >= 0; i--) {
+        const el = list.children[i];
+        if (el.classList.contains('menu-item-row') && !el.classList.contains('dragging')) {
+          prevRow = el;
+          break;
+        }
+      }
+
+      const maxDepth = prevRow ? (parseInt(prevRow.getAttribute('data-depth')) || 0) + 1 : 0;
+      if (newDepth > maxDepth) newDepth = maxDepth;
+
+      // First item must be depth 0
+      if (placeholderIdx === 0 || (!prevRow && placeholderIdx <= 1)) newDepth = 0;
+
+      currentDepth = newDepth;
+      placeholder.style.marginLeft = (currentDepth * INDENT_PX) + 'px';
+
+      // Vertical reordering: move placeholder
       const y = ev.clientY;
-      let after = null;
+      let insertAfter = null;
       for (const row of rows) {
         const rect = row.getBoundingClientRect();
-        if (y > rect.top + rect.height / 2) after = row;
+        if (y > rect.top + rect.height / 2) insertAfter = row;
       }
-      if (after) {
-        after.insertAdjacentElement('afterend', dragItem);
+
+      if (insertAfter) {
+        if (insertAfter.nextSibling !== placeholder) {
+          insertAfter.insertAdjacentElement('afterend', placeholder);
+        }
       } else if (rows.length > 0) {
-        list.insertBefore(dragItem, rows[0]);
+        const firstRow = rows[0];
+        if (list.firstChild !== placeholder || (list.firstChild === placeholder && list.children[1] !== firstRow)) {
+          list.insertBefore(placeholder, firstRow);
+        }
       }
     };
 
     const onUp = () => {
-      dragItem.classList.remove('dragging');
-      dragItem = null;
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      // Update menu_order from DOM
-      const allRows = list.querySelectorAll('.menu-item-row');
-      allRows.forEach((row, idx) => {
-        const itemId = row.getAttribute('data-item-id');
-        const item = _menuItems.find(i => String(i.id) === String(itemId) || String(i.temp_id) === String(itemId));
-        if (item) item.menu_order = idx;
-      });
+      document.body.style.userSelect = '';
+
+      // Reset drag styles
+      dragItem.classList.remove('dragging');
+      dragItem.style.position = '';
+      dragItem.style.width = '';
+      dragItem.style.zIndex = '';
+      dragItem.style.left = '';
+      dragItem.style.top = '';
+
+      // Place item where placeholder is
+      dragItem.setAttribute('data-depth', currentDepth);
+      dragItem.style.marginLeft = (currentDepth * INDENT_PX) + 'px';
+      placeholder.replaceWith(dragItem);
+      placeholder = null;
+      dragItem = null;
+
+      // Sync parent_ids and menu_order from DOM
+      _syncParentsFromDOM();
     };
 
     document.addEventListener('mousemove', onMove);

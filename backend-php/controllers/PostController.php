@@ -69,6 +69,7 @@ class PostController {
         }
 
         $post = PostModel::findBySlug($body['slug']);
+        trigger_frontend_rebuild('post created: ' . $body['slug']);
         json_response($post, 201);
     }
 
@@ -84,11 +85,13 @@ class PostController {
         }
 
         $post = PostModel::findBySlug($body['slug']);
+        trigger_frontend_rebuild('post updated: ' . $body['slug']);
         json_response($post);
     }
 
     public static function delete(int $id): void {
         PostModel::delete($id);
+        trigger_frontend_rebuild('post deleted: ' . $id);
         json_response(['message' => 'Post deleted successfully']);
     }
 }

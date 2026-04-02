@@ -145,8 +145,8 @@ if (ref.content) {
 
       {/* Navigation prev/next */}
       <div class="container">
-        <div class="btn-wrapper space-between">
-          <a href="/references" class="btn btn-tertiary prev">Retour aux références</a>
+        <div class="btn-wrapper-center">
+          <a href="/references" class="btn btn-tertiary">Retour aux références</a>
         </div>
       </div>
     </main>
@@ -192,36 +192,84 @@ if (ref.content) {
   .border-rounded .page-single-refs .slider-wrapper {
     border-radius: var(--border-radius, 0);
   }
-  .page-single-refs .slider-wrapper:hover .slider-navigation {
-    opacity: 1;
-  }
-  .page-single-refs .slider-wrapper:hover .slider-navigation.prev,
-  .page-single-refs .slider-wrapper:hover .slider-navigation.next {
-    transform: translateY(-50%);
-  }
+  /* Base slider styles (not loaded from app.css on this page) */
   .page-single-refs .slider-navigation {
-    opacity: 0;
-    transition: all .3s ease;
-  }
-  .border-rounded .page-single-refs .slider-navigation {
-    border-radius: 50%;
+    position: absolute;
+    z-index: 5;
+    top: 50%;
+    display: none;
+    padding: 10px;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: opacity .3s ease;
   }
   .page-single-refs .slider-navigation::before {
-    border-color: #fff;
+    position: relative;
+    display: block;
+    width: 24px;
+    height: 24px;
+    border: 2px solid #fff;
+    content: '';
+    transform: rotate(45deg);
   }
   .page-single-refs .slider-navigation.prev {
     left: 16px;
-    transform: translate(.5rem, -50%);
+  }
+  .page-single-refs .slider-navigation.prev::before {
+    left: 5px;
+    border-top: 0;
+    border-right: 0;
   }
   .page-single-refs .slider-navigation.next {
     right: 16px;
-    transform: translate(-.5rem, -50%);
+  }
+  .page-single-refs .slider-navigation.next::before {
+    right: 5px;
+    border-bottom: 0;
+    border-left: 0;
+  }
+  .page-single-refs .swiper-initialized ~ .slider-navigation,
+  .page-single-refs .swiper-initialized .slider-navigation,
+  .page-single-refs .slider-wrapper .slider-navigation {
+    display: block;
+  }
+  .page-single-refs .slider-navigation.swiper-button-disabled {
+    opacity: 0;
+    visibility: hidden;
   }
   .page-single-refs .slider-pagination {
+    position: absolute;
     bottom: 20px;
+    left: 0;
+    width: 100%;
+    z-index: 5;
+    display: none;
+    justify-content: center;
+    gap: 10px;
+  }
+  .page-single-refs .swiper-initialized ~ .slider-pagination,
+  .page-single-refs .swiper-initialized .slider-pagination,
+  .page-single-refs .slider-wrapper .slider-pagination {
+    display: flex;
   }
   .page-single-refs .slider-pagination .swiper-pagination-bullet {
+    margin: 0;
+    width: 8px;
+    height: 8px;
+    opacity: .2;
     background-color: #fff;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: opacity .3s ease;
+  }
+  .page-single-refs .slider-pagination .swiper-pagination-bullet-active,
+  .page-single-refs .slider-pagination .swiper-pagination-bullet:hover {
+    opacity: 1;
+  }
+  .border-rounded .page-single-refs .slider-navigation {
+    border-radius: 50%;
   }
   .page-single-refs .illus-wrapper {
     display: block;
@@ -291,6 +339,10 @@ if (ref.content) {
     padding: 0;
     margin-top: 40px;
   }
+  .page-single-refs .btn-wrapper-center {
+    text-align: center;
+    margin-top: 80px;
+  }
 
   /* Responsive */
   @media (max-width: 1024px) {
@@ -304,15 +356,6 @@ if (ref.content) {
     .page-single-refs .col-1,
     .page-single-refs .col-2 {
       width: 100% !important;
-    }
-    .page-single-refs .btn-wrapper {
-      flex-direction: column;
-    }
-    .page-single-refs .btn-wrapper .prev {
-      text-align: left;
-    }
-    .page-single-refs .btn-wrapper .next {
-      text-align: right;
     }
   }
 </style>

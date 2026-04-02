@@ -50,7 +50,7 @@ window.addEventListener('load',function(){
   });
 
   // ── Other sliders — load Swiper only if needed ──
-  var needsSwiper=document.querySelector('.js_images-slider')||document.querySelector('.js_logos-slider')||document.querySelector('.js_references-slider');
+  var needsSwiper=document.querySelector('.js_images-slider')||document.querySelector('.js_logos-slider')||document.querySelector('.js_references-slider')||document.querySelector('.js_ref-single-slider');
   if(needsSwiper){
     var lc=document.createElement('link');lc.rel='stylesheet';lc.href='https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css';document.head.appendChild(lc);
     setTimeout(function(){
@@ -67,11 +67,15 @@ window.addEventListener('load',function(){
           });
           document.querySelectorAll('.js_logos-slider').forEach(function(e){
             var c=e.querySelectorAll('.swiper-slide').length;
-            var ww=window.innerWidth;var spv=2;
-            if(ww>=1025)spv=6;else if(ww>=961)spv=4;else if(ww>=601)spv=3;else if(ww>=481)spv=2;
+            var cw=e.closest('.slider-wrapper')?.offsetWidth||e.offsetWidth||window.innerWidth;
+            var spv=2;
+            if(cw>=1025)spv=6;else if(cw>=961)spv=4;else if(cw>=601)spv=3;else if(cw>=481)spv=2;
             if(c<=spv)return;
             var w=e.closest('.slider-wrapper');
-            new window.Swiper(e,{loop:true,speed:750,slidesPerView:2,spaceBetween:26,preventClicks:false,preventClicksPropagation:false,breakpoints:{481:{slidesPerView:2},601:{slidesPerView:3},961:{slidesPerView:4},1025:{slidesPerView:6}},autoplay:{delay:3e3,disableOnInteraction:true},navigation:{nextEl:w?w.querySelector('.js_logos-slider-btn-next'):null,prevEl:w?w.querySelector('.js_logos-slider-btn-prev'):null}});
+            var inCol=!!e.closest('.module-columns');
+            var opts={loop:c>spv,speed:750,slidesPerView:spv,spaceBetween:26,preventClicks:false,preventClicksPropagation:false,autoplay:{delay:3e3,disableOnInteraction:true}};
+            if(inCol){if(w){var nb=w.querySelector('.js_logos-slider-btn-next');var pb=w.querySelector('.js_logos-slider-btn-prev');if(nb)nb.style.display='none';if(pb)pb.style.display='none';}}else{opts.navigation={nextEl:w?w.querySelector('.js_logos-slider-btn-next'):null,prevEl:w?w.querySelector('.js_logos-slider-btn-prev'):null};opts.breakpoints={481:{slidesPerView:2},601:{slidesPerView:3},961:{slidesPerView:4},1025:{slidesPerView:6}};}
+            new window.Swiper(e,opts);
           });
           document.querySelectorAll('.js_references-slider').forEach(function(e){
             var c=e.querySelectorAll('.swiper-slide').length;if(c<=1)return;

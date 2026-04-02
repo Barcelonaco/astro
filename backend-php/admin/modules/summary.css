@@ -556,8 +556,6 @@
 ---------------------------------------- */
 .module-summary {
   position: relative;
-  padding-bottom: calc(37.5px + 1.95313vw);
-  padding-top: calc(37.5px + 1.95313vw);
 }
 .module-columns.has-background-primary:not(.cols_have_background) .module-summary a, .module-columns.has-background-primary:not(.cols_have_background) .module-summary .title, .module-summary.has-background-primary:not(.cols_have_background) a, .module-summary.has-background-primary:not(.cols_have_background) .title, .cols-background-primary .module-summary a, .cols-background-primary .module-summary .title, .module-columns.has-background-secondary:not(.cols_have_background) .module-summary a, .module-columns.has-background-secondary:not(.cols_have_background) .module-summary .title, .module-summary.has-background-secondary:not(.cols_have_background) a, .module-summary.has-background-secondary:not(.cols_have_background) .title, .cols-background-secondary .module-summary a, .cols-background-secondary .module-summary .title {
   color: #fff;

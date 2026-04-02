@@ -59,6 +59,7 @@ class PageController {
             'parent_id' => $body['parent_id'] ?? null,
         ]);
 
+        trigger_frontend_rebuild('page created: ' . $body['slug']);
         json_response(['id' => $pageId, 'message' => 'Page created successfully'], 201);
     }
 
@@ -82,6 +83,7 @@ class PageController {
             'parent_id' => $body['parent_id'] ?? null,
         ]);
 
+        trigger_frontend_rebuild('page updated: ' . $body['slug']);
         json_response(['message' => 'Page updated successfully']);
     }
 
@@ -90,6 +92,7 @@ class PageController {
         // Remove menu items referencing this page
         $db->prepare('DELETE FROM menu_items WHERE page_id = ? AND type = ?')->execute([$id, 'page']);
         PageModel::delete($id);
+        trigger_frontend_rebuild('page deleted: ' . $id);
         json_response(['message' => 'Page deleted successfully']);
     }
 

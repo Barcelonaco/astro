@@ -147,6 +147,14 @@ class MenuModel {
         }
     }
 
+    public static function getNavigationById(int $id): ?array {
+        $menu = self::findById($id);
+        if ($menu && !empty($menu['items'])) {
+            return self::filterDraftPages($menu['items']);
+        }
+        return null;
+    }
+
     public static function getNavigationByLocation(string $location): ?array {
         $menu = self::findByLocation($location);
         if ($menu && !empty($menu['items'])) {

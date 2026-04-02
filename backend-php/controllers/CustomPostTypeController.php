@@ -242,6 +242,7 @@ class CustomPostTypeController {
             $stmt->execute([$itemId]);
             $item = self::parseCPTRow($stmt->fetch());
             $items = self::attachCategories([$item], $slug);
+            trigger_frontend_rebuild("cpt $slug created");
             json_response($items[0], 201);
         } catch (PDOException $e) {
             if ($e->getCode() == 23000) error_response('Un élément avec ce slug existe déjà', 409);
@@ -277,6 +278,7 @@ class CustomPostTypeController {
 
             $item = self::parseCPTRow($row);
             $items = self::attachCategories([$item], $slug);
+            trigger_frontend_rebuild("cpt $slug updated");
             json_response($items[0]);
         } catch (PDOException $e) {
             if ($e->getCode() == 23000) error_response('Un élément avec ce slug existe déjà', 409);
@@ -294,6 +296,7 @@ class CustomPostTypeController {
         if (!$stmt->fetch()) error_response('Item not found', 404);
 
         $db->prepare("DELETE FROM `cpt_{$slug}` WHERE id = ?")->execute([$id]);
+        trigger_frontend_rebuild("cpt $slug deleted");
         json_response(['success' => true]);
     }
 

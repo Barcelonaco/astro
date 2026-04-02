@@ -7,9 +7,14 @@ class ModuleFieldsController {
     private const BLOCK_PARAMS_REF_PATTERN = '/BlockParams::(get[A-Za-z0-9_]+)/';
 
     private const INPUT_FIELD_TYPES = [
-        'Text', 'Textarea', 'WYSIWYGEditor', 'Image', 'File', 'URL', 'Url', 'Link',
+        'Text', 'Textarea', 'WYSIWYGEditor', 'WysiwygEditor', 'Image', 'File', 'URL', 'Url', 'Link',
         'TrueFalse', 'Number', 'Range', 'ColorPicker', 'ButtonGroup', 'Select',
         'RadioButton', 'GoogleMap', 'Repeater', 'Group', 'FlexibleContent', 'Email', 'Password'
+    ];
+
+    // Normalize variant class names to canonical type used by the admin UI
+    private const TYPE_ALIASES = [
+        'WysiwygEditor' => 'WYSIWYGEditor',
     ];
 
     private static function findStatementEnd(string $text): int {
@@ -210,10 +215,11 @@ class ModuleFieldsController {
                 $subFields = self::parseFieldList($subContent);
             }
 
+            $fieldType = self::TYPE_ALIASES[$m['type']] ?? $m['type'];
             $field = [
                 'name' => $m['name'],
                 'label' => $m['label'],
-                'type' => $m['type'],
+                'type' => $fieldType,
                 'choices' => self::parseChoices($ownChain),
                 'onLabel' => null,
                 'offLabel' => null,
@@ -264,10 +270,11 @@ class ModuleFieldsController {
             if (isset($seen[$key])) continue;
             $seen[$key] = true;
 
+            $fieldType2 = self::TYPE_ALIASES[$current['type']] ?? $current['type'];
             $field = [
                 'name' => $current['name'],
                 'label' => $current['label'],
-                'type' => $current['type'],
+                'type' => $fieldType2,
                 'choices' => self::parseChoices($chain),
                 'onLabel' => null,
                 'offLabel' => null,
@@ -338,56 +345,34 @@ class ModuleFieldsController {
 
     public static function getModuleFields(): void {
         $repoRoot = realpath(__DIR__ . '/../..');
-        $modulesDir = $repoRoot . '/nickl/app/Modules';
-        $fieldGroupDir = $modulesDir . '/FieldGroup';
-        $blockParamsPath = $modulesDir . '/BlockParams.php';
 
-        $blockParamsMap = file_exists($blockParamsPath)
-            ? self::parseBlockParamsMethods(file_get_contents($blockParamsPath))
-            : [];
+        // 1. Load core module definitions from static JSON
+        $configPath = __DIR__ . '/../config/module-fields.json';
+        $config = file_exists($configPath)
+            ? json_decode(file_get_contents($configPath), true)
+            : ['modules' => [], 'blockParams' => []];
 
-        $modules = [];
+        $modules = $config['modules'] ?? [];
+        $blockParamsMap = $config['blockParams'] ?? [];
 
-        $scanDir = function (string $dir) use (&$scanDir, &$modules, $blockParamsMap) {
-            if (!is_dir($dir)) return;
-            foreach (scandir($dir) as $entry) {
-                if ($entry === '.' || $entry === '..') continue;
-                $fullPath = $dir . '/' . $entry;
-                if (is_dir($fullPath)) {
-                    $scanDir($fullPath);
-                    continue;
-                }
-                if (!str_ends_with($entry, '.php')) continue;
-
-                $parsed = self::parsePhpFile($fullPath, $blockParamsMap);
-                if (!$parsed) continue;
-
-                if (!isset($modules[$parsed['className']])) {
-                    $modules[$parsed['className']] = ['fields' => $parsed['fields'], 'layout' => $parsed['layout']];
-                } else {
-                    $existing = [];
-                    foreach ($modules[$parsed['className']]['fields'] as $f) $existing[$f['name']] = $f;
-                    foreach ($parsed['fields'] as $f) {
-                        if (!isset($existing[$f['name']])) $existing[$f['name']] = $f;
-                    }
-                    $modules[$parsed['className']]['fields'] = array_values($existing);
-                    if (!$modules[$parsed['className']]['layout'] && $parsed['layout']) {
-                        $modules[$parsed['className']]['layout'] = $parsed['layout'];
-                    }
-                }
-            }
-        };
-
-        $scanDir($modulesDir);
-        if (is_dir($fieldGroupDir)) $scanDir($fieldGroupDir);
-
-        // Scan plugin modules
+        // 2. Scan plugin modules (PHP parsing fallback)
         $pluginsDir = $repoRoot . '/plugins';
         if (is_dir($pluginsDir)) {
             foreach (scandir($pluginsDir) as $entry) {
                 if ($entry === '.' || $entry === '..') continue;
                 $pluginModulesDir = $pluginsDir . '/' . $entry . '/modules';
-                $scanDir($pluginModulesDir);
+                if (!is_dir($pluginModulesDir)) continue;
+                foreach (scandir($pluginModulesDir) as $file) {
+                    if ($file === '.' || $file === '..') continue;
+                    if (!str_ends_with($file, '.php')) continue;
+
+                    $parsed = self::parsePhpFile($pluginModulesDir . '/' . $file, $blockParamsMap);
+                    if (!$parsed) continue;
+
+                    if (!isset($modules[$parsed['className']])) {
+                        $modules[$parsed['className']] = ['fields' => $parsed['fields'], 'layout' => $parsed['layout']];
+                    }
+                }
             }
         }
 

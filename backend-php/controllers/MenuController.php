@@ -16,6 +16,7 @@ class MenuController {
         $body = get_json_body();
         if (empty($body['name'])) error_response('Name is required', 400);
         $id = MenuModel::create(['name' => $body['name'], 'location' => $body['location'] ?? null]);
+        trigger_frontend_rebuild('menu created');
         json_response(['id' => $id, 'message' => 'Menu created'], 201);
     }
 
@@ -23,11 +24,13 @@ class MenuController {
         $body = get_json_body();
         if (empty($body['name'])) error_response('Name is required', 400);
         MenuModel::update($id, ['name' => $body['name'], 'location' => $body['location'] ?? null]);
+        trigger_frontend_rebuild('menu updated');
         json_response(['message' => 'Menu updated']);
     }
 
     public static function delete(int $id): void {
         MenuModel::delete($id);
+        trigger_frontend_rebuild('menu deleted');
         json_response(['message' => 'Menu deleted']);
     }
 
@@ -37,7 +40,17 @@ class MenuController {
             error_response('Items must be an array', 400);
         }
         MenuModel::replaceItems($id, $body['items']);
+        trigger_frontend_rebuild('menu items saved');
         json_response(['message' => 'Menu items saved']);
+    }
+
+    public static function getNavigationById(int $id): void {
+        $items = MenuModel::getNavigationById($id);
+        if ($items) {
+            json_response($items);
+            return;
+        }
+        error_response('Menu not found', 404);
     }
 
     public static function getNavigationByLocation(string $location): void {
@@ -59,6 +72,37 @@ class MenuController {
             'parent_id' => $p['parent_id'],
             'parent_title' => $p['parent_title'] ?? null,
         ], $pages));
+    }
+
+    public static function getAvailableCptItems(): void {
+        $manifests = PluginController::getPluginManifests();
+        $result = [];
+        $db = Database::getInstance();
+
+        foreach ($manifests as $manifest) {
+            foreach ($manifest['postTypes'] ?? [] as $pt) {
+                $slug = $pt['slug'] ?? null;
+                if (!$slug || !preg_match('/^[a-z0-9-]+$/', $slug)) continue;
+
+                $table = "cpt_{$slug}";
+                try {
+                    $stmt = $db->prepare("SELECT id, title, slug FROM `{$table}` WHERE status = 'published' ORDER BY title ASC");
+                    $stmt->execute();
+                    $items = $stmt->fetchAll();
+                } catch (\Exception $e) {
+                    $items = [];
+                }
+
+                $result[] = [
+                    'slug' => $slug,
+                    'label' => $pt['labelPlural'] ?? $pt['label'] ?? $slug,
+                    'icon' => $pt['icon'] ?? '',
+                    'items' => $items,
+                ];
+            }
+        }
+
+        json_response($result);
     }
 
     public static function getAllPageMenuInfo(): void {
@@ -98,6 +142,7 @@ class MenuController {
         ], $body['assignments']);
 
         MenuModel::syncPageMenus($pageId, $body['title'] ?? '', $body['slug'] ?? '', $assignments);
+        trigger_frontend_rebuild('page menus synced');
         json_response(['message' => 'Page menus synced']);
     }
 }

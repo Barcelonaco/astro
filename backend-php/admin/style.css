@@ -3033,6 +3033,14 @@ body.sidebar-collapsed .builder-settings {
   color: var(--gray-600);
   margin-bottom: 8px;
 }
+.menu-search-input {
+  margin-bottom: 8px;
+}
+.menu-add-section + .menu-add-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gray-100);
+}
 .menu-pages-list {
   max-height: 200px;
   overflow-y: auto;
@@ -3067,8 +3075,18 @@ body.sidebar-collapsed .builder-settings {
   transition: box-shadow 0.15s;
 }
 .menu-item-row.dragging {
-  opacity: 0.5;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  opacity: 0.9;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  border-color: var(--primary, #4f46e5);
+  pointer-events: none;
+}
+.menu-item-placeholder {
+  height: 44px;
+  border: 2px dashed var(--primary, #4f46e5);
+  border-radius: 6px;
+  margin-bottom: 4px;
+  background: rgba(79, 70, 229, 0.05);
+  transition: margin-left 0.1s ease;
 }
 .menu-item-header {
   display: flex;

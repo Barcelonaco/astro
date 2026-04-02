@@ -129,6 +129,9 @@
         }
         &.cols_justify_center .col {
             justify-content: center;
+            > .module {
+                flex: 0 1 auto;
+            }
             .cols-wrapper{
                 align-items: center;
             }

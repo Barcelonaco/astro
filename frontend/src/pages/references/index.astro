@@ -25,6 +25,10 @@ const archiveTitle = cptOptions.archive_title || 'Références';
 const showTitle = cptOptions.title_in_header !== 'hideTitle';
 const useH1 = cptOptions.h1_in_header !== 'no';
 const archiveOrder = cptOptions.randomise_refs === 'random' ? 'random' : undefined;
+const archiveDisplay = cptOptions.archive_display || 'column-1'; // 'column-1' or 'columns-2'
+const refDisplay = cptOptions.ref_display || 'popup'; // 'page', 'popup', or 'both'
+const usePopup = refDisplay === 'popup' || refDisplay === 'both';
+const usePageLink = refDisplay === 'page' || refDisplay === 'both';
 
 // Initial load: 6 published references
 const initialResult = await getReferences({ status: 'published', limit: REFS_PER_PAGE, order: archiveOrder });
@@ -92,6 +96,260 @@ function getCategoryNames(ref: ReferenceItem): string {
         object-fit: cover !important;
         object-position: center !important;
       }
+      /* Column layouts */
+      .module-references .list.list-2-cols .item { width: calc(50% - 13px); }
+      .module-references .list.list-1-col .item { width: 100%; }
+      .module-references .list.list-1-col { gap: 32px; }
+      @media (max-width: 600px) {
+        .module-references .list.list-2-cols .item,
+        .module-references .list.list-1-col .item { width: 100%; }
+      }
+
+      /* Popup — Nickl popin style */
+      .ref-popup-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        z-index: 9999;
+        visibility: hidden;
+        opacity: 0;
+        transition: all .6s ease;
+      }
+      .ref-popup-overlay::before {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: .74;
+        z-index: -1;
+        background-color: var(--color-default, #224f5a);
+        content: '';
+      }
+      .ref-popup-overlay.active {
+        visibility: visible;
+        opacity: 1;
+      }
+      .ref-popup {
+        position: relative;
+        width: calc(100% - 5vw * 2);
+        max-width: 1482px;
+        max-height: calc(100vh - 5vw * 2);
+        padding: 36px 26px 39px;
+        overflow: auto;
+        background-color: #fff;
+      }
+      .border-rounded .ref-popup {
+        border-radius: .75rem;
+      }
+      .ref-popup-close {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 70px;
+        height: 70px;
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        background: none;
+        cursor: pointer;
+        transition: color .3s ease;
+      }
+      .ref-popup-close svg {
+        width: 24px;
+        height: 24px;
+      }
+      .ref-popup-close svg * {
+        fill: var(--color-default, #224f5a);
+        transition: fill .3s ease;
+      }
+      .ref-popup-close:hover svg * {
+        fill: var(--color-secondary, #02bd9c);
+      }
+      .ref-popup-cols {
+        display: flex;
+        justify-content: flex-start;
+        align-items: flex-start;
+        flex-wrap: nowrap;
+        gap: 26px;
+      }
+      .ref-popup-cols > .ref-popup-col-img {
+        flex: 1 1 50%;
+        max-width: calc(50% - 13px);
+      }
+      .ref-popup-cols > .ref-popup-col-txt {
+        flex: 1 1 50%;
+        max-width: calc(50% - 13px);
+      }
+      .ref-popup-slider {
+        overflow: hidden;
+      }
+      .border-rounded .ref-popup-slider {
+        border-radius: .75rem;
+      }
+      .ref-popup-slider .slider-navigation {
+        position: absolute;
+        z-index: 5;
+        top: 50%;
+        display: none;
+        padding: 10px;
+        border: 0;
+        background: none;
+        cursor: pointer;
+        transform: translateY(-50%);
+      }
+      .ref-popup-slider .slider-navigation::before {
+        position: relative;
+        display: block;
+        width: 24px;
+        height: 24px;
+        border: 2px solid #fff;
+        content: '';
+        transform: rotate(45deg);
+      }
+      .ref-popup-slider .slider-navigation.prev { left: 16px; }
+      .ref-popup-slider .slider-navigation.prev::before { left: 5px; border-top: 0; border-right: 0; }
+      .ref-popup-slider .slider-navigation.next { right: 16px; }
+      .ref-popup-slider .slider-navigation.next::before { right: 5px; border-bottom: 0; border-left: 0; }
+      .ref-popup-slider .swiper-initialized ~ .slider-navigation,
+      .ref-popup-slider .swiper-initialized .slider-navigation,
+      .ref-popup-slider .slider-navigation { display: block; }
+      .ref-popup-slider .slider-navigation.swiper-button-disabled { opacity: 0; visibility: hidden; }
+      .ref-popup-slider .slider-pagination {
+        position: absolute;
+        bottom: 20px;
+        left: 0;
+        width: 100%;
+        z-index: 5;
+        display: none;
+        justify-content: center;
+        gap: 10px;
+      }
+      .ref-popup-slider .swiper-initialized ~ .slider-pagination,
+      .ref-popup-slider .swiper-initialized .slider-pagination,
+      .ref-popup-slider .slider-pagination { display: flex; }
+      .ref-popup-slider .swiper-pagination-bullet {
+        margin: 0; width: 8px; height: 8px; opacity: .2;
+        background-color: #fff; border-radius: 50%; cursor: pointer; transition: opacity .3s;
+      }
+      .ref-popup-slider .swiper-pagination-bullet-active,
+      .ref-popup-slider .swiper-pagination-bullet:hover { opacity: 1; }
+      .ref-popup .illus-wrapper {
+        display: block;
+        width: 100%;
+        position: relative;
+        padding-top: 82.76%;
+        border: 0;
+        overflow: hidden;
+      }
+      .ref-popup .illus {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+      }
+      .ref-popup-overlay .ref-popup .category {
+        margin-bottom: 4px !important;
+        font-size: 14px !important;
+        line-height: 1.2 !important;
+        letter-spacing: -.04em !important;
+        color: var(--color-primary, #3ee98d) !important;
+        text-transform: uppercase !important;
+      }
+      .ref-popup-overlay .ref-popup .title {
+        margin: 0 !important;
+        padding: 0 !important;
+        text-align: left !important;
+        font-family: var(--font-title, arial, sans-serif) !important;
+        font-size: 42px !important;
+        line-height: 1.05 !important;
+        letter-spacing: -.04em !important;
+        font-weight: 700 !important;
+        color: var(--color-default, #224f5a) !important;
+      }
+      .mode-uppercase .ref-popup-overlay .ref-popup .title {
+        text-transform: uppercase !important;
+        font-size: 45px !important;
+      }
+      .ref-popup-overlay .ref-popup .name {
+        margin: 10px 0 0 !important;
+        padding: 0 !important;
+        font-family: var(--font-title, arial, sans-serif) !important;
+        font-size: 24px !important;
+        line-height: 1.2 !important;
+        letter-spacing: -.04em !important;
+        font-weight: 600 !important;
+        color: var(--color-tertiary, #d6d6d6) !important;
+        text-transform: uppercase !important;
+        text-align: left !important;
+      }
+      .ref-popup-overlay .ref-popup .txt {
+        margin-top: 12px !important;
+        line-height: 1.2 !important;
+        font-size: 16px !important;
+        text-align: left !important;
+      }
+      .ref-popup-overlay .ref-popup .txt p {
+        margin-bottom: 8px !important;
+        line-height: 1.6 !important;
+      }
+      .ref-popup-overlay .ref-popup .txt h2,
+      .ref-popup-overlay .ref-popup .txt h3,
+      .ref-popup-overlay .ref-popup .txt h4 {
+        font-family: var(--font-title, arial, sans-serif) !important;
+        font-weight: 700 !important;
+        letter-spacing: -.04em !important;
+        line-height: 1.1 !important;
+        margin: 16px 0 8px !important;
+        text-align: left !important;
+        color: var(--color-default, #224f5a) !important;
+      }
+      .ref-popup-overlay .ref-popup .txt h2 { font-size: 28px !important; }
+      .ref-popup-overlay .ref-popup .txt h3 { font-size: 22px !important; }
+      .ref-popup-overlay .ref-popup .txt h4 { font-size: 18px !important; }
+      .ref-popup-overlay .ref-popup .txt h2:first-child,
+      .ref-popup-overlay .ref-popup .txt h3:first-child,
+      .ref-popup-overlay .ref-popup .txt h4:first-child {
+        margin-top: 0 !important;
+      }
+      .ref-popup-overlay .ref-popup .btn-wrapper {
+        display: flex !important;
+        gap: 16px !important;
+        flex-wrap: wrap !important;
+        margin-top: 30px !important;
+      }
+      .ref-popup-overlay .ref-popup .btn-secondary {
+        color: var(--color-secondary, #02bd9c) !important;
+        border-color: var(--color-secondary, #02bd9c) !important;
+      }
+      .ref-popup-overlay .ref-popup .btn-secondary:hover {
+        color: #fff !important;
+        background-color: var(--color-secondary, #02bd9c) !important;
+      }
+      @media (max-width: 1550px) {
+        .ref-popup-close { width: 3rem; height: 3rem; }
+        .ref-popup-close svg * { fill: var(--color-primary, #3ee98d); }
+        .ref-popup { position: relative; width: 100%; max-height: 100%; }
+      }
+      @media (max-width: 960px) {
+        .ref-popup-cols { display: block; }
+        .ref-popup-cols > .ref-popup-col-img,
+        .ref-popup-cols > .ref-popup-col-txt { max-width: 100%; }
+        .ref-popup-cols > .ref-popup-col-txt { margin-top: 2.25rem; }
+      }
+      @media (max-width: 600px) {
+        .ref-popup-overlay .ref-popup .title { font-size: 2.75rem !important; }
+      }
     </style>
   </head>
   <body class={bodyClasses || undefined}>
@@ -125,12 +383,15 @@ function getCategoryNames(ref: ReferenceItem): string {
             )}
 
             {/* References grid */}
-            <ul class="list js_list-refs">
+            <ul class={`list js_list-refs ${archiveDisplay === 'columns-2' ? 'list-2-cols' : 'list-1-col'}`} data-display={refDisplay}>
               {initialRefs.map((ref) => {
                 const photos = getPhotos(ref);
                 const mainImage = getMainImage(ref);
                 const categoryNames = getCategoryNames(ref);
                 const customerName = ref.custom_fields?.customer_name || '';
+                const itemLink = usePageLink ? `/references/${ref.slug}` : '#';
+                const itemClickAttr = usePopup ? `data-ref-popup="${ref.id}"` : '';
+                const description = ref.custom_fields?.text || '';
 
                 return (
                   <li class="item" data-id={ref.id}>
@@ -140,7 +401,7 @@ function getCategoryNames(ref: ReferenceItem): string {
                           <div class="swiper-wrapper">
                             {photos.map((photo, idx) => (
                               <div class="swiper-slide sub-item">
-                                <a href={`/references/${ref.slug}`} class="link illus-wrapper">
+                                <a href={itemLink} class="link illus-wrapper" {...(usePopup ? {'data-ref-popup': String(ref.id)} : {})}>
                                   <img src={optimizedImageUrl(photo, 1200, 80)} alt={ref.title} class="illus" loading="lazy" />
                                   <div class="overlay">
                                     <span class="icon" aria-hidden="true">
@@ -157,7 +418,7 @@ function getCategoryNames(ref: ReferenceItem): string {
                           <div class="slider-pagination js_references-slider-pagination"></div>
                         </div>
                       ) : (
-                        <a href={`/references/${ref.slug}`} class="illus-wrapper">
+                        <a href={itemLink} class="illus-wrapper" {...(usePopup ? {'data-ref-popup': String(ref.id)} : {})}>
                           {mainImage && <img src={optimizedImageUrl(mainImage, 1200, 80)} alt={ref.title} class="illus" loading="lazy" />}
                           <div class="overlay">
                             <span class="icon" aria-hidden="true">
@@ -168,11 +429,33 @@ function getCategoryNames(ref: ReferenceItem): string {
                         </a>
                       )}
                     </div>
-                    <a href={`/references/${ref.slug}`} class="link">
+                    <a href={usePopup ? '#' : `/references/${ref.slug}`} class="link" {...(usePopup ? {'data-ref-popup': String(ref.id)} : {})}>
                       {categoryNames && <p class="category">{categoryNames}</p>}
                       <h3 class="title title-section-3">{ref.title}</h3>
                       {customerName && <p class="name">{customerName}</p>}
                     </a>
+                    {/* Hidden data for popup */}
+                    {usePopup && (() => {
+                      let refLink = null;
+                      try {
+                        const rawLink = ref.custom_fields?.link;
+                        if (rawLink) refLink = typeof rawLink === 'string' ? JSON.parse(rawLink) : rawLink;
+                      } catch {}
+                      return (
+                        <div class="js_ref-data" data-ref-id={ref.id} data-ref-json={JSON.stringify({
+                          id: ref.id,
+                          title: ref.title,
+                          slug: ref.slug,
+                          category: categoryNames,
+                          customerName,
+                          description,
+                          photos,
+                          mainImage,
+                          pageLink: usePageLink ? `/references/${ref.slug}` : null,
+                          link: refLink,
+                        })} style="display:none"></div>
+                      );
+                    })()}
                   </li>
                 );
               })}
@@ -205,6 +488,9 @@ function getCategoryNames(ref: ReferenceItem): string {
   var listEl = container.querySelector('.js_list-refs');
   var paginationEl = container.querySelector('.js_list-pagination');
   var currentTerm = 'all';
+  var _refDisplay = listEl.getAttribute('data-display') || 'page';
+  var _usePopup = _refDisplay === 'popup' || _refDisplay === 'both';
+  var _usePageLink = _refDisplay === 'page' || _refDisplay === 'both';
 
   // Tab click: filter by category
   container.querySelectorAll('.js_change-term').forEach(function(btn) {
@@ -224,6 +510,23 @@ function getCategoryNames(ref: ReferenceItem): string {
     var offset = (page - 1) * 6;
     loadRefs(currentTerm, offset, false, page);
   });
+
+  // Popup click handler
+  if (_usePopup) {
+    container.addEventListener('click', function(e) {
+      var trigger = e.target.closest('[data-ref-popup]');
+      if (!trigger) return;
+      e.preventDefault();
+      var refId = trigger.getAttribute('data-ref-popup');
+      var dataEl = container.querySelector('.js_ref-data[data-ref-id="' + refId + '"]');
+      if (dataEl) {
+        try {
+          var refData = JSON.parse(dataEl.getAttribute('data-ref-json'));
+          openRefPopup(refData);
+        } catch(err) { console.error('Popup data error:', err); }
+      }
+    });
+  }
 
   function loadRefs(term, offset, replace, nextPage) {
     var url = API_URL + '/cpt/references?status=published&limit=6&offset=' + (offset || 0);
@@ -264,6 +567,8 @@ function getCategoryNames(ref: ReferenceItem): string {
     var categoryNames = ref.categories ? ref.categories.map(function(c) { return c.name; }).join(' - ') : '';
     var customerName = cf.customer_name || '';
     var slug = ref.slug;
+    var itemHref = _usePageLink ? '/references/' + slug : '#';
+    var popupAttr = _usePopup ? ' data-ref-popup="' + ref.id + '"' : '';
 
     function optImg(url) {
       if (!url) return '';
@@ -281,22 +586,140 @@ function getCategoryNames(ref: ReferenceItem): string {
     var sliderHtml = '';
     if (photos.length > 1) {
       var slides = photos.map(function(photo) {
-        return '<div class="swiper-slide sub-item"><a href="/references/' + slug + '" class="link illus-wrapper"><img src="' + optImg(photo) + '" alt="' + escHtml(ref.title) + '" class="illus" loading="lazy" />' + overlayHtml + '</a></div>';
+        return '<div class="swiper-slide sub-item"><a href="' + itemHref + '" class="link illus-wrapper"' + popupAttr + '><img src="' + optImg(photo) + '" alt="' + escHtml(ref.title) + '" class="illus" loading="lazy" />' + overlayHtml + '</a></div>';
       }).join('');
       sliderHtml = '<div class="swiper slider js_references-slider"><div class="swiper-wrapper">' + slides + '</div><button type="button" class="slider-navigation prev"></button><button type="button" class="slider-navigation next"></button><div class="slider-pagination js_references-slider-pagination"></div></div>';
     } else if (mainImage) {
-      sliderHtml = '<a href="/references/' + slug + '" class="illus-wrapper"><img src="' + optImg(mainImage) + '" alt="' + escHtml(ref.title) + '" class="illus" loading="lazy" />' + overlayHtml + '</a>';
+      sliderHtml = '<a href="' + itemHref + '" class="illus-wrapper"' + popupAttr + '><img src="' + optImg(mainImage) + '" alt="' + escHtml(ref.title) + '" class="illus" loading="lazy" />' + overlayHtml + '</a>';
     }
 
     var catHtml = categoryNames ? '<p class="category">' + escHtml(categoryNames) + '</p>' : '';
     var nameHtml = customerName ? '<p class="name">' + escHtml(customerName) + '</p>' : '';
+    var linkHref = _usePopup ? '#' : '/references/' + slug;
 
-    return '<li class="item" data-id="' + ref.id + '"><div class="slider-wrapper">' + sliderHtml + '</div><a href="/references/' + slug + '" class="link">' + catHtml + '<h3 class="title title-section-3">' + escHtml(ref.title) + '</h3>' + nameHtml + '</a></li>';
+    // Parse link
+    var refLink = null;
+    try { if (cf.link) refLink = typeof cf.link === 'string' ? JSON.parse(cf.link) : cf.link; } catch(e) {}
+
+    // Hidden data for popup (for dynamically loaded items)
+    var dataJson = _usePopup ? JSON.stringify({
+      id: ref.id, title: ref.title, slug: slug, category: categoryNames,
+      customerName: customerName, description: cf.text || '',
+      photos: photos, mainImage: mainImage,
+      pageLink: _usePageLink ? '/references/' + slug : null,
+      link: refLink
+    }) : '';
+    var dataScript = _usePopup ? '<div class="js_ref-data" data-ref-id="' + ref.id + '" data-ref-json="' + escHtml(dataJson) + '" style="display:none"></div>' : '';
+
+    return '<li class="item" data-id="' + ref.id + '"><div class="slider-wrapper">' + sliderHtml + '</div><a href="' + linkHref + '" class="link"' + popupAttr + '>' + catHtml + '<h3 class="title title-section-3">' + escHtml(ref.title) + '</h3>' + nameHtml + '</a>' + dataScript + '</li>';
   }
 
   function escHtml(s) {
     if (!s) return '';
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Popup
+  var svgClose = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z"/></svg>';
+
+  function openRefPopup(data) {
+    closeRefPopup();
+    var photos = data.photos || [];
+    var mainImage = data.mainImage || '';
+
+    function optImg(url) {
+      if (!url) return '';
+      var m = url.match(/\/uploads\/media\/([^/?#]+)$/);
+      if (m && !/\.(mp4|webm|mov|avi)$/i.test(m[1])) return '/uploads/media/_optimized/' + m[1] + '?w=1200&q=80&f=webp';
+      return url;
+    }
+
+    // Build image column (slider or single)
+    var imgHtml = '';
+    if (photos.length > 1) {
+      var slides = photos.map(function(p) {
+        return '<div class="swiper-slide"><div class="illus-wrapper"><img src="' + optImg(p) + '" alt="' + escHtml(data.title) + '" class="illus" loading="lazy" /></div></div>';
+      }).join('');
+      imgHtml = '<div class="ref-popup-slider"><div class="swiper slider js_ref-popup-slider" style="position:relative"><div class="swiper-wrapper">' + slides + '</div><button type="button" class="slider-navigation prev"></button><button type="button" class="slider-navigation next"></button><div class="slider-pagination js_ref-popup-pagination"></div></div></div>';
+    } else if (mainImage) {
+      imgHtml = '<div class="ref-popup-slider"><div class="illus-wrapper"><img src="' + optImg(mainImage) + '" alt="' + escHtml(data.title) + '" class="illus" loading="lazy" /></div></div>';
+    }
+
+    // Build text column
+    var catHtml = data.category ? '<p class="category">' + escHtml(data.category) + '</p>' : '';
+    var nameHtml = data.customerName ? '<p class="name">' + escHtml(data.customerName) + '</p>' : '';
+    var descHtml = data.description ? '<div class="txt editor">' + data.description + '</div>' : '';
+    var btnHtml = '';
+    var hasLink = data.link && data.link.url;
+    var hasPageLink = data.pageLink;
+    if (hasLink || hasPageLink) {
+      btnHtml = '<div class="btn-wrapper">';
+      if (hasLink) {
+        var linkTarget = data.link.target ? ' target="' + escHtml(data.link.target) + '"' : '';
+        var linkTitle = data.link.title || 'Voir le lien';
+        btnHtml += '<a href="' + escHtml(data.link.url) + '" class="btn btn-primary"' + linkTarget + '>' + escHtml(linkTitle) + '</a>';
+      }
+      if (hasPageLink) {
+        btnHtml += '<a href="' + data.pageLink + '" class="btn btn-secondary">En savoir plus</a>';
+      }
+      btnHtml += '</div>';
+    }
+
+    var html = '<div class="ref-popup-overlay" id="refPopupOverlay">'
+      + '<div class="ref-popup">'
+      +   '<button type="button" class="ref-popup-close btn-close" aria-label="Fermer">' + svgClose + '</button>'
+      +   '<div class="ref-popup-cols">'
+      +     '<div class="ref-popup-col-img col">' + imgHtml + '</div>'
+      +     '<div class="ref-popup-col-txt col">'
+      +       catHtml
+      +       '<h2 class="title title-section-2">' + escHtml(data.title) + '</h2>'
+      +       nameHtml + descHtml + btnHtml
+      +     '</div>'
+      +   '</div>'
+      + '</div>'
+      + '</div>';
+
+    document.body.insertAdjacentHTML('beforeend', html);
+    document.body.style.overflow = 'hidden';
+    requestAnimationFrame(function() {
+      var overlay = document.getElementById('refPopupOverlay');
+      if (overlay) overlay.classList.add('active');
+    });
+
+    // Close button
+    document.querySelector('.ref-popup-close').addEventListener('click', closeRefPopup);
+
+    // Close on overlay click
+    var overlay = document.getElementById('refPopupOverlay');
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) closeRefPopup();
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', function onEsc(e) {
+      if (e.key === 'Escape') { closeRefPopup(); document.removeEventListener('keydown', onEsc); }
+    });
+
+    // Init popup slider
+    setTimeout(function() {
+      if (!window.Swiper) return;
+      var sliderEl = document.querySelector('.js_ref-popup-slider');
+      if (!sliderEl || sliderEl.swiper) return;
+      var count = sliderEl.querySelectorAll('.swiper-slide').length;
+      if (count < 2) return;
+      var w = sliderEl.closest('.ref-popup-slider') || sliderEl.parentElement;
+      new window.Swiper(sliderEl, {
+        loop: count > 2, speed: 750, slidesPerView: 1,
+        navigation: { nextEl: w.querySelector('.next'), prevEl: w.querySelector('.prev') },
+        pagination: { el: w.querySelector('.js_ref-popup-pagination'), type: 'bullets', clickable: true }
+      });
+    }, 100);
+  }
+
+  function closeRefPopup() {
+    var overlay = document.getElementById('refPopupOverlay');
+    if (overlay) overlay.remove();
+    document.body.style.overflow = '';
   }
 
   function reloadSwipers() {

@@ -30,6 +30,7 @@ require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/helpers/response.php';
 require_once __DIR__ . '/helpers/request.php';
 require_once __DIR__ . '/helpers/slug.php';
+require_once __DIR__ . '/helpers/rebuild.php';
 require_once __DIR__ . '/middleware/auth.php';
 
 // Models
@@ -394,6 +395,19 @@ try {
         SettingsController::updateSettings();
     }
 
+    // ── Rebuild ──
+    elseif ($method === 'POST' && $path === '/rebuild') {
+        $user = authenticate_token();
+        require_admin($user);
+        $body = get_json_body();
+        trigger_frontend_rebuild($body['reason'] ?? 'manual');
+        json_response(['message' => 'Rebuild triggered', 'status' => get_rebuild_status()]);
+    }
+    elseif ($method === 'GET' && $path === '/rebuild/status') {
+        $user = authenticate_token();
+        json_response(get_rebuild_status());
+    }
+
     // ── Users (admin) ──
     elseif ($method === 'GET' && $path === '/users') {
         $user = authenticate_token();
@@ -486,6 +500,9 @@ try {
     elseif ($method === 'GET' && match_route('/menus/navigation/:location', $path, $params)) {
         MenuController::getNavigationByLocation($params['location']);
     }
+    elseif ($method === 'GET' && match_route('/menus/:id/navigation', $path, $params)) {
+        MenuController::getNavigationById((int) $params['id']);
+    }
     elseif ($method === 'GET' && $path === '/menus') {
         $user = authenticate_token();
         require_admin($user);
@@ -495,6 +512,11 @@ try {
         $user = authenticate_token();
         require_admin($user);
         MenuController::getAvailablePages();
+    }
+    elseif ($method === 'GET' && $path === '/menus/cpt-items') {
+        $user = authenticate_token();
+        require_admin($user);
+        MenuController::getAvailableCptItems();
     }
     elseif ($method === 'GET' && match_route('/menus/:id', $path, $params)) {
         $user = authenticate_token();

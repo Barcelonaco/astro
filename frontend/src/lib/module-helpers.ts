@@ -69,8 +69,8 @@ export function optimizedImageUrl(
   const match = url.match(/\/uploads\/media\/([^/?#]+)$/);
   if (!match) return url;
   const filename = match[1];
-  // Skip video files
-  if (/\.(mp4|webm|mov|avi)$/i.test(filename)) return url;
+  // Skip video files and SVGs (SVGs are already resolution-independent)
+  if (/\.(mp4|webm|mov|avi|svg)$/i.test(filename)) return url;
   return `/uploads/media/_optimized/${filename}?w=${width}&q=${quality}&f=${format}`;
 }
 

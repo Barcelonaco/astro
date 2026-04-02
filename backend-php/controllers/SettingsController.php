@@ -195,6 +195,7 @@ class SettingsController {
         // Invalidate bootstrap cache
         @unlink(__DIR__ . '/../uploads/.bootstrap_cache.json');
 
+        trigger_frontend_rebuild('settings updated');
         json_response(self::getSettingsMap());
     }
 }

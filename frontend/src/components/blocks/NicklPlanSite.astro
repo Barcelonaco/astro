@@ -1,9 +1,13 @@
 ---
 /**
  * Module PlanSite — Plan du site
- * Génère automatiquement la liste des pages depuis l'API CMS.
+ * Génère automatiquement le plan du site avec pages, articles et CPTs (plugins).
+ * Reproduit le comportement du shortcode [plan_du_site] WordPress.
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import { getAllPages, getAllPosts } from '../../lib/api';
+import fs from 'node:fs';
+import path from 'node:path';
 
 interface Props {
   data: Record<string, any>;
@@ -11,32 +15,111 @@ interface Props {
 
 const { data } = Astro.props;
 
-const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.PUBLIC_API_URL || 'https://astro.lan/api';
+const apiOrigin = new URL(API_URL).origin;
 
+// --- Fetch pages ---
 let pages: any[] = [];
 try {
-  const res = await fetch(`${API_URL}/pages?status=published`);
-  if (res.ok) {
-    const json = await res.json();
-    pages = Array.isArray(json) ? json : json.pages || [];
-  }
-} catch {
-  // Silently fail
+  pages = await getAllPages();
+  pages = pages.filter((p: any) => p.status === 'published');
+} catch { /* silent */ }
+
+// --- Fetch posts ---
+let posts: any[] = [];
+try {
+  posts = await getAllPosts();
+} catch { /* silent */ }
+
+// --- Discover CPTs from plugin.json files ---
+interface CptSection {
+  label: string;
+  slug: string;
+  items: any[];
 }
+
+let cptSections: CptSection[] = [];
+try {
+  const pluginsDir = path.resolve(process.cwd(), '..', 'plugins');
+  if (fs.existsSync(pluginsDir)) {
+    const pluginDirs = fs.readdirSync(pluginsDir, { withFileTypes: true })
+      .filter(d => d.isDirectory());
+
+    for (const dir of pluginDirs) {
+      const manifestPath = path.join(pluginsDir, dir.name, 'plugin.json');
+      if (!fs.existsSync(manifestPath)) continue;
+
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      const postTypes = manifest.postTypes || [];
+
+      for (const pt of postTypes) {
+        try {
+          const res = await fetch(`${API_URL}/cpt/${pt.slug}`);
+          if (res.ok) {
+            const cptData = await res.json();
+            const items = (Array.isArray(cptData) ? cptData : cptData.items || [])
+              .filter((item: any) => item.status === 'published');
+            if (items.length > 0) {
+              cptSections.push({
+                label: pt.labelPlural || pt.label || pt.slug,
+                slug: pt.slug,
+                items,
+              });
+            }
+          }
+        } catch { /* silent */ }
+      }
+    }
+  }
+} catch { /* silent */ }
 ---
 
-<NicklModuleWrapper data={data} moduleName="plan-site">
-  {pages.length > 0 ? (
-    <ul class="plan-site-list">
-      {pages.map((page: any) => (
-        <li>
-          <a href={`/pages/${page.slug}`}>{page.title}</a>
-        </li>
+<NicklModuleWrapper data={data} moduleName="plansite">
+  <div class="txt editor">
+    <div class="list">
+      {/* Pages */}
+      {pages.length > 0 && (
+        <div class="item">
+          <h2>Les pages</h2>
+          <ul>
+            {pages.map((page: any) => (
+              <li>
+                <a href={`/pages/${page.slug}`}>{page.title}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Articles */}
+      {posts.length > 0 && (
+        <div class="item">
+          <h2>Les articles</h2>
+          <ul>
+            <li><a href="/blog">Blog</a></li>
+            {posts.map((post: any) => (
+              <li>
+                <a href={`/blog/${post.slug}`}>{post.title}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* CPTs from plugins */}
+      {cptSections.map((section) => (
+        <div class="item">
+          <h2>{section.label}</h2>
+          <ul>
+            <li><a href={`/${section.slug}`}>{section.label}</a></li>
+            {section.items.map((item: any) => (
+              <li>
+                <a href={`/${section.slug}/${item.slug}`}>{item.title}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
       ))}
-    </ul>
-  ) : (
-    <p class="placeholder-message" style="text-align:center;opacity:0.6;">
-      Aucune page disponible pour le plan du site.
-    </p>
-  )}
+    </div>
+  </div>
 </NicklModuleWrapper>
