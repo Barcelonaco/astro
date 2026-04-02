@@ -1,6 +1,26 @@
 <?php
 
 class MediaController {
+    private static bool $migrated = false;
+
+    private static function ensureExtraColumns(): void {
+        if (self::$migrated) return;
+        self::$migrated = true;
+        $db = Database::getInstance();
+        $existing = [];
+        foreach ($db->query("SHOW COLUMNS FROM media_items")->fetchAll() as $col) {
+            $existing[] = $col['Field'];
+        }
+        if (!in_array('alt', $existing))
+            $db->exec("ALTER TABLE media_items ADD COLUMN alt VARCHAR(500) DEFAULT '' AFTER original_name");
+        if (!in_array('title', $existing))
+            $db->exec("ALTER TABLE media_items ADD COLUMN title VARCHAR(500) DEFAULT '' AFTER alt");
+        if (!in_array('caption', $existing))
+            $db->exec("ALTER TABLE media_items ADD COLUMN caption TEXT AFTER title");
+        if (!in_array('description', $existing))
+            $db->exec("ALTER TABLE media_items ADD COLUMN description TEXT AFTER caption");
+    }
+
     private static function normalizeFolderId($value): ?int {
         if ($value === null || $value === '' || $value === 'null') return null;
         $parsed = filter_var($value, FILTER_VALIDATE_INT);
@@ -15,7 +35,9 @@ class MediaController {
 
     public static function getFolders(): void {
         $db = Database::getInstance();
-        json_response($db->query('SELECT id, name, parent_id, created_at FROM media_folders ORDER BY name ASC')->fetchAll());
+        $folders = $db->query('SELECT f.id, f.name, f.parent_id, f.created_at, COUNT(m.id) AS media_count FROM media_folders f LEFT JOIN media_items m ON m.folder_id = f.id GROUP BY f.id ORDER BY f.name ASC')->fetchAll();
+        $total = (int) $db->query('SELECT COUNT(*) FROM media_items')->fetchColumn();
+        json_response(['folders' => $folders, 'total' => $total]);
     }
 
     public static function createFolder(): void {
@@ -56,13 +78,19 @@ class MediaController {
         json_response(['success' => true]);
     }
 
+    private static function selectFields(): string {
+        return 'id, folder_id, type, filename, original_name, alt, title, caption, description, mime_type, size, width, height, url, created_at';
+    }
+
     public static function getItems(): void {
+        self::ensureExtraColumns();
         $db = Database::getInstance();
         $folderId = self::normalizeFolderId($_GET['folder_id'] ?? null);
         $search = trim($_GET['search'] ?? '');
         $showAll = ($_GET['all'] ?? '') === '1';
 
-        $sql = 'SELECT id, folder_id, type, filename, original_name, mime_type, size, width, height, url, created_at FROM media_items';
+        $fields = self::selectFields();
+        $sql = "SELECT {$fields} FROM media_items";
         $params = [];
 
         if ($search) {
@@ -84,6 +112,7 @@ class MediaController {
     }
 
     public static function upload(): void {
+        self::ensureExtraColumns();
         $uploadDir = __DIR__ . '/../uploads/media';
         if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
 
@@ -152,6 +181,7 @@ class MediaController {
     }
 
     public static function updateItem(int $id): void {
+        self::ensureExtraColumns();
         $body = get_json_body();
         $db = Database::getInstance();
         $updates = [];
@@ -161,9 +191,25 @@ class MediaController {
             $updates[] = 'folder_id = ?';
             $params[] = self::normalizeFolderId($body['folder_id']);
         }
-        if (!empty($body['original_name'])) {
+        if (array_key_exists('original_name', $body)) {
             $updates[] = 'original_name = ?';
-            $params[] = trim($body['original_name']);
+            $params[] = trim($body['original_name'] ?? '');
+        }
+        if (array_key_exists('alt', $body)) {
+            $updates[] = 'alt = ?';
+            $params[] = trim($body['alt'] ?? '');
+        }
+        if (array_key_exists('title', $body)) {
+            $updates[] = 'title = ?';
+            $params[] = trim($body['title'] ?? '');
+        }
+        if (array_key_exists('caption', $body)) {
+            $updates[] = 'caption = ?';
+            $params[] = trim($body['caption'] ?? '');
+        }
+        if (array_key_exists('description', $body)) {
+            $updates[] = 'description = ?';
+            $params[] = trim($body['description'] ?? '');
         }
 
         if (!empty($updates)) {
@@ -171,7 +217,79 @@ class MediaController {
             $db->prepare('UPDATE media_items SET ' . implode(', ', $updates) . ' WHERE id = ?')->execute($params);
         }
 
-        $stmt = $db->prepare('SELECT id, folder_id, type, filename, original_name, mime_type, size, width, height, url, created_at FROM media_items WHERE id = ?');
+        $fields = self::selectFields();
+        $stmt = $db->prepare("SELECT {$fields} FROM media_items WHERE id = ?");
+        $stmt->execute([$id]);
+        json_response($stmt->fetch());
+    }
+
+    public static function cropItem(int $id): void {
+        $body = get_json_body();
+        $x = (int) ($body['x'] ?? 0);
+        $y = (int) ($body['y'] ?? 0);
+        $w = (int) ($body['width'] ?? 0);
+        $h = (int) ($body['height'] ?? 0);
+
+        if ($w <= 0 || $h <= 0) error_response('Dimensions invalides', 400);
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT * FROM media_items WHERE id = ?');
+        $stmt->execute([$id]);
+        $item = $stmt->fetch();
+        if (!$item) error_response('Média introuvable', 404);
+
+        $uploadDir = __DIR__ . '/../uploads/media';
+        $srcPath = $uploadDir . '/' . $item['filename'];
+        if (!file_exists($srcPath)) error_response('Fichier introuvable', 404);
+
+        $mime = $item['mime_type'];
+        $src = match ($mime) {
+            'image/jpeg' => @imagecreatefromjpeg($srcPath),
+            'image/png'  => @imagecreatefrompng($srcPath),
+            'image/gif'  => @imagecreatefromgif($srcPath),
+            'image/webp' => @imagecreatefromwebp($srcPath),
+            default      => null,
+        };
+        if (!$src) error_response('Format non supporté pour le recadrage', 400);
+
+        $dst = imagecreatetruecolor($w, $h);
+
+        // Preserve transparency for PNG/GIF
+        if ($mime === 'image/png' || $mime === 'image/gif') {
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+            $transparent = imagecolorallocatealpha($dst, 0, 0, 0, 127);
+            imagefilledrectangle($dst, 0, 0, $w, $h, $transparent);
+        }
+
+        imagecopyresampled($dst, $src, 0, 0, $x, $y, $w, $h, $w, $h);
+        imagedestroy($src);
+
+        // Save over original file
+        match ($mime) {
+            'image/jpeg' => imagejpeg($dst, $srcPath, 92),
+            'image/png'  => imagepng($dst, $srcPath, 6),
+            'image/gif'  => imagegif($dst, $srcPath),
+            'image/webp' => imagewebp($dst, $srcPath, 90),
+        };
+        imagedestroy($dst);
+
+        // Clear optimized cache
+        $optimizedDir = $uploadDir . '/_optimized';
+        if (is_dir($optimizedDir)) {
+            $baseName = pathinfo($item['filename'], PATHINFO_FILENAME);
+            foreach (glob($optimizedDir . '/' . $baseName . '*') as $cached) {
+                @unlink($cached);
+            }
+        }
+
+        // Update dimensions in DB
+        $newSize = filesize($srcPath);
+        $db->prepare('UPDATE media_items SET width = ?, height = ?, size = ? WHERE id = ?')
+            ->execute([$w, $h, $newSize, $id]);
+
+        $fields = self::selectFields();
+        $stmt = $db->prepare("SELECT {$fields} FROM media_items WHERE id = ?");
         $stmt->execute([$id]);
         json_response($stmt->fetch());
     }

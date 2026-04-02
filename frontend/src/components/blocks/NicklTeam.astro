@@ -81,7 +81,7 @@ const isSingle = teamMembers.length === 1;
           <>
             <li class="item">
               <div class="illus-wrapper">
-                {pictureUrl && <img src={pictureUrl} alt={pictureAlt} class="illus" width="300" height="300" loading="lazy" />}
+                {pictureUrl && <img src={pictureUrl} alt={pictureAlt} class="illus" width="300" height="300" loading="lazy" decoding="async" />}
               </div>
             </li>
             <li class="item">
@@ -94,7 +94,7 @@ const isSingle = teamMembers.length === 1;
       return (
         <li class="item">
           <div class="illus-wrapper">
-            {pictureUrl && <img src={pictureUrl} alt={pictureAlt} class="illus" width="300" height="300" loading="lazy" />}
+            {pictureUrl && <img src={pictureUrl} alt={pictureAlt} class="illus" width="300" height="300" loading="lazy" decoding="async" />}
           </div>
           {descBlock}
         </li>

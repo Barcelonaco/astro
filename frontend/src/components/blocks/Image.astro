@@ -1,10 +1,10 @@
 ---
-const { src, alt = '', caption } = Astro.props.data || {};
+const { src, alt = '', title, caption, width, height } = Astro.props.data || {};
 ---
 
 {src && (
   <figure class="block-image">
-    <img src={src} alt={alt} loading="lazy" />
+    <img src={src} alt={alt} title={title || undefined} width={width || undefined} height={height || undefined} loading="lazy" decoding="async" />
     {caption && <figcaption>{caption}</figcaption>}
   </figure>
 )}

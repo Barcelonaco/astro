@@ -31,6 +31,7 @@ require_once __DIR__ . '/helpers/response.php';
 require_once __DIR__ . '/helpers/request.php';
 require_once __DIR__ . '/helpers/slug.php';
 require_once __DIR__ . '/helpers/rebuild.php';
+require_once __DIR__ . '/helpers/media-enricher.php';
 require_once __DIR__ . '/middleware/auth.php';
 
 // Models
@@ -489,6 +490,11 @@ try {
         $user = authenticate_token();
         require_admin($user);
         MediaController::updateItem((int) $params['id']);
+    }
+    elseif ($method === 'POST' && match_route('/media/:id/crop', $path, $params)) {
+        $user = authenticate_token();
+        require_admin($user);
+        MediaController::cropItem((int) $params['id']);
     }
     elseif ($method === 'DELETE' && match_route('/media/:id', $path, $params)) {
         $user = authenticate_token();

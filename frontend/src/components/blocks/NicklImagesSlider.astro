@@ -52,7 +52,7 @@ const images = rawSliders.map((slide) => ({
             {images.map((slide) => (
               <div class={`swiper-slide item ${slide.has_desc ? 'has-desc' : 'no-desc'}`}>
                 <div class="illus-wrapper">
-                  <img src={slide.image_url} alt={slide.image_alt} class="illus" width="1200" height="675" loading="lazy" />
+                  <img src={slide.image_url} alt={slide.image_alt} class="illus" width="1200" height="675" loading="lazy" decoding="async" />
                 </div>
                 {slide.has_desc && (
                   <div class="container-large container-2">

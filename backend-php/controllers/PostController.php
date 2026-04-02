@@ -19,7 +19,7 @@ class PostController {
             'title' => $post['title'],
             'slug' => $post['slug'],
             'excerpt' => $post['excerpt'],
-            'content' => $post['content'],
+            'content' => enrichMediaInContent($post['content'] ?? ''),
             'featured_image' => $post['featured_image'],
             'author' => [
                 'id' => $post['author_id'],

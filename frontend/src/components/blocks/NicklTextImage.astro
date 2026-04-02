@@ -9,6 +9,8 @@ import { cleanHtml, resolveLink, isTruthy } from '../../lib/module-classes';
 import {
   resolveImageUrl,
   resolveImageAlt,
+  resolveImageTitle,
+  resolveImageDimensions,
   extractYouTubeId,
   extractVimeoId,
   extractDailymotionId,
@@ -53,6 +55,8 @@ const imgParallax = isTruthy(data.img_parallax) && mediaChoice;
 // Image
 const imageUrl = resolveImageUrl(data.image, apiOrigin, ratioImg);
 const imageAlt = resolveImageAlt(data.image);
+const imageTitle = resolveImageTitle(data.image);
+const imageDims = resolveImageDimensions(data.image);
 
 // Vidéo
 const videoFile = data.video as any;
@@ -170,7 +174,7 @@ const extraClasses = extraParts.join(' ');
         /* Image */
         imageUrl && (
           <div class={`illus-wrapper ${mediaRatio}`}>
-            <img src={imageUrl} alt={imageAlt} class="illus" width="800" height="600" loading="lazy" />
+            <img src={imageUrl} alt={imageAlt} title={imageTitle || undefined} class="illus" width={imageDims.width || 800} height={imageDims.height || 600} loading="lazy" decoding="async" />
           </div>
         )
       )}

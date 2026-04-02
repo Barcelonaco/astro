@@ -1337,8 +1337,9 @@ function openCPTFeaturedPicker() {
   ensureMediaPickerModal();
   showLoading();
   Promise.all([apiFetch('/media/folders'), apiFetch('/media?all=1')])
-    .then(([folders, items]) => {
-      mediaPickerState.folders = folders;
+    .then(([res, items]) => {
+      mediaPickerState.folders = res.folders || [];
+      mediaPickerState.totalCount = res.total || 0;
       mediaPickerState.items = items;
       hideLoading();
       document.getElementById('mediaPickerModal').classList.add('is-open');
@@ -1368,8 +1369,9 @@ function openCPTPhotoPicker() {
   ensureMediaPickerModal();
   showLoading();
   Promise.all([apiFetch('/media/folders'), apiFetch('/media?all=1')])
-    .then(([folders, items]) => {
-      mediaPickerState.folders = folders;
+    .then(([res, items]) => {
+      mediaPickerState.folders = res.folders || [];
+      mediaPickerState.totalCount = res.total || 0;
       mediaPickerState.items = items;
       hideLoading();
       document.getElementById('mediaPickerModal').classList.add('is-open');
@@ -1775,8 +1777,9 @@ function openCPTOptionsImgPicker() {
   ensureMediaPickerModal();
   showLoading();
   Promise.all([apiFetch('/media/folders'), apiFetch('/media?all=1')])
-    .then(([folders, items]) => {
-      mediaPickerState.folders = folders;
+    .then(([res, items]) => {
+      mediaPickerState.folders = res.folders || [];
+      mediaPickerState.totalCount = res.total || 0;
       mediaPickerState.items = items;
       hideLoading();
       updateMediaPickerContent();
@@ -7570,11 +7573,16 @@ async function deleteReusableBloc(id, title) {
 }
 
 // ========== MEDIA LIBRARY ==========
+let mediaTotalCount = 0;
+
 async function fetchMediaFolders() {
   try {
-    mediaState.folders = await apiFetch('/media/folders');
+    const res = await apiFetch('/media/folders');
+    mediaState.folders = res.folders || [];
+    mediaTotalCount = res.total || 0;
   } catch (e) {
     mediaState.folders = [];
+    mediaTotalCount = 0;
   }
 }
 
@@ -7630,14 +7638,14 @@ async function renderMediaLibrary() {
           <input type="text" class="media-search-input" placeholder="Rechercher un média…" value="${escapeHtml(mediaState.search)}" oninput="handleMediaSearch(this.value)" />
           ${mediaState.search ? `<button class="media-search-clear" onclick="clearMediaSearch()" title="Effacer">&times;</button>` : ''}
         </div>
-        <button class="media-folder-item media-folder-all ${currentFolder === null ? 'is-active' : ''}" onclick="selectMediaFolder(null)">
-          📁 Tous les médias
+        <button class="media-folder-item media-folder-all ${currentFolder === null ? 'is-active' : ''}" onclick="selectMediaFolder(null)" ondragover="onFolderDragOver(event)" ondragleave="onFolderDragLeave(event)" ondrop="onFolderDrop(event, null)">
+          Tous les médias <span class="media-folder-count">${mediaTotalCount}</span>
         </button>
         <h3>Dossiers</h3>
         <div class="media-folder-list">
           ${folders.map(folder => `
-            <button class="media-folder-item ${String(folder.id) === String(currentFolder) ? 'is-active' : ''}" onclick="selectMediaFolder(${folder.id ?? 'null'})">
-              📁 ${escapeHtml(folder.name)}
+            <button class="media-folder-item ${String(folder.id) === String(currentFolder) ? 'is-active' : ''}" onclick="selectMediaFolder(${folder.id ?? 'null'})" ondragover="onFolderDragOver(event)" ondragleave="onFolderDragLeave(event)" ondrop="onFolderDrop(event, ${folder.id})">
+              ${escapeHtml(folder.name)} <span class="media-folder-count">${folder.media_count || 0}</span>
             </button>
           `).join('')}
         </div>
@@ -7691,7 +7699,7 @@ function renderMediaCard(item, forPicker = false) {
         </div>
       `;
   return `
-    <article class="media-card ${forPicker ? 'is-picker' : ''} ${isSelected ? 'is-selected' : ''}" onclick="${forPicker ? `selectMediaFromPicker(${item.id})` : ''}">
+    <article class="media-card ${forPicker ? 'is-picker' : ''} ${isSelected ? 'is-selected' : ''}" ${!forPicker ? `draggable="true" ondragstart="onMediaDragStart(event, ${item.id})"` : ''} onclick="${forPicker ? `selectMediaFromPicker(${item.id})` : `openMediaDetail(${item.id})`}">
       ${!forPicker ? `
         <label class="media-select" onclick="event.stopPropagation()">
           <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleMediaSelection(${item.id}, this.checked); event.stopPropagation();" />
@@ -7769,7 +7777,7 @@ async function handleMediaUpload(event) {
   const files = Array.from(event.target.files || []);
   if (files.length === 0) return;
   const formData = new FormData();
-  files.forEach(file => formData.append('files', file));
+  files.forEach(file => formData.append('files[]', file));
   if (mediaState.currentFolderId) formData.append('folder_id', mediaState.currentFolderId);
   showLoading();
   try {
@@ -7830,6 +7838,261 @@ async function moveMediaItem(id, folderId) {
   }
 }
 
+// ── Drag & drop media → folder ──
+function onMediaDragStart(event, mediaId) {
+  event.dataTransfer.setData('text/plain', String(mediaId));
+  event.dataTransfer.effectAllowed = 'move';
+  event.currentTarget.classList.add('is-dragging');
+  // Highlight all folder targets
+  document.querySelectorAll('.media-folder-item').forEach(el => el.classList.add('is-drop-target'));
+}
+
+document.addEventListener('dragend', () => {
+  document.querySelectorAll('.is-dragging').forEach(el => el.classList.remove('is-dragging'));
+  document.querySelectorAll('.is-drop-target, .is-drag-over').forEach(el => el.classList.remove('is-drop-target', 'is-drag-over'));
+});
+
+function onFolderDragOver(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  event.currentTarget.classList.add('is-drag-over');
+}
+
+function onFolderDragLeave(event) {
+  event.currentTarget.classList.remove('is-drag-over');
+}
+
+async function onFolderDrop(event, folderId) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('is-drag-over');
+  document.querySelectorAll('.is-drop-target').forEach(el => el.classList.remove('is-drop-target'));
+  const mediaId = event.dataTransfer.getData('text/plain');
+  if (!mediaId) return;
+  await moveMediaItem(parseInt(mediaId), folderId);
+}
+
+// ── Media detail panel ──
+function openMediaDetail(mediaId) {
+  const item = mediaState.items.find(i => i.id === mediaId || String(i.id) === String(mediaId));
+  if (!item) return;
+
+  // Remove existing panel
+  const existing = document.getElementById('mediaDetailPanel');
+  if (existing) existing.remove();
+
+  const isImage = item.type === 'image';
+  const previewUrl = isImage ? getOptimizedUrl(item.url, 600, 80) : item.url;
+  const dims = (item.width && item.height) ? `${item.width} × ${item.height} px` : '';
+  const folderName = item.folder_id ? (mediaState.folders.find(f => String(f.id) === String(item.folder_id))?.name || '') : 'Aucun';
+
+  const panel = document.createElement('div');
+  panel.id = 'mediaDetailPanel';
+  panel.className = 'media-detail-panel';
+  panel.innerHTML = `
+    <div class="media-detail-backdrop" onclick="closeMediaDetail()"></div>
+    <div class="media-detail-content">
+      <div class="media-detail-header">
+        <h3>Détails du média</h3>
+        <button class="media-detail-close" onclick="closeMediaDetail()">&times;</button>
+      </div>
+      <div class="media-detail-preview">
+        ${isImage
+          ? `<img src="${escapeHtml(previewUrl)}" alt="${escapeHtml(item.alt || item.original_name)}">`
+          : `<video src="${escapeHtml(item.url)}" controls></video>`}
+      </div>
+      <div class="media-detail-infos">
+        <span>${escapeHtml(item.mime_type)}</span>
+        <span>${formatBytes(item.size)}</span>
+        ${dims ? `<span>${dims}</span>` : ''}
+      </div>
+      <form class="media-detail-form" onsubmit="saveMediaDetail(event, ${item.id})">
+        <label>
+          <span>Texte alternatif</span>
+          <textarea name="alt" rows="2" placeholder="Décrivez le but de l'image. Laissez vide si l'image est purement décorative.">${escapeHtml(item.alt || '')}</textarea>
+        </label>
+        <label>
+          <span>Titre</span>
+          <input type="text" name="title" value="${escapeHtml(item.title || item.original_name || '')}" />
+        </label>
+        <label>
+          <span>Légende</span>
+          <textarea name="caption" rows="2" placeholder="Texte affiché sous l'image">${escapeHtml(item.caption || '')}</textarea>
+        </label>
+        <label>
+          <span>Description</span>
+          <textarea name="description" rows="3" placeholder="Description détaillée du média">${escapeHtml(item.description || '')}</textarea>
+        </label>
+        <label>
+          <span>Nom du fichier</span>
+          <input type="text" name="original_name" value="${escapeHtml(item.original_name || '')}" />
+        </label>
+        <label>
+          <span>Dossier</span>
+          <select name="folder_id">
+            <option value="">Sans dossier</option>
+            ${mediaState.folders.map(f => `<option value="${f.id}" ${String(f.id) === String(item.folder_id) ? 'selected' : ''}>${escapeHtml(f.name)}</option>`).join('')}
+          </select>
+        </label>
+        <label>
+          <span>URL du fichier</span>
+          <div class="media-detail-url">
+            <input type="text" value="${escapeHtml(item.url)}" readonly id="mediaDetailUrl" />
+            <button type="button" class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('mediaDetailUrl').value); showToast('URL copiée', 'success');">Copier</button>
+          </div>
+        </label>
+        <div class="media-detail-actions">
+          <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
+          ${isImage ? `<button type="button" class="btn btn-outline btn-sm" onclick="openCropEditor(${item.id}, '${escapeHtml(item.url)}')">Recadrer</button>` : ''}
+          <button type="button" class="btn btn-danger btn-sm" onclick="deleteMediaItem(${item.id}); closeMediaDetail();">Supprimer</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(panel);
+  // Animate in
+  requestAnimationFrame(() => panel.classList.add('is-open'));
+}
+
+function closeMediaDetail() {
+  const panel = document.getElementById('mediaDetailPanel');
+  if (!panel) return;
+  panel.classList.remove('is-open');
+  setTimeout(() => panel.remove(), 200);
+}
+
+async function saveMediaDetail(event, id) {
+  event.preventDefault();
+  const form = event.target;
+  const data = {
+    original_name: form.original_name.value.trim(),
+    alt: form.alt.value.trim(),
+    title: form.title.value.trim(),
+    caption: form.caption.value.trim(),
+    description: form.description.value.trim(),
+    folder_id: form.folder_id.value || null
+  };
+  try {
+    await apiFetch(`/media/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+    showToast('Média mis à jour', 'success');
+    closeMediaDetail();
+    await fetchMediaItems(mediaState.currentFolderId);
+    document.getElementById('content').innerHTML = await renderMediaLibrary();
+  } catch (e) {
+    showToast(e.message || 'Erreur', 'error');
+  }
+}
+
+// ── Crop editor ──
+let _cropperInstance = null;
+
+function ensureCropperLib() {
+  return new Promise((resolve) => {
+    if (window.Cropper) return resolve();
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css';
+    document.head.appendChild(link);
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js';
+    script.onload = resolve;
+    document.head.appendChild(script);
+  });
+}
+
+async function openCropEditor(mediaId, imageUrl) {
+  await ensureCropperLib();
+
+  // Remove existing
+  const existing = document.getElementById('cropEditorModal');
+  if (existing) existing.remove();
+  if (_cropperInstance) { _cropperInstance.destroy(); _cropperInstance = null; }
+
+  const modal = document.createElement('div');
+  modal.id = 'cropEditorModal';
+  modal.className = 'crop-modal';
+  modal.innerHTML = `
+    <div class="crop-modal-backdrop" onclick="closeCropEditor()"></div>
+    <div class="crop-modal-panel">
+      <div class="crop-modal-header">
+        <h3>Recadrer l'image</h3>
+        <button class="media-detail-close" onclick="closeCropEditor()">&times;</button>
+      </div>
+      <div class="crop-modal-body">
+        <img id="cropEditorImage" src="${imageUrl}?t=${Date.now()}" crossorigin="anonymous" />
+      </div>
+      <div class="crop-modal-toolbar">
+        <div class="crop-ratios">
+          <button type="button" class="btn btn-outline btn-sm crop-ratio-btn is-active" onclick="setCropRatio(NaN, this)">Libre</button>
+          <button type="button" class="btn btn-outline btn-sm crop-ratio-btn" onclick="setCropRatio(1, this)">1:1</button>
+          <button type="button" class="btn btn-outline btn-sm crop-ratio-btn" onclick="setCropRatio(16/9, this)">16:9</button>
+          <button type="button" class="btn btn-outline btn-sm crop-ratio-btn" onclick="setCropRatio(4/3, this)">4:3</button>
+          <button type="button" class="btn btn-outline btn-sm crop-ratio-btn" onclick="setCropRatio(3/2, this)">3:2</button>
+        </div>
+        <div class="crop-actions">
+          <button type="button" class="btn btn-outline btn-sm" onclick="closeCropEditor()">Annuler</button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="applyCrop(${mediaId})">Appliquer</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  requestAnimationFrame(() => {
+    modal.classList.add('is-open');
+    const img = document.getElementById('cropEditorImage');
+    _cropperInstance = new Cropper(img, {
+      viewMode: 1,
+      dragMode: 'move',
+      autoCropArea: 1,
+      responsive: true,
+      background: true,
+    });
+  });
+}
+
+function setCropRatio(ratio, btn) {
+  if (!_cropperInstance) return;
+  _cropperInstance.setAspectRatio(ratio);
+  document.querySelectorAll('.crop-ratio-btn').forEach(b => b.classList.remove('is-active'));
+  btn.classList.add('is-active');
+}
+
+async function applyCrop(mediaId) {
+  if (!_cropperInstance) return;
+  const data = _cropperInstance.getData(true); // rounded integers
+  showLoading();
+  try {
+    await apiFetch(`/media/${mediaId}/crop`, {
+      method: 'POST',
+      body: JSON.stringify({
+        x: data.x,
+        y: data.y,
+        width: data.width,
+        height: data.height
+      })
+    });
+    showToast('Image recadrée', 'success');
+    closeCropEditor();
+    closeMediaDetail();
+    await fetchMediaItems(mediaState.currentFolderId);
+    document.getElementById('content').innerHTML = await renderMediaLibrary();
+  } catch (e) {
+    showToast(e.message || 'Erreur lors du recadrage', 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function closeCropEditor() {
+  if (_cropperInstance) { _cropperInstance.destroy(); _cropperInstance = null; }
+  const modal = document.getElementById('cropEditorModal');
+  if (!modal) return;
+  modal.classList.remove('is-open');
+  setTimeout(() => modal.remove(), 200);
+}
+
 async function renameMediaItem(id, currentName) {
   const name = await promptModal('Nouveau nom du média ?', currentName || '');
   if (!name) return;
@@ -7877,11 +8140,13 @@ function ensureMediaPickerModal() {
         </div>
         <div class="media-modal-header-actions">
           <div class="media-modal-actions" id="mediaPickerActions"></div>
-          <label class="btn btn-primary btn-sm" style="cursor:pointer;margin:0">
+          <button class="btn-close-modal" onclick="createMediaPickerFolder()">+ Dossier</button>
+          <label class="btn-upload">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
             Importer
             <input type="file" multiple accept="image/*,video/*" onchange="handleMediaPickerUpload(event)" style="display:none">
           </label>
-          <button class="btn btn-outline btn-sm" onclick="closeMediaPicker()">Fermer</button>
+          <button class="btn-close-modal" onclick="closeMediaPicker()">Fermer</button>
         </div>
       </div>
       <div class="media-modal-body">
@@ -7919,7 +8184,9 @@ async function openSettingsMediaPicker(settingName) {
   ensureMediaPickerModal();
   showLoading();
   try {
-    mediaPickerState.folders = await apiFetch('/media/folders');
+    const fRes = await apiFetch('/media/folders');
+    mediaPickerState.folders = fRes.folders || [];
+    mediaPickerState.totalCount = fRes.total || 0;
     mediaPickerState.items = await apiFetch('/media?all=1');
   } catch (e) {
     mediaPickerState.folders = [];
@@ -7992,7 +8259,9 @@ async function openMediaPicker(type, blockId, fieldName, options = {}) {
   ensureMediaPickerModal();
   showLoading();
   try {
-    mediaPickerState.folders = await apiFetch('/media/folders');
+    const fRes = await apiFetch('/media/folders');
+    mediaPickerState.folders = fRes.folders || [];
+    mediaPickerState.totalCount = fRes.total || 0;
     mediaPickerState.items = await apiFetch('/media?all=1');
   } catch (e) {
     mediaPickerState.folders = [];
@@ -8018,7 +8287,7 @@ async function handleMediaPickerUpload(event) {
   const files = Array.from(event.target.files || []);
   if (files.length === 0) return;
   const formData = new FormData();
-  files.forEach(file => formData.append('files', file));
+  files.forEach(file => formData.append('files[]', file));
   if (mediaPickerState.folderId) formData.append('folder_id', mediaPickerState.folderId);
   showLoading();
   try {
@@ -8031,6 +8300,24 @@ async function handleMediaPickerUpload(event) {
   } finally {
     hideLoading();
     event.target.value = '';
+  }
+}
+
+async function createMediaPickerFolder() {
+  const name = await promptModal('Nom du dossier ?', '');
+  if (!name) return;
+  try {
+    await apiFetch('/media/folders', {
+      method: 'POST',
+      body: JSON.stringify({ name, parent_id: null })
+    });
+    const fRes2 = await apiFetch('/media/folders');
+    mediaPickerState.folders = fRes2.folders || [];
+    mediaPickerState.totalCount = fRes2.total || 0;
+    updateMediaPickerContent();
+    showToast('Dossier créé', 'success');
+  } catch (e) {
+    showToast(e.message || 'Erreur lors de la création', 'error');
   }
 }
 
@@ -8099,12 +8386,12 @@ function updateMediaPickerContent() {
   if (!folderEl || !gridEl) return;
   folderEl.innerHTML = `
     <button class="media-folder-item media-folder-all ${mediaPickerState.folderId === null ? 'is-active' : ''}" onclick="selectMediaPickerFolder(null)">
-      📁 Tous les médias
+      Tous les médias <span class="media-folder-count">${mediaPickerState.totalCount || 0}</span>
     </button>
     <h3 style="margin:8px 0 4px;font-size:13px;font-weight:600;color:var(--gray-600)">Dossiers</h3>
   ` + mediaPickerState.folders.map(folder => `
     <button class="media-folder-item ${String(folder.id) === String(mediaPickerState.folderId) ? 'is-active' : ''}" onclick="selectMediaPickerFolder(${folder.id ?? 'null'})">
-      📁 ${escapeHtml(folder.name)}
+      ${escapeHtml(folder.name)} <span class="media-folder-count">${folder.media_count || 0}</span>
     </button>
   `).join('');
   const filtered = mediaPickerState.type === 'all'
@@ -8164,7 +8451,7 @@ function selectMediaFromPicker(id) {
 
   // CPT Featured image picker
   if (mediaPickerState.blockId === '__cpt_featured__') {
-    const payload = { id: item.id, url: item.url, alt: item.original_name || '', sizes: { thumbnail: item.url, half: item.url, banner: item.url } };
+    const payload = { id: item.id, url: item.url, alt: item.alt || item.original_name || '', title: item.title || '', caption: item.caption || '', width: item.width || null, height: item.height || null, sizes: { thumbnail: item.url, half: item.url, banner: item.url } };
     document.getElementById('cptFeaturedInput').value = JSON.stringify(payload);
     document.getElementById('cptFeaturedPreview').innerHTML = `<img src="${escapeHtml(getOptimizedUrl(item.url, 400, 70))}" style="max-width:200px;max-height:150px;object-fit:cover;border-radius:8px;">`;
     closeMediaPicker();
@@ -8222,10 +8509,15 @@ function applyMediaSelection(blockId, fieldName, item) {
   const payload = {
     id: item.id,
     url: item.url,
+    alt: item.alt || '',
+    title: item.title || '',
+    caption: item.caption || '',
     type: item.type,
     original_name: item.original_name,
     mime_type: item.mime_type,
-    size: item.size
+    size: item.size,
+    width: item.width || null,
+    height: item.height || null
   };
   input.value = JSON.stringify(payload);
   const wrapper = input.closest('.media-field');
@@ -8303,10 +8595,15 @@ function applyMediaSelectionMultiple(blockId, fieldName, items) {
   const payloadItems = items.map(item => ({
     id: item.id,
     url: item.url,
+    alt: item.alt || '',
+    title: item.title || '',
+    caption: item.caption || '',
     type: item.type,
     original_name: item.original_name,
     mime_type: item.mime_type,
-    size: item.size
+    size: item.size,
+    width: item.width || null,
+    height: item.height || null
   }));
   const payload = fieldName === 'list'
     ? payloadItems.map(media => ({ image: media }))

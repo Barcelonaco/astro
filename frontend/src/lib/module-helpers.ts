@@ -79,3 +79,50 @@ export function resolveImageAlt(img: unknown): string {
   if (!img || typeof img === 'string') return '';
   return (img as Record<string, any>).alt || '';
 }
+
+/** Récupère le titre d'une image */
+export function resolveImageTitle(img: unknown): string {
+  if (!img || typeof img === 'string') return '';
+  return (img as Record<string, any>).title || '';
+}
+
+/** Récupère la légende d'une image */
+export function resolveImageCaption(img: unknown): string {
+  if (!img || typeof img === 'string') return '';
+  return (img as Record<string, any>).caption || '';
+}
+
+/** Récupère les dimensions d'une image */
+export function resolveImageDimensions(img: unknown): { width?: number; height?: number } {
+  if (!img || typeof img === 'string') return {};
+  const obj = img as Record<string, any>;
+  return {
+    width: obj.width || undefined,
+    height: obj.height || undefined
+  };
+}
+
+/**
+ * Génère les attributs HTML d'une image à partir d'un objet image ACF.
+ * Retourne un objet avec src, alt, title, width, height, loading, decoding.
+ */
+export function resolveImageAttrs(
+  img: unknown,
+  apiOrigin: string,
+  preferredSize?: string,
+  eager: boolean = false
+): Record<string, string | number | undefined> {
+  const src = resolveImageUrl(img, apiOrigin, preferredSize);
+  const alt = resolveImageAlt(img);
+  const title = resolveImageTitle(img);
+  const dims = resolveImageDimensions(img);
+  return {
+    src,
+    alt,
+    ...(title ? { title } : {}),
+    ...(dims.width ? { width: dims.width } : {}),
+    ...(dims.height ? { height: dims.height } : {}),
+    loading: eager ? 'eager' : 'lazy',
+    decoding: 'async'
+  };
+}

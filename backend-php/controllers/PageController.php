@@ -6,7 +6,7 @@ class PageController {
             'id' => $page['id'],
             'title' => $page['title'],
             'slug' => $page['slug'],
-            'content' => $page['content'],
+            'content' => enrichMediaInContent($page['content'] ?? ''),
             'color_overrides' => $page['color_overrides'] ?? null,
             'seo_meta' => $page['seo_meta'] ?? null,
             'status' => $page['status'],

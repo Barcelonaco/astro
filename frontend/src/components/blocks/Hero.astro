@@ -122,13 +122,13 @@ function normalizeCta(cta: any): { url: string; title: string; target: string } 
               <div class="link">
                 <div class="background">
                   {bloc.image?.url && (
-                    <img src={optimizedImageUrl(bloc.image.url, 960, 80)} alt={bloc.image.alt ?? ''} class="illus" width="960" height="540" loading="lazy" decoding="async" />
+                    <img src={optimizedImageUrl(bloc.image.url, 960, 80)} alt={bloc.image.alt || ''} class="illus" width="960" height="540" loading="lazy" decoding="async" />
                   )}
                 </div>
                 <div class="desc">
                   {bloc.logo?.url && (
                     <div class="logo-wrapper">
-                      <img src={bloc.logo.url} alt={bloc.logo.alt ?? ''} class="logo" width="200" height="80" />
+                      <img src={bloc.logo.url} alt={bloc.logo.alt || ''} class="logo" width="200" height="80" />
                     </div>
                   )}
                   {bloc.title && <p class="title title-section-2">{bloc.title}</p>}
