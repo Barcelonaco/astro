@@ -6210,6 +6210,8 @@ function saveSchemaData(blockId, event) {
     const name = field.name;
     const type = field.type || 'Text';
     if (type === 'Repeater') {
+      const rc = form.querySelector(`.repeater-field[data-field-name="${CSS.escape(name)}"]`);
+      if (!rc && data[name] !== undefined) return; // hidden repeater (e.g. Accordion inline) — keep existing data
       data[name] = collectRepeaterData(form, name, field.subFields || []);
       return;
     }
@@ -6397,6 +6399,8 @@ function liveUpdateFromSettingsForm(form) {
     const type = field.type || 'Text';
     try {
     if (type === 'Repeater') {
+      const rc = form.querySelector(`.repeater-field[data-field-name="${CSS.escape(name)}"]`);
+      if (!rc && data[name] !== undefined) return; // hidden repeater (e.g. Accordion inline) — keep existing data
       data[name] = collectRepeaterData(form, name, field.subFields || []);
       return;
     }
@@ -6818,7 +6822,7 @@ function _updateToolbarState() {
  * @param {HTMLElement} [targetTxtEditor] - optional: the specific .txt.editor element (for sub-modules in columns)
  * @param {object} [dataRef] - optional: direct reference to the sub-module data object
  */
-function enableInlineEditing(blockId, targetTxtEditor, dataRef) {
+function enableInlineEditing(blockId, targetTxtEditor, dataRef, fieldName) {
   const block = pageBuilderState.blocks.find(b => b.id === blockId);
   if (!block) return;
 
@@ -6843,7 +6847,7 @@ function enableInlineEditing(blockId, targetTxtEditor, dataRef) {
   disableInlineEditing();
 
   _inlineEditingBlockId = blockId;
-  _inlineEditingFieldName = 'text';
+  _inlineEditingFieldName = fieldName || 'text';
   _inlineEditingDataRef = dataRef || block.data;
   _inlineEditingElement = targetTxtEditor;
 
@@ -9437,12 +9441,24 @@ async function renderSiteSettings() {
           <h2 class="builder-settings-title" style="margin-top: 0;">Footer</h2>
           <div class="form-group">
             <label class="form-label">Couleur de fond du footer</label>
-            <select class="form-select" name="footer_color">
-              <option value="no-background-color" ${footerColor === 'no-background-color' ? 'selected' : ''}>Aucune</option>
-              <option value="has-background-primary" ${footerColor === 'has-background-primary' ? 'selected' : ''}>Couleur primaire</option>
-              <option value="has-background-secondary" ${footerColor === 'has-background-secondary' ? 'selected' : ''}>Couleur secondaire</option>
-              <option value="has-background-dark" ${footerColor === 'has-background-dark' ? 'selected' : ''}>Couleur textes (sombre)</option>
-            </select>
+            <div class="radio-pill-group">
+              ${[
+                { value: 'no-background-color', label: 'Aucune', color: null },
+                { value: 'has-background-primary', label: 'Primaire', color: settings.primary_color || null },
+                { value: 'has-background-secondary', label: 'Secondaire', color: settings.secondary_color || null },
+                { value: 'has-background-dark', label: 'Sombre', color: settings.default_color || '#224f5a' },
+              ].map((opt, i) => {
+                const checked = footerColor === opt.value ? 'checked' : '';
+                const swatch = opt.color
+                  ? '<span class="color-swatch" style="background:' + escapeHtml(opt.color) + '"></span>'
+                  : '<span class="color-swatch color-swatch--none"></span>';
+                return '<label class="radio-pill radio-pill--color" for="footer_color_' + i + '">'
+                  + '<input type="radio" id="footer_color_' + i + '" name="footer_color" value="' + escapeHtml(opt.value) + '" ' + checked + '>'
+                  + swatch
+                  + '<span class="color-label">' + escapeHtml(opt.label) + '</span>'
+                  + '</label>';
+              }).join('')}
+            </div>
           </div>
           <div class="form-row" style="align-items:end;">
             <div class="form-group">
