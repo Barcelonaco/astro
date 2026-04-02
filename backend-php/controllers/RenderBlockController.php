@@ -217,7 +217,7 @@ class RenderBlockController {
         if ($showArchive) {
             $label = htmlspecialchars($data['archive_link_label'] ?? 'Voir toutes les références');
             $html .= '<div style="margin-top:60px;text-align:center;">';
-            $html .= '<a href="/references" class="btn btn-primary">' . $label . '</a>';
+            $html .= '<a href="/references" class="btn btn-tertiary color-primary">' . $label . '</a>';
             $html .= '</div>';
         }
 

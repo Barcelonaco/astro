@@ -124,7 +124,7 @@ const indexPopin = Math.floor(Math.random() * 1000);
 
       {showArchiveLink && (
         <div class="btn-more-wrapper">
-          <a href="/references" class="btn btn-primary">{archiveLinkLabel}</a>
+          <a href="/references" class="btn btn-tertiary color-primary">{archiveLinkLabel}</a>
         </div>
       )}
     </>
@@ -166,6 +166,13 @@ const indexPopin = Math.floor(Math.random() * 1000);
     position: relative;
     border: 0;
     overflow: hidden;
+  }
+  .module-references .list .illus-wrapper::before {
+    display: block;
+    width: 100%;
+    padding-top: 74.78%;
+    visibility: hidden;
+    content: '';
   }
   .module-references .list .illus-wrapper::after {
     position: absolute;

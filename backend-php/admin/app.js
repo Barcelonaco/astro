@@ -2948,6 +2948,40 @@ function renderBlockPreviewHtml(block) {
     if (!moduleTemplateCache['summary']) queueModuleTemplateLoad('summary');
     return `<div class="module module-summary ${sumCls}" style="position:relative;"><div class="container">${sumTitleHtml}${sumContent}</div></div>`;
   }
+  // BlocReferences — live preview from server-side render
+  if (block.type === 'bloc-references' || block.type === 'BlocReferences') {
+    const refCls = [d.bloc_color || '', d.padding_top || '', d.padding_bottom || ''].filter(Boolean).join(' ');
+    const refId = 'ref-preview-' + (block.id || Math.random().toString(36).slice(2));
+    const refTitle = d.title_bloc || d.title || '';
+    const refTitleStyle = d.title_style || '2';
+    const refTitleAlign = d.title_align || 'center';
+    const refTitleHtml = refTitle ? `<h${refTitleStyle} class="title-module title-section-${refTitleStyle} align-${escapeHtml(String(refTitleAlign))}">${escapeHtml(String(refTitle))}</h${refTitleStyle}>` : '';
+    let refBgHtml = '';
+    const refBgExtraCls = [];
+    const refBgImg = d.bg_img;
+    if (refBgImg) {
+      const bgUrl = typeof refBgImg === 'string' ? refBgImg : (refBgImg.url || '');
+      const bgOpacity = (d.bg_opacity ?? 10) / 100;
+      if (bgUrl) {
+        refBgHtml = `<div class="background" style="background-image: url(${escapeHtml(bgUrl)}); opacity: ${bgOpacity}; background-size: cover; background-position: center; position: absolute; inset: 0;"></div>`;
+        refBgExtraCls.push('has-background-image');
+      }
+    }
+    if (!moduleTemplateCache['references']) queueModuleTemplateLoad('references');
+    setTimeout(async () => {
+      const el = document.getElementById(refId);
+      if (!el || el.dataset.loaded) return;
+      el.dataset.loaded = '1';
+      try {
+        const res = await apiFetch('/render-block', { method: 'POST', body: JSON.stringify({ type: 'bloc-references', data: d }) });
+        if (res.html) el.innerHTML = res.html;
+        else el.innerHTML = '<p style="text-align:center;opacity:0.6;">Aucune référence à afficher</p>';
+      } catch (e) {
+        el.innerHTML = '<p style="text-align:center;color:red;">Erreur: ' + escapeHtml(e.message) + '</p>';
+      }
+    }, 50);
+    return `<div class="module module-references ${escapeHtml(refCls)} ${refBgExtraCls.join(' ')}" style="position:relative;">${refBgHtml}<div class="container-large">${refTitleHtml}<div id="${refId}"><p style="text-align:center;opacity:0.5;">Chargement des références…</p></div></div></div>`;
+  }
   // GoogleReviews — live preview from plugin API
   if (block.type === 'google-reviews' || block.type === 'GoogleReviews') {
     const grCls = [d.bloc_color || '', d.padding_top || '', d.padding_bottom || ''].filter(Boolean).join(' ');
@@ -3862,7 +3896,8 @@ function resolveExpression(expr, ctx, allowHtml) {
   const cleaned = String(expr).trim();
   const bgMatch = cleaned.match(/^GlobalHelper::displayBackground\((.+)\)$/);
   if (bgMatch) {
-    const url = resolveValue(bgMatch[1], ctx);
+    const firstArg = bgMatch[1].split(',')[0].trim();
+    const url = resolveValue(firstArg, ctx);
     if (!url) return '';
     return `background-image: url(${url})`;
   }

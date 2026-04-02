@@ -14,7 +14,24 @@ const apiOrigin = new URL(API_URL).origin;
 const inColumns = !!data.columns;
 const id = inColumns ? '' : ((data.id_bloc as string) ?? '');
 const classes = inColumns ? '' : buildModuleClasses(data);
-const backgroundImage = inColumns ? null : ((data.backgroundImage as any) ?? null);
+const bgImg = inColumns ? null : ((data.bg_img as any) ?? null);
+const rawBgOpacity = data.bg_opacity as number | string | undefined;
+const opacityPercent =
+  rawBgOpacity === undefined || rawBgOpacity === null || rawBgOpacity === ''
+    ? 10
+    : Number(rawBgOpacity);
+const bgOpacity = Number.isNaN(opacityPercent) ? 10 : opacityPercent;
+
+const backgroundImage = bgImg
+  ? {
+      url: typeof bgImg === 'string'
+        ? (bgImg.startsWith('http') ? bgImg : apiOrigin + bgImg)
+        : (typeof bgImg.url === 'string' && bgImg.url.startsWith('http')
+            ? bgImg.url
+            : apiOrigin + String(bgImg.url || '')),
+      opacity: bgOpacity,
+    }
+  : null;
 const titleBloc = inColumns ? '' : ((data.title_bloc as string) ?? (data.title as string) ?? '');
 const titleStyle = (data.title_style as number | string) ?? 2;
 const titleAlign = (data.title_align as string) ?? 'center';
@@ -68,7 +85,7 @@ function hasDesc(item: any): boolean {
     {backgroundImage && backgroundImage.url && (
       <div
         class="background"
-        style={`background-image: url(${backgroundImage.url}); opacity: ${backgroundImage.opacity ?? 1};`}
+        style={`background-image: url(${backgroundImage.url}); opacity: ${Number(backgroundImage.opacity ?? 10) / 100};`}
       />
     )}
 
