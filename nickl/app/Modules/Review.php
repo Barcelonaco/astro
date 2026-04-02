@@ -7,6 +7,7 @@ use App\Modules\BlockParams;
 use Extended\ACF\Fields\ButtonGroup;
 use Extended\ACF\Fields\Layout;
 use Extended\ACF\Fields\Message;
+use Extended\ACF\Fields\Text;
 
 class Review
 {
@@ -40,6 +41,9 @@ class Review
                 ->layout('horizontal')
                 ->wrapper(['width' => 25])
                 ->default('google'),
+            Text::make('TrustIndex Widget ID', 'trustindex_widget_id')
+                ->helperText('Entrez l\'identifiant du widget TrustIndex (ex: 47a06b7201a01391068606420). Retrouvez-le dans votre tableau de bord TrustIndex.')
+                ->wrapper(['width' => 50]),
         ]);
         return Layout::make('Avis client', 'review')
             ->layout('block')

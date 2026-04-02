@@ -187,7 +187,7 @@ class SettingsController {
         $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
 
         foreach ($updates as $key => $value) {
-            if (!in_array($key, $allowedKeys) && !preg_match('/^cpt_[a-z0-9_]+$/', $key)) continue;
+            if (!in_array($key, $allowedKeys) && !preg_match('/^(cpt|plugin)_[a-z0-9_]+$/', $key)) continue;
             $strValue = ($value === null) ? '' : (string) $value;
             $stmt->execute([$key, $strValue]);
         }

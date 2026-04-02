@@ -313,6 +313,35 @@ export async function getCPTOptions(postType: string): Promise<Record<string, st
   }
 }
 
+export interface GoogleReview {
+  author_name: string
+  author_url?: string
+  profile_photo_url: string
+  rating: number
+  relative_time_description: string
+  text: string
+  time: number
+}
+
+export interface GoogleReviewsData {
+  rating: number
+  total: number
+  reviews: GoogleReview[]
+}
+
+export async function getGoogleReviews(limit?: number, minRating?: number): Promise<GoogleReviewsData | null> {
+  try {
+    const params = new URLSearchParams()
+    if (limit) params.set('limit', String(limit))
+    if (minRating) params.set('min_rating', String(minRating))
+    const qs = params.toString()
+    const data = await fetchAPI(`/google-reviews${qs ? '?' + qs : ''}`)
+    return data || null
+  } catch {
+    return null
+  }
+}
+
 // Helper to format content (since it's now plain text/HTML from MySQL)
 export function formatContent(content: string): string {
   if (!content) return ''

@@ -207,6 +207,10 @@ async function loadSection(section) {
         const slug = section.split(':')[1];
         const ptDef = findPostTypeDef(slug);
         if (ptDef) { content.innerHTML = await renderCPTOptionsPage(ptDef); attachCPTOptionsEvents(); }
+      } else if (section.startsWith('plugin-options:')) {
+        const pluginName = section.split(':')[1];
+        const pluginDef = loadedPlugins.find(p => p.name === pluginName);
+        if (pluginDef && pluginDef.options) { content.innerHTML = await renderPluginOptionsPage(pluginDef); attachPluginOptionsEvents(); }
       } else if (section.startsWith('form-edit:')) {
         const formId = parseInt(section.split(':')[1]) || null;
         content.innerHTML = await renderFormBuilder(formId);
@@ -883,6 +887,27 @@ async function loadPlugins() {
             loadSection(subItem.dataset.section);
           });
         });
+      }
+    }
+
+    // Inject sidebar items for plugins with options but no postTypes
+    if (plugin.options && plugin.options.length > 0 && (!plugin.postTypes || plugin.postTypes.length === 0)) {
+      const nav = document.querySelector('.sidebar .nav');
+      const settingsLink = nav ? nav.querySelector('[data-section="site-settings"]') : null;
+      if (nav && !nav.querySelector(`[data-section="plugin-options:${plugin.name}"]`)) {
+        const a = document.createElement('a');
+        a.href = '#';
+        a.className = 'nav-item';
+        a.dataset.section = `plugin-options:${plugin.name}`;
+        a.innerHTML = `${plugin.icon || '🔌'} ${escapeHtml(plugin.label || plugin.name)}`;
+        a.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+          a.classList.add('active');
+          loadSection(`plugin-options:${plugin.name}`);
+        });
+        if (settingsLink) nav.insertBefore(a, settingsLink);
+        else nav.appendChild(a);
       }
     }
   }
@@ -1579,6 +1604,115 @@ async function deleteCPTCategory(postTypeSlug, catId, name) {
     loadSection(`cpt-categories:${postTypeSlug}`);
   } catch {
     showToast('Erreur lors de la suppression', 'error');
+  }
+}
+
+// ========== PLUGIN OPTIONS PAGE ==========
+
+async function renderPluginOptionsPage(pluginDef) {
+  showLoading();
+  const prefix = `plugin_${pluginDef.name.replace(/-/g, '_')}_`;
+  let settings = {};
+  try {
+    const allSettings = await apiFetch('/settings');
+    for (const s of allSettings) {
+      if (s.setting_key.startsWith(prefix)) {
+        settings[s.setting_key.replace(prefix, '')] = s.setting_value;
+      }
+    }
+  } catch { /* ignore */ }
+  hideLoading();
+
+  let fieldsHtml = '';
+  for (const opt of pluginDef.options || []) {
+    const val = settings[opt.name] !== undefined ? settings[opt.name] : (opt.default || '');
+    const helper = opt.helperText ? `<small style="color:#888;display:block;margin-top:4px;">${escapeHtml(opt.helperText)}</small>` : '';
+    const required = opt.required ? ' <span style="color:red;">*</span>' : '';
+
+    if (opt.type === 'text') {
+      fieldsHtml += `
+        <div class="form-group" style="margin-bottom:16px;">
+          <label class="form-label">${escapeHtml(opt.label)}${required}</label>
+          <input type="text" class="form-input" name="${escapeHtml(opt.name)}" value="${escapeHtml(val)}"${opt.required ? ' required' : ''}>
+          ${helper}
+        </div>`;
+    } else if (opt.type === 'range') {
+      fieldsHtml += `
+        <div class="form-group" style="margin-bottom:16px;max-width:300px;">
+          <label class="form-label">${escapeHtml(opt.label)}${required}</label>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <input type="range" name="${escapeHtml(opt.name)}" min="${opt.min || 1}" max="${opt.max || 10}" value="${escapeHtml(val)}" oninput="this.nextElementSibling.textContent=this.value" style="flex:1;">
+            <span style="min-width:24px;text-align:center;font-weight:600;">${escapeHtml(val || opt.default || '3')}</span>
+          </div>
+          ${helper}
+        </div>`;
+    } else if (opt.type === 'select') {
+      const optionsHtml = (opt.choices || []).map(c =>
+        `<option value="${escapeHtml(c.value)}"${c.value === val ? ' selected' : ''}>${escapeHtml(c.label)}</option>`
+      ).join('');
+      fieldsHtml += `
+        <div class="form-group" style="margin-bottom:16px;max-width:300px;">
+          <label class="form-label">${escapeHtml(opt.label)}${required}</label>
+          <select class="form-input" name="${escapeHtml(opt.name)}">${optionsHtml}</select>
+          ${helper}
+        </div>`;
+    } else if (opt.type === 'toggle') {
+      fieldsHtml += `
+        <div class="form-group" style="margin-bottom:16px;">
+          <label class="form-label">${escapeHtml(opt.label)}</label>
+          <div class="cpt-toggle-group" data-name="${escapeHtml(opt.name)}">
+            <button type="button" class="cpt-toggle-btn ${val !== '0' ? 'active' : ''}" data-value="1">Oui</button>
+            <button type="button" class="cpt-toggle-btn ${val === '0' ? 'active' : ''}" data-value="0">Non</button>
+          </div>
+          <input type="hidden" name="${escapeHtml(opt.name)}" value="${escapeHtml(val || opt.default || '1')}">
+          ${helper}
+        </div>`;
+    }
+  }
+
+  return `
+    <div class="page-header">
+      <h1>${pluginDef.icon || '🔌'} ${escapeHtml(pluginDef.label || pluginDef.name)} — Options</h1>
+    </div>
+    <div class="card">
+      <form id="pluginOptionsForm" onsubmit="savePluginOptions(event, '${escapeHtml(pluginDef.name)}')">
+        ${fieldsHtml}
+        <div style="display:flex;justify-content:flex-end;margin-top:24px;">
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+function attachPluginOptionsEvents() {
+  document.querySelectorAll('#pluginOptionsForm .cpt-toggle-group').forEach(group => {
+    const name = group.dataset.name;
+    const hiddenInput = group.parentElement.querySelector(`input[name="${name}"]`);
+    group.querySelectorAll('.cpt-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        group.querySelectorAll('.cpt-toggle-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (hiddenInput) hiddenInput.value = btn.dataset.value;
+      });
+    });
+  });
+}
+
+async function savePluginOptions(event, pluginName) {
+  event.preventDefault();
+  const form = event.target;
+  const prefix = `plugin_${pluginName.replace(/-/g, '_')}_`;
+  const formData = new FormData(form);
+  const settings = {};
+  for (const [key, value] of formData.entries()) {
+    settings[`${prefix}${key}`] = value;
+  }
+  try {
+    await apiFetch('/settings', { method: 'PUT', body: JSON.stringify({ settings }) });
+    showToast('Options enregistrées', 'success');
+  } catch (error) {
+    showToast(error.message || 'Erreur', 'error');
   }
 }
 
@@ -2813,6 +2947,39 @@ function renderBlockPreviewHtml(block) {
     }
     if (!moduleTemplateCache['summary']) queueModuleTemplateLoad('summary');
     return `<div class="module module-summary ${sumCls}" style="position:relative;"><div class="container">${sumTitleHtml}${sumContent}</div></div>`;
+  }
+  // GoogleReviews — live preview from plugin API
+  if (block.type === 'google-reviews' || block.type === 'GoogleReviews') {
+    const grCls = [d.bloc_color || '', d.padding_top || '', d.padding_bottom || ''].filter(Boolean).join(' ');
+    const grId = 'gr-preview-' + (block.id || Math.random().toString(36).slice(2));
+    const grTitle = d.title_bloc || d.title || '';
+    const grTitleStyle = d.title_style || '2';
+    const grTitleAlign = d.title_align || 'center';
+    const grTitleHtml = grTitle ? `<h${grTitleStyle} class="title-module title-section-${grTitleStyle} align-${escapeHtml(String(grTitleAlign))}">${escapeHtml(String(grTitle))}</h${grTitleStyle}>` : '';
+    let grBgHtml = '';
+    const grBgExtraCls = [];
+    const grBgImg = d.bg_img;
+    if (grBgImg) {
+      const bgUrl = typeof grBgImg === 'string' ? grBgImg : (grBgImg.url || '');
+      const bgOpacity = (d.bg_opacity ?? 10) / 100;
+      if (bgUrl) {
+        grBgHtml = `<div class="background" style="background-image: url(${escapeHtml(bgUrl)}); opacity: ${bgOpacity}; background-size: cover; background-position: center; position: absolute; inset: 0;"></div>`;
+        grBgExtraCls.push('has-background-image');
+      }
+    }
+    setTimeout(async () => {
+      const el = document.getElementById(grId);
+      if (!el || el.dataset.loaded) return;
+      el.dataset.loaded = '1';
+      try {
+        const res = await apiFetch('/render-block', { method: 'POST', body: JSON.stringify({ type: 'google-reviews', data: d }) });
+        if (res.html) el.innerHTML = res.html;
+        else el.innerHTML = '<p style="text-align:center;opacity:0.6;">Aucun aperçu disponible</p>';
+      } catch (e) {
+        el.innerHTML = '<p style="text-align:center;color:red;">Erreur: ' + escapeHtml(e.message) + '</p>';
+      }
+    }, 50);
+    return `<div class="module module-google-reviews ${escapeHtml(grCls)} ${grBgExtraCls.join(' ')}" style="position:relative;">${grBgHtml}<div class="container-large">${grTitleHtml}<div id="${grId}"><p style="text-align:center;opacity:0.5;">Chargement des avis Google…</p></div></div></div>`;
   }
   const layout = getModuleLayout(block);
   if (!layout) return '';

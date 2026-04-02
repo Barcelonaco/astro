@@ -81,7 +81,34 @@
   color: inherit;
 }
 
-/* 7. FORMULAIRES */
+/* 7. ORNEMENT : forcer une hauteur minimale dans le builder pour que le bloc
+   reste visible et sélectionnable même sans padding */
+.builder-canvas-inner .module.module-ornament {
+  min-height: 80px;
+  z-index: auto;
+  display: flex;
+}
+.builder-canvas-inner .module.module-ornament .illus-wrapper {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+}
+.builder-canvas-inner .module.module-ornament .illus-wrapper.img-left {
+  margin-right: auto;
+}
+.builder-canvas-inner .module.module-ornament .illus-wrapper.img-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+.builder-canvas-inner .module.module-ornament .illus-wrapper.img-right {
+  margin-left: auto;
+}
+.builder-canvas-inner .module.module-ornament .illus {
+  top: auto;
+}
+
+/* 8. FORMULAIRES */
 .builder-canvas-inner .module input:not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="color"]),
 .builder-canvas-inner .module textarea,
 .builder-canvas-inner .module select {

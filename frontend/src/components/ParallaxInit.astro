@@ -14,8 +14,9 @@
 
   var bgModules = document.querySelectorAll('.module.has-background-image.background-parallax');
   var imgParallaxWrappers = document.querySelectorAll('.module.img-parallax .illus-wrapper');
+  var ornamentWrappers = document.querySelectorAll('.module-ornament .illus-wrapper');
 
-  if (bgModules.length === 0 && imgParallaxWrappers.length === 0) return;
+  if (bgModules.length === 0 && imgParallaxWrappers.length === 0 && ornamentWrappers.length === 0) return;
 
   var ticking = false;
 
@@ -39,6 +40,17 @@
       var progress = (wh - rect.top) / (wh + rect.height);
       var y = 200 * (1 - progress);
       illus.style.transform = 'translateY(' + y + 'px)';
+    });
+
+    // Ornament illus parallax: reproduit GSAP scrub y: 0 → 14vh
+    ornamentWrappers.forEach(function(wrapper) {
+      var rect = wrapper.getBoundingClientRect();
+      if (rect.bottom < -200 || rect.top > wh + 200) return;
+      var illus = wrapper.querySelector('.illus');
+      if (!illus) return;
+      var progress = (wh - rect.top) / (wh + rect.height);
+      var y = 14 * progress;
+      illus.style.transform = 'translateY(' + y + 'vh)';
     });
 
     ticking = false;

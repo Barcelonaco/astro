@@ -1044,7 +1044,7 @@
                         },
                         {
                             "name": "catchphrase",
-                            "label": "Phrase d\\'accroche",
+                            "label": "Phrase d'accroche",
                             "type": "Text",
                             "choices": null,
                             "onLabel": null,
@@ -2742,7 +2742,7 @@
                         },
                         {
                             "name": "catchphrase",
-                            "label": "Phrase d\\'accroche",
+                            "label": "Phrase d'accroche",
                             "type": "Text",
                             "choices": null,
                             "onLabel": null,
@@ -3346,59 +3346,6 @@
                     "isBlockParam": true
                 },
                 {
-                    "name": "place_id",
-                    "label": "Place ID Google",
-                    "type": "Text",
-                    "choices": null,
-                    "onLabel": null,
-                    "offLabel": null,
-                    "conditional": null,
-                    "subFields": null
-                },
-                {
-                    "name": "limit",
-                    "label": "Nombre d\\'avis à afficher",
-                    "type": "Range",
-                    "choices": null,
-                    "onLabel": null,
-                    "offLabel": null,
-                    "conditional": null,
-                    "subFields": null,
-                    "defaultValue": 3
-                },
-                {
-                    "name": "min_rating",
-                    "label": "Note minimale",
-                    "type": "Select",
-                    "choices": [
-                        {
-                            "value": "1",
-                            "label": "1 étoile"
-                        },
-                        {
-                            "value": "2",
-                            "label": "2 étoiles"
-                        },
-                        {
-                            "value": "3",
-                            "label": "3 étoiles"
-                        },
-                        {
-                            "value": "4",
-                            "label": "4 étoiles"
-                        },
-                        {
-                            "value": "5",
-                            "label": "5 étoiles"
-                        }
-                    ],
-                    "onLabel": null,
-                    "offLabel": null,
-                    "conditional": null,
-                    "subFields": null,
-                    "defaultValue": "4"
-                },
-                {
                     "name": "display_google_reviews_link",
                     "label": "Afficher le lien vers Google Avis ?",
                     "type": "TrueFalse",
@@ -3745,7 +3692,7 @@
                         },
                         {
                             "name": "logo_size",
-                            "label": "Choix de la taille de l\\'illustration",
+                            "label": "Choix de la taille de l'illustration",
                             "type": "ButtonGroup",
                             "choices": [
                                 {
@@ -3905,7 +3852,7 @@
                         },
                         {
                             "name": "catchphrase",
-                            "label": "Phrase d\\'accroche",
+                            "label": "Phrase d'accroche",
                             "type": "Textarea",
                             "choices": null,
                             "onLabel": null,
@@ -3970,7 +3917,7 @@
                         },
                         {
                             "name": "catchphrase",
-                            "label": "Phrase d\\'accroche",
+                            "label": "Phrase d'accroche",
                             "type": "Textarea",
                             "choices": null,
                             "onLabel": null,
@@ -4220,7 +4167,7 @@
                 },
                 {
                     "name": "icon_type",
-                    "label": "Style d\\'affichage",
+                    "label": "Style d'affichage",
                     "type": "TrueFalse",
                     "choices": null,
                     "onLabel": "Icone",
@@ -6591,7 +6538,7 @@
                 },
                 {
                     "name": "img_placement",
-                    "label": "Placement de l\\'illustration",
+                    "label": "Placement de l'illustration",
                     "type": "ButtonGroup",
                     "choices": [
                         {
@@ -6637,7 +6584,7 @@
                 },
                 {
                     "name": "img_width",
-                    "label": "Largeur de l\\'image sur grand écran (en pixels)",
+                    "label": "Largeur de l'image sur grand écran (en pixels)",
                     "type": "Number",
                     "choices": null,
                     "onLabel": null,
@@ -7571,6 +7518,16 @@
                     "conditional": null,
                     "subFields": null,
                     "defaultValue": "google"
+                },
+                {
+                    "name": "trustindex_widget_id",
+                    "label": "TrustIndex Widget ID",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "helperText": "Entrez l'identifiant du widget TrustIndex (ex: 47a06b7201a01391068606420)"
                 }
             ]
         },
@@ -7758,7 +7715,7 @@
                 },
                 {
                     "name": "width",
-                    "label": "Taille (en % de la largeur de l\\'ecran)",
+                    "label": "Taille (en % de la largeur de l'ecran)",
                     "type": "Text",
                     "choices": null,
                     "onLabel": null,
@@ -8775,7 +8732,7 @@
                 },
                 {
                     "name": "list",
-                    "label": "Membres de l\\'équipe",
+                    "label": "Membres de l'équipe",
                     "type": "Repeater",
                     "choices": null,
                     "onLabel": null,
@@ -9208,7 +9165,7 @@
                 },
                 {
                     "name": "img_parallax",
-                    "label": "Effet parallaxe sur l\\'image",
+                    "label": "Effet parallaxe sur l'image",
                     "type": "TrueFalse",
                     "choices": null,
                     "onLabel": "Activé",
@@ -10416,7 +10373,7 @@
                 },
                 {
                     "name": "img_parallax",
-                    "label": "Effet parallaxe sur l\\'image",
+                    "label": "Effet parallaxe sur l'image",
                     "type": "TrueFalse",
                     "choices": null,
                     "onLabel": "Activé",

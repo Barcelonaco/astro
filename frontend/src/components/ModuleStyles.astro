@@ -111,14 +111,35 @@ for (const name of cssFileNames) {
 
 const inlinedCss = cssChunks.filter(Boolean).join('\n');
 
-/** Plugin blocks: types not in blockToCss — must stay as <link> (external) */
+/** Plugin blocks: types not in blockToCss — read CSS from plugins/ at build time */
+const pluginsDir = path.join(process.cwd(), '..', 'plugins');
 const pluginBlockTypes = blocks
   ? [...new Set(
-      blocks
-        .map((b) => b.type)
-        .filter((type) => !blockToCss[type]),
+      allTypes.filter((type) => !blockToCss[type]),
     )]
   : [];
+
+function readPluginCss(type: string): string {
+  try {
+    // Scan plugin directories for matching CSS file
+    const dirs = fs.readdirSync(pluginsDir, { withFileTypes: true });
+    for (const dir of dirs) {
+      if (!dir.isDirectory()) continue;
+      const cssPath = path.join(pluginsDir, dir.name, 'css', `${type}.css`);
+      if (fs.existsSync(cssPath)) {
+        return fs.readFileSync(cssPath, 'utf-8');
+      }
+    }
+  } catch { /* plugins dir may not exist */ }
+  return '';
+}
+
+const pluginCssChunks: string[] = [];
+for (const type of pluginBlockTypes) {
+  const css = readPluginCss(type);
+  if (css) pluginCssChunks.push(css);
+}
+const pluginInlinedCss = pluginCssChunks.filter(Boolean).join('\n');
 ---
 
 {/* Main CSS — external, preloaded in BaseHead for some cases but always requested here */}
@@ -127,7 +148,5 @@ const pluginBlockTypes = blocks
 {/* All Nickl module CSS inlined — zero external render-blocking requests for module specifics */}
 {inlinedCss && <style set:html={inlinedCss} />}
 
-{/* Plugin CSS — external (can't inline, lives in plugins/) */}
-{pluginBlockTypes.map((type) => (
-  <link rel="stylesheet" href={`/plugin-assets/${type}/css/${type}.css`} />
-))}
+{/* Plugin CSS — inlined at build time from plugins/ directory */}
+{pluginInlinedCss && <style set:html={pluginInlinedCss} />}

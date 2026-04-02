@@ -59,6 +59,7 @@ require_once __DIR__ . '/controllers/ModuleFieldsController.php';
 require_once __DIR__ . '/controllers/ModuleTemplatesController.php';
 require_once __DIR__ . '/controllers/RenderBlockController.php';
 require_once __DIR__ . '/controllers/PluginController.php';
+require_once __DIR__ . '/controllers/GoogleReviewsController.php';
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 $allowedOrigins = [
@@ -448,6 +449,11 @@ try {
         $user = authenticate_token();
         require_admin($user);
         PluginController::getPlugins();
+    }
+
+    // ── Google Reviews ──
+    elseif ($method === 'GET' && $path === '/google-reviews') {
+        GoogleReviewsController::get();
     }
 
     // ── Block rendering ──

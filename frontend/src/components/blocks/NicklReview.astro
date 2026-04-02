@@ -1,7 +1,7 @@
 ---
 /**
- * Module Review — Reproduit review.blade.php
- * Stub — TrustIndex n'est pas disponible hors WordPress.
+ * Module Review — Intégration TrustIndex
+ * Charge le widget TrustIndex via son ID pour afficher les avis (Google, Airbnb, etc.)
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 
@@ -12,10 +12,17 @@ interface Props {
 const { data } = Astro.props;
 
 const reviewsSrc = (data.reviews_src as string) || 'google';
+const widgetId = (data.trustindex_widget_id as string) || '';
 ---
 
 <NicklModuleWrapper data={data} moduleName="review" containerLarge>
-  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
-    Les avis ({reviewsSrc}) ne sont pas disponibles en mode statique (TrustIndex requis).
-  </p>
+  {widgetId ? (
+    <div class="trustindex-widget-wrapper">
+      <script is:inline src={`https://cdn.trustindex.io/loader.js?${widgetId}`} defer></script>
+    </div>
+  ) : (
+    <p class="placeholder-message" style="text-align:center;opacity:0.6;">
+      Aucun Widget ID TrustIndex configuré pour les avis ({reviewsSrc}).
+    </p>
+  )}
 </NicklModuleWrapper>
