@@ -131,14 +131,108 @@ class RenderBlockController {
         return $html;
     }
 
+    private static function renderBlocReferences(array $data): string {
+        $db = Database::getInstance();
+
+        $isManual = !empty($data['is_manual']) && ($data['is_manual'] === true || $data['is_manual'] === 1 || $data['is_manual'] === '1');
+        $refsId = $data['refs_id'] ?? [];
+
+        $refs = [];
+        try {
+            if ($isManual && !empty($refsId)) {
+                $ids = array_map('intval', (array) $refsId);
+                $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                $stmt = $db->prepare("SELECT * FROM cpt_references WHERE id IN ({$placeholders}) AND status = 'published' ORDER BY FIELD(id, {$placeholders})");
+                $stmt->execute(array_merge($ids, $ids));
+                $refs = $stmt->fetchAll();
+            } else {
+                $stmt = $db->query("SELECT * FROM cpt_references WHERE status = 'published' ORDER BY created_at DESC LIMIT 3");
+                $refs = $stmt->fetchAll();
+            }
+        } catch (\Exception $e) {
+            return '<p style="text-align:center;padding:2rem;opacity:0.6;">Table des références non trouvée.</p>';
+        }
+
+        if (empty($refs)) {
+            return '<p style="text-align:center;padding:2rem;opacity:0.6;">Aucune référence à afficher.</p>';
+        }
+
+        // Attach categories
+        $ids = array_column($refs, 'id');
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        try {
+            $stmt = $db->prepare("SELECT m.item_id, c.name FROM cpt_references_category_map m JOIN cpt_references_categories c ON c.id = m.category_id WHERE m.item_id IN ({$placeholders})");
+            $stmt->execute($ids);
+            $catMap = [];
+            foreach ($stmt->fetchAll() as $r) {
+                $catMap[$r['item_id']] = $r['name'];
+            }
+        } catch (\Exception $e) {
+            $catMap = [];
+        }
+
+        $html = '<ul class="list" style="display:flex;flex-wrap:wrap;gap:26px;row-gap:48px;list-style:none;padding:0;margin:0;">';
+        foreach ($refs as $ref) {
+            $title = htmlspecialchars($ref['title'] ?? '');
+            $customFields = !empty($ref['custom_fields']) ? (is_string($ref['custom_fields']) ? json_decode($ref['custom_fields'], true) : $ref['custom_fields']) : [];
+            $customerName = htmlspecialchars($customFields['customer_name'] ?? '');
+            $category = htmlspecialchars($catMap[$ref['id']] ?? '');
+
+            // Resolve image
+            $imgUrl = '';
+            $featuredImage = !empty($ref['featured_image']) ? (is_string($ref['featured_image']) ? json_decode($ref['featured_image'], true) : $ref['featured_image']) : null;
+            if ($featuredImage) {
+                $imgUrl = is_array($featuredImage) ? ($featuredImage['url'] ?? '') : (string) $featuredImage;
+            }
+            if (empty($imgUrl)) {
+                $photos = $customFields['photos'] ?? '';
+                if (is_string($photos)) {
+                    $parsed = json_decode($photos, true);
+                    if (is_array($parsed) && !empty($parsed)) $imgUrl = $parsed[0];
+                }
+            }
+
+            $html .= '<li style="width:calc(100% / 3 - 18px);">';
+            if ($imgUrl) {
+                $imgUrl = htmlspecialchars($imgUrl);
+                $html .= '<div style="overflow:hidden;background:rgba(0,0,0,.05);border-radius:var(--border-radius,0);aspect-ratio:4/3;">';
+                $html .= '<img src="' . $imgUrl . '" alt="' . $title . '" style="width:100%;height:100%;object-fit:cover;" loading="lazy">';
+                $html .= '</div>';
+            }
+            $html .= '<div style="padding-top:14px;">';
+            if ($category) {
+                $html .= '<p style="margin:0 0 2px;font-size:14px;line-height:1.4;letter-spacing:.05em;color:var(--color-primary,#666);text-transform:uppercase;">' . $category . '</p>';
+            }
+            $html .= '<h3 style="margin:0;font-size:inherit;">' . $title . '</h3>';
+            if ($customerName) {
+                $html .= '<p style="margin-top:12px;font-size:20px;line-height:1.4;letter-spacing:.05em;color:#999;">' . $customerName . '</p>';
+            }
+            $html .= '</div>';
+            $html .= '</li>';
+        }
+        $html .= '</ul>';
+
+        // Archive link
+        $showArchive = !empty($data['display_archive_link']) && ($data['display_archive_link'] === true || $data['display_archive_link'] === 1 || $data['display_archive_link'] === '1');
+        if ($showArchive) {
+            $label = htmlspecialchars($data['archive_link_label'] ?? 'Voir toutes les références');
+            $html .= '<div style="margin-top:60px;text-align:center;">';
+            $html .= '<a href="/references" class="btn btn-primary">' . $label . '</a>';
+            $html .= '</div>';
+        }
+
+        return $html;
+    }
+
     public static function renderBlock(): void {
         $body = get_json_body();
         $type = $body['type'] ?? '';
         if (empty($type)) error_response('Missing type', 400);
 
-        $template = self::findTemplate($type);
-        if (!$template) {
-            json_response(['html' => '']);
+        // Special handling for bloc-references: fetch live data from DB
+        if ($type === 'bloc-references') {
+            $html = self::renderBlocReferences($body['data'] ?? []);
+            json_response(['html' => $html]);
             return;
         }
 
@@ -146,6 +240,12 @@ class RenderBlockController {
         if ($type === 'google-reviews') {
             $html = self::renderGoogleReviews();
             json_response(['html' => $html]);
+            return;
+        }
+
+        $template = self::findTemplate($type);
+        if (!$template) {
+            json_response(['html' => '']);
             return;
         }
 

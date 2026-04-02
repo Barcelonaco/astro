@@ -1,0 +1,530 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Database Migration Script
+ *
+ * Safe to run multiple times — uses IF NOT EXISTS and checks existing columns.
+ * Never drops tables, columns, or data.
+ *
+ * Usage: php migrate.php
+ */
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load();
+
+require_once __DIR__ . '/config/database.php';
+
+$db = Database::getInstance();
+
+echo "=== CMS Astro — Database Migration ===\n\n";
+echo "Database: " . ($_ENV['DB_NAME'] ?? 'astro_blog_cms') . "\n";
+echo "Host: " . ($_ENV['DB_HOST'] ?? 'localhost') . "\n\n";
+
+$changes = 0;
+
+// ─── Helper functions ───────────────────────────────────────────────────────
+
+function table_exists(PDO $db, string $table): bool {
+    $safe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+    $result = $db->query("SHOW TABLES LIKE '{$safe}'")->fetch();
+    return (bool) $result;
+}
+
+function get_columns(PDO $db, string $table): array {
+    $cols = [];
+    foreach ($db->query("SHOW COLUMNS FROM `{$table}`")->fetchAll() as $col) {
+        $cols[$col['Field']] = $col;
+    }
+    return $cols;
+}
+
+function ensure_column(PDO $db, string $table, string $column, string $definition, ?string $after = null): bool {
+    $cols = get_columns($db, $table);
+    if (isset($cols[$column])) return false;
+
+    $sql = "ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}";
+    if ($after) $sql .= " AFTER `{$after}`";
+    $db->exec($sql);
+    echo "  + Added column {$table}.{$column}\n";
+    return true;
+}
+
+// ─── Table: users ───────────────────────────────────────────────────────────
+
+echo "Table: users\n";
+if (!table_exists($db, 'users')) {
+    $db->exec("
+        CREATE TABLE users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            email VARCHAR(255) NOT NULL UNIQUE,
+            password VARCHAR(255) NOT NULL,
+            role ENUM('admin', 'editor') NOT NULL DEFAULT 'editor',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+
+    // Default admin user
+    $hash = password_hash('admin123', PASSWORD_DEFAULT);
+    $db->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)")
+       ->execute(['Admin', 'admin@example.com', $hash, 'admin']);
+    echo "  + Created default admin (admin@example.com / admin123)\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── Table: posts ───────────────────────────────────────────────────────────
+
+echo "Table: posts\n";
+if (!table_exists($db, 'posts')) {
+    $db->exec("
+        CREATE TABLE posts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            slug VARCHAR(255) NOT NULL,
+            excerpt TEXT,
+            content LONGTEXT,
+            featured_image TEXT,
+            author_id INT NOT NULL,
+            status ENUM('draft', 'published') NOT NULL DEFAULT 'draft',
+            published_date DATETIME,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE INDEX idx_slug (slug),
+            INDEX idx_status (status),
+            INDEX idx_published_date (published_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── Table: categories ──────────────────────────────────────────────────────
+
+echo "Table: categories\n";
+if (!table_exists($db, 'categories')) {
+    $db->exec("
+        CREATE TABLE categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            slug VARCHAR(255) NOT NULL,
+            description TEXT,
+            UNIQUE INDEX idx_slug (slug)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── Table: post_categories ─────────────────────────────────────────────────
+
+echo "Table: post_categories\n";
+if (!table_exists($db, 'post_categories')) {
+    $db->exec("
+        CREATE TABLE post_categories (
+            post_id INT NOT NULL,
+            category_id INT NOT NULL,
+            PRIMARY KEY (post_id, category_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── Table: tags ────────────────────────────────────────────────────────────
+
+echo "Table: tags\n";
+if (!table_exists($db, 'tags')) {
+    $db->exec("
+        CREATE TABLE tags (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL UNIQUE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── Table: post_tags ───────────────────────────────────────────────────────
+
+echo "Table: post_tags\n";
+if (!table_exists($db, 'post_tags')) {
+    $db->exec("
+        CREATE TABLE post_tags (
+            post_id INT NOT NULL,
+            tag_id INT NOT NULL,
+            PRIMARY KEY (post_id, tag_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── Table: pages ───────────────────────────────────────────────────────────
+
+echo "Table: pages\n";
+if (!table_exists($db, 'pages')) {
+    $db->exec("
+        CREATE TABLE pages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            slug VARCHAR(255) NOT NULL,
+            content LONGTEXT,
+            color_overrides JSON DEFAULT NULL,
+            seo_meta JSON DEFAULT NULL,
+            author_id INT NOT NULL,
+            status ENUM('draft', 'published') NOT NULL DEFAULT 'draft',
+            show_in_menu TINYINT(1) NOT NULL DEFAULT 1,
+            menu_order INT NOT NULL DEFAULT 0,
+            parent_id INT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE INDEX idx_slug (slug),
+            INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    // Add columns that may be missing on older installs
+    if (ensure_column($db, 'pages', 'color_overrides', 'JSON DEFAULT NULL', 'content')) $changes++;
+    if (ensure_column($db, 'pages', 'seo_meta', 'JSON DEFAULT NULL', 'color_overrides')) $changes++;
+    if (ensure_column($db, 'pages', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP', 'created_at')) $changes++;
+    if ($changes === 0) echo "  OK\n";
+}
+
+// ─── Table: settings ────────────────────────────────────────────────────────
+
+echo "Table: settings\n";
+if (!table_exists($db, 'settings')) {
+    $db->exec("
+        CREATE TABLE settings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            setting_key VARCHAR(255) NOT NULL UNIQUE,
+            setting_value TEXT
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    // Default settings
+    $defaults = [
+        ['site_name', 'Mon Site'],
+        ['site_description', ''],
+        ['posts_per_page', '10'],
+        ['theme_use_child', '0'],
+        ['active_theme', 'default'],
+    ];
+    $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)");
+    foreach ($defaults as [$key, $val]) {
+        $stmt->execute([$key, $val]);
+    }
+    echo "  + Created table with defaults\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── Table: media_folders ───────────────────────────────────────────────────
+
+echo "Table: media_folders\n";
+if (!table_exists($db, 'media_folders')) {
+    $db->exec("
+        CREATE TABLE media_folders (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            parent_id INT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── Table: media_items ─────────────────────────────────────────────────────
+
+echo "Table: media_items\n";
+if (!table_exists($db, 'media_items')) {
+    $db->exec("
+        CREATE TABLE media_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            folder_id INT DEFAULT NULL,
+            type VARCHAR(20),
+            filename VARCHAR(255) NOT NULL,
+            original_name VARCHAR(255),
+            alt VARCHAR(500) DEFAULT '',
+            title VARCHAR(500) DEFAULT '',
+            caption TEXT,
+            description TEXT,
+            mime_type VARCHAR(100),
+            size INT,
+            width INT,
+            height INT,
+            url VARCHAR(500),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_folder (folder_id),
+            INDEX idx_type (type)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    // Add columns that may be missing
+    if (ensure_column($db, 'media_items', 'alt', "VARCHAR(500) DEFAULT ''", 'original_name')) $changes++;
+    if (ensure_column($db, 'media_items', 'title', "VARCHAR(500) DEFAULT ''", 'alt')) $changes++;
+    if (ensure_column($db, 'media_items', 'caption', 'TEXT', 'title')) $changes++;
+    if (ensure_column($db, 'media_items', 'description', 'TEXT', 'caption')) $changes++;
+    if (ensure_column($db, 'media_items', 'width', 'INT', 'size')) $changes++;
+    if (ensure_column($db, 'media_items', 'height', 'INT', 'width')) $changes++;
+    if ($changes === 0) echo "  OK\n";
+}
+
+// ─── Table: menus ───────────────────────────────────────────────────────────
+
+echo "Table: menus\n";
+if (!table_exists($db, 'menus')) {
+    $db->exec("
+        CREATE TABLE menus (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            location VARCHAR(100) DEFAULT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── Table: menu_items ──────────────────────────────────────────────────────
+
+echo "Table: menu_items\n";
+if (!table_exists($db, 'menu_items')) {
+    $db->exec("
+        CREATE TABLE menu_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            menu_id INT NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            url VARCHAR(500) DEFAULT NULL,
+            type VARCHAR(50) NOT NULL DEFAULT 'custom',
+            page_id INT DEFAULT NULL,
+            parent_id INT DEFAULT NULL,
+            menu_order INT NOT NULL DEFAULT 0,
+            open_in_new_tab TINYINT(1) NOT NULL DEFAULT 0,
+            INDEX idx_menu (menu_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    if (ensure_column($db, 'menu_items', 'open_in_new_tab', "TINYINT(1) NOT NULL DEFAULT 0", 'menu_order')) $changes++;
+    if ($changes === 0) echo "  OK\n";
+}
+
+// ─── Table: reusable_blocs ──────────────────────────────────────────────────
+
+echo "Table: reusable_blocs\n";
+if (!table_exists($db, 'reusable_blocs')) {
+    $db->exec("
+        CREATE TABLE reusable_blocs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            content LONGTEXT,
+            status ENUM('draft', 'published') NOT NULL DEFAULT 'draft',
+            author_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── Table: forms ───────────────────────────────────────────────────────────
+
+echo "Table: forms\n";
+if (!table_exists($db, 'forms')) {
+    $db->exec("
+        CREATE TABLE forms (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            slug VARCHAR(255) NOT NULL,
+            description TEXT,
+            settings JSON DEFAULT NULL,
+            status ENUM('draft', 'published') NOT NULL DEFAULT 'draft',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── Table: form_fields ─────────────────────────────────────────────────────
+
+echo "Table: form_fields\n";
+if (!table_exists($db, 'form_fields')) {
+    $db->exec("
+        CREATE TABLE form_fields (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            form_id INT NOT NULL,
+            type VARCHAR(50) NOT NULL,
+            label VARCHAR(255) NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            placeholder VARCHAR(255) DEFAULT '',
+            required TINYINT(1) NOT NULL DEFAULT 0,
+            options JSON DEFAULT NULL,
+            validation JSON DEFAULT NULL,
+            field_order INT NOT NULL DEFAULT 0,
+            settings JSON DEFAULT NULL,
+            INDEX idx_form (form_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── Table: form_entries ────────────────────────────────────────────────────
+
+echo "Table: form_entries\n";
+if (!table_exists($db, 'form_entries')) {
+    $db->exec("
+        CREATE TABLE form_entries (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            form_id INT NOT NULL,
+            ip_address VARCHAR(45),
+            user_agent TEXT,
+            status VARCHAR(20) NOT NULL DEFAULT 'new',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_form (form_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── Table: form_entry_values ───────────────────────────────────────────────
+
+echo "Table: form_entry_values\n";
+if (!table_exists($db, 'form_entry_values')) {
+    $db->exec("
+        CREATE TABLE form_entry_values (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            entry_id INT NOT NULL,
+            field_id INT DEFAULT NULL,
+            field_label VARCHAR(255),
+            field_value TEXT,
+            INDEX idx_entry (entry_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+// ─── CPT tables (from plugins) ──────────────────────────────────────────────
+
+echo "\nCustom Post Types (plugins):\n";
+$pluginsDir = __DIR__ . '/../plugins';
+if (is_dir($pluginsDir)) {
+    foreach (scandir($pluginsDir) as $dir) {
+        $manifest = $pluginsDir . '/' . $dir . '/plugin.json';
+        if (!file_exists($manifest)) continue;
+
+        $plugin = json_decode(file_get_contents($manifest), true);
+        if (!$plugin || empty($plugin['postTypes'])) continue;
+
+        foreach ($plugin['postTypes'] as $pt) {
+            $slug = $pt['slug'];
+            $table = "cpt_{$slug}";
+
+            echo "  Table: {$table}\n";
+            if (!table_exists($db, $table)) {
+                $db->exec("
+                    CREATE TABLE `{$table}` (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        title VARCHAR(255) NOT NULL,
+                        slug VARCHAR(255) NOT NULL,
+                        excerpt TEXT,
+                        content LONGTEXT,
+                        featured_image JSON DEFAULT NULL,
+                        custom_fields JSON DEFAULT NULL,
+                        author_id INT NOT NULL,
+                        status ENUM('draft', 'published') NOT NULL DEFAULT 'draft',
+                        published_date DATETIME,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        UNIQUE INDEX idx_slug (slug)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                ");
+                echo "    + Created table\n";
+                $changes++;
+            } else {
+                echo "    OK\n";
+            }
+
+            if (!empty($pt['hasCategories'])) {
+                $catTable = "cpt_{$slug}_categories";
+                $mapTable = "cpt_{$slug}_category_map";
+
+                if (!table_exists($db, $catTable)) {
+                    $db->exec("
+                        CREATE TABLE `{$catTable}` (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            name VARCHAR(255) NOT NULL,
+                            slug VARCHAR(255) NOT NULL,
+                            UNIQUE INDEX idx_slug (slug)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                    echo "    + Created {$catTable}\n";
+                    $changes++;
+                }
+
+                if (!table_exists($db, $mapTable)) {
+                    $db->exec("
+                        CREATE TABLE `{$mapTable}` (
+                            item_id INT NOT NULL,
+                            category_id INT NOT NULL,
+                            PRIMARY KEY (item_id, category_id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                    echo "    + Created {$mapTable}\n";
+                    $changes++;
+                }
+            }
+        }
+    }
+} else {
+    echo "  No plugins directory found\n";
+}
+
+// ─── Summary ────────────────────────────────────────────────────────────────
+
+echo "\n=== Done! ";
+if ($changes > 0) {
+    echo "{$changes} change(s) applied. ===\n";
+} else {
+    echo "Database is up to date. ===\n";
+}
