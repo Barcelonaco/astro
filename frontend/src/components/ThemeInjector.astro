@@ -62,7 +62,10 @@ const fontGeneral = FONT_GENERALS[fontGeneralKey] || 'Plus Jakarta Sans';
 // Logo
 const logoHeight = parseInt(settings.logo_height || '100', 10);
 
-// Google Fonts — fetch CSS at build time and inline it to avoid external requests
+// Google Fonts — fetch at build time, download woff2 files locally, rewrite URLs
+import fs from 'node:fs';
+import path from 'node:path';
+
 const fontsToLoad = new Set<string>();
 if (fontTitle) fontsToLoad.add(fontTitle);
 if (fontGeneral) fontsToLoad.add(fontGeneral);
@@ -72,36 +75,68 @@ const googleFontsUrl = fontsToLoad.size > 0
     '&display=swap'
   : '';
 
-// Fetch @font-face CSS at build time so we can inline it (eliminates blocking request)
-// font-display: swap → shows system font immediately, swaps to Google font when loaded
+// Fetch @font-face CSS and self-host the woff2 files
 let googleFontsCss = '';
+const fontPreloads: string[] = [];
 if (googleFontsUrl) {
   try {
-    // Use modern User-Agent to get woff2 format (default fetch gets TTF)
     const res = await fetch(googleFontsUrl, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
     });
-    if (res.ok) googleFontsCss = await res.text();
-  } catch {}
-}
+    if (res.ok) {
+      let css = await res.text();
 
-// Extract woff2 URLs for weight 400 latin subset only (1 per family, max 2 preloads)
-const fontPreloads: string[] = [];
-if (googleFontsCss) {
-  // Split into individual @font-face blocks
-  const blocks = googleFontsCss.split('@font-face').filter(b => b.includes('font-weight'));
-  const seen = new Set<string>();
-  for (const block of blocks) {
-    // Only weight 400 + latin subset (last block per family, no unicode-range suffix like -ext)
-    if (!/font-weight:\s*400/.test(block)) continue;
-    if (/latin-ext|cyrillic|greek|vietnamese/i.test(block)) continue;
-    const urlMatch = block.match(/url\((https:\/\/[^)]+\.woff2)\)/);
-    const familyMatch = block.match(/font-family:\s*'([^']+)'/);
-    if (urlMatch && familyMatch && !seen.has(familyMatch[1])) {
-      seen.add(familyMatch[1]);
-      fontPreloads.push(urlMatch[1]);
+      // Download each woff2 file and save locally
+      const fontsDir = path.join(process.cwd(), 'public', 'fonts', 'google');
+      fs.mkdirSync(fontsDir, { recursive: true });
+
+      const urlRegex = /url\((https:\/\/fonts\.gstatic\.com\/[^)]+\.woff2)\)/g;
+      let match;
+      const downloads: Promise<void>[] = [];
+      const urlMap = new Map<string, string>();
+
+      while ((match = urlRegex.exec(css)) !== null) {
+        const remoteUrl = match[1];
+        if (urlMap.has(remoteUrl)) continue;
+        // Generate local filename from URL
+        const filename = remoteUrl.split('/').slice(-2).join('-').replace(/[^a-zA-Z0-9._-]/g, '');
+        const localPath = `/fonts/google/${filename}`;
+        urlMap.set(remoteUrl, localPath);
+
+        const filePath = path.join(fontsDir, filename);
+        if (!fs.existsSync(filePath)) {
+          downloads.push(
+            fetch(remoteUrl).then(r => r.arrayBuffer()).then(buf => {
+              fs.writeFileSync(filePath, Buffer.from(buf));
+            }).catch(() => {})
+          );
+        }
+      }
+
+      await Promise.all(downloads);
+
+      // Rewrite URLs in CSS to local paths
+      for (const [remote, local] of urlMap) {
+        css = css.replaceAll(remote, local);
+      }
+
+      googleFontsCss = css;
+
+      // Extract preloads for weight 400 latin subset (1 per family)
+      const blocks = css.split('@font-face').filter(b => b.includes('font-weight'));
+      const seen = new Set<string>();
+      for (const block of blocks) {
+        if (!/font-weight:\s*400/.test(block)) continue;
+        if (/latin-ext|cyrillic|greek|vietnamese/i.test(block)) continue;
+        const urlM = block.match(/url\(([^)]+\.woff2)\)/);
+        const famM = block.match(/font-family:\s*'([^']+)'/);
+        if (urlM && famM && !seen.has(famM[1])) {
+          seen.add(famM[1]);
+          fontPreloads.push(urlM[1]);
+        }
+      }
     }
-  }
+  } catch {}
 }
 
 // Build CSS variables string
