@@ -9,11 +9,9 @@ import path from 'node:path';
 
 interface Props {
   blocks: { type: string; data?: any }[] | null;
-  /** Skip app.css when rendered outside <head> (e.g. Footer) to avoid duplicates */
-  skipAppCss?: boolean;
 }
 
-const { blocks, skipAppCss = false } = Astro.props;
+const { blocks } = Astro.props;
 
 /** Correspondance type de bloc → nom du fichier CSS (sans extension) */
 const blockToCss: Record<string, string> = {
@@ -93,6 +91,9 @@ function readCss(filename: string): string {
   }
 }
 
+// Inline app.css at build time — eliminates the 760ms render-blocking external request
+const appCss = readCss('app.css');
+
 const allTypes = blocks ? collectAllBlockTypes(blocks as any) : [];
 
 const cssFileNames = [
@@ -142,8 +143,8 @@ for (const type of pluginBlockTypes) {
 const pluginInlinedCss = pluginCssChunks.filter(Boolean).join('\n');
 ---
 
-{/* Main CSS — external, preloaded in BaseHead for some cases but always requested here */}
-{!skipAppCss && <link rel="stylesheet" href="/nickl-assets/css/app.css" />}
+{/* Main CSS — inlined at build time to eliminate render-blocking external request */}
+{appCss && <style set:html={appCss} />}
 
 {/* All Nickl module CSS inlined — zero external render-blocking requests for module specifics */}
 {inlinedCss && <style set:html={inlinedCss} />}

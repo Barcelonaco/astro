@@ -136,7 +136,7 @@ const list = (data.list as any[]) ?? [];
                   return (
                     <div class={`swiper-slide item ${hasDesc ? 'has-desc' : 'no-desc'}`}>
                       <div class="illus-wrapper">
-                        <img src={optimizedImageUrl(image.url || '', 1200, 80)} alt={image.alt || ''} class="illus" width="600" height="450" loading="lazy" />
+                        <img src={optimizedImageUrl(image.url || '', 800, 80)} alt={image.alt || ''} class="illus" width="600" height="450" loading="lazy" />
                       </div>
                       {hasDesc && (
                         <div class="container-large container-2">

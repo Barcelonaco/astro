@@ -53,7 +53,7 @@ function resolveImage(img: any): { url: string; alt: string } | null {
   if (!img) return null;
   const url = typeof img === 'string' ? img : img.url || img.sizes?.half || '';
   const alt = typeof img === 'string' ? '' : img.alt || '';
-  return url ? { url: optimizedImageUrl(resolveUrl(url), 1200, 80), alt } : null;
+  return url ? { url: optimizedImageUrl(resolveUrl(url), 900, 80), alt } : null;
 }
 ---
 

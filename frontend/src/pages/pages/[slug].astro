@@ -105,10 +105,8 @@ const bodyClasses = [
 <!doctype html>
 <html lang="fr">
 	<head>
-		<BaseHead title={seoTitle} description={seoDescription} styleSettings={styleSettings} siteSettings={siteSettings} />
+		<BaseHead title={seoTitle} description={seoDescription} styleSettings={styleSettings} siteSettings={siteSettings} lcpImage={lcpImages} />
 		{schemaOrg && <script type="application/ld+json" set:html={schemaOrg} />}
-		{lcpImages.mobile && <link rel="preload" as="image" href={lcpImages.mobile} media="(max-width: 600px)" fetchpriority="high" />}
-		{lcpImages.desktop && <link rel="preload" as="image" href={lcpImages.desktop} media="(min-width: 601px)" fetchpriority="high" />}
 		<ModuleStyles blocks={blocks} />
 	</head>
 	<body class={bodyClasses || undefined}>

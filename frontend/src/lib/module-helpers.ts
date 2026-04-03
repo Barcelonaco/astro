@@ -51,7 +51,8 @@ export function resolveImageUrl(
     rawUrl = rawUrl.startsWith('http') ? rawUrl : apiOrigin + rawUrl;
   }
   // Auto-optimize local uploads to WebP
-  return optimizedImageUrl(rawUrl, 1200, 80);
+  // Use 900px for standard container images; banner/hero sizes use explicit widths
+  return optimizedImageUrl(rawUrl, 900, 80);
 }
 
 /**

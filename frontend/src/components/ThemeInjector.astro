@@ -68,11 +68,12 @@ if (fontTitle) fontsToLoad.add(fontTitle);
 if (fontGeneral) fontsToLoad.add(fontGeneral);
 const googleFontsUrl = fontsToLoad.size > 0
   ? 'https://fonts.googleapis.com/css2?' +
-    Array.from(fontsToLoad).map(f => `family=${f.replace(/ /g, '+')}:wght@300;400;500;600;700`).join('&') +
-    '&display=swap'
+    Array.from(fontsToLoad).map(f => `family=${f.replace(/ /g, '+')}:wght@400;500;600;700`).join('&') +
+    '&display=optional'
   : '';
 
 // Fetch @font-face CSS at build time so we can inline it (eliminates blocking request)
+// font-display: optional → no layout shift, font used only if cached or fast to load
 let googleFontsCss = '';
 if (googleFontsUrl) {
   try {

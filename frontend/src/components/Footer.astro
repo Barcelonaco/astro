@@ -99,7 +99,7 @@ const today = new Date();
 
 {customBlocBlocks && footerCustomBlocLocation === 'before' && (
   <div class="footer-custom-block footer-custom-block-before">
-    <ModuleStyles blocks={customBlocBlocks} skipAppCss />
+    <ModuleStyles blocks={customBlocBlocks}/>
     <BlockRenderer blocks={customBlocBlocks} />
   </div>
 )}
@@ -205,7 +205,7 @@ const today = new Date();
 </footer>
 {customBlocBlocks && footerCustomBlocLocation === 'after' && (
   <div class="footer-custom-block footer-custom-block-after">
-    <ModuleStyles blocks={customBlocBlocks} skipAppCss />
+    <ModuleStyles blocks={customBlocBlocks}/>
     <BlockRenderer blocks={customBlocBlocks} />
   </div>
 )}

@@ -11,7 +11,8 @@ export default defineConfig({
 	integrations: [mdx(), sitemap()],
 	scopedStyleStrategy: 'where',
 	build: {
-		// Inline all CSS — avoids render-blocking external requests on slow 3G
+		// Inline all Astro CSS to avoid additional render-blocking external requests.
+		// app.css (Nickl) is the only external CSS — loaded as blocking to prevent CLS.
 		inlineStylesheets: 'always',
 	},
 });

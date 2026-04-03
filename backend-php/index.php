@@ -178,6 +178,7 @@ if (preg_match('#^/plugin-assets/(.+)$#', $uri, $m)) {
     if (file_exists($file)) {
         $mime = mime_content_type($file);
         header("Content-Type: $mime");
+        header('Cache-Control: public, max-age=2592000');
         readfile($file);
         exit;
     }
@@ -232,6 +233,12 @@ if (!preg_match('#^/api/(.*)$#', $uri, $apiMatch)) {
         ];
         $mime = $mimeMap[$ext] ?? (mime_content_type($distFile) ?: 'application/octet-stream');
         header("Content-Type: $mime");
+        // Hashed assets (/_astro/) get immutable cache; HTML pages get no-cache
+        if (str_contains($uri, '/_astro/')) {
+            header('Cache-Control: public, max-age=31536000, immutable');
+        } elseif ($ext !== 'html') {
+            header('Cache-Control: public, max-age=86400');
+        }
         readfile($distFile);
         exit;
     }
