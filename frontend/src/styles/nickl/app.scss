@@ -5,7 +5,8 @@
 @import 'base/mixin';
 
 
-// COMPONENT
+// COMPONENT — kept for @extend dependencies (modules use .color-secondary etc.)
+// Migrated CSS equivalents are in src/styles/components.css
 // ----------------------------------------
 @import 'components/buttons';
 @import 'components/breadcrumb';
@@ -21,18 +22,18 @@
 @import 'components/tabs';
 
 
-// PARTIALS
+// PARTIALS — ALL MIGRATED to src/styles/*.css
 // ----------------------------------------
-@import 'partials/accessibility';
-@import 'partials/document';
-// @import 'partials/cookies'; // MIGRATED → cookies.css
-// @import 'partials/footer'; // MIGRATED → Footer.astro <style is:global>
-// @import 'partials/header'; // MIGRATED → header.css
-@import 'partials/search-form';
-@import 'partials/sidebar';
+// @import 'partials/accessibility';  → accessibility.css
+// @import 'partials/document';       → document.css
+// @import 'partials/cookies';        → cookies.css
+// @import 'partials/footer';         → footer.css
+// @import 'partials/header';         → header.css
+// @import 'partials/search-form';    → search-form.css
+// @import 'partials/sidebar';        → sidebar.css
 
 
-// MODULES (inclus dans app.css)
+// MODULES
 // ----------------------------------------
 @import 'modules/modules';
 @import 'modules/gallery';

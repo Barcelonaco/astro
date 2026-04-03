@@ -1,0 +1,72 @@
+/**
+ * GENERAL
+ * MEDIA QUERIES
+ */
+/* GENERAL
+---------------------------------------- */
+.page-woocommerce-archive-product .wrapper-sidebar {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  column-gap: 0px;
+}
+.page-woocommerce-archive-product .wrapper-sidebar > * {
+  flex: 0 1 auto;
+}
+.page-woocommerce-archive-product .wrapper-sidebar > * {
+  flex-basis: 100%;
+}
+.page-woocommerce-archive-product .wrapper-sidebar .sidebar {
+  margin-right: 2.25rem;
+  flex-basis: 21.125rem;
+}
+.page-woocommerce-archive-product .wrapper-sidebar .content-primary {
+  flex: 1 1 auto;
+  flex-basis: calc(100% - 2.25rem - 21.125rem);
+}
+.page-woocommerce-archive-product .wrapper-sidebar .widget-woof .woof_list_checkbox .icheckbox_flat-aero.checked {
+  border-color: var(--color-default, #224f5a);
+  background-color: var(--color-default, #224f5a);
+}
+.page-woocommerce-archive-product .wrapper-sidebar .widget-woof .woof_list_checkbox .icheckbox_flat-aero {
+  display: block;
+}
+.page-woocommerce-archive-product .wrapper-sidebar .widget-woof .woof_list_checkbox > .woof_childs_list_li .woof_checkbox_label {
+  border-bottom: none;
+}
+.page-woocommerce-archive-product .wrapper-sidebar .widget-woof h3 {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-primary, #3ee98d);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.page-woocommerce-archive-product .wrapper-sidebar .widget-woof .woof_submit_search_form {
+  background-color: var(--color-primary, #3ee98d);
+}
+.page-woocommerce-archive-product .wrapper-sidebar .widget-woof .woof_submit_search_form:hover:not(:active), .page-woocommerce-archive-product .wrapper-sidebar .widget-woof .woof_submit_search_form:focus:not(:active) {
+  background-color: var(--color-secondary, #02bd9c);
+}
+.page-woocommerce-archive-product .wrapper-sidebar .widget-woof .woof_childs_list_opener {
+  transform: translateY(-50%);
+}
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 1200px) {
+  .wrapper-sidebar {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+}
+@media only screen and (max-width: 1024px) {
+  .wrapper-sidebar {
+    display: block;
+  }
+  .wrapper-sidebar .sidebar {
+    margin-right: 0;
+  }
+  .wrapper-sidebar .content-primary {
+    margin-top: 2rem;
+  }
+}
