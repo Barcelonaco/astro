@@ -75,6 +75,26 @@ export function optimizedImageUrl(
   return `/uploads/media/_optimized/${filename}?w=${width}&q=${quality}&f=${format}`;
 }
 
+/**
+ * Generates a srcset string with multiple widths for responsive images.
+ * Returns empty string if the URL is not a local upload.
+ */
+export function responsiveSrcset(
+  url: string,
+  widths: number[] = [400, 600, 900],
+  quality: number = 75,
+  format: 'webp' | 'avif' = 'webp'
+): string {
+  if (!url) return '';
+  const match = url.match(/\/uploads\/media\/([^/?#]+)$/);
+  if (!match) return '';
+  const filename = match[1];
+  if (/\.(mp4|webm|mov|avi|svg)$/i.test(filename)) return '';
+  return widths
+    .map(w => `/uploads/media/_optimized/${filename}?w=${w}&q=${quality}&f=${format} ${w}w`)
+    .join(', ');
+}
+
 /** Récupère l'alt text d'une image ACF */
 export function resolveImageAlt(img: unknown): string {
   if (!img || typeof img === 'string') return '';

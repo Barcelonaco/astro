@@ -11,6 +11,7 @@ import {
   resolveImageAlt,
   resolveImageTitle,
   resolveImageDimensions,
+  responsiveSrcset,
   extractYouTubeId,
   extractVimeoId,
   extractDailymotionId,
@@ -56,6 +57,9 @@ const imgParallax = isTruthy(data.img_parallax) && mediaChoice;
 const imageUrl = resolveImageUrl(data.image, apiOrigin, ratioImg);
 const imageAlt = resolveImageAlt(data.image);
 const imageTitle = resolveImageTitle(data.image);
+// Responsive srcset — serve right size for viewport width
+const rawImgUrl = typeof data.image === 'string' ? data.image : (data.image as any)?.url || '';
+const imgSrcset = responsiveSrcset(rawImgUrl, [400, 600, 900], 75);
 const imageDims = resolveImageDimensions(data.image);
 
 // Vidéo
@@ -174,7 +178,7 @@ const extraClasses = extraParts.join(' ');
         /* Image */
         imageUrl && (
           <div class={`illus-wrapper ${mediaRatio}`}>
-            <img src={imageUrl} alt={imageAlt} title={imageTitle || undefined} class="illus" width={imageDims.width || 800} height={imageDims.height || 600} loading={data._eager ? 'eager' : 'lazy'} decoding="async" fetchpriority={data._eager ? 'high' : undefined} />
+            <img src={imageUrl} srcset={imgSrcset || undefined} sizes={imgSrcset ? '(max-width: 600px) 100vw, (max-width: 960px) 50vw, 450px' : undefined} alt={imageAlt} title={imageTitle || undefined} class="illus" width={imageDims.width || 800} height={imageDims.height || 600} loading={data._eager ? 'eager' : 'lazy'} decoding="async" fetchpriority={data._eager ? 'high' : undefined} />
           </div>
         )
       )}

@@ -1,6 +1,6 @@
 ---
 import { buildModuleClasses } from '../../lib/module-classes';
-import { optimizedImageUrl } from '../../lib/module-helpers';
+import { optimizedImageUrl, responsiveSrcset } from '../../lib/module-helpers';
 
 interface Props {
   data: Record<string, any>;
@@ -64,7 +64,12 @@ function resolveFileUrl(file: any): string {
   const url = typeof file === 'string' ? file : (file.url || '');
   if (!url) return '';
   const fullUrl = url.startsWith('http') ? url : apiOrigin + url;
-  return optimizedImageUrl(fullUrl, 900, 75);
+  return optimizedImageUrl(fullUrl, 700, 75);
+}
+
+function resolveFileSrcset(file: any): string {
+  const url = typeof file === 'string' ? file : (file?.url || '');
+  return responsiveSrcset(url, [400, 550, 700], 75);
 }
 
 function isVideo(file: any): boolean {
@@ -114,7 +119,7 @@ function hasDesc(item: any): boolean {
                     </div>
                   ) : (
                     <div class="illus-wrapper">
-                      <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
+                      <img src={resolveFileUrl(item.file)} srcset={resolveFileSrcset(item.file) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw" alt="" class="illus" width="700" height="500" loading="lazy" />
                     </div>
                   )}
                   {hasDesc(item) && (
@@ -134,7 +139,7 @@ function hasDesc(item: any): boolean {
                     </div>
                   ) : (
                     <div class="illus-wrapper">
-                      <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
+                      <img src={resolveFileUrl(item.file)} srcset={resolveFileSrcset(item.file) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw" alt="" class="illus" width="700" height="500" loading="lazy" />
                     </div>
                   )}
                   {hasDesc(item) && (
@@ -180,7 +185,7 @@ function hasDesc(item: any): boolean {
                         </div>
                       ) : (
                         <div class="illus-wrapper">
-                          <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
+                          <img src={resolveFileUrl(item.file)} srcset={resolveFileSrcset(item.file) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw" alt="" class="illus" width="700" height="500" loading="lazy" />
                         </div>
                       )}
                       {hasDesc(item) && (
@@ -200,7 +205,7 @@ function hasDesc(item: any): boolean {
                         </div>
                       ) : (
                         <div class="illus-wrapper">
-                          <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
+                          <img src={resolveFileUrl(item.file)} srcset={resolveFileSrcset(item.file) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw" alt="" class="illus" width="700" height="500" loading="lazy" />
                         </div>
                       )}
                       {hasDesc(item) && (
@@ -244,7 +249,7 @@ function hasDesc(item: any): boolean {
                       </div>
                     ) : (
                       <div class="illus-wrapper">
-                        <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
+                        <img src={resolveFileUrl(item.file)} srcset={resolveFileSrcset(item.file) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw" alt="" class="illus" width="700" height="500" loading="lazy" />
                       </div>
                     )}
                     {hasDesc(item) && (
@@ -264,7 +269,7 @@ function hasDesc(item: any): boolean {
                       </div>
                     ) : (
                       <div class="illus-wrapper">
-                        <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
+                        <img src={resolveFileUrl(item.file)} srcset={resolveFileSrcset(item.file) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw" alt="" class="illus" width="700" height="500" loading="lazy" />
                       </div>
                     )}
                     {hasDesc(item) && (
@@ -308,7 +313,7 @@ function hasDesc(item: any): boolean {
                         </div>
                       ) : (
                         <div class="illus-wrapper">
-                          <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
+                          <img src={resolveFileUrl(item.file)} srcset={resolveFileSrcset(item.file) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw" alt="" class="illus" width="700" height="500" loading="lazy" />
                         </div>
                       )}
                       {hasDesc(item) && (
@@ -328,7 +333,7 @@ function hasDesc(item: any): boolean {
                         </div>
                       ) : (
                         <div class="illus-wrapper">
-                          <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
+                          <img src={resolveFileUrl(item.file)} srcset={resolveFileSrcset(item.file) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw" alt="" class="illus" width="700" height="500" loading="lazy" />
                         </div>
                       )}
                       {hasDesc(item) && (
@@ -373,7 +378,7 @@ function hasDesc(item: any): boolean {
                         </div>
                       ) : (
                         <div class="illus-wrapper">
-                          <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
+                          <img src={resolveFileUrl(item.file)} srcset={resolveFileSrcset(item.file) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw" alt="" class="illus" width="700" height="500" loading="lazy" />
                         </div>
                       )}
                       {hasDesc(item) && (
@@ -393,7 +398,7 @@ function hasDesc(item: any): boolean {
                         </div>
                       ) : (
                         <div class="illus-wrapper">
-                          <img src={resolveFileUrl(item.file)} alt="" class="illus" width="700" height="500" loading="lazy" />
+                          <img src={resolveFileUrl(item.file)} srcset={resolveFileSrcset(item.file) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw" alt="" class="illus" width="700" height="500" loading="lazy" />
                         </div>
                       )}
                       {hasDesc(item) && (
