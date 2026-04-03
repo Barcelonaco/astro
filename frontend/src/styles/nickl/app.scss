@@ -1,24 +1,35 @@
-// BASE — normalize + variables + mixins
+// BASE
 // ----------------------------------------
 @import 'base/reset';
 @import 'base/variables';
 @import 'base/mixin';
 
 
-// COMPONENT — MIGRATED → components.css (imported via BaseHead.astro)
-// Kept here only because modules need variables/mixins context
+// COMPONENT
 // ----------------------------------------
+@import 'components/buttons';
+@import 'components/breadcrumb';
+@import 'components/floating-btn';
+@import 'components/editor';
+@import 'components/form';
+@import 'components/module-protected';
+@import 'components/no-cookies';
+@import 'components/pagination';
+@import 'components/popins';
+@import 'components/sliders';
+@import 'components/social-networks';
+@import 'components/tabs';
 
 
-// PARTIALS — ALL MIGRATED to src/styles/*.css
+// PARTIALS — shared layout styles (cached in app.css)
+// header/footer/cookies migrated to component CSS imports
 // ----------------------------------------
+@import 'partials/accessibility';
+@import 'partials/document';
+@import 'partials/search-form';
+@import 'partials/sidebar';
 
 
-// MODULES — base wrapper styles only
-// gallery/references/alert/share already compiled as individual CSS files
+// MODULES — base wrapper styles
 // ----------------------------------------
 @import 'modules/modules';
-// @import 'modules/gallery';     // already in gallery.css (inlined per-page)
-// @import 'modules/references';  // already in references.css (inlined per-page)
-// @import 'modules/alert';       // already in alert CSS
-// @import 'modules/share';       // already in share CSS
