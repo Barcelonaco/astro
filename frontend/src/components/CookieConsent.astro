@@ -26,10 +26,14 @@ const {
 } = Astro.props;
 
 const enabled = cookieEnabled === '1';
+
+// Import cookieconsent CSS via bundler (inlined at build time)
+if (enabled) {
+  await import('vanilla-cookieconsent/dist/cookieconsent.css');
+}
 ---
 
 {enabled && (
-  <link rel="stylesheet" href="/nickl-assets/css/cookieconsent.css" />
   <script
     id="cc-config"
     type="application/json"
