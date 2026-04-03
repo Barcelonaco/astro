@@ -109,6 +109,8 @@ class SettingsController {
             'id_application_instagram', 'secret_key_application_instagram',
             'link_account_instagram', 'access_token_instagram',
             'ga_code', 'aw_code', 'gtm_code', 'meta_pixel_code',
+            'cookie_enabled', 'cookie_title', 'cookie_description',
+            'cookie_privacy_url', 'cookie_accept_text', 'cookie_reject_text',
             'is_onepage', 'is_activate_schemas', 'custom_balise', 'google_api_key'
         ];
         $siteSettings = [];
@@ -175,6 +177,8 @@ class SettingsController {
             'is_maintenance', 'text_maintenance', 'show_infos', 'show_rs',
             'ga_code', 'aw_code', 'gtm_code', 'meta_pixel_code',
             'recaptcha_site_key', 'recaptcha_secret_key',
+            'cookie_enabled', 'cookie_title', 'cookie_description',
+            'cookie_privacy_url', 'cookie_accept_text', 'cookie_reject_text',
             'is_onepage', 'is_activate_schemas', 'custom_balise', 'google_api_key'
         ];
 

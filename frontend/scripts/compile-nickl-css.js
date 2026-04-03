@@ -8,7 +8,7 @@
  */
 
 import * as sass from 'sass';
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync, copyFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -17,6 +17,12 @@ const srcDir = resolve(__dirname, '../src/styles/nickl');
 const outDir = resolve(__dirname, '../public/nickl-assets/css');
 
 mkdirSync(outDir, { recursive: true });
+
+// Copy vanilla-cookieconsent base CSS (loaded before app.css so Nickl overrides win)
+copyFileSync(
+  resolve(__dirname, '../node_modules/vanilla-cookieconsent/dist/cookieconsent.css'),
+  resolve(outDir, 'cookieconsent.css')
+);
 
 // Module entries: output name → source file (same mapping as bud.config.js)
 const moduleEntries = {

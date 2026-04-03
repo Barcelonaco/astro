@@ -1,5 +1,9 @@
 RewriteEngine On
 
+# ── MIME types ──
+AddType application/javascript .js
+AddType text/css .css
+
 # ── Gzip compression ──
 <IfModule mod_deflate.c>
   AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml text/xml application/xml

@@ -209,7 +209,28 @@ if (!preg_match('#^/api/(.*)$#', $uri, $apiMatch)) {
     }
 
     if (file_exists($distFile) && !is_dir($distFile)) {
-        $mime = mime_content_type($distFile) ?: 'application/octet-stream';
+        $ext = strtolower(pathinfo($distFile, PATHINFO_EXTENSION));
+        $mimeMap = [
+            'js' => 'application/javascript',
+            'mjs' => 'application/javascript',
+            'css' => 'text/css',
+            'json' => 'application/json',
+            'svg' => 'image/svg+xml',
+            'png' => 'image/png',
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'avif' => 'image/avif',
+            'ico' => 'image/x-icon',
+            'woff' => 'font/woff',
+            'woff2' => 'font/woff2',
+            'ttf' => 'font/ttf',
+            'xml' => 'application/xml',
+            'txt' => 'text/plain',
+            'html' => 'text/html; charset=utf-8',
+        ];
+        $mime = $mimeMap[$ext] ?? (mime_content_type($distFile) ?: 'application/octet-stream');
         header("Content-Type: $mime");
         readfile($distFile);
         exit;

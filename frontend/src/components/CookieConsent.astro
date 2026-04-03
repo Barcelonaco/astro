@@ -1,0 +1,250 @@
+---
+interface Props {
+  cookieEnabled?: string;
+  cookieTitle?: string;
+  cookieDescription?: string;
+  cookiePrivacyUrl?: string;
+  cookieAcceptText?: string;
+  cookieRejectText?: string;
+  gaCode?: string;
+  gtmCode?: string;
+  awCode?: string;
+  metaPixelCode?: string;
+}
+
+const {
+  cookieEnabled = '0',
+  cookieTitle = 'Hello ! voici des <span class="large">Cookies</span>',
+  cookieDescription = 'Ce site utilise des cookies essentiels pour assurer son bon fonctionnement et des cookies de suivi pour comprendre comment vous interagissez avec lui.',
+  cookiePrivacyUrl = '',
+  cookieAcceptText = 'Tout accepter',
+  cookieRejectText = 'Tout rejeter',
+  gaCode = '',
+  gtmCode = '',
+  awCode = '',
+  metaPixelCode = '',
+} = Astro.props;
+
+const enabled = cookieEnabled === '1';
+---
+
+{enabled && (
+  <link rel="stylesheet" href="/nickl-assets/css/cookieconsent.css" />
+  <script
+    id="cc-config"
+    type="application/json"
+    set:html={JSON.stringify({
+      cookieTitle,
+      cookieDescription,
+      cookiePrivacyUrl,
+      cookieAcceptText,
+      cookieRejectText,
+      gaCode,
+      gtmCode,
+      awCode,
+      metaPixelCode,
+    })}
+  />
+)}
+
+<script>
+  import * as CookieConsent from 'vanilla-cookieconsent';
+
+  function initCookieConsent() {
+    const configEl = document.getElementById('cc-config');
+    if (!configEl) return;
+
+    const config = JSON.parse(configEl.textContent || '{}');
+
+    // Reset if already initialized (HMR / SPA navigation)
+    if (window._ccRun) {
+      CookieConsent.reset(false);
+    }
+
+    // Default Google Consent Mode to denied
+    if (typeof window.gtag === 'function') {
+      window.gtag('consent', 'default', {
+        ad_storage: 'denied',
+        analytics_storage: 'denied',
+        personalization_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        security_storage: 'granted',
+        functionality_storage: 'granted',
+      });
+    }
+
+    function updateGoogleConsent(cookie: { categories?: string[] }) {
+      if (typeof window.gtag !== 'function') return;
+      window.gtag('consent', 'update', {
+        ad_storage: cookie?.categories?.includes('ads') ? 'granted' : 'denied',
+        analytics_storage: cookie?.categories?.includes('analytics') ? 'granted' : 'denied',
+        personalization_storage: cookie?.categories?.includes('personalization') ? 'granted' : 'denied',
+        ad_user_data: cookie?.categories?.includes('user') ? 'granted' : 'denied',
+        ad_personalization: cookie?.categories?.includes('personalization') ? 'granted' : 'denied',
+        security_storage: 'granted',
+        functionality_storage: 'granted',
+      });
+    }
+
+    function loadTrackingScripts(cookie: { categories?: string[] }) {
+      const hasAnalytics = cookie?.categories?.includes('analytics');
+      const hasAds = cookie?.categories?.includes('ads');
+
+      // GTM
+      if (hasAnalytics && config.gtmCode && !document.getElementById('gtm-script')) {
+        const s = document.createElement('script');
+        s.id = 'gtm-script';
+        s.innerHTML = `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${config.gtmCode}');`;
+        document.head.appendChild(s);
+      }
+
+      // GA4 (only if no GTM)
+      if (hasAnalytics && config.gaCode && !config.gtmCode && !document.getElementById('ga-script')) {
+        const s = document.createElement('script');
+        s.id = 'ga-script';
+        s.async = true;
+        s.src = `https://www.googletagmanager.com/gtag/js?id=${config.gaCode}`;
+        document.head.appendChild(s);
+        const s2 = document.createElement('script');
+        s2.innerHTML = `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${config.gaCode}');`;
+        document.head.appendChild(s2);
+      }
+
+      // Google Ads (only if no GTM)
+      if (hasAds && config.awCode && !config.gtmCode && !document.getElementById('aw-script')) {
+        const s = document.createElement('script');
+        s.id = 'aw-script';
+        s.async = true;
+        s.src = `https://www.googletagmanager.com/gtag/js?id=${config.awCode}`;
+        document.head.appendChild(s);
+        const s2 = document.createElement('script');
+        s2.innerHTML = `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${config.awCode}');`;
+        document.head.appendChild(s2);
+      }
+
+      // Meta Pixel
+      if (hasAds && config.metaPixelCode && !document.getElementById('meta-pixel-script')) {
+        const s = document.createElement('script');
+        s.id = 'meta-pixel-script';
+        s.innerHTML = `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${config.metaPixelCode}');fbq('track','PageView');`;
+        document.head.appendChild(s);
+      }
+    }
+
+    // Build description with privacy link
+    let description = config.cookieDescription || '';
+    description += '<br><br><button type="button" data-cc="show-preferencesModal" aria-haspopup="dialog" class="cc-link">Choisir mes préférences</button>';
+    if (config.cookiePrivacyUrl) {
+      description += `<br><a href="${config.cookiePrivacyUrl}" class="cc-link">Voir la politique de confidentialité</a>`;
+    }
+
+    CookieConsent.run({
+      cookie: { name: 'cc_cookie' },
+      hideFromBots: false,
+      guiOptions: {
+        consentModal: {
+          layout: 'box',
+          position: 'bottom left',
+          transition: 'slide',
+        },
+        preferencesModal: {
+          layout: 'box',
+          transition: 'slide',
+        },
+      },
+      onFirstConsent: ({ cookie }) => {
+        updateGoogleConsent(cookie);
+        loadTrackingScripts(cookie);
+      },
+      onConsent: ({ cookie }) => {
+        updateGoogleConsent(cookie);
+        loadTrackingScripts(cookie);
+      },
+      onChange: ({ cookie }) => {
+        updateGoogleConsent(cookie);
+        loadTrackingScripts(cookie);
+      },
+      categories: {
+        necessary: {
+          enabled: true,
+          readOnly: true,
+        },
+        analytics: {
+          autoClear: {
+            cookies: [{ name: /^_ga/ }, { name: '_gid' }],
+          },
+        },
+        ads: {
+          autoClear: {
+            cookies: [{ name: 'ad_cookie' }],
+          },
+        },
+        personalization: {},
+        user: {},
+      },
+      language: {
+        default: 'fr',
+        translations: {
+          fr: {
+            consentModal: {
+              title: config.cookieTitle || 'Hello ! voici des <span class="large">Cookies</span>',
+              description,
+              acceptAllBtn: config.cookieAcceptText || 'Tout accepter',
+              acceptNecessaryBtn: config.cookieRejectText || 'Tout rejeter',
+            },
+            preferencesModal: {
+              title: 'Gestion de préférence des cookies',
+              acceptAllBtn: config.cookieAcceptText || 'Tout accepter',
+              acceptNecessaryBtn: config.cookieRejectText || 'Tout rejeter',
+              savePreferencesBtn: 'Enregistrer',
+              closeIconLabel: 'Fermer',
+              sections: [
+                {
+                  title: 'Votre choix de confidentialité',
+                  description: 'Dans ce panneau, vous pouvez exprimer certaines préférences liées au traitement de vos informations personnelles. Vous pouvez revoir et modifier ces choix à tout moment en rouvrant ce panneau via le lien fourni.',
+                },
+                {
+                  title: 'Cookies nécessaires',
+                  description: 'Ces cookies sont indispensables au bon fonctionnement du site.',
+                  linkedCategory: 'necessary',
+                },
+                {
+                  title: 'Publicitaires',
+                  description: "Ces cookies permettent d'améliorer l'expérience utilisateur.",
+                  linkedCategory: 'ads',
+                },
+                {
+                  title: 'Google Analytics',
+                  description: "Ces cookies permettent d'analyser les statistiques du site.",
+                  linkedCategory: 'analytics',
+                },
+                {
+                  title: 'Données personnelles',
+                  description: "Ces cookies permettent d'utiliser les données personnelles.",
+                  linkedCategory: 'user',
+                },
+                {
+                  title: 'Personnalisation annonces',
+                  description: "Ces cookies permettent de personnaliser les annonces.",
+                  linkedCategory: 'personalization',
+                },
+                {
+                  title: "Plus d'informations",
+                  description: 'Pour toute question concernant notre politique en matière de cookies, veuillez <a href="' + (config.cookiePrivacyUrl || '#') + '">nous contacter</a>.',
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // Ensure DOM is ready before initializing (body must exist for #cc-main injection)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCookieConsent);
+  } else {
+    initCookieConsent();
+  }
+</script>

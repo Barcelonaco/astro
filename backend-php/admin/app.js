@@ -9618,6 +9618,14 @@ async function renderSiteSettings() {
     const showInfos = settings.show_infos === '1';
     const showRs = settings.show_rs === '1';
 
+    // Cookies
+    const cookieEnabled = settings.cookie_enabled === '1';
+    const cookieTitle = settings.cookie_title || 'Hello ! voici des Cookies';
+    const cookieDescription = settings.cookie_description || 'Ce site utilise des cookies essentiels pour assurer son bon fonctionnement et des cookies de suivi pour comprendre comment vous interagissez avec lui.';
+    const cookiePrivacyUrl = settings.cookie_privacy_url || '';
+    const cookieAcceptText = settings.cookie_accept_text || 'Tout accepter';
+    const cookieRejectText = settings.cookie_reject_text || 'Tout rejeter';
+
     // Tracking
     const gaCode = settings.ga_code || '';
     const awCode = settings.aw_code || '';
@@ -9648,6 +9656,7 @@ async function renderSiteSettings() {
           <button type="button" class="settings-tab" data-target="#settings-popup">Popup</button>
           <button type="button" class="settings-tab" data-target="#settings-floating">Bouton flottant</button>
           <button type="button" class="settings-tab" data-target="#settings-maintenance">Mode maintenance</button>
+          <button type="button" class="settings-tab" data-target="#settings-cookies">Cookies</button>
           <button type="button" class="settings-tab" data-target="#settings-tracking">Tracking & Analytics</button>
           <button type="button" class="settings-tab" data-target="#settings-recaptcha">reCAPTCHA</button>
           <button type="button" class="settings-tab" data-target="#settings-technical">Technique</button>
@@ -10298,6 +10307,42 @@ async function renderSiteSettings() {
           </div>
 
           </div>
+          <div class="settings-section" id="settings-cookies">
+          <h2 class="builder-settings-title" style="margin-top: 0;">Bandeau de cookies</h2>
+          <p style="margin-bottom:16px;color:var(--gray-500);font-size:13px">Configure le bandeau de consentement aux cookies (RGPD). Les scripts de tracking (GA, GTM, Meta Pixel) ne seront chargés qu'après consentement.</p>
+          <div class="form-row">
+            <div class="form-group">
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="cookie_enabled" ${cookieEnabled ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Activer le bandeau de cookies</span></div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Titre du bandeau</label>
+              <input type="text" class="form-input" name="cookie_title" value="${escapeHtml(cookieTitle)}" placeholder="Hello ! voici des Cookies">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea class="form-textarea" name="cookie_description" rows="3" placeholder="Ce site utilise des cookies essentiels...">${escapeHtml(cookieDescription)}</textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">URL politique de confidentialité</label>
+              <input type="text" class="form-input" name="cookie_privacy_url" value="${escapeHtml(cookiePrivacyUrl)}" placeholder="/politique-de-confidentialite/">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Texte bouton « Accepter »</label>
+              <input type="text" class="form-input" name="cookie_accept_text" value="${escapeHtml(cookieAcceptText)}" placeholder="Tout accepter">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Texte bouton « Rejeter »</label>
+              <input type="text" class="form-input" name="cookie_reject_text" value="${escapeHtml(cookieRejectText)}" placeholder="Tout rejeter">
+            </div>
+          </div>
+          </div>
+
           <div class="settings-section" id="settings-tracking">
           <h2 class="builder-settings-title" style="margin-top: 0;">Tracking & Analytics</h2>
           <div class="form-row">
@@ -10469,6 +10514,12 @@ async function saveSiteSettings(event) {
     text_maintenance: formData.get('text_maintenance') || '',
     show_infos: formData.get('show_infos') ? '1' : '0',
     show_rs: formData.get('show_rs') ? '1' : '0',
+    cookie_enabled: formData.get('cookie_enabled') ? '1' : '0',
+    cookie_title: formData.get('cookie_title') || '',
+    cookie_description: formData.get('cookie_description') || '',
+    cookie_privacy_url: formData.get('cookie_privacy_url') || '',
+    cookie_accept_text: formData.get('cookie_accept_text') || '',
+    cookie_reject_text: formData.get('cookie_reject_text') || '',
     ga_code: formData.get('ga_code') || '',
     aw_code: formData.get('aw_code') || '',
     gtm_code: formData.get('gtm_code') || '',
