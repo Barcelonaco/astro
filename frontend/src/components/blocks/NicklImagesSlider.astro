@@ -6,7 +6,7 @@
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { resolveLink } from '../../lib/module-classes';
-import { resolveImageUrl, resolveImageAlt, optimizedImageUrl } from '../../lib/module-helpers';
+import { resolveImageUrl, resolveImageAlt, optimizedImageUrl, responsiveSrcset } from '../../lib/module-helpers';
 
 interface Props {
   data: Record<string, any>;
@@ -32,6 +32,7 @@ const images = rawSliders.map((slide) => ({
     }
     return optimizedImageUrl(rawUrl, 1600, 80);
   })(),
+  image_srcset: responsiveSrcset(typeof slide.image === 'string' ? slide.image : (slide.image as any)?.url || '', [600, 900, 1440], 75),
   image_alt: resolveImageAlt(slide.image),
   has_desc: !!(slide.legend || slide.text || slide.link?.url),
   legend: (slide.legend as string) || '',
@@ -52,7 +53,7 @@ const images = rawSliders.map((slide) => ({
             {images.map((slide) => (
               <div class={`swiper-slide item ${slide.has_desc ? 'has-desc' : 'no-desc'}`}>
                 <div class="illus-wrapper">
-                  <img src={slide.image_url} alt={slide.image_alt} class="illus" width="1200" height="675" loading="lazy" decoding="async" />
+                  <img src={slide.image_url} srcset={slide.image_srcset || undefined} sizes="100vw" alt={slide.image_alt} class="illus" width="1200" height="675" loading="lazy" decoding="async" />
                 </div>
                 {slide.has_desc && (
                   <div class="container-large container-2">

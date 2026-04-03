@@ -8,6 +8,7 @@ import { isTruthy } from '../../lib/module-classes';
 import {
   resolveImageUrl,
   resolveImageAlt,
+  responsiveSrcset,
   extractYouTubeId,
   extractVimeoId,
   extractDailymotionId,
@@ -153,7 +154,7 @@ const extraClasses = imgParallax ? 'img-parallax' : '';
     imageUrl && (
       <div class="container-large">
         <div class={`illus-wrapper ${mediaRatio}`}>
-          <img src={imageUrl} alt={imageAlt} class="illus" width="800" height="450" loading="lazy" />
+          <img src={imageUrl} srcset={responsiveSrcset(typeof data.image === "string" ? data.image : (data.image as any)?.url || "", [400, 600, 900], 75) || undefined} sizes="100vw" alt={imageAlt} class="illus" width="800" height="450" loading="lazy" />
         </div>
       </div>
     )

@@ -42,7 +42,7 @@ try {
             <a href={`/blog/${post.slug}`} class="link">
               {post.featured_image && (
                 <div class="illus-wrapper">
-                  <img src={post.featured_image} alt={post.title || ''} class="illus" width="600" height="400" loading="lazy" />
+                  <img src={post.featured_image} srcset={responsiveSrcset(post.featured_image, [300, 450, 600], 75) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw" alt={post.title || ''} class="illus" width="600" height="400" loading="lazy" />
                 </div>
               )}
               <div class="desc">

@@ -6,7 +6,7 @@
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { resolveLink } from '../../lib/module-classes';
-import { resolveImageUrl, resolveImageAlt } from '../../lib/module-helpers';
+import { resolveImageUrl, resolveImageAlt, responsiveSrcset } from '../../lib/module-helpers';
 
 interface Props {
   data: Record<string, any>;
@@ -81,7 +81,7 @@ const isSingle = teamMembers.length === 1;
           <>
             <li class="item">
               <div class="illus-wrapper">
-                {pictureUrl && <img src={pictureUrl} alt={pictureAlt} class="illus" width="300" height="300" loading="lazy" decoding="async" />}
+                {pictureUrl && <img src={pictureUrl} srcset={responsiveSrcset(typeof team.picture === "string" ? team.picture : (team.picture as any)?.url || "", [200, 300], 75) || undefined} sizes="200px" alt={pictureAlt} class="illus" width="300" height="300" loading="lazy" decoding="async" />}
               </div>
             </li>
             <li class="item">
@@ -94,7 +94,7 @@ const isSingle = teamMembers.length === 1;
       return (
         <li class="item">
           <div class="illus-wrapper">
-            {pictureUrl && <img src={pictureUrl} alt={pictureAlt} class="illus" width="300" height="300" loading="lazy" decoding="async" />}
+            {pictureUrl && <img src={pictureUrl} srcset={responsiveSrcset(typeof team.picture === "string" ? team.picture : (team.picture as any)?.url || "", [200, 300], 75) || undefined} sizes="200px" alt={pictureAlt} class="illus" width="300" height="300" loading="lazy" decoding="async" />}
           </div>
           {descBlock}
         </li>

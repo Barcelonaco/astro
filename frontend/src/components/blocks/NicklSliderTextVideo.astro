@@ -6,7 +6,7 @@
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { cleanHtml, resolveLink, isTruthy } from '../../lib/module-classes';
-import { extractYouTubeId, resolveImageUrl } from '../../lib/module-helpers';
+import { extractYouTubeId, resolveImageUrl, responsiveSrcset } from '../../lib/module-helpers';
 
 interface Props {
   data: Record<string, any>;
@@ -83,7 +83,7 @@ const hasMultipleSlides = slider.length > 1;
                     {hasVideo && youtubeId ? (
                       <div class="video">
                         {preview && previewType === 'image' && (
-                          <img src={previewUrl} alt={previewAlt} class="illus" width="800" height="450" loading="lazy" />
+                          <img src={previewUrl} srcset={responsiveSrcset(typeof slide.preview === "string" ? slide.preview : (slide.preview as any)?.url || "", [400, 600, 800], 75) || undefined} sizes="(max-width: 960px) 100vw, 50vw" alt={previewAlt} class="illus" width="800" height="450" loading="lazy" />
                         )}
                         {preview && previewType === 'video' && (
                           <video class="background-video js-lazy-video" autoplay loop muted playsinline>
@@ -101,7 +101,7 @@ const hasMultipleSlides = slider.length > 1;
                     ) : preview ? (
                       <div class="video">
                         {previewType === 'image' ? (
-                          <img src={previewUrl} alt={previewAlt} class="illus" width="800" height="450" loading="lazy" />
+                          <img src={previewUrl} srcset={responsiveSrcset(typeof slide.preview === "string" ? slide.preview : (slide.preview as any)?.url || "", [400, 600, 800], 75) || undefined} sizes="(max-width: 960px) 100vw, 50vw" alt={previewAlt} class="illus" width="800" height="450" loading="lazy" />
                         ) : (
                           <video class="background-video js-lazy-video" autoplay loop muted playsinline>
                             <source src={previewUrl} type="video/mp4" />

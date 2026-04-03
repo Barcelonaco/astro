@@ -5,7 +5,7 @@
  * Hauteurs : small, medium, large, none.
  */
 import { buildModuleClasses, resolveBackgroundImage } from '../../lib/module-classes';
-import { resolveImageUrl, resolveImageAlt, resolveImageTitle, resolveImageDimensions, optimizedImageUrl } from '../../lib/module-helpers';
+import { resolveImageUrl, resolveImageAlt, resolveImageTitle, resolveImageDimensions, optimizedImageUrl, responsiveSrcset } from '../../lib/module-helpers';
 
 interface Props {
   data: Record<string, any>;
@@ -32,6 +32,8 @@ const imgBanner = data.image as any;
 const imgUrl = resolveImageUrl(imgBanner, apiOrigin);
 const imgAlt = resolveImageAlt(imgBanner);
 const imgTitle = resolveImageTitle(imgBanner);
+const rawBannerUrl = typeof imgBanner === 'string' ? imgBanner : (imgBanner as any)?.url || '';
+const bannerSrcset = responsiveSrcset(rawBannerUrl, [600, 900, 1440], 80);
 const imgDims = resolveImageDimensions(imgBanner);
 
 const hideTitleClass = titleInHeader === 'hideTitle' ? ' hide_banner_title' : '';
@@ -55,7 +57,7 @@ const titleSizeClass = titleSize ? ` h1-${titleSize}` : '';
     {/* Image banner principale */}
     {heightBanner !== 'none' && imgUrl && (
       <div class="background">
-        <img src={optimizedImageUrl(imgUrl, 1440, 80)} width={imgDims.width || 1440} height={imgDims.height || 600} fetchpriority="high" loading="eager" decoding="sync" alt={imgAlt} title={imgTitle || undefined} class="illus" />
+        <img src={optimizedImageUrl(imgUrl, 1440, 80)} srcset={bannerSrcset || undefined} sizes="100vw" width={imgDims.width || 1440} height={imgDims.height || 600} fetchpriority="high" loading="eager" decoding="sync" alt={imgAlt} title={imgTitle || undefined} class="illus" />
       </div>
     )}
 

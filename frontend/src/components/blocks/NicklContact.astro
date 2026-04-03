@@ -5,7 +5,7 @@
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { isTruthy } from '../../lib/module-classes';
-import { resolveImageUrl, resolveImageAlt } from '../../lib/module-helpers';
+import { resolveImageUrl, resolveImageAlt, responsiveSrcset } from '../../lib/module-helpers';
 import { socialIcons, socialLabels, socialOrder } from '../../lib/social-icons';
 
 interface Props {
@@ -21,6 +21,8 @@ const addresses = (data.addresses as any[]) || [];
 const isMap = isTruthy(data.is_map);
 const photoUrl = resolveImageUrl(data.photo, apiOrigin, 'text-image-default');
 const photoAlt = resolveImageAlt(data.photo);
+const rawPhotoUrl = typeof data.photo === 'string' ? data.photo : (data.photo as any)?.url || '';
+const photoSrcset = responsiveSrcset(rawPhotoUrl, [200, 300, 400], 75);
 
 // Calcul du centre pour la carte
 const markers: [number, number][] = [];
@@ -136,7 +138,7 @@ const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
     <div class="col col-2">
       {!isMap ? (
         photoUrl && (
-          <img src={photoUrl} alt={photoAlt} class="illus" width="400" height="400" loading="lazy" />
+          <img src={photoUrl} srcset={photoSrcset || undefined} sizes="(max-width: 960px) 100vw, 400px" alt={photoAlt} class="illus" width="400" height="400" loading="lazy" />
         )
       ) : (
         <>
