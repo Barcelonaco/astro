@@ -171,6 +171,14 @@ class RenderBlockController {
             $catMap = [];
         }
 
+        // Detect background color for text contrast
+        $bgColor = $data['bloc_color'] ?? '';
+        $isDarkBg = str_contains($bgColor, 'background-primary') || str_contains($bgColor, 'background-secondary');
+        $catColor = $isDarkBg ? '#fff' : 'var(--color-primary, #3b82f6)';
+        $nameColor = $isDarkBg ? '#fff' : '#999';
+        $titleColor = $isDarkBg ? '#fff' : 'inherit';
+        $btnColor = $isDarkBg ? 'color:#fff;' : '';
+
         $html = '<ul class="list" style="display:flex;flex-wrap:wrap;gap:26px;row-gap:48px;list-style:none;padding:0;margin:0;">';
         foreach ($refs as $ref) {
             $title = htmlspecialchars($ref['title'] ?? '');
@@ -195,17 +203,17 @@ class RenderBlockController {
             $html .= '<li style="width:calc(100% / 3 - 18px);">';
             if ($imgUrl) {
                 $imgUrl = htmlspecialchars($imgUrl);
-                $html .= '<div style="overflow:hidden;background:rgba(0,0,0,.05);border-radius:var(--border-radius,0);aspect-ratio:4/3;">';
-                $html .= '<img src="' . $imgUrl . '" alt="' . $title . '" style="width:100%;height:100%;object-fit:cover;" loading="lazy">';
+                $html .= '<div style="overflow:hidden;background:rgba(0,0,0,.05);border-radius:.75rem;aspect-ratio:100/74.78;">';
+                $html .= '<img src="' . $imgUrl . '" alt="' . $title . '" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy">';
                 $html .= '</div>';
             }
-            $html .= '<div style="padding-top:14px;">';
+            $html .= '<div style="padding-top:.875rem;">';
             if ($category) {
-                $html .= '<p style="margin:0 0 2px;font-size:14px;line-height:1.4;letter-spacing:.05em;color:var(--color-primary,#666);text-transform:uppercase;">' . $category . '</p>';
+                $html .= '<p style="margin:0 0 .125rem;font-size:.875rem;line-height:1.2;letter-spacing:-.04em;color:' . $catColor . ';text-transform:uppercase;">' . $category . '</p>';
             }
-            $html .= '<h3 style="margin:0;font-size:inherit;">' . $title . '</h3>';
+            $html .= '<h3 style="margin:0;font-size:1.5rem;font-weight:700;line-height:1.2;color:' . $titleColor . ';">' . $title . '</h3>';
             if ($customerName) {
-                $html .= '<p style="margin-top:12px;font-size:20px;line-height:1.4;letter-spacing:.05em;color:#999;">' . $customerName . '</p>';
+                $html .= '<p style="margin-top:.75rem;font-size:1.25rem;line-height:1.2;letter-spacing:-.04em;color:' . $nameColor . ';">' . $customerName . '</p>';
             }
             $html .= '</div>';
             $html .= '</li>';
@@ -217,7 +225,7 @@ class RenderBlockController {
         if ($showArchive) {
             $label = htmlspecialchars($data['archive_link_label'] ?? 'Voir toutes les références');
             $html .= '<div style="margin-top:60px;text-align:center;">';
-            $html .= '<a href="/references" class="btn btn-tertiary color-primary">' . $label . '</a>';
+            $html .= '<a href="/references" class="btn btn-tertiary color-primary" style="' . $btnColor . '">' . $label . '</a>';
             $html .= '</div>';
         }
 

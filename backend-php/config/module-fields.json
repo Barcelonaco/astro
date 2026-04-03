@@ -7290,6 +7290,17 @@
                     "conditional": null,
                     "defaultValue": "yes",
                     "isBlockParam": true
+                },
+                {
+                    "name": "bloc_id",
+                    "label": "Bloc réutilisable",
+                    "type": "Select",
+                    "choices": [],
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "defaultValue": null,
+                    "isBlockParam": false
                 }
             ]
         },

@@ -2948,6 +2948,42 @@ function renderBlockPreviewHtml(block) {
     if (!moduleTemplateCache['summary']) queueModuleTemplateLoad('summary');
     return `<div class="module module-summary ${sumCls}" style="position:relative;"><div class="container">${sumTitleHtml}${sumContent}</div></div>`;
   }
+  // ReusableBloc — fetch bloc content and render sub-blocks
+  if (block.type === 'reusable-bloc' || block.type === 'ReusableBloc') {
+    const blocId = d.bloc_id;
+    const rbPreviewId = 'rb-preview-' + (block.id || Math.random().toString(36).slice(2));
+    if (!blocId) {
+      return `<div class="module module-reusable-bloc" style="padding:40px 20px;text-align:center;opacity:0.5;">Aucun bloc réutilisable sélectionné</div>`;
+    }
+    setTimeout(async () => {
+      const el = document.getElementById(rbPreviewId);
+      if (!el) return;
+      try {
+        const bloc = await apiFetch(`/reusable-blocs/${blocId}`);
+        if (!bloc || !bloc.content) {
+          el.innerHTML = '<p style="text-align:center;opacity:0.5;">Bloc réutilisable vide</p>';
+          return;
+        }
+        let subBlocks;
+        try { subBlocks = typeof bloc.content === 'string' ? JSON.parse(bloc.content) : bloc.content; } catch (e) { subBlocks = []; }
+        if (!Array.isArray(subBlocks) || subBlocks.length === 0) {
+          el.innerHTML = '<p style="text-align:center;opacity:0.5;">Bloc réutilisable vide</p>';
+          return;
+        }
+        let html = '';
+        for (const sub of subBlocks) {
+          try {
+            const subHtml = renderBlockPreviewHtml(sub);
+            if (subHtml) html += subHtml;
+          } catch (e) { console.warn('ReusableBloc sub-block render error:', e); }
+        }
+        el.innerHTML = html || '<p style="text-align:center;opacity:0.5;">Aucun aperçu disponible</p>';
+      } catch (e) {
+        el.innerHTML = '<p style="text-align:center;color:red;">Erreur: ' + escapeHtml(e.message) + '</p>';
+      }
+    }, 50);
+    return `<div class="module module-reusable-bloc"><div id="${rbPreviewId}"><p style="text-align:center;opacity:0.5;">Chargement du bloc réutilisable…</p></div></div>`;
+  }
   // BlocReferences — live preview from server-side render
   if (block.type === 'bloc-references' || block.type === 'BlocReferences') {
     const refCls = [d.bloc_color || '', d.padding_top || '', d.padding_bottom || ''].filter(Boolean).join(' ');
