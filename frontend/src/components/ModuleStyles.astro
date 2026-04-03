@@ -91,9 +91,6 @@ function readCss(filename: string): string {
   }
 }
 
-// Inline app.css at build time — eliminates the 760ms render-blocking external request
-const appCss = readCss('app.css');
-
 const allTypes = blocks ? collectAllBlockTypes(blocks as any) : [];
 
 const cssFileNames = [
@@ -142,9 +139,6 @@ for (const type of pluginBlockTypes) {
 }
 const pluginInlinedCss = pluginCssChunks.filter(Boolean).join('\n');
 ---
-
-{/* Main CSS — inlined at build time to eliminate render-blocking external request */}
-{appCss && <style set:html={appCss} />}
 
 {/* All Nickl module CSS inlined — zero external render-blocking requests for module specifics */}
 {inlinedCss && <style set:html={inlinedCss} />}
