@@ -177,27 +177,21 @@ const socials = [
     bottom: 1.5rem;
     right: 1.5rem;
     z-index: 9998;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
     background: var(--color-primary, var(--accent));
     color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
     box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     text-decoration: none;
     transition: transform 0.2s;
-  }
-  .floating-btn.has-label {
-    width: auto;
-    border-radius: 28px;
-    padding: 0 1.25rem;
     font-size: 0.875rem;
     font-weight: 600;
   }
   .floating-btn:hover { transform: scale(1.05); }
+  .border-rounded .floating-btn { border-radius: 30px; }
   .floating-btn-icon {
     width: 24px;
     height: 24px;
