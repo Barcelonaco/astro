@@ -230,6 +230,16 @@ if (!preg_match('#^/api/(.*)$#', $uri, $apiMatch)) {
         exit;
     }
 
+    // If a rebuild is in progress, show a waiting page instead of raw JSON error
+    $rebuildStatus = get_rebuild_status();
+    if (in_array($rebuildStatus['status'] ?? '', ['building', 'queued'])) {
+        http_response_code(503);
+        header('Content-Type: text/html; charset=utf-8');
+        header('Retry-After: 5');
+        echo '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mise à jour en cours…</title><meta http-equiv="refresh" content="3"><style>body{display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;font-family:system-ui,sans-serif;background:#f8f9fa;color:#333}div{text-align:center}.spinner{width:40px;height:40px;border:4px solid #e0e0e0;border-top-color:#666;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 1rem}@keyframes spin{to{transform:rotate(360deg)}}</style></head><body><div><div class="spinner"></div><p>Le site est en cours de mise à jour…</p><p style="font-size:.85em;color:#888">Rechargement automatique dans quelques secondes</p></div></body></html>';
+        exit;
+    }
+
     error_response('Not found', 404);
 }
 

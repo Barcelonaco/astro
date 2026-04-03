@@ -9609,6 +9609,7 @@ async function renderSiteSettings() {
     // Bouton flottant
     const showBtn = settings.show_btn === '1';
     const floatingBtnLink = settings.floating_btn_link || '';
+    const floatingBtnLinkTitle = settings.floating_btn_link_title || '';
     const floatingBtnImg = settings.floating_btn_img || '';
 
     // Maintenance
@@ -10256,9 +10257,13 @@ async function renderSiteSettings() {
           <div class="form-group">
             <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="show_btn" ${showBtn ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Affichage du bouton</span></div>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="width:50%;display:inline-block;vertical-align:top;padding-right:8px;">
             <label class="form-label">Lien du bouton</label>
             <input type="url" class="form-input" name="floating_btn_link" value="${escapeHtml(floatingBtnLink)}">
+          </div>
+          <div class="form-group" style="width:50%;display:inline-block;vertical-align:top;padding-left:8px;">
+            <label class="form-label">Titre du lien</label>
+            <input type="text" class="form-input" name="floating_btn_link_title" value="${escapeHtml(floatingBtnLinkTitle)}" placeholder="Ex: Nous contacter">
           </div>
           <div class="form-group">
             <label class="form-label">Icône du bouton</label>
@@ -10458,6 +10463,7 @@ async function saveSiteSettings(event) {
     alert_cta2_text: formData.get('alert_cta2_text') || '',
     show_btn: formData.get('show_btn') ? '1' : '0',
     floating_btn_link: formData.get('floating_btn_link') || '',
+    floating_btn_link_title: formData.get('floating_btn_link_title') || '',
     floating_btn_img: formData.get('floating_btn_img') || '',
     is_maintenance: formData.get('is_maintenance') ? '1' : '0',
     text_maintenance: formData.get('text_maintenance') || '',
@@ -10904,12 +10910,32 @@ async function apiUpload(endpoint, formData) {
   return response.json();
 }
 
-function showLoading() {
-  document.getElementById('loadingOverlay').classList.add('show');
+let _loadingTimer = null;
+
+function showLoading(text = '') {
+  const overlay = document.getElementById('loadingOverlay');
+  const textEl = document.getElementById('loadingText');
+  if (textEl) textEl.textContent = text;
+  overlay.classList.add('show');
+
+  // If no explicit text, show "Publication en cours…" after 2s (rebuild is running)
+  clearTimeout(_loadingTimer);
+  if (!text) {
+    _loadingTimer = setTimeout(() => {
+      if (textEl && overlay.classList.contains('show')) {
+        textEl.textContent = 'Publication en cours…';
+      }
+    }, 2000);
+  }
 }
 
 function hideLoading() {
-  document.getElementById('loadingOverlay').classList.remove('show');
+  clearTimeout(_loadingTimer);
+  _loadingTimer = null;
+  const overlay = document.getElementById('loadingOverlay');
+  const textEl = document.getElementById('loadingText');
+  if (textEl) textEl.textContent = '';
+  overlay.classList.remove('show');
 }
 
 function showToast(message, type = 'success') {

@@ -19,19 +19,26 @@ do_build() {
     # Update status
     echo "{\"status\":\"building\",\"started_at\":$(date +%s)}" > "$STATUS_FILE"
 
-    # Run build
-    cd "$FRONTEND_DIR" && npm run build 2>&1
+    # Build to a temp directory so the current dist/ stays live during build
+    cd "$FRONTEND_DIR" && npx astro build --outDir dist_new 2>&1
 
     BUILD_EXIT=$?
 
-    # Remove lock
-    rm -f "$LOCK_FILE"
-
     if [ $BUILD_EXIT -eq 0 ]; then
+        # Atomic swap: old dist stays live until the very last moment
+        rm -rf "$FRONTEND_DIR/dist_old"
+        mv "$FRONTEND_DIR/dist" "$FRONTEND_DIR/dist_old" 2>/dev/null
+        mv "$FRONTEND_DIR/dist_new" "$FRONTEND_DIR/dist"
+        rm -rf "$FRONTEND_DIR/dist_old"
         echo "{\"status\":\"done\",\"completed_at\":$(date +%s)}" > "$STATUS_FILE"
     else
+        # Failed: clean up temp dir, keep current dist intact
+        rm -rf "$FRONTEND_DIR/dist_new"
         echo "{\"status\":\"error\",\"completed_at\":$(date +%s),\"exit_code\":$BUILD_EXIT}" > "$STATUS_FILE"
     fi
+
+    # Remove lock
+    rm -f "$LOCK_FILE"
 }
 
 # First build

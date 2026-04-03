@@ -555,11 +555,19 @@ tr:hover {
   display: none;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
+  gap: 1rem;
   z-index: 9999;
 }
 
 .loading-overlay.show {
   display: flex;
+}
+
+.loading-text {
+  color: white;
+  font-size: 0.95rem;
+  font-family: system-ui, sans-serif;
 }
 
 .spinner {

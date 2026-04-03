@@ -22,6 +22,8 @@ const hasAlertCtas = (alertCtaUrl && alertCtaText) || (alertCta2Url && alertCta2
 // Floating button
 const showBtn = s.show_btn === '1';
 const floatingBtnLink = s.floating_btn_link || '';
+const floatingBtnLinkTitle = s.floating_btn_link_title || '';
+const floatingBtnImg = s.floating_btn_img || '';
 
 // Maintenance
 const isMaintenance = s.is_maintenance === '1';
@@ -67,10 +69,11 @@ const socials = [
 
 {/* Bouton flottant */}
 {showBtn && floatingBtnLink && (
-  <a href={floatingBtnLink} class="floating-btn" target="_blank" rel="noopener noreferrer">
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />
-    </svg>
+  <a href={floatingBtnLink} class={`floating-btn${floatingBtnLinkTitle ? ' has-label' : ''}`} target="_blank" rel="noopener noreferrer" title={floatingBtnLinkTitle || undefined}>
+    {floatingBtnImg && (
+      <img src={floatingBtnImg} alt={floatingBtnLinkTitle || 'Bouton flottant'} class="floating-btn-icon" />
+    )}
+    {floatingBtnLinkTitle && <span class="floating-btn-label">{floatingBtnLinkTitle}</span>}
   </a>
 )}
 
@@ -182,11 +185,27 @@ const socials = [
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 0.5rem;
     box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     text-decoration: none;
     transition: transform 0.2s;
   }
-  .floating-btn:hover { transform: scale(1.1); }
+  .floating-btn.has-label {
+    width: auto;
+    border-radius: 28px;
+    padding: 0 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .floating-btn:hover { transform: scale(1.05); }
+  .floating-btn-icon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+  }
+  .floating-btn-label {
+    white-space: nowrap;
+  }
 
   /* ── Maintenance ── */
   .maintenance-overlay {
