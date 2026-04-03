@@ -69,17 +69,39 @@ if (fontGeneral) fontsToLoad.add(fontGeneral);
 const googleFontsUrl = fontsToLoad.size > 0
   ? 'https://fonts.googleapis.com/css2?' +
     Array.from(fontsToLoad).map(f => `family=${f.replace(/ /g, '+')}:wght@400;500;600;700`).join('&') +
-    '&display=optional'
+    '&display=swap'
   : '';
 
 // Fetch @font-face CSS at build time so we can inline it (eliminates blocking request)
-// font-display: optional → no layout shift, font used only if cached or fast to load
+// font-display: swap → shows system font immediately, swaps to Google font when loaded
 let googleFontsCss = '';
 if (googleFontsUrl) {
   try {
-    const res = await fetch(googleFontsUrl);
+    // Use modern User-Agent to get woff2 format (default fetch gets TTF)
+    const res = await fetch(googleFontsUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+    });
     if (res.ok) googleFontsCss = await res.text();
   } catch {}
+}
+
+// Extract woff2 URLs for weight 400 latin subset only (1 per family, max 2 preloads)
+const fontPreloads: string[] = [];
+if (googleFontsCss) {
+  // Split into individual @font-face blocks
+  const blocks = googleFontsCss.split('@font-face').filter(b => b.includes('font-weight'));
+  const seen = new Set<string>();
+  for (const block of blocks) {
+    // Only weight 400 + latin subset (last block per family, no unicode-range suffix like -ext)
+    if (!/font-weight:\s*400/.test(block)) continue;
+    if (/latin-ext|cyrillic|greek|vietnamese/i.test(block)) continue;
+    const urlMatch = block.match(/url\((https:\/\/[^)]+\.woff2)\)/);
+    const familyMatch = block.match(/font-family:\s*'([^']+)'/);
+    if (urlMatch && familyMatch && !seen.has(familyMatch[1])) {
+      seen.add(familyMatch[1]);
+      fontPreloads.push(urlMatch[1]);
+    }
+  }
 }
 
 // Build CSS variables string
@@ -107,6 +129,11 @@ if (!isNaN(logoHeight)) cssVars.push(`--logo-height:${logoHeight}px`);
 
 {/* Inline CSS variables — no client-side fetch needed */}
 <style set:html={`:root{${cssVars.join(';')}}`} />
+
+{/* Preload critical font files — reduces CLS from font swap */}
+{fontPreloads.map(url => (
+  <link rel="preload" as="font" type="font/woff2" href={url} crossorigin="anonymous" />
+))}
 
 {/* Google Fonts — inlined at build time to avoid external blocking request */}
 {googleFontsCss ? (
