@@ -151,9 +151,10 @@ if (preg_match('#^/uploads/(.+)$#', $uri, $m)) {
     exit;
 }
 
-// Serve nickl-assets: try nickl/public/ first, then backend/public/nickl/
+// Serve nickl-assets: try dist (Astro build) first, then nickl/public/, then backend/nickl-css/
 if (preg_match('#^/nickl-assets/(.+)$#', $uri, $m)) {
     $candidates = [
+        __DIR__ . '/dist/nickl-assets/' . $m[1],
         __DIR__ . '/../nickl/public/' . $m[1],
         __DIR__ . '/nickl-css/' . basename($m[1]),
     ];
