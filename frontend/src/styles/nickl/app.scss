@@ -25,9 +25,9 @@
 // ----------------------------------------
 @import 'partials/accessibility';
 @import 'partials/document';
-@import 'partials/cookies';
-@import 'partials/footer';
-@import 'partials/header';
+// @import 'partials/cookies'; // MIGRATED → cookies.css
+// @import 'partials/footer'; // MIGRATED → Footer.astro <style is:global>
+// @import 'partials/header'; // MIGRATED → header.css
 @import 'partials/search-form';
 @import 'partials/sidebar';
 

@@ -30,6 +30,7 @@ const enabled = cookieEnabled === '1';
 // Import cookieconsent CSS via bundler (inlined at build time)
 if (enabled) {
   await import('vanilla-cookieconsent/dist/cookieconsent.css');
+  await import('../styles/cookies.css');
 }
 ---
 
