@@ -158,6 +158,10 @@
     if (modules.length === 0) return;
 
     modules.forEach(function(mod) {
+      // Skip modules already in the viewport — animating them causes CLS
+      var rect = mod.getBoundingClientRect();
+      if (rect.top < window.innerHeight && rect.bottom > 0) return;
+
       var steps = ANIM[moduleClass];
       var cumulDelay = 0;
 

@@ -174,7 +174,7 @@ const extraClasses = extraParts.join(' ');
         /* Image */
         imageUrl && (
           <div class={`illus-wrapper ${mediaRatio}`}>
-            <img src={imageUrl} alt={imageAlt} title={imageTitle || undefined} class="illus" width={imageDims.width || 800} height={imageDims.height || 600} loading="lazy" decoding="async" />
+            <img src={imageUrl} alt={imageAlt} title={imageTitle || undefined} class="illus" width={imageDims.width || 800} height={imageDims.height || 600} loading={data._eager ? 'eager' : 'lazy'} decoding="async" fetchpriority={data._eager ? 'high' : undefined} />
           </div>
         )
       )}

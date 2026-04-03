@@ -69,8 +69,10 @@ const { blocks = [] } = Astro.props as { blocks: Block[] };
 ---
 
 <div class="page-blocks">
-  {blocks.map((block) => {
+  {blocks.map((block, blockIndex) => {
     const data = block.data || {};
+    // First block gets eager loading for LCP optimization
+    if (blockIndex === 0) data._eager = true;
     switch (block.type) {
       case 'heading':
         return <Heading data={data} />;
