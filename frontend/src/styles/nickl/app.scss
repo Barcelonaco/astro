@@ -1,42 +1,24 @@
-// BASE
+// BASE — normalize + variables + mixins
 // ----------------------------------------
 @import 'base/reset';
 @import 'base/variables';
 @import 'base/mixin';
 
 
-// COMPONENT — kept for @extend dependencies (modules use .color-secondary etc.)
-// Migrated CSS equivalents are in src/styles/components.css
+// COMPONENT — MIGRATED → components.css (imported via BaseHead.astro)
+// Kept here only because modules need variables/mixins context
 // ----------------------------------------
-@import 'components/buttons';
-@import 'components/breadcrumb';
-@import 'components/floating-btn';
-@import 'components/editor';
-@import 'components/form';
-@import 'components/module-protected';
-@import 'components/no-cookies';
-@import 'components/pagination';
-@import 'components/popins';
-@import 'components/sliders';
-@import 'components/social-networks';
-@import 'components/tabs';
 
 
 // PARTIALS — ALL MIGRATED to src/styles/*.css
 // ----------------------------------------
-// @import 'partials/accessibility';  → accessibility.css
-// @import 'partials/document';       → document.css
-// @import 'partials/cookies';        → cookies.css
-// @import 'partials/footer';         → footer.css
-// @import 'partials/header';         → header.css
-// @import 'partials/search-form';    → search-form.css
-// @import 'partials/sidebar';        → sidebar.css
 
 
-// MODULES
+// MODULES — base wrapper styles only
+// gallery/references/alert/share already compiled as individual CSS files
 // ----------------------------------------
 @import 'modules/modules';
-@import 'modules/gallery';
-@import 'modules/references';
-@import 'modules/alert';
-@import 'modules/share';
+// @import 'modules/gallery';     // already in gallery.css (inlined per-page)
+// @import 'modules/references';  // already in references.css (inlined per-page)
+// @import 'modules/alert';       // already in alert CSS
+// @import 'modules/share';       // already in share CSS

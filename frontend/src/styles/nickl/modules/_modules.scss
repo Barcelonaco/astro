@@ -197,7 +197,7 @@
                 }
             }
             .btn-secondary {
-                @extend .color-secondary;
+                border-color: $color4;
                 @include hover {
                     background-color: $color4bis;
                     border-color: $color4bis;
@@ -269,7 +269,12 @@
                 }
             }
             .btn-secondary {
-                @extend .color-default;
+                border-color: $color-default;
+                @include hover {
+                    background-color: $color-default;
+                    border-color: $color-default;
+                    color: $color1;
+                }
                 // border-color: $color1;
                 border-color: currentColor;
                 &.color-primary-full {
