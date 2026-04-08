@@ -9,6 +9,17 @@ function authenticate_token(): array {
         error_response('Access denied. No token provided.', 401);
     }
 
+    // Check static API key first (per-site, permanent)
+    $apiKey = $_ENV['API_KEY'] ?? '';
+    if (!empty($apiKey) && hash_equals($apiKey, $token)) {
+        return [
+            'id' => 0,
+            'email' => 'api@site',
+            'role' => 'admin',
+        ];
+    }
+
+    // Fall back to JWT (per-user, expires)
     try {
         $decoded = JWT::decode($token, new Key($_ENV['JWT_SECRET'], 'HS256'));
         return (array) $decoded;

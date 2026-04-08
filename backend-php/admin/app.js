@@ -75,10 +75,11 @@ async function init() {
   try {
     document.getElementById('userInfo').textContent = currentUser.name;
 
-    // Afficher le menu Utilisateurs pour les admins uniquement
+    // Afficher les menus admin-only pour les admins uniquement
     if (currentUser.role === 'admin') {
       const navUsers = document.getElementById('navUsers');
       if (navUsers) navUsers.style.display = '';
+      document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
     }
 
     // Appliquer le thème choisi au back-office
@@ -525,8 +526,9 @@ async function loadPlugins() {
       if (nav && !nav.querySelector(`[data-section="plugin-options:${plugin.name}"]`)) {
         const a = document.createElement('a');
         a.href = '#';
-        a.className = 'nav-item';
+        a.className = 'nav-item admin-only';
         a.dataset.section = `plugin-options:${plugin.name}`;
+        if (currentUser.role !== 'admin') a.style.display = 'none';
         a.innerHTML = `${plugin.icon || '🔌'} ${escapeHtml(plugin.label || plugin.name)}`;
         a.addEventListener('click', (ev) => {
           ev.preventDefault();

@@ -333,6 +333,12 @@ try {
     if ($method === 'POST' && $path === '/auth/login') {
         AuthController::login();
     }
+    elseif ($method === 'POST' && $path === '/auth/forgot-password') {
+        AuthController::forgotPassword();
+    }
+    elseif ($method === 'POST' && $path === '/auth/reset-password') {
+        AuthController::resetPassword();
+    }
     elseif ($method === 'GET' && $path === '/auth/me') {
         $user = authenticate_token();
         AuthController::me($user);
@@ -387,7 +393,6 @@ try {
     }
     elseif ($method === 'GET' && $path === '/pages/menu-info') {
         $user = authenticate_token();
-        require_admin($user);
         MenuController::getAllPageMenuInfo();
     }
     elseif ($method === 'GET' && match_route('/pages/:slug', $path, $params)) {
@@ -465,7 +470,6 @@ try {
     }
     elseif ($method === 'GET' && $path === '/settings') {
         $user = authenticate_token();
-        require_admin($user);
         SettingsController::getAllSettings();
     }
     elseif ($method === 'PUT' && $path === '/settings') {
@@ -524,7 +528,6 @@ try {
     // ── Plugins (admin) ──
     elseif ($method === 'GET' && $path === '/plugins') {
         $user = authenticate_token();
-        require_admin($user);
         PluginController::getPlugins();
     }
 
@@ -594,7 +597,6 @@ try {
     }
     elseif ($method === 'GET' && $path === '/menus') {
         $user = authenticate_token();
-        require_admin($user);
         MenuController::getAll();
     }
     elseif ($method === 'GET' && $path === '/menus/pages') {

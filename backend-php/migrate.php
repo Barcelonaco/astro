@@ -67,15 +67,39 @@ if (!table_exists($db, 'users')) {
     ");
     echo "  + Created table\n";
 
-    // Default admin user
-    $hash = password_hash('admin123', PASSWORD_DEFAULT);
-    $db->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)")
-       ->execute(['Admin', 'admin@example.com', $hash, 'admin']);
-    echo "  + Created default admin (admin@example.com / admin123)\n";
+    // Default admin users
+    $defaultUsers = [
+        ['Chulee',   'chulee@barcelona-co.fr',   'GS3iQMjJROQj'],
+        ['Quentin',  'quentin@barcelona-co.fr',   'Linoleum-Impurity-Launder0-Scariness'],
+        ['Olivier',  'olivier@barcelona-co.fr',    'Overvalue-Cactus-Hunter0'],
+    ];
+    $stmt = $db->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'admin')");
+    foreach ($defaultUsers as [$name, $email, $pwd]) {
+        $stmt->execute([$name, $email, password_hash($pwd, PASSWORD_DEFAULT)]);
+        echo "  + Created admin ({$email})\n";
+    }
     $changes++;
 } else {
-    echo "  OK\n";
+    // Ensure default admin users exist
+    $defaultUsers = [
+        ['Chulee',   'chulee@barcelona-co.fr',   'GS3iQMjJROQj'],
+        ['Quentin',  'quentin@barcelona-co.fr',   'Linoleum-Impurity-Launder0-Scariness'],
+        ['Olivier',  'olivier@barcelona-co.fr',    'Overvalue-Cactus-Hunter0'],
+    ];
+    $check = $db->prepare("SELECT id FROM users WHERE email = ?");
+    $insert = $db->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'admin')");
+    foreach ($defaultUsers as [$name, $email, $pwd]) {
+        $check->execute([$email]);
+        if (!$check->fetch()) {
+            $insert->execute([$name, $email, password_hash($pwd, PASSWORD_DEFAULT)]);
+            echo "  + Created admin ({$email})\n";
+            $changes++;
+        }
+    }
+    if ($changes === 0) echo "  OK\n";
 }
+$changes += ensure_column($db, 'users', 'reset_token', "VARCHAR(64) DEFAULT NULL") ? 1 : 0;
+$changes += ensure_column($db, 'users', 'reset_token_expires', "DATETIME DEFAULT NULL", 'reset_token') ? 1 : 0;
 
 // ─── Table: posts ───────────────────────────────────────────────────────────
 
@@ -305,9 +329,39 @@ if (!table_exists($db, 'menus')) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
     echo "  + Created table\n";
+
+    // Default menus
+    $defaultMenus = [
+        ['Footer',            'footer'],
+        ['Menu principale',   'primary'],
+        ['Menu secondaire',   'secondary'],
+    ];
+    $stmt = $db->prepare("INSERT INTO menus (name, location) VALUES (?, ?)");
+    foreach ($defaultMenus as [$name, $loc]) {
+        $stmt->execute([$name, $loc]);
+        echo "  + Created menu '{$name}' ({$loc})\n";
+    }
     $changes++;
 } else {
-    echo "  OK\n";
+    // Ensure default menus exist
+    $defaultMenus = [
+        ['Footer',            'footer'],
+        ['Menu principale',   'primary'],
+        ['Menu secondaire',   'secondary'],
+    ];
+    $menuChanges = 0;
+    $check = $db->prepare("SELECT id FROM menus WHERE location = ?");
+    $insert = $db->prepare("INSERT INTO menus (name, location) VALUES (?, ?)");
+    foreach ($defaultMenus as [$name, $loc]) {
+        $check->execute([$loc]);
+        if (!$check->fetch()) {
+            $insert->execute([$name, $loc]);
+            echo "  + Created menu '{$name}' ({$loc})\n";
+            $menuChanges++;
+        }
+    }
+    $changes += $menuChanges;
+    if ($menuChanges === 0) echo "  OK\n";
 }
 
 // ─── Table: menu_items ──────────────────────────────────────────────────────

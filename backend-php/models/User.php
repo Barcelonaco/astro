@@ -58,4 +58,23 @@ class UserModel {
     public static function verifyPassword(string $plain, string $hashed): bool {
         return password_verify($plain, $hashed);
     }
+
+    public static function setResetToken(int $id, string $token, string $expires): void {
+        $db = Database::getInstance();
+        $stmt = $db->prepare('UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?');
+        $stmt->execute([$token, $expires, $id]);
+    }
+
+    public static function findByResetToken(string $token): ?array {
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT id, name, email, role, reset_token_expires FROM users WHERE reset_token = ?');
+        $stmt->execute([$token]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public static function clearResetToken(int $id): void {
+        $db = Database::getInstance();
+        $stmt = $db->prepare('UPDATE users SET reset_token = NULL, reset_token_expires = NULL WHERE id = ?');
+        $stmt->execute([$id]);
+    }
 }
