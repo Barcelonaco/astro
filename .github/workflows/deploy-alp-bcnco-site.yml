@@ -20,9 +20,8 @@ jobs:
                   node-version: "20" # version LTS
 
             - name: Set API URL for build
-              env:
-                  PUBLIC_API_URL: https://alp.bcnco.site/api # ← changez selon le site
-              run: echo "PUBLIC_API_URL=$ALP_API_URL" >> $GITHUB_ENV
+              run: |
+                  echo "PUBLIC_API_URL=https://alp.bcnco.site/api" >> $GITHUB_ENV
 
             - name: Install frontend dependencies
               working-directory: ./frontend
