@@ -19,6 +19,11 @@ jobs:
         with:
           node-version: "20" # LTS
 
+      - name: Set API URL for build
+        env:
+          PUBLIC_API_URL: https://astro.bcnco.site/api
+        run: echo "PUBLIC_API_URL=$ASTRO_API_URL" >> $GITHUB_ENV
+
       - name: Install frontend deps
         working-directory: ./frontend
         run: npm ci
