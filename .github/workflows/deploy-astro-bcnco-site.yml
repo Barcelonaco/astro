@@ -71,8 +71,11 @@ jobs:
             cd "$REMOTE_ROOT"
             npm i
 
-            # Start temporary PHP server for build-time API access
+            # Migrate database (safe to re-run, never drops data)
             cd "$REMOTE_ROOT/backend-php"
+            php migrate.php
+
+            # Start temporary PHP server for build-time API access
             php -S 127.0.0.1:8888 index.php > /dev/null 2>&1 &
             PHP_PID=$!
             sleep 2
