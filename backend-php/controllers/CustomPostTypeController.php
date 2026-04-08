@@ -21,11 +21,18 @@ class CustomPostTypeController {
                 status ENUM('draft', 'published') DEFAULT 'draft',
                 published_date DATETIME,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                seo_meta JSON DEFAULT NULL,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 UNIQUE INDEX idx_slug (slug),
                 INDEX idx_status (status)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
+        // Migration: add seo_meta column if missing
+        try {
+            $db->exec("ALTER TABLE `{$table}` ADD COLUMN seo_meta JSON DEFAULT NULL AFTER custom_fields");
+        } catch (\PDOException $e) {
+            // Column already exists — ignore
+        }
     }
 
     private static function ensureCPTCategoryTables(string $slug): void {
@@ -61,6 +68,7 @@ class CustomPostTypeController {
     private static function parseCPTRow(array $row): array {
         $row['featured_image'] = !empty($row['featured_image']) ? (is_string($row['featured_image']) ? json_decode($row['featured_image'], true) : $row['featured_image']) : null;
         $row['custom_fields'] = !empty($row['custom_fields']) ? (is_string($row['custom_fields']) ? json_decode($row['custom_fields'], true) : $row['custom_fields']) : new \stdClass();
+        $row['seo_meta'] = !empty($row['seo_meta']) ? (is_string($row['seo_meta']) ? json_decode($row['seo_meta'], true) : $row['seo_meta']) : null;
         return $row;
     }
 
@@ -223,12 +231,13 @@ class CustomPostTypeController {
         $db = Database::getInstance();
 
         try {
-            $stmt = $db->prepare("INSERT INTO `cpt_{$slug}` (title, slug, excerpt, content, featured_image, custom_fields, author_id, status, published_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt = $db->prepare("INSERT INTO `cpt_{$slug}` (title, slug, excerpt, content, featured_image, custom_fields, seo_meta, author_id, status, published_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([
                 $body['title'], $finalSlug, $body['excerpt'] ?? null,
                 $body['content'] ?? null,
                 !empty($body['featured_image']) ? json_encode($body['featured_image']) : null,
                 !empty($body['custom_fields']) ? json_encode($body['custom_fields']) : '{}',
+                !empty($body['seo_meta']) ? (is_string($body['seo_meta']) ? $body['seo_meta'] : json_encode($body['seo_meta'])) : null,
                 $authUser['id'], $body['status'] ?? 'draft',
                 $body['published_date'] ?? date('Y-m-d H:i:s')
             ]);
@@ -258,12 +267,13 @@ class CustomPostTypeController {
         $db = Database::getInstance();
 
         try {
-            $stmt = $db->prepare("UPDATE `cpt_{$slug}` SET title = ?, slug = ?, excerpt = ?, content = ?, featured_image = ?, custom_fields = ?, status = ?, published_date = ? WHERE id = ?");
+            $stmt = $db->prepare("UPDATE `cpt_{$slug}` SET title = ?, slug = ?, excerpt = ?, content = ?, featured_image = ?, custom_fields = ?, seo_meta = ?, status = ?, published_date = ? WHERE id = ?");
             $stmt->execute([
                 $body['title'], $body['slug'], $body['excerpt'] ?? null,
                 $body['content'] ?? null,
                 !empty($body['featured_image']) ? json_encode($body['featured_image']) : null,
                 !empty($body['custom_fields']) ? json_encode($body['custom_fields']) : '{}',
+                !empty($body['seo_meta']) ? (is_string($body['seo_meta']) ? $body['seo_meta'] : json_encode($body['seo_meta'])) : null,
                 $body['status'] ?? 'draft', $body['published_date'] ?? null, $id
             ]);
 

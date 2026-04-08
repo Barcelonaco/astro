@@ -382,8 +382,40 @@ tr:hover {
 }
 
 .badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-danger {
   background: #fed7d7;
   color: #742a2a;
+}
+
+.badge-primary {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.user-avatar--admin {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+}
+
+.user-avatar--editor {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
 }
 
 .actions {
@@ -812,6 +844,11 @@ tr:hover {
   align-items: center;
   align-self: flex-end;
   gap: 8px;
+}
+
+.builder-header .btn {
+  padding: 8px 20px;
+  font-size: 13.5px;
 }
 
 .builder-meta {
@@ -3670,6 +3707,135 @@ body.sidebar-collapsed .builder-settings {
   font-family: monospace;
 }
 
+/* SEO Meta panel */
+.builder-seo-btn {
+  width: 100%;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.builder-seo-panel {
+  padding: 16px;
+  border-bottom: 1px solid var(--gray-200);
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+.builder-seo-panel .builder-menu-settings-header {
+  margin-bottom: 14px;
+}
+.builder-seo-body .seo-toggle {
+  margin-bottom: 14px;
+}
+.builder-seo-body .seo-toggle label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  gap: 8px;
+}
+.builder-seo-body .seo-toggle label span:last-child {
+  font-weight: 600;
+  font-size: 14px;
+}
+.builder-seo-body .seo-analyze-btn {
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.builder-seo-body .seo-field {
+  margin-bottom: 14px;
+}
+.builder-seo-body .seo-field .form-label {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.builder-seo-body .seo-field .form-label .seo-counter {
+  font-weight: normal;
+  color: var(--gray-400);
+  font-size: 12px;
+}
+.seo-progress-bar {
+  margin-top: 4px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--gray-100);
+  overflow: hidden;
+}
+.seo-progress-bar > div {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.2s, background 0.2s;
+}
+.seo-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 16px 0 12px;
+}
+.seo-tab-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--gray-200);
+  background: var(--gray-50, #f9fafb);
+  color: var(--gray-500);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.seo-tab-btn:hover {
+  background: var(--gray-100);
+}
+.seo-tab-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+.seo-google-preview {
+  padding: 14px;
+  background: var(--gray-50, #f9fafb);
+  border-radius: 10px;
+  border: 1px solid var(--gray-100);
+  font-family: Arial, sans-serif;
+}
+.seo-google-preview .seo-preview-title {
+  font-size: 18px;
+  color: #1a0dab;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seo-google-preview .seo-preview-url {
+  font-size: 13px;
+  color: #006621;
+  margin: 3px 0;
+}
+.seo-google-preview .seo-preview-desc {
+  font-size: 13px;
+  color: #545454;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.seo-schema-panel .seo-generate-btn {
+  width: 100%;
+  margin-bottom: 10px;
+}
+.seo-schema-panel textarea {
+  resize: vertical;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  tab-size: 2;
+}
+.seo-schema-panel .form-help {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--gray-400);
+}
+
 .modal-footer {
   display: flex;
   justify-content: flex-end;
@@ -3961,6 +4127,44 @@ body.sidebar-collapsed .builder-settings {
 }
 .googlemap-field-group .googlemap-preview {
   height: 0;
+  background: var(--gray-100, #f5f5f5);
+  border-radius: 8px;
+  border: 1px solid var(--gray-200, #e5e5e5);
+  overflow: hidden;
+  transition: height 0.2s ease;
+}
+
+/* Address autocomplete — builder sidebar & CPT forms */
+.cpt-address-field .googlemap-suggestions {
+  background: #fff;
+  border: 1px solid var(--gray-200, #e5e5e5);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 6px 16px rgba(0,0,0,.12);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.cpt-address-field .googlemap-suggestion {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.4;
+  border-bottom: 1px solid var(--gray-100, #f5f5f5);
+  transition: background .15s;
+}
+.cpt-address-field .googlemap-suggestion:last-child {
+  border-bottom: none;
+}
+.cpt-address-field .googlemap-suggestion:hover {
+  background: var(--primary-light, #eef6f8);
+}
+.cpt-address-field .googlemap-suggestion-empty {
+  padding: 14px;
+  text-align: center;
+  color: var(--gray-400, #aaa);
+  font-size: 13px;
+}
+.cpt-address-field .googlemap-preview {
   background: var(--gray-100, #f5f5f5);
   border-radius: 8px;
   border: 1px solid var(--gray-200, #e5e5e5);

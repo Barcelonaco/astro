@@ -23,13 +23,14 @@
       "slug": "references",
       "label": "Référence",
       "labelPlural": "Références",
+      "isFemale": true,
       "icon": "🎨",
       "supports": ["title", "slug", "featured_image", "content", "status"],
       "fields": [
         { "name": "customer_name", "label": "Sous-titre / Nom du client", "type": "Text" },
         { "name": "text", "label": "Description", "type": "Textarea" },
-        { "name": "photos", "label": "Galerie photos (JSON array d'URLs)", "type": "Textarea" },
-        { "name": "link", "label": "Lien (JSON: {url, title, target})", "type": "Textarea" }
+        { "name": "photos", "label": "Galerie photos", "type": "Photos" },
+        { "name": "link", "label": "Lien", "type": "Link" }
       ],
       "hasCategories": true,
       "categoryLabel": "Catégories de références"

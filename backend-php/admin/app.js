@@ -54,6 +54,7 @@ async function loadAdminTheme() {
 }
 
 async function init() {
+  // 1. Verify auth — only this should trigger logout on failure
   try {
     const response = await fetch(`${API_BASE}/auth/me`, {
       headers: { 'Authorization': `Bearer ${token}` }
@@ -64,6 +65,14 @@ async function init() {
     }
 
     currentUser = await response.json();
+  } catch (error) {
+    localStorage.removeItem('token');
+    window.location.href = '/admin/login.html';
+    return;
+  }
+
+  // 2. Initialize app — errors here should NOT cause logout
+  try {
     document.getElementById('userInfo').textContent = currentUser.name;
 
     // Afficher le menu Utilisateurs pour les admins uniquement
@@ -85,22 +94,28 @@ async function init() {
     setupNavigation();
     setupSidebarToggle();
 
-    // Restaurer la dernière vue si possible
-    const lastView = localStorage.getItem('adminLastView');
-    if (lastView && lastView.startsWith('builder:')) {
-      const pageId = lastView.split(':')[1];
-      await openPageBuilder(pageId === 'new' ? null : Number(pageId));
-    } else if (lastView && lastView.startsWith('rb-builder:')) {
-      const blocId = lastView.split(':')[1];
-      await openReusableBlocBuilder(blocId === 'new' ? null : Number(blocId));
-    } else if (lastView) {
-      await loadSection(lastView);
+    // Restaurer la dernière vue ou le fragment d'URL
+    const hash = window.location.hash.replace('#', '');
+    if (hash) {
+      await loadSection(hash);
     } else {
-      loadSection('dashboard');
+      const lastView = localStorage.getItem('adminLastView');
+      if (lastView && lastView.startsWith('builder:')) {
+        const pageId = lastView.split(':')[1];
+        await openPageBuilder(pageId === 'new' ? null : Number(pageId));
+      } else if (lastView && lastView.startsWith('rb-builder:')) {
+        const blocId = lastView.split(':')[1];
+        await openReusableBlocBuilder(blocId === 'new' ? null : Number(blocId));
+      } else if (lastView) {
+        await loadSection(lastView);
+      } else {
+        loadSection('dashboard');
+      }
     }
   } catch (error) {
-    localStorage.removeItem('token');
-    window.location.href = '/admin/login.html';
+    console.error('Init error (not auth):', error);
+    // Fallback to dashboard instead of logging out
+    try { loadSection('dashboard'); } catch(e) { /* ignore */ }
   }
 }
 
@@ -149,7 +164,13 @@ async function loadSection(section) {
 
   // Highlight the correct nav item
   document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-  const activeNav = document.querySelector(`.nav-item[data-section="${section}"]`);
+  let navSection = section;
+  if (/^cpt-(add|edit|categories|options):/.test(section)) {
+    navSection = 'cpt:' + section.split(':')[1];
+  } else if (section.startsWith('builder:')) {
+    navSection = 'pages';
+  }
+  const activeNav = document.querySelector(`.nav-item[data-section="${navSection}"]`);
   if (activeNav) activeNav.classList.add('active');
 
   switch(section) {
@@ -188,7 +209,7 @@ async function loadSection(section) {
         const slug = section.split(':')[1];
         const ptDef = findPostTypeDef(slug);
         if (ptDef) {
-          if (ptDef.supports?.includes('content') && (!ptDef.fields || ptDef.fields.length === 0)) {
+          if (ptDef.supports?.includes('content')) {
             await openCPTBuilder(ptDef, null);
           } else {
             content.innerHTML = await renderCPTEditPage(ptDef, null); attachCPTFormEvents(ptDef);
@@ -199,7 +220,7 @@ async function loadSection(section) {
         const slug = parts[1]; const itemId = parseInt(parts[2]);
         const ptDef = findPostTypeDef(slug);
         if (ptDef) {
-          if (ptDef.supports?.includes('content') && (!ptDef.fields || ptDef.fields.length === 0)) {
+          if (ptDef.supports?.includes('content')) {
             await openCPTBuilder(ptDef, itemId);
           } else {
             content.innerHTML = await renderCPTEditPage(ptDef, itemId); attachCPTFormEvents(ptDef);
@@ -318,7 +339,7 @@ const MODULE_LABELS = {
   Summary: 'Sommaire',
   Form: 'Formulaire',
   ReusableBloc: 'Bloc réutilisable',
-  ColumnsTab: 'Colonnes / onglets',
+  ColumnsTab: 'Colonnes',
   Separator: 'Séparateur',
   NewsletterForm: 'Formulaire newsletter',
   Review: 'Avis',
@@ -346,32 +367,14 @@ const MODULE_CATEGORIES = [
     id: 'media',
     label: 'Médias',
     icon: '🎞️',
-    modules: ['Gallery', 'Video', 'ImagesSlider', 'Files', 'ImagesVideosParallax', 'IconLogo', 'SliderLogo', 'Ornament', 'IllusVideo']
-  },
-  {
-    id: 'news',
-    label: 'Actualités & références',
-    icon: '📰',
-    modules: ['ClickableTiles', 'FreePost', 'NewsSlider', 'EventsSlider', 'BlocReferences', 'Team', 'Contact', 'Map']
+    modules: ['Gallery', 'Video', 'ImagesSlider', 'Files', 'ImagesVideosParallax', 'IconLogo', 'SliderLogo', 'Ornament', 'IllusVideo', 'ClickableTiles']
   },
   {
     id: 'tools',
     label: 'Fonctionnels & outils',
     icon: '🧰',
-    modules: ['GoogleReviews', 'Summary', 'Form', 'ReusableBloc', 'ColumnsTab', 'Separator', 'NewsletterForm', 'Review', 'Widget', 'PlanSite']
+    modules: ['FreePost', 'Team', 'Contact', 'Map', 'Summary', 'Form', 'ReusableBloc', 'ColumnsTab', 'Separator', 'NewsletterForm', 'Widget', 'PlanSite']
   },
-  {
-    id: 'social',
-    label: 'Réseaux sociaux',
-    icon: '💬',
-    modules: ['InstaFeed', 'ThreadsFeed']
-  },
-  {
-    id: 'commerce',
-    label: 'E-commerce',
-    icon: '🛒',
-    modules: ['Product']
-  }
 ];
 
 function humanizeModuleName(name) {
@@ -983,7 +986,7 @@ async function renderCPTEditPage(ptDef, itemId) {
     </div>
 
     <form id="cptEditForm" data-post-type="${escapeHtml(ptDef.slug)}" data-item-id="${itemId || ''}">
-      <div style="display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start;">
+      <div style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start;">
         <!-- Main column -->
         <div>
           <div class="card" style="margin-bottom:24px;">
@@ -1030,6 +1033,29 @@ async function renderCPTEditPage(ptDef, itemId) {
           </div>
 
           ${categoriesHtml ? `<div class="card" style="margin-bottom:16px;">${categoriesHtml}</div>` : ''}
+
+          <!-- Live Preview -->
+          ${hasCustomFields ? `
+          <div class="card cpt-preview-card" style="margin-bottom:16px;position:sticky;top:16px;">
+            <h3 style="margin-bottom:12px;display:flex;align-items:center;gap:6px;">
+              <span style="font-size:14px;">👁</span> Aperçu
+            </h3>
+            <div id="cptLivePreview" style="border:1px solid var(--border,#e5e7eb);border-radius:8px;overflow:hidden;background:#fff;">
+              <div id="cptPreviewImage" style="width:100%;height:140px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;overflow:hidden;">
+                ${fi ? `<img src="${escapeHtml(getOptimizedUrl(fi.sizes?.medium || fi.url || '', 400, 70))}" style="width:100%;height:100%;object-fit:cover;">` : 'Aucune image'}
+              </div>
+              <div style="padding:12px;">
+                <div id="cptPreviewBadges" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;min-height:0;"></div>
+                <h4 id="cptPreviewTitle" style="font-size:15px;font-weight:700;margin:0 0 6px 0;line-height:1.3;color:#1a1a1a;">${escapeHtml(item?.title || 'Titre de l\'élément')}</h4>
+                <div id="cptPreviewDates" style="font-size:12px;color:#666;margin-bottom:6px;display:flex;align-items:center;gap:4px;"></div>
+                <div id="cptPreviewLocation" style="font-size:12px;color:#666;margin-bottom:6px;display:flex;align-items:center;gap:4px;"></div>
+                <div id="cptPreviewPrice" style="font-size:12px;color:#666;margin-bottom:8px;display:flex;align-items:center;gap:4px;"></div>
+                <p id="cptPreviewDesc" style="font-size:12px;color:#888;margin:0;line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;"></p>
+                <div id="cptPreviewCta" style="margin-top:10px;"></div>
+              </div>
+            </div>
+          </div>
+          ` : ''}
         </div>
       </div>
     </form>
@@ -1091,6 +1117,9 @@ function attachCPTFormEvents(ptDef) {
     initGoogleMapField(el.id);
   });
 
+  // Live preview updates
+  initCPTLivePreview(ptDef);
+
   // Form submit
   const form = document.getElementById('cptEditForm');
   if (form) {
@@ -1099,6 +1128,170 @@ function attachCPTFormEvents(ptDef) {
       saveCPTItemFromForm(ptDef);
     });
   }
+}
+
+// ── CPT Live Preview ──
+
+function initCPTLivePreview(ptDef) {
+  const preview = document.getElementById('cptLivePreview');
+  if (!preview) return;
+
+  const form = document.getElementById('cptEditForm');
+  if (!form) return;
+
+  const fieldNames = (ptDef.fields || []).map(f => f.name);
+
+  function getVal(name) {
+    const el = form.querySelector(`[name="cf_${name}"]`);
+    if (!el) return '';
+    if (el.type === 'checkbox') return el.checked ? '1' : '0';
+    return el.value || '';
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr.replace(/\//g, '-'));
+    if (isNaN(d)) return dateStr;
+    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function updatePreview() {
+    // Title
+    const titleEl = document.getElementById('cptPreviewTitle');
+    const titleInput = form.querySelector('[name="title"]');
+    if (titleEl && titleInput) {
+      titleEl.textContent = titleInput.value || 'Titre de l\'élément';
+    }
+
+    // Badges
+    const badgesEl = document.getElementById('cptPreviewBadges');
+    if (badgesEl) {
+      let badges = '';
+      if (getVal('is_sticky') === '1') {
+        badges += '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:#fef3c7;color:#92400e;">⭐ À la une</span>';
+      }
+      if (getVal('sold_out') === '1') {
+        badges += '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:#fee2e2;color:#991b1b;">Complet</span>';
+      }
+      const status = form.querySelector('[name="status"]');
+      if (status && status.value === 'draft') {
+        badges += '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:#e5e7eb;color:#6b7280;">Brouillon</span>';
+      }
+      badgesEl.innerHTML = badges;
+    }
+
+    // Dates
+    const datesEl = document.getElementById('cptPreviewDates');
+    if (datesEl && fieldNames.includes('start_date')) {
+      const sd = getVal('start_date');
+      const ed = getVal('end_date');
+      const st = getVal('start_time');
+      const et = getVal('end_time');
+      let dateStr = '';
+      if (sd) {
+        dateStr = '📅 ' + formatDate(sd);
+        if (ed && ed !== sd) dateStr += ' → ' + formatDate(ed);
+        if (st) { dateStr += ' · ' + st; if (et) dateStr += ' - ' + et; }
+      }
+      datesEl.innerHTML = dateStr;
+      datesEl.style.display = dateStr ? '' : 'none';
+    }
+
+    // Location
+    const locEl = document.getElementById('cptPreviewLocation');
+    if (locEl && fieldNames.includes('location_name')) {
+      const locName = getVal('location_name');
+      const addrField = form.querySelector('[name="cf_location__address"]');
+      const addr = addrField ? addrField.value : '';
+      let locStr = '';
+      if (locName || addr) {
+        locStr = '📍 ' + (locName || '');
+        if (addr && addr !== locName) locStr += (locName ? ', ' : '') + addr;
+      }
+      locEl.innerHTML = locStr ? escapeHtml(locStr).replace('📍', '📍') : '';
+      locEl.style.display = locStr ? '' : 'none';
+    }
+
+    // Price
+    const priceEl = document.getElementById('cptPreviewPrice');
+    if (priceEl && fieldNames.includes('price')) {
+      const price = getVal('price');
+      priceEl.innerHTML = price ? '🎟 ' + escapeHtml(price) : '';
+      priceEl.style.display = price ? '' : 'none';
+    }
+
+    // Description
+    const descEl = document.getElementById('cptPreviewDesc');
+    if (descEl) {
+      const desc = getVal('desc') || '';
+      const excerpt = form.querySelector('[name="excerpt"]');
+      descEl.textContent = desc || (excerpt ? excerpt.value : '') || '';
+      descEl.style.display = descEl.textContent ? '' : 'none';
+    }
+
+    // CTA
+    const ctaEl = document.getElementById('cptPreviewCta');
+    if (ctaEl && fieldNames.includes('cta')) {
+      const ctaUrl = form.querySelector('[name="cf_cta_url"]');
+      const ctaTitle = form.querySelector('[name="cf_cta_title"]');
+      const url = ctaUrl ? ctaUrl.value : '';
+      const title = ctaTitle ? ctaTitle.value : '';
+      if (url || title) {
+        ctaEl.innerHTML = `<span style="display:inline-block;padding:4px 12px;border-radius:4px;font-size:11px;font-weight:600;background:var(--primary,#224f5a);color:#fff;">${escapeHtml(title || 'En savoir plus')} →</span>`;
+      } else {
+        ctaEl.innerHTML = '';
+      }
+    }
+  }
+
+  // Listen to all input changes
+  form.addEventListener('input', updatePreview);
+  form.addEventListener('change', updatePreview);
+
+  // Watch for featured image changes (MutationObserver on hidden input)
+  const fiInput = form.querySelector('[name="featured_image"]');
+  if (fiInput) {
+    const observer = new MutationObserver(() => {
+      const previewImg = document.getElementById('cptPreviewImage');
+      if (!previewImg) return;
+      try {
+        const fi = fiInput.value ? JSON.parse(fiInput.value) : null;
+        if (fi) {
+          const url = fi.sizes?.medium || fi.url || '';
+          previewImg.innerHTML = `<img src="${escapeHtml(getOptimizedUrl(url, 400, 70))}" style="width:100%;height:100%;object-fit:cover;">`;
+        } else {
+          previewImg.innerHTML = 'Aucune image';
+        }
+      } catch { /* ignore parse errors */ }
+    });
+    observer.observe(fiInput, { attributes: true, attributeFilter: ['value'] });
+    // Also poll for value changes (some programmatic sets don't trigger mutation)
+    let lastFiVal = fiInput.value;
+    setInterval(() => {
+      if (fiInput.value !== lastFiVal) {
+        lastFiVal = fiInput.value;
+        const evt = new Event('change');
+        fiInput.dispatchEvent(evt);
+        observer.disconnect();
+        observer.observe(fiInput, { attributes: true, attributeFilter: ['value'] });
+        // Update preview image
+        const previewImg = document.getElementById('cptPreviewImage');
+        if (!previewImg) return;
+        try {
+          const fi = fiInput.value ? JSON.parse(fiInput.value) : null;
+          if (fi) {
+            const url = fi.sizes?.medium || fi.url || '';
+            previewImg.innerHTML = `<img src="${escapeHtml(getOptimizedUrl(url, 400, 70))}" style="width:100%;height:100%;object-fit:cover;">`;
+          } else {
+            previewImg.innerHTML = 'Aucune image';
+          }
+        } catch { /* ignore */ }
+      }
+    }, 500);
+  }
+
+  // Initial render
+  updatePreview();
 }
 
 function initCPTQuillEditors() {
@@ -1216,7 +1409,56 @@ function clearCPTBuilderFeatured() {
   document.getElementById('cptBuilderFeaturedPreview').innerHTML = '<div style="width:100%;height:100px;background:#f5f5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;">Aucune image</div>';
 }
 
-// Photos gallery picker
+// Builder photos gallery picker
+function openCPTBuilderPhotoPicker() {
+  mediaPickerState = {
+    isOpen: true,
+    blockId: '__cpt_builder_photos__',
+    fieldName: 'photos',
+    type: 'image',
+    folderId: null,
+    folders: [],
+    items: [],
+    multiple: true,
+    selectedIds: []
+  };
+  ensureMediaPickerModal();
+  showLoading();
+  Promise.all([apiFetch('/media/folders'), apiFetch('/media?all=1')])
+    .then(([res, items]) => {
+      mediaPickerState.folders = res.folders || [];
+      mediaPickerState.totalCount = res.total || 0;
+      mediaPickerState.items = items;
+      hideLoading();
+      document.getElementById('mediaPickerModal').classList.add('is-open');
+      updateMediaPickerContent();
+    })
+    .catch(() => hideLoading());
+}
+
+function removeCPTBuilderPhoto(index) {
+  const input = document.getElementById('cptBuilderPhotosInput');
+  let photos = [];
+  try { photos = JSON.parse(input.value || '[]'); } catch { photos = []; }
+  photos.splice(index, 1);
+  input.value = JSON.stringify(photos);
+  updateCPTBuilderPhotosPreview(photos);
+}
+
+function updateCPTBuilderPhotosPreview(photos) {
+  const preview = document.getElementById('cptBuilderPhotosPreview');
+  if (!preview) return;
+  if (photos.length === 0) {
+    preview.innerHTML = '';
+    return;
+  }
+  preview.innerHTML = photos.map((url, i) => `<div class="cpt-photo-item" data-index="${i}" style="position:relative;display:inline-block;margin:4px;">
+    <img src="${escapeHtml(getOptimizedUrl(url, 80, 60))}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;">
+    <button type="button" onclick="removeCPTBuilderPhoto(${i})" style="position:absolute;top:-6px;right:-6px;background:#e74c3c;color:#fff;border:0;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:18px;text-align:center;">×</button>
+  </div>`).join('');
+}
+
+// Photos gallery picker (classic form)
 function openCPTPhotoPicker() {
   mediaPickerState = {
     isOpen: true,
@@ -1931,7 +2173,7 @@ async function saveCPTOptions(event, postTypeSlug) {
   }
 }
 
-let pageBuilderState = { editingPageId: null, blocks: [], meta: { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null }, colorOverrides: { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' }, seoMeta: { enabled: false, meta_title: '', meta_description: '', schema_org: '' }, cptMode: null, cptExcerpt: '', cptFeaturedImage: null, cptCategories: [], cptItemCategories: [] };
+let pageBuilderState = { editingPageId: null, blocks: [], meta: { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null }, colorOverrides: { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' }, seoMeta: { enabled: false, meta_title: '', meta_description: '', schema_org: '' }, cptMode: null, cptExcerpt: '', cptFeaturedImage: null, cptCategories: [], cptItemCategories: [], cptCustomFields: {} };
 let selectedBlockId = null;
 let reusableBlocBuilderMode = false;
 let _inlineEditingBlockId = null;
@@ -2057,6 +2299,8 @@ async function openCPTBuilder(ptDef, itemId) {
   pageBuilderState.cptFeaturedImage = null;
   pageBuilderState.cptCategories = [];
   pageBuilderState.cptItemCategories = [];
+  pageBuilderState.cptCustomFields = {};
+  pageBuilderState.cptHeaderSettings = { h1_in_header: 'yes', title_in_header: 'showTitle' };
   pageBuilderState.pageMenus = [];
   selectedBlockId = null;
 
@@ -2078,6 +2322,17 @@ async function openCPTBuilder(ptDef, itemId) {
         pageBuilderState.cptExcerpt = item.excerpt || '';
         pageBuilderState.cptFeaturedImage = item.featured_image || null;
         pageBuilderState.cptItemCategories = item.categories || [];
+        pageBuilderState.cptCustomFields = typeof item.custom_fields === 'string' ? JSON.parse(item.custom_fields || '{}') : (item.custom_fields || {});
+        // Load header settings from custom_fields
+        const cf = pageBuilderState.cptCustomFields;
+        pageBuilderState.cptHeaderSettings = {
+          h1_in_header: cf.h1_in_header || 'yes',
+          title_in_header: cf.title_in_header || 'showTitle',
+        };
+        if (item.seo_meta) {
+          const seo = typeof item.seo_meta === 'string' ? JSON.parse(item.seo_meta) : item.seo_meta;
+          pageBuilderState.seoMeta = { enabled: seo.enabled || false, meta_title: seo.meta_title || '', meta_description: seo.meta_description || '', schema_org: seo.schema_org || '' };
+        }
       }
       pageBuilderState.cptCategories = categories || [];
     } catch (e) { console.error(e); }
@@ -2090,6 +2345,8 @@ async function openCPTBuilder(ptDef, itemId) {
   }
 
   document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+  const cptNav = document.querySelector(`.nav-item[data-section="cpt:${ptDef.slug}"]`);
+  if (cptNav) cptNav.classList.add('active');
   document.getElementById('content').innerHTML = await renderPageBuilder();
   attachPageBuilderListeners();
   if (siteSettingsCache) {
@@ -2141,8 +2398,51 @@ async function saveCPTBuilder() {
     categories.push(parseInt(cb.value));
   });
 
+  // Read custom fields from sidebar
+  const custom_fields = {};
+  if (ptDef.fields && ptDef.fields.length > 0) {
+    for (const field of ptDef.fields) {
+      const ftype = (field.type || 'Text').toLowerCase();
+      if (ftype === 'link') {
+        const fn = field.name;
+        const linkUrl = document.getElementById(`cptBf_${fn}_url`)?.value || '';
+        const linkTitle = document.getElementById(`cptBf_${fn}_title`)?.value || '';
+        const linkTarget = document.getElementById(`cptBf_${fn}_target`)?.value || '_self';
+        custom_fields[fn] = linkUrl ? JSON.stringify({ url: linkUrl, title: linkTitle, target: linkTarget }) : '';
+      } else if (field.name === 'photos' || ftype === 'photos') {
+        custom_fields.photos = document.getElementById('cptBuilderPhotosInput')?.value || '[]';
+      } else if (ftype === 'address') {
+        const fn = field.name;
+        const addr = {
+          address: document.querySelector(`input[name="cf_${fn}__address"]`)?.value || '',
+          street_number: document.querySelector(`input[name="cf_${fn}__street_number"]`)?.value || '',
+          street_name: document.querySelector(`input[name="cf_${fn}__street_name"]`)?.value || '',
+          post_code: document.querySelector(`input[name="cf_${fn}__post_code"]`)?.value || '',
+          city: document.querySelector(`input[name="cf_${fn}__city"]`)?.value || '',
+          lat: document.querySelector(`input[name="cf_${fn}__lat"]`)?.value || '',
+          lng: document.querySelector(`input[name="cf_${fn}__lng"]`)?.value || ''
+        };
+        const hasAny = Object.values(addr).some(v => v !== '');
+        custom_fields[fn] = hasAny ? JSON.stringify(addr) : '';
+      } else if (ftype === 'truefalse') {
+        const cb = document.querySelector(`.cpt-builder-cf-toggle[data-cf="${field.name}"]`);
+        custom_fields[field.name] = cb?.checked ? '1' : '0';
+      } else {
+        const el = document.querySelector(`.cpt-builder-cf[data-cf="${field.name}"]`);
+        custom_fields[field.name] = el?.value || '';
+      }
+    }
+  }
+
+  // Read header settings from DOM (checkbox toggles)
+  const h1Cb = document.querySelector('input[name="h1_in_header"]');
+  const titleCb = document.querySelector('input[name="title_in_header"]');
+  if (h1Cb) custom_fields.h1_in_header = h1Cb.checked ? 'yes' : 'no';
+  if (titleCb) custom_fields.title_in_header = titleCb.checked ? 'showTitle' : 'hideTitle';
+
   const published_date = status === 'published' ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null;
-  const payload = { title, slug, excerpt, content, status, featured_image, custom_fields: {}, categories, published_date };
+  const seo_meta = pageBuilderState.seoMeta.enabled ? JSON.stringify(pageBuilderState.seoMeta) : null;
+  const payload = { title, slug, excerpt, content, status, featured_image, custom_fields, categories, published_date, seo_meta };
 
   showLoading();
   try {
@@ -2222,6 +2522,8 @@ async function openPageBuilder(pageId) {
     } catch (e) {}
   }
   document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+  const pagesNav = document.querySelector('.nav-item[data-section="pages"]');
+  if (pagesNav) pagesNav.classList.add('active');
   document.getElementById('content').innerHTML = await renderPageBuilder();
   attachPageBuilderListeners();
   // Apply border-rounded class to canvas based on current settings
@@ -2237,7 +2539,7 @@ async function renderPageBuilder() {
   const m = pageBuilderState.meta;
   const isCPT = !!pageBuilderState.cptMode;
   const cptDef = pageBuilderState.cptMode;
-  const pages = isCPT ? [] : await apiFetch('/pages').catch(() => []);
+  const pages = await apiFetch('/pages').catch(() => []);
   pageBuilderState._allPages = pages || [];
 
   const backSection = isCPT ? `cpt:${cptDef.slug}` : 'pages';
@@ -2247,8 +2549,9 @@ async function renderPageBuilder() {
     : `${siteSettingsCache?.frontend_url || 'http://localhost:4321'}/pages/${encodeURIComponent(m.slug)}`;
   const titlePlaceholder = isCPT ? `Titre de l'${cptDef.label.toLowerCase()}` : 'Titre de la page';
 
-  // CPT sidebar: featured image, excerpt, categories
+  // CPT sidebar: featured image, excerpt, categories, custom fields
   let cptSidebarHtml = '';
+  let customFieldsSidebarHtml = '';
   if (isCPT) {
     const fi = pageBuilderState.cptFeaturedImage;
     const fiPreview = fi
@@ -2270,6 +2573,110 @@ async function renderPageBuilder() {
         </div>`
       : '';
 
+    // Build custom fields HTML for sidebar
+    if (cptDef.fields && cptDef.fields.length > 0) {
+      const cf = pageBuilderState.cptCustomFields;
+      const allPages = pageBuilderState._allPages || [];
+      customFieldsSidebarHtml = cptDef.fields.map(field => {
+        const val = cf[field.name] || '';
+        const ftype = (field.type || 'Text').toLowerCase();
+
+        if (field.name === 'photos' || ftype === 'photos') {
+          let photos = [];
+          try { photos = JSON.parse(val || '[]'); } catch { photos = []; }
+          if (!Array.isArray(photos)) photos = [];
+          const photosPreview = photos.length > 0
+            ? photos.map((url, i) => `<div class="cpt-photo-item" data-index="${i}" style="position:relative;display:inline-block;margin:4px;">
+                <img src="${escapeHtml(getOptimizedUrl(url, 80, 60))}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;">
+                <button type="button" onclick="removeCPTBuilderPhoto(${i})" style="position:absolute;top:-6px;right:-6px;background:#e74c3c;color:#fff;border:0;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:18px;text-align:center;">×</button>
+              </div>`).join('')
+            : '';
+          return `<div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">${escapeHtml(field.label)}</label>
+            <div id="cptBuilderPhotosPreview" style="margin-bottom:8px;">${photosPreview}</div>
+            <input type="hidden" id="cptBuilderPhotosInput" value="${escapeHtml(JSON.stringify(photos))}">
+            <button type="button" class="btn btn-outline btn-xs" onclick="openCPTBuilderPhotoPicker()">Ajouter des photos</button>
+          </div>`;
+        }
+
+        if (ftype === 'link') {
+          let lObj = { url: '', title: '', target: '_self' };
+          try { if (val) lObj = typeof val === 'string' ? JSON.parse(val) : val; } catch {}
+          const fnEsc = escapeHtml(field.name);
+          return `<div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">${escapeHtml(field.label)}</label>
+            <select class="form-input cpt-link-page-select" data-target="cptBf_${fnEsc}_url" style="font-size:12px;margin-bottom:4px;">
+              <option value="">— Page du site —</option>
+              ${allPages.filter(p => p.status === 'published').map(p => `<option value="/pages/${escapeHtml(p.slug)}" ${lObj.url === '/pages/' + p.slug ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
+            </select>
+            <input type="text" class="form-input" id="cptBf_${fnEsc}_url" value="${escapeHtml(lObj.url || '')}" placeholder="URL" style="font-size:12px;margin-bottom:4px;">
+            <input type="text" class="form-input" id="cptBf_${fnEsc}_title" value="${escapeHtml(lObj.title || '')}" placeholder="Titre du lien" style="font-size:12px;margin-bottom:4px;">
+            <select class="form-input" id="cptBf_${fnEsc}_target" style="font-size:12px;">
+              <option value="_self" ${lObj.target !== '_blank' ? 'selected' : ''}>Même fenêtre</option>
+              <option value="_blank" ${lObj.target === '_blank' ? 'selected' : ''}>Nouvel onglet</option>
+            </select>
+          </div>`;
+        }
+
+        if (ftype === 'textarea') {
+          return `<div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">${escapeHtml(field.label)}</label>
+            <textarea class="form-input cpt-builder-cf" data-cf="${escapeHtml(field.name)}" rows="3" style="font-size:12px;resize:vertical;">${escapeHtml(val)}</textarea>
+          </div>`;
+        }
+
+        if (ftype === 'truefalse') {
+          const isOn = val === true || val === 1 || val === '1' || val === 'true';
+          return `<div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">${escapeHtml(field.label)}</label>
+            <div style="padding:4px 0;">
+              <label class="cpt-toggle" style="display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">
+                <input type="checkbox" class="cpt-builder-cf-toggle" data-cf="${escapeHtml(field.name)}" ${isOn ? 'checked' : ''} style="display:none;">
+                <span class="cpt-toggle-track" style="position:relative;width:44px;height:24px;border-radius:12px;background:${isOn ? 'var(--primary,#224f5a)' : '#ccc'};transition:background .2s;">
+                  <span class="cpt-toggle-thumb" style="position:absolute;top:2px;left:${isOn ? '22px' : '2px'};width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .2s;"></span>
+                </span>
+                <span class="cpt-toggle-label" style="font-size:13px;color:#666;">${isOn ? 'Oui' : 'Non'}</span>
+              </label>
+            </div>
+          </div>`;
+        }
+
+        // Address (Mapbox geocoding + mini-map)
+        if (ftype === 'address') {
+          let addr = { address: '', city: '', post_code: '', street_name: '', street_number: '', lat: '', lng: '' };
+          try { if (val) addr = typeof val === 'string' ? JSON.parse(val) : val; } catch {}
+          const fnEsc = escapeHtml(field.name);
+          const uid = `cptBAddress_${fnEsc}_${Date.now()}`;
+          return `<div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">${escapeHtml(field.label)}</label>
+            <div id="${uid}" class="cpt-address-field" data-field="${fnEsc}" style="position:relative;">
+              <div style="position:relative;margin-bottom:8px;">
+                <input type="text" class="form-input googlemap-search" value="${escapeHtml(addr.address || '')}" placeholder="Rechercher une adresse..." autocomplete="off" style="font-size:12px;">
+                <div class="googlemap-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid var(--border);border-top:0;border-radius:0 0 6px 6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1);"></div>
+              </div>
+              <div class="googlemap-preview" style="height:${(addr.lat && addr.lng) ? '150px' : '0'};border-radius:8px;overflow:hidden;margin-bottom:8px;"></div>
+              <input type="hidden" name="cf_${fnEsc}__street_number" value="${escapeHtml(addr.street_number || '')}">
+              <input type="hidden" name="cf_${fnEsc}__street_name" value="${escapeHtml(addr.street_name || '')}">
+              <input type="hidden" name="cf_${fnEsc}__post_code" value="${escapeHtml(addr.post_code || '')}">
+              <input type="hidden" name="cf_${fnEsc}__city" value="${escapeHtml(addr.city || '')}">
+              <input type="hidden" name="cf_${fnEsc}__address" value="${escapeHtml(addr.address || '')}">
+              <input type="hidden" name="cf_${fnEsc}__lat" value="${escapeHtml(addr.lat || '')}">
+              <input type="hidden" name="cf_${fnEsc}__lng" value="${escapeHtml(addr.lng || '')}">
+              <input type="hidden" name="cf_${fnEsc}__place_id" value="">
+              <input type="hidden" name="cf_${fnEsc}__name" value="">
+              <input type="hidden" name="cf_${fnEsc}__street_name_short" value="">
+            </div>
+          </div>`;
+        }
+
+        // Default: text input
+        return `<div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">${escapeHtml(field.label)}</label>
+          <input type="text" class="form-input cpt-builder-cf" data-cf="${escapeHtml(field.name)}" value="${escapeHtml(val)}" style="font-size:12px;">
+        </div>`;
+      }).join('');
+    }
+
     cptSidebarHtml = `
       <div style="padding:12px;border-bottom:1px solid var(--border);">
         <h4 style="margin:0 0 8px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gray-400);">Image à la une</h4>
@@ -2286,7 +2693,8 @@ async function renderPageBuilder() {
           </div>
         ` : ''}
         ${catsHtml}
-      </div>`;
+      </div>
+      `;
   }
 
   return `
@@ -2312,7 +2720,7 @@ async function renderPageBuilder() {
         </div>
         <div class="builder-actions">
           <button type="button" class="btn btn-primary" onclick="${saveFunc}">Enregistrer</button>
-          <a href="${viewUrl}" target="_blank" class="btn btn-outline" id="viewPageBtn">Voir ${isCPT ? "l'" + cptDef.label.toLowerCase() : 'la page'}</a>
+          <a href="${viewUrl}" target="_blank" class="btn btn-outline" id="viewPageBtn">Voir ${isCPT ? (cptDef.isFemale ? 'la ' : "l'") + cptDef.label.toLowerCase() : 'la page'}</a>
         </div>
       </header>
       <div class="builder-body">
@@ -2393,57 +2801,186 @@ async function renderPageBuilder() {
               </div>
             </div>
           </div>
+          ${!(isCPT && cptDef?.hasModules !== false) ? `
           <!-- SEO Meta panel (collapsible) -->
           <div class="builder-seo-panel" id="builderSeoPanel" style="display:none">
             <div class="builder-menu-settings-header">
               <h3>SEO Meta</h3>
               <button type="button" class="btn btn-xs" onclick="toggleSeoPanel(false)">&times;</button>
             </div>
-            <div class="builder-seo-body" style="padding:12px">
-              <div class="form-group" style="margin-bottom:12px">
-                <label class="toggle-switch-label" style="display:flex;align-items:center;cursor:pointer">
+            <div class="builder-seo-body">
+              <div class="seo-toggle">
+                <label>
                   <span class="toggle-switch">
                     <input type="checkbox" id="seoEnabled" ${pageBuilderState.seoMeta.enabled ? 'checked' : ''} onchange="onSeoToggle(this.checked)" />
                     <span class="toggle-slider"></span>
                   </span>
-                  <span style="margin-left:8px;font-weight:600;font-size:14px">Activer les meta SEO</span>
+                  <span>Activer les meta SEO</span>
                 </label>
               </div>
               <div id="seoFields" style="${pageBuilderState.seoMeta.enabled ? '' : 'display:none'}">
-                <button type="button" class="btn btn-sm btn-primary" onclick="analyzeSeoPage()" style="margin-bottom:14px;width:100%">Analyser la page</button>
-                <div class="form-group" style="margin-bottom:10px">
-                  <label class="form-label">Meta Title <span id="seoTitleCount" style="font-weight:normal;color:#888;font-size:12px">(${pageBuilderState.seoMeta.meta_title.length}/60)</span></label>
+                <button type="button" class="btn btn-primary seo-analyze-btn" onclick="analyzeSeoPage()">Analyser la page</button>
+                <div class="seo-field">
+                  <label class="form-label">Meta Title <span class="seo-counter" id="seoTitleCount">(${pageBuilderState.seoMeta.meta_title.length}/60)</span></label>
                   <input type="text" class="form-input" id="seo_meta_title" value="${(pageBuilderState.seoMeta.meta_title || '').replace(/"/g, '&quot;')}" oninput="onSeoFieldChange()" maxlength="60" placeholder="Titre SEO de la page (max 60 car.)" />
-                  <div class="seo-preview-bar" style="margin-top:4px;height:4px;border-radius:2px;background:#e0e0e0;overflow:hidden"><div id="seoTitleBar" style="height:100%;border-radius:2px;transition:width .2s,background .2s;width:${Math.min(100, (pageBuilderState.seoMeta.meta_title.length / 60) * 100)}%;background:${pageBuilderState.seoMeta.meta_title.length <= 60 ? '#22c55e' : '#ef4444'}"></div></div>
+                  <div class="seo-progress-bar"><div id="seoTitleBar" style="width:${Math.min(100, (pageBuilderState.seoMeta.meta_title.length / 60) * 100)}%;background:${pageBuilderState.seoMeta.meta_title.length <= 60 ? '#22c55e' : '#ef4444'}"></div></div>
                 </div>
-                <div class="form-group" style="margin-bottom:10px">
-                  <label class="form-label">Meta Description <span id="seoDescCount" style="font-weight:normal;color:#888;font-size:12px">(${pageBuilderState.seoMeta.meta_description.length}/160)</span></label>
+                <div class="seo-field">
+                  <label class="form-label">Meta Description <span class="seo-counter" id="seoDescCount">(${pageBuilderState.seoMeta.meta_description.length}/160)</span></label>
                   <textarea class="form-input" id="seo_meta_description" oninput="onSeoFieldChange()" maxlength="160" rows="3" placeholder="Description SEO de la page (max 160 car.)" style="resize:vertical">${(pageBuilderState.seoMeta.meta_description || '').replace(/</g, '&lt;')}</textarea>
-                  <div class="seo-preview-bar" style="margin-top:4px;height:4px;border-radius:2px;background:#e0e0e0;overflow:hidden"><div id="seoDescBar" style="height:100%;border-radius:2px;transition:width .2s,background .2s;width:${Math.min(100, (pageBuilderState.seoMeta.meta_description.length / 160) * 100)}%;background:${pageBuilderState.seoMeta.meta_description.length <= 160 ? '#22c55e' : '#ef4444'}"></div></div>
+                  <div class="seo-progress-bar"><div id="seoDescBar" style="width:${Math.min(100, (pageBuilderState.seoMeta.meta_description.length / 160) * 100)}%;background:${pageBuilderState.seoMeta.meta_description.length <= 160 ? '#22c55e' : '#ef4444'}"></div></div>
                 </div>
-                <div style="margin-top:14px;display:flex;gap:6px;margin-bottom:10px">
-                  <button type="button" class="btn btn-xs seo-tab-btn active" id="seoTabPreview" onclick="switchSeoTab('preview')">Apercu Google</button>
-                  <button type="button" class="btn btn-xs btn-outline seo-tab-btn" id="seoTabSchema" onclick="switchSeoTab('schema')">Schema.org</button>
+                <div class="seo-tabs">
+                  <button type="button" class="seo-tab-btn active" id="seoTabPreview" onclick="switchSeoTab('preview')">Apercu Google</button>
+                  <button type="button" class="seo-tab-btn" id="seoTabSchema" onclick="switchSeoTab('schema')">Schema.org</button>
                 </div>
-                <div id="seoPreview" style="padding:12px;background:#f8f9fa;border-radius:8px;font-family:Arial,sans-serif">
-                  <div style="font-size:18px;color:#1a0dab;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || 'Titre de la page'}</div>
-                  <div style="font-size:13px;color:#006621;margin:2px 0">example.com/pages/${pageBuilderState.meta.slug || 'slug'}</div>
-                  <div style="font-size:13px;color:#545454;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${pageBuilderState.seoMeta.meta_description || 'Description de la page...'}</div>
+                <div id="seoPreview" class="seo-google-preview">
+                  <div class="seo-preview-title">${pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || 'Titre de la page'}</div>
+                  <div class="seo-preview-url">example.com/${isCPT ? cptDef.slug : 'pages'}/${pageBuilderState.meta.slug || 'slug'}</div>
+                  <div class="seo-preview-desc">${pageBuilderState.seoMeta.meta_description || 'Description de la page...'}</div>
                 </div>
-                <div id="seoSchemaPanel" style="display:none">
-                  <button type="button" class="btn btn-sm btn-outline" onclick="generateSchemaOrg()" style="margin-bottom:10px;width:100%">Generer depuis le contenu</button>
-                  <textarea class="form-input" id="seo_schema_org" oninput="onSchemaOrgChange()" rows="14" placeholder='{"@context":"https://schema.org",...}' style="resize:vertical;font-family:monospace;font-size:12px;line-height:1.4;tab-size:2">${(pageBuilderState.seoMeta.schema_org || '').replace(/</g, '&lt;')}</textarea>
-                  <p class="form-help" style="margin-top:4px;font-size:11px;color:#888">JSON-LD injecte dans &lt;head&gt;. Genere automatiquement selon les blocs de la page.</p>
+                <div id="seoSchemaPanel" class="seo-schema-panel" style="display:none">
+                  <button type="button" class="btn btn-sm btn-outline seo-generate-btn" onclick="generateSchemaOrg()">Generer depuis le contenu</button>
+                  <textarea class="form-input" id="seo_schema_org" oninput="onSchemaOrgChange()" rows="14" placeholder='{"@context":"https://schema.org",...}'>${(pageBuilderState.seoMeta.schema_org || '').replace(/</g, '&lt;')}</textarea>
+                  <p class="form-help">JSON-LD injecte dans &lt;head&gt;. Genere automatiquement selon les blocs de la page.</p>
                 </div>
               </div>
             </div>
           </div>
+          ` : ''}
           <div class="builder-modules-panel" id="builderModulesPanel" style="${selectedBlockId ? 'display:none' : ''}">
             ${isCPT ? '' : `<button type="button" class="btn btn-sm btn-outline builder-menu-settings-btn" onclick="toggleMenuSettingsPanel(true)" style="${m.status === 'draft' ? 'display:none' : ''}">Parametres menu</button>
-            <button type="button" class="btn btn-sm btn-outline builder-color-overrides-btn" onclick="toggleColorOverridesPanel(true)">Surcharge des couleurs</button>
-            <button type="button" class="btn btn-sm btn-outline builder-seo-btn" onclick="toggleSeoPanel(true)">SEO Meta</button>`}
-            <h3 style="margin-top:18px">Modules</h3>
+            <button type="button" class="btn btn-sm btn-outline builder-color-overrides-btn" onclick="toggleColorOverridesPanel(true)">Surcharge des couleurs</button>`}
+            ${isCPT && !customFieldsSidebarHtml && cptDef?.hasModules !== false ? `
+            <div class="cpt-builder-tabs" style="display:flex;border-bottom:2px solid var(--border,#e5e7eb);margin-bottom:0;">
+              <button type="button" class="cpt-builder-tab active" data-tab="cpt-header" style="flex:1;padding:10px 0;border:0;background:0;cursor:pointer;font-weight:600;font-size:13px;border-bottom:2px solid var(--primary,#224f5a);margin-bottom:-2px;color:var(--primary,#224f5a);">Header</button>
+              <button type="button" class="cpt-builder-tab" data-tab="cpt-seo" style="flex:1;padding:10px 0;border:0;background:0;cursor:pointer;font-weight:600;font-size:13px;border-bottom:2px solid transparent;margin-bottom:-2px;color:#999;">SEO Meta</button>
+              <button type="button" class="cpt-builder-tab" data-tab="cpt-modules" style="flex:1;padding:10px 0;border:0;background:0;cursor:pointer;font-weight:600;font-size:13px;border-bottom:2px solid transparent;margin-bottom:-2px;color:#999;">Modules</button>
+            </div>
+            <div class="cpt-builder-tab-content" data-tab="cpt-header" style="padding-top:16px;">
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                <label class="toggle-switch"><input type="checkbox" name="h1_in_header" ${pageBuilderState.cptHeaderSettings.h1_in_header !== 'no' ? 'checked' : ''}><span class="toggle-slider"></span></label>
+                <span class="toggle-label">Mettre le titre H1 dans le header</span>
+              </div>
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;">
+                <label class="toggle-switch"><input type="checkbox" name="title_in_header" ${pageBuilderState.cptHeaderSettings.title_in_header !== 'hideTitle' ? 'checked' : ''}><span class="toggle-slider"></span></label>
+                <span class="toggle-label">Afficher le titre dans le header</span>
+              </div>
+            </div>
+            <div class="cpt-builder-tab-content" data-tab="cpt-seo" style="display:none;padding-top:16px;">
+              <div class="builder-seo-body">
+                <div class="seo-toggle">
+                  <label>
+                    <span class="toggle-switch">
+                      <input type="checkbox" id="seoEnabled" ${pageBuilderState.seoMeta.enabled ? 'checked' : ''} onchange="onSeoToggle(this.checked)" />
+                      <span class="toggle-slider"></span>
+                    </span>
+                    <span>Activer les meta SEO</span>
+                  </label>
+                </div>
+                <div id="seoFields" style="${pageBuilderState.seoMeta.enabled ? '' : 'display:none'}">
+                  <button type="button" class="btn btn-primary seo-analyze-btn" onclick="analyzeSeoPage()">Analyser la page</button>
+                  <div class="seo-field">
+                    <label class="form-label">Meta Title <span class="seo-counter" id="seoTitleCount">(${pageBuilderState.seoMeta.meta_title.length}/60)</span></label>
+                    <input type="text" class="form-input" id="seo_meta_title" value="${(pageBuilderState.seoMeta.meta_title || '').replace(/"/g, '&quot;')}" oninput="onSeoFieldChange()" maxlength="60" placeholder="Titre SEO de la page (max 60 car.)" />
+                    <div class="seo-progress-bar"><div id="seoTitleBar" style="width:${Math.min(100, (pageBuilderState.seoMeta.meta_title.length / 60) * 100)}%;background:${pageBuilderState.seoMeta.meta_title.length <= 60 ? '#22c55e' : '#ef4444'}"></div></div>
+                  </div>
+                  <div class="seo-field">
+                    <label class="form-label">Meta Description <span class="seo-counter" id="seoDescCount">(${pageBuilderState.seoMeta.meta_description.length}/160)</span></label>
+                    <textarea class="form-input" id="seo_meta_description" oninput="onSeoFieldChange()" maxlength="160" rows="3" placeholder="Description SEO de la page (max 160 car.)" style="resize:vertical">${(pageBuilderState.seoMeta.meta_description || '').replace(/</g, '&lt;')}</textarea>
+                    <div class="seo-progress-bar"><div id="seoDescBar" style="width:${Math.min(100, (pageBuilderState.seoMeta.meta_description.length / 160) * 100)}%;background:${pageBuilderState.seoMeta.meta_description.length <= 160 ? '#22c55e' : '#ef4444'}"></div></div>
+                  </div>
+                  <div class="seo-tabs">
+                    <button type="button" class="seo-tab-btn active" id="seoTabPreview" onclick="switchSeoTab('preview')">Apercu Google</button>
+                    <button type="button" class="seo-tab-btn" id="seoTabSchema" onclick="switchSeoTab('schema')">Schema.org</button>
+                  </div>
+                  <div id="seoPreview" class="seo-google-preview">
+                    <div class="seo-preview-title">${pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || 'Titre de la page'}</div>
+                    <div class="seo-preview-url">example.com/${cptDef.slug}/${pageBuilderState.meta.slug || 'slug'}</div>
+                    <div class="seo-preview-desc">${pageBuilderState.seoMeta.meta_description || 'Description de la page...'}</div>
+                  </div>
+                  <div id="seoSchemaPanel" class="seo-schema-panel" style="display:none">
+                    <button type="button" class="btn btn-sm btn-outline seo-generate-btn" onclick="generateSchemaOrg()">Generer depuis le contenu</button>
+                    <textarea class="form-input" id="seo_schema_org" oninput="onSchemaOrgChange()" rows="14" placeholder='{"@context":"https://schema.org",...}'>${(pageBuilderState.seoMeta.schema_org || '').replace(/</g, '&lt;')}</textarea>
+                    <p class="form-help">JSON-LD injecte dans &lt;head&gt;. Genere automatiquement selon les blocs de la page.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="cpt-builder-tab-content" data-tab="cpt-modules" style="display:none;padding-top:16px;">
+            ` : isCPT && customFieldsSidebarHtml && cptDef?.hasModules !== false ? `
+            <div class="cpt-builder-tabs" style="display:flex;border-bottom:2px solid var(--border,#e5e7eb);margin-bottom:0;">
+              <button type="button" class="cpt-builder-tab active" data-tab="cpt-header" style="flex:1;padding:10px 0;border:0;background:0;cursor:pointer;font-weight:600;font-size:13px;border-bottom:2px solid var(--primary,#224f5a);margin-bottom:-2px;color:var(--primary,#224f5a);">Header</button>
+              <button type="button" class="cpt-builder-tab" data-tab="cpt-seo" style="flex:1;padding:10px 0;border:0;background:0;cursor:pointer;font-weight:600;font-size:13px;border-bottom:2px solid transparent;margin-bottom:-2px;color:#999;">SEO Meta</button>
+              <button type="button" class="cpt-builder-tab" data-tab="cpt-contenu" style="flex:1;padding:10px 0;border:0;background:0;cursor:pointer;font-weight:600;font-size:13px;border-bottom:2px solid transparent;margin-bottom:-2px;color:#999;">Contenu</button>
+              <button type="button" class="cpt-builder-tab" data-tab="cpt-modules" style="flex:1;padding:10px 0;border:0;background:0;cursor:pointer;font-weight:600;font-size:13px;border-bottom:2px solid transparent;margin-bottom:-2px;color:#999;">Modules</button>
+            </div>
+            <div class="cpt-builder-tab-content" data-tab="cpt-header" style="padding-top:16px;">
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                <label class="toggle-switch"><input type="checkbox" name="h1_in_header" ${pageBuilderState.cptHeaderSettings.h1_in_header !== 'no' ? 'checked' : ''}><span class="toggle-slider"></span></label>
+                <span class="toggle-label">Mettre le titre H1 dans le header</span>
+              </div>
+              <div class="toggle-field" style="display:flex;align-items:center;gap:10px;">
+                <label class="toggle-switch"><input type="checkbox" name="title_in_header" ${pageBuilderState.cptHeaderSettings.title_in_header !== 'hideTitle' ? 'checked' : ''}><span class="toggle-slider"></span></label>
+                <span class="toggle-label">Afficher le titre dans le header</span>
+              </div>
+            </div>
+            <div class="cpt-builder-tab-content" data-tab="cpt-seo" style="display:none;padding-top:16px;">
+              <div class="builder-seo-body">
+                <div class="seo-toggle">
+                  <label>
+                    <span class="toggle-switch">
+                      <input type="checkbox" id="seoEnabled" ${pageBuilderState.seoMeta.enabled ? 'checked' : ''} onchange="onSeoToggle(this.checked)" />
+                      <span class="toggle-slider"></span>
+                    </span>
+                    <span>Activer les meta SEO</span>
+                  </label>
+                </div>
+                <div id="seoFields" style="${pageBuilderState.seoMeta.enabled ? '' : 'display:none'}">
+                  <button type="button" class="btn btn-primary seo-analyze-btn" onclick="analyzeSeoPage()">Analyser la page</button>
+                  <div class="seo-field">
+                    <label class="form-label">Meta Title <span class="seo-counter" id="seoTitleCount">(${pageBuilderState.seoMeta.meta_title.length}/60)</span></label>
+                    <input type="text" class="form-input" id="seo_meta_title" value="${(pageBuilderState.seoMeta.meta_title || '').replace(/"/g, '&quot;')}" oninput="onSeoFieldChange()" maxlength="60" placeholder="Titre SEO de la page (max 60 car.)" />
+                    <div class="seo-progress-bar"><div id="seoTitleBar" style="width:${Math.min(100, (pageBuilderState.seoMeta.meta_title.length / 60) * 100)}%;background:${pageBuilderState.seoMeta.meta_title.length <= 60 ? '#22c55e' : '#ef4444'}"></div></div>
+                  </div>
+                  <div class="seo-field">
+                    <label class="form-label">Meta Description <span class="seo-counter" id="seoDescCount">(${pageBuilderState.seoMeta.meta_description.length}/160)</span></label>
+                    <textarea class="form-input" id="seo_meta_description" oninput="onSeoFieldChange()" maxlength="160" rows="3" placeholder="Description SEO de la page (max 160 car.)" style="resize:vertical">${(pageBuilderState.seoMeta.meta_description || '').replace(/</g, '&lt;')}</textarea>
+                    <div class="seo-progress-bar"><div id="seoDescBar" style="width:${Math.min(100, (pageBuilderState.seoMeta.meta_description.length / 160) * 100)}%;background:${pageBuilderState.seoMeta.meta_description.length <= 160 ? '#22c55e' : '#ef4444'}"></div></div>
+                  </div>
+                  <div class="seo-tabs">
+                    <button type="button" class="seo-tab-btn active" id="seoTabPreview" onclick="switchSeoTab('preview')">Apercu Google</button>
+                    <button type="button" class="seo-tab-btn" id="seoTabSchema" onclick="switchSeoTab('schema')">Schema.org</button>
+                  </div>
+                  <div id="seoPreview" class="seo-google-preview">
+                    <div class="seo-preview-title">${pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || 'Titre de la page'}</div>
+                    <div class="seo-preview-url">example.com/${cptDef.slug}/${pageBuilderState.meta.slug || 'slug'}</div>
+                    <div class="seo-preview-desc">${pageBuilderState.seoMeta.meta_description || 'Description de la page...'}</div>
+                  </div>
+                  <div id="seoSchemaPanel" class="seo-schema-panel" style="display:none">
+                    <button type="button" class="btn btn-sm btn-outline seo-generate-btn" onclick="generateSchemaOrg()">Generer depuis le contenu</button>
+                    <textarea class="form-input" id="seo_schema_org" oninput="onSchemaOrgChange()" rows="14" placeholder='{"@context":"https://schema.org",...}'>${(pageBuilderState.seoMeta.schema_org || '').replace(/</g, '&lt;')}</textarea>
+                    <p class="form-help">JSON-LD injecte dans &lt;head&gt;. Genere automatiquement selon les blocs de la page.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="cpt-builder-tab-content" data-tab="cpt-contenu" style="display:none;padding-top:16px;">
+              ${customFieldsSidebarHtml}
+            </div>
+            <div class="cpt-builder-tab-content" data-tab="cpt-modules" style="display:none;padding-top:16px;">
+            ` : `
+            <button type="button" class="btn btn-sm btn-outline builder-seo-btn" onclick="toggleSeoPanel(true)">SEO Meta</button>
+            ${customFieldsSidebarHtml && cptDef?.hasModules === false ? `
+            <div style="padding-top:16px;">
+              ${customFieldsSidebarHtml}
+            </div>
+            ` : ''}
+            `}
+            ${cptDef?.hasModules !== false ? `
+            ${!customFieldsSidebarHtml && !(isCPT && !customFieldsSidebarHtml && cptDef?.hasModules !== false) ? `<h3 style="margin-top:18px">Modules</h3>` : ''}
             <p class="form-help">Glissez un module dans la zone de droite.</p>
+            <input type="text" class="form-input builder-module-search" placeholder="Rechercher un module…" oninput="filterBuilderModules(this.value)" style="margin-bottom:12px;font-size:13px;">
             <div class="builder-modules-list">
               ${MODULE_CATEGORIES.map(category => `
                 <div class="builder-module-category">
@@ -2465,19 +3002,21 @@ async function renderPageBuilder() {
                 </div>
               `).join('')}
             </div>
+            ` : ''}
+            ${(customFieldsSidebarHtml && cptDef?.hasModules !== false) || (isCPT && !customFieldsSidebarHtml && cptDef?.hasModules !== false) ? `</div>` : ''}
           </div>
           <div class="builder-settings" id="builderSettings" style="${selectedBlockId ? '' : 'display:none'}">
             ${renderBuilderSettingsPanel()}
           </div>
         </aside>
-        <main class="builder-canvas" id="builderCanvas" data-drop-zone="true">
+        ${cptDef?.hasModules === false ? '' : `<main class="builder-canvas" id="builderCanvas" data-drop-zone="true">
           <div class="builder-canvas-inner" id="builderCanvasInner" style="${buildColorOverrideStyle()}">
             <div class="builder-canvas-placeholder" id="builderPlaceholder">Glissez des modules ici ou cliquez sur un module à gauche pour l'ajouter.</div>
             <div class="builder-blocks" id="builderBlocks">
               ${pageBuilderState.blocks.map(block => renderBlockCard(block)).join('')}
             </div>
           </div>
-        </main>
+        </main>`}
       </div>
     </div>
   `;
@@ -4359,30 +4898,29 @@ function attachPageBuilderListeners() {
   const canvas = document.getElementById('builderCanvas');
   const blocksEl = document.getElementById('builderBlocks');
   const placeholder = document.getElementById('builderPlaceholder');
-  if (!canvas || !blocksEl) return;
 
-  document.querySelectorAll('.builder-module-item').forEach(el => {
-    el.addEventListener('dragstart', e => {
-      const payload = { type: 'new', blockType: el.dataset.blockType };
-      const str = JSON.stringify(payload);
-      e.dataTransfer.setData('application/json', str);
-      e.dataTransfer.setData('text/plain', str);
-      e.dataTransfer.effectAllowed = 'copy';
+  if (canvas && blocksEl) {
+    document.querySelectorAll('.builder-module-item').forEach(el => {
+      el.addEventListener('dragstart', e => {
+        const payload = { type: 'new', blockType: el.dataset.blockType };
+        const str = JSON.stringify(payload);
+        e.dataTransfer.setData('application/json', str);
+        e.dataTransfer.setData('text/plain', str);
+        e.dataTransfer.effectAllowed = 'copy';
+      });
     });
-  });
 
-  reattachBlockCardListeners();
+    reattachBlockCardListeners();
 
-  canvas.addEventListener('dragover', handleBuilderDragover);
-  canvas.addEventListener('dragleave', handleBuilderDragleave);
-  canvas.addEventListener('drop', handleBuilderDrop);
-  if (blocksEl) {
+    canvas.addEventListener('dragover', handleBuilderDragover);
+    canvas.addEventListener('dragleave', handleBuilderDragleave);
+    canvas.addEventListener('drop', handleBuilderDrop);
     blocksEl.addEventListener('dragover', handleBuilderDragover);
     blocksEl.addEventListener('drop', handleBuilderDrop);
-  }
-  if (placeholder) {
-    placeholder.addEventListener('dragover', handleBuilderDragover);
-    placeholder.addEventListener('drop', handleBuilderDrop);
+    if (placeholder) {
+      placeholder.addEventListener('dragover', handleBuilderDragover);
+      placeholder.addEventListener('drop', handleBuilderDrop);
+    }
   }
 
   document.querySelectorAll('.builder-meta input, .builder-meta select, .builder-title, .builder-slug, .builder-status').forEach(el => {
@@ -4406,6 +4944,52 @@ function attachPageBuilderListeners() {
   }
 
   // No more .builder-parent in header — parent_id derived from primary menu
+
+  // CPT builder sidebar: init Address fields (Mapbox geocoding)
+  document.querySelectorAll('.builder-sidebar .cpt-address-field').forEach(el => {
+    initGoogleMapField(el.id);
+  });
+
+  // CPT builder sidebar: toggle switches
+  document.querySelectorAll('.builder-sidebar .cpt-toggle').forEach(wrapper => {
+    const cb = wrapper.querySelector('input[type="checkbox"]');
+    if (!cb) return;
+    const track = wrapper.querySelector('.cpt-toggle-track');
+    const thumb = wrapper.querySelector('.cpt-toggle-thumb');
+    const lbl = wrapper.querySelector('.cpt-toggle-label');
+    function sync() {
+      if (track) track.style.background = cb.checked ? 'var(--primary,#224f5a)' : '#ccc';
+      if (thumb) thumb.style.left = cb.checked ? '22px' : '2px';
+      if (lbl) lbl.textContent = cb.checked ? 'Oui' : 'Non';
+    }
+    cb.addEventListener('change', sync);
+  });
+
+  // CPT builder sidebar: tab switching (Contenu / Modules)
+  document.querySelectorAll('.cpt-builder-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.cpt-builder-tab').forEach(b => {
+        const isActive = b.dataset.tab === tab;
+        b.classList.toggle('active', isActive);
+        b.style.borderBottomColor = isActive ? 'var(--primary,#224f5a)' : 'transparent';
+        b.style.color = isActive ? 'var(--primary,#224f5a)' : '#999';
+      });
+      document.querySelectorAll('.cpt-builder-tab-content').forEach(c => {
+        c.style.display = c.dataset.tab === tab ? '' : 'none';
+      });
+    });
+  });
+
+  // CPT builder sidebar: link page selectors
+  document.querySelectorAll('.builder-sidebar .cpt-link-page-select').forEach(sel => {
+    const targetId = sel.dataset.target;
+    if (!targetId) return;
+    const urlInput = document.getElementById(targetId);
+    if (urlInput) {
+      sel.addEventListener('change', () => { if (sel.value) urlInput.value = sel.value; });
+    }
+  });
 
   // ── Accordion toggle avec slideUp/slideDown (reproduit le JS Nickl) ──
   const adminSlideProp = 'height 400ms ease, padding 400ms ease';
@@ -4887,10 +5471,11 @@ function updateSeoPreview() {
   const title = pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || 'Titre de la page';
   const slug = pageBuilderState.meta.slug || 'slug';
   const desc = pageBuilderState.seoMeta.meta_description || 'Description de la page...';
+  const basePath = pageBuilderState.cptMode ? pageBuilderState.cptMode.slug : 'pages';
   preview.innerHTML = `
-    <div style="font-size:18px;color:#1a0dab;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(title)}</div>
-    <div style="font-size:13px;color:#006621;margin:2px 0">example.com/pages/${escapeHtml(slug)}</div>
-    <div style="font-size:13px;color:#545454;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${escapeHtml(desc)}</div>
+    <div class="seo-preview-title">${escapeHtml(title)}</div>
+    <div class="seo-preview-url">example.com/${escapeHtml(basePath)}/${escapeHtml(slug)}</div>
+    <div class="seo-preview-desc">${escapeHtml(desc)}</div>
   `;
 }
 
@@ -4957,13 +5542,13 @@ function switchSeoTab(tab) {
   if (tab === 'schema') {
     if (preview) preview.style.display = 'none';
     if (schema) schema.style.display = '';
-    if (btnPreview) { btnPreview.classList.remove('active'); btnPreview.classList.add('btn-outline'); }
-    if (btnSchema) { btnSchema.classList.add('active'); btnSchema.classList.remove('btn-outline'); }
+    if (btnPreview) btnPreview.classList.remove('active');
+    if (btnSchema) btnSchema.classList.add('active');
   } else {
     if (preview) preview.style.display = '';
     if (schema) schema.style.display = 'none';
-    if (btnPreview) { btnPreview.classList.add('active'); btnPreview.classList.remove('btn-outline'); }
-    if (btnSchema) { btnSchema.classList.remove('active'); btnSchema.classList.add('btn-outline'); }
+    if (btnPreview) btnPreview.classList.add('active');
+    if (btnSchema) btnSchema.classList.remove('active');
   }
 }
 
@@ -4972,7 +5557,7 @@ function onSchemaOrgChange() {
   if (textarea) pageBuilderState.seoMeta.schema_org = textarea.value;
 }
 
-function generateSchemaOrg() {
+async function generateSchemaOrg() {
   const title = pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || '';
   const description = pageBuilderState.seoMeta.meta_description || '';
   const slug = pageBuilderState.meta.slug || '';
@@ -5071,18 +5656,81 @@ function generateSchemaOrg() {
     }
   }
 
-  // Event if EventsSlider block
-  const eventBlocks = blocks.filter(b => (BLOCK_TYPES[b.type]?.moduleName || b.type) === 'EventsSlider');
-  if (eventBlocks.length > 0) {
-    for (const block of eventBlocks) {
-      const events = block.data?.events || block.data?.items || [];
-      for (const ev of events) {
+  // Event if EventsSlider block — fetch from CPT API
+  const hasEvents = blocks.some(b => (BLOCK_TYPES[b.type]?.moduleName || b.type) === 'EventsSlider');
+  if (hasEvents) {
+    try {
+      const evData = await apiFetch('/cpt/evenements?status=published&limit=10');
+      const evItems = evData.items || evData || [];
+      for (const ev of evItems) {
+        const cf = ev.custom_fields || {};
         const event = { '@type': 'Event', 'name': stripHtml(ev.title || '') };
-        if (ev.date) event.startDate = ev.date;
-        if (ev.location || ev.lieu) event.location = { '@type': 'Place', 'name': stripHtml(ev.location || ev.lieu || '') };
+        if (cf.start_date) {
+          // Convert DD/MM/YYYY to ISO date
+          const parts = cf.start_date.split('/');
+          event.startDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : cf.start_date;
+        }
+        if (cf.end_date) {
+          const parts = cf.end_date.split('/');
+          event.endDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : cf.end_date;
+        }
+        if (cf.start_time) event.startDate = (event.startDate || '') + 'T' + cf.start_time;
+        if (cf.location_name) event.location = { '@type': 'Place', 'name': stripHtml(cf.location_name) };
+        if (cf.location) {
+          const loc = typeof cf.location === 'string' ? (() => { try { return JSON.parse(cf.location); } catch(e) { return {}; } })() : cf.location;
+          if (loc.city || loc.address) {
+            if (!event.location) event.location = { '@type': 'Place', 'name': stripHtml(cf.location_name || loc.city || '') };
+            event.location.address = { '@type': 'PostalAddress', 'addressLocality': loc.city || '', 'streetAddress': loc.address || '' };
+          }
+        }
+        if (cf.contact_name) event.organizer = { '@type': 'Person', 'name': stripHtml(cf.contact_name) };
+        if (cf.price) event.offers = { '@type': 'Offer', 'price': stripHtml(cf.price), 'priceCurrency': 'EUR' };
+        if (ev.excerpt) event.description = stripHtml(ev.excerpt);
         if (event.name) schema['@graph'].push(event);
       }
-    }
+    } catch (e) { console.warn('Schema.org: erreur chargement evenements', e); }
+  }
+
+  // BlocReferences — CreativeWork items from CPT API
+  const hasRefs = blocks.some(b => (BLOCK_TYPES[b.type]?.moduleName || b.type) === 'BlocReferences');
+  if (hasRefs) {
+    try {
+      const refData = await apiFetch('/cpt/references?status=published&limit=10');
+      const refItems = refData.items || refData || [];
+      for (const ref of refItems) {
+        const cf = ref.custom_fields || {};
+        const work = { '@type': 'CreativeWork', 'name': stripHtml(ref.title || '') };
+        if (cf.customer_name) work.creator = { '@type': 'Organization', 'name': stripHtml(cf.customer_name) };
+        if (cf.text) work.description = stripHtml(cf.text);
+        if (ref.featured_image) work.image = typeof ref.featured_image === 'string' ? ref.featured_image : (ref.featured_image.url || '');
+        const cats = ref.categories || [];
+        if (cats.length > 0) work.genre = cats.map(c => c.name).join(', ');
+        if (cf.link) {
+          const linkUrl = typeof cf.link === 'string' ? cf.link : (cf.link.url || '');
+          if (linkUrl) work.url = linkUrl;
+        }
+        if (work.name) schema['@graph'].push(work);
+      }
+    } catch (e) { console.warn('Schema.org: erreur chargement references', e); }
+  }
+
+  // NewsSlider — NewsArticle items from CPT API
+  const hasNews = blocks.some(b => (BLOCK_TYPES[b.type]?.moduleName || b.type) === 'NewsSlider');
+  if (hasNews) {
+    try {
+      const newsData = await apiFetch('/cpt/actualites?status=published&limit=10');
+      const newsItems = newsData.items || newsData || [];
+      for (const item of newsItems) {
+        const article = { '@type': 'NewsArticle', 'headline': stripHtml(item.title || '') };
+        if (item.published_date || item.created_at) article.datePublished = item.published_date || item.created_at;
+        if (item.excerpt) article.description = stripHtml(item.excerpt);
+        if (item.featured_image) article.image = typeof item.featured_image === 'string' ? item.featured_image : (item.featured_image.url || '');
+        const cats = item.categories || [];
+        if (cats.length > 0) article.articleSection = cats[0].name;
+        article.url = `{{site_url}}/actualites/${item.slug || ''}`;
+        if (article.headline) schema['@graph'].push(article);
+      }
+    } catch (e) { console.warn('Schema.org: erreur chargement actualites', e); }
   }
 
   // Team / Person if Team block
@@ -5333,6 +5981,21 @@ function reattachBlockCardListeners() {
   updateSelectedBlockCard();
 }
 
+function filterBuilderModules(query) {
+  const q = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  document.querySelectorAll('.builder-modules-list .builder-module-category').forEach(cat => {
+    const items = cat.querySelectorAll('.builder-module-item');
+    let visibleCount = 0;
+    items.forEach(item => {
+      const label = (item.textContent || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const match = !q || label.includes(q);
+      item.style.display = match ? '' : 'none';
+      if (match) visibleCount++;
+    });
+    cat.style.display = visibleCount > 0 ? '' : 'none';
+  });
+}
+
 function addBlockByClick(blockType) {
   if (!BLOCK_TYPES[blockType]) return;
   const def = BLOCK_TYPES[blockType];
@@ -5384,8 +6047,7 @@ function removeBlock(id) {
   pageBuilderState.blocks = pageBuilderState.blocks.filter(b => b.id !== id);
   rebuildBuilderBlocksDOM();
   if (selectedBlockId === id) {
-    selectedBlockId = null;
-    renderBlockSettings();
+    deselectBlock();
   }
 }
 
@@ -9040,7 +9702,7 @@ function clearMediaPickerSelection() {
 function confirmMediaPickerSelection() {
   const items = mediaPickerState.items.filter(item => (mediaPickerState.selectedIds || []).includes(String(item.id)));
 
-  // CPT Photos gallery picker
+  // CPT Photos gallery picker (classic form)
   if (mediaPickerState.blockId === '__cpt_photos__') {
     const input = document.getElementById('cptPhotosInput');
     let existing = [];
@@ -9049,6 +9711,19 @@ function confirmMediaPickerSelection() {
     const merged = [...existing, ...newUrls];
     input.value = JSON.stringify(merged);
     updateCPTPhotosPreview(merged);
+    closeMediaPicker();
+    return;
+  }
+
+  // CPT Builder Photos gallery picker
+  if (mediaPickerState.blockId === '__cpt_builder_photos__') {
+    const input = document.getElementById('cptBuilderPhotosInput');
+    let existing = [];
+    try { existing = JSON.parse(input.value || '[]'); } catch { existing = []; }
+    const newUrls = items.map(item => item.url);
+    const merged = [...existing, ...newUrls];
+    input.value = JSON.stringify(merged);
+    updateCPTBuilderPhotosPreview(merged);
     closeMediaPicker();
     return;
   }
@@ -11183,14 +11858,16 @@ async function renderUsers() {
 }
 
 function renderUsersTable(users) {
-  const roleLabel = r => r === 'admin' ? 'Administrateur' : 'Editeur';
-  const roleBadge = r => r === 'admin' ? 'badge-danger' : 'badge-warning';
+  const roleLabel = r => r === 'admin' ? 'Administrateur' : 'Éditeur';
+  const roleBadge = r => r === 'admin' ? 'badge-primary' : 'badge-warning';
+  const avatarClass = r => r === 'admin' ? 'user-avatar--admin' : 'user-avatar--editor';
+  const getInitials = name => name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
 
   return `
     <div class="pages-list">
       <div class="pages-list-header">
+        <span style="width:36px;flex-shrink:0"></span>
         <span class="page-item__info">Utilisateur</span>
-        <span class="page-item__parent">Email</span>
         <span class="page-item__meta">Créé le</span>
         <span class="page-item__badges">Rôle</span>
         <span class="page-item__actions" style="opacity:1">Actions</span>
@@ -11199,10 +11876,11 @@ function renderUsersTable(users) {
         const safeName = escapeHtml(user.name).replace(/'/g, "\\'");
         const dateStr = new Date(user.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
         return '<div class="page-item">'
+          + '<div class="user-avatar ' + avatarClass(user.role) + '">' + getInitials(user.name) + '</div>'
           + '<div class="page-item__info" style="cursor:pointer" onclick="showUserForm(' + user.id + ')">'
           +   '<div class="page-item__title">' + escapeHtml(user.name) + (user.id === currentUser.id ? ' <span class="badge badge-info" style="font-size:10px">Vous</span>' : '') + '</div>'
+          +   '<div class="page-item__slug">' + escapeHtml(user.email) + '</div>'
           + '</div>'
-          + '<div class="page-item__parent">' + escapeHtml(user.email) + '</div>'
           + '<div class="page-item__meta"><span class="page-item__date">' + dateStr + '</span></div>'
           + '<div class="page-item__badges"><span class="badge ' + roleBadge(user.role) + '">' + roleLabel(user.role) + '</span></div>'
           + '<div class="page-item__actions">'

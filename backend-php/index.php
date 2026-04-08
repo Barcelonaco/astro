@@ -139,7 +139,24 @@ if (preg_match('#^/admin(?:/(.*))?$#', $uri, $m)) {
         readfile($file);
         exit;
     }
-    http_response_code(404);
+    // SPA fallback: serve index.html for any unmatched /admin/* path
+    // (e.g. hard refresh on /admin/evenements)
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    $html = file_get_contents(__DIR__ . '/admin/index.html');
+    $html = preg_replace_callback('/href="([^"]+\.css)(?:\?[^"]*)?"/i', function($match) {
+        $file = __DIR__ . '/admin/' . basename($match[1]);
+        $v = file_exists($file) ? filemtime($file) : time();
+        return 'href="' . $match[1] . '?v=' . $v . '"';
+    }, $html);
+    $html = preg_replace_callback('/src="([^"]+\.js)(?:\?[^"]*)?"/i', function($match) {
+        $file = __DIR__ . '/admin/' . basename($match[1]);
+        $v = file_exists($file) ? filemtime($file) : time();
+        return 'src="' . $match[1] . '?v=' . $v . '"';
+    }, $html);
+    echo $html;
     exit;
 }
 
