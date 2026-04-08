@@ -2,50 +2,81 @@ name: Deploy to Production astro.bcnco.site
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy via SSH
+      # 1️⃣ Checkout du repo (dans le runner GitHub)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Installer Node & PHP (Composer)
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20" # LTS
+
+      - name: Install frontend deps
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, intl, zip
+          coverage: none
+
+      - name: Install backend deps (Composer)
+        working-directory: ./backend-php
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Deploy via SSH (rsync)
         uses: appleboy/ssh-action@v1
         with:
-          host: 162.19.56.20
-          username: bcnco
+          host: ${{ secrets.ASTRO_SSH_HOST }} # 162.19.56.20
+          username: ${{ secrets.ASTRO_SSH_USER }} # bcnco
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd ~/astro.bcnco.site/httpdocs
+            set -e
+            REMOTE_ROOT=~/astro.bcnco.site/httpdocs
 
-            # Sauvegarder les .env avant reset
-            cp -f backend-php/.env /tmp/backend-php.env 2>/dev/null || true
-            cp -f frontend/.env /tmp/frontend.env 2>/dev/null || true
+            # Crée le répertoire s’il n’existe pas
+            mkdir -p "$REMOTE_ROOT"
 
-            # Pull les derniers changements (force reset si historique réécrit)
-            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/Barcelonaco/astro.git
-            git fetch origin main
-            git reset --hard origin/main
+            # 1️⃣ Pull du dépôt distant (si le repo existe déjà sur le serveur)
+            if [ -d "$REMOTE_ROOT/.git" ]; then
+              cd "$REMOTE_ROOT"
+              git fetch origin main
+              git merge --ff-only origin/main || true   # garde les fichiers locaux non‑versionnés
+            else
+              # Si le repo n’est pas encore présent, le cloner
+              git clone https://github.com/Barcelonaco/astro.git "$REMOTE_ROOT"
+            fi
 
-            # Restaurer les .env
-            cp -f /tmp/backend-php.env backend-php/.env 2>/dev/null || true
-            cp -f /tmp/frontend.env frontend/.env 2>/dev/null || true
+            # 2️⃣ Sauvegarder les .env existants (s’ils existent)
+            [ -f "$REMOTE_ROOT/backend-php/.env" ] && cp -f "$REMOTE_ROOT/backend-php/.env" /tmp/backend-php.env || true
+            [ -f "$REMOTE_ROOT/frontend/.env" ] && cp -f "$REMOTE_ROOT/frontend/.env" /tmp/frontend.env || true
 
-            # S'assurer que le frontend .env est correct
-            echo "PUBLIC_API_URL=https://astro.bcnco.site/api" > frontend/.env
+            # 3️⃣ Copier les nouvelles dépendances et le build
+            rsync -avz --delete ./backend-php/ "$REMOTE_ROOT/backend-php/"
+            rsync -avz --delete ./frontend/dist/ "$REMOTE_ROOT/frontend/dist/"
 
-            # Trouver PHP 8.x sur le serveur Plesk
-            PHP_BIN=$(ls /opt/plesk/php/8.*/bin/php 2>/dev/null | sort -V | tail -1)
-            if [ -z "$PHP_BIN" ]; then PHP_BIN=php; fi
-            echo "Using PHP: $PHP_BIN ($($PHP_BIN -v | head -1))"
+            # 4️⃣ Restaurer les .env si on les avait sauvegardés
+            [ -f /tmp/backend-php.env ] && cp -f /tmp/backend-php.env "$REMOTE_ROOT/backend-php/.env" || true
+            [ -f /tmp/frontend.env ] && cp -f /tmp/frontend.env "$REMOTE_ROOT/frontend/.env" || true
 
-            # Install dépendances PHP + migration DB (avant le build frontend)
-            cd ~/astro.bcnco.site/httpdocs/backend-php && $PHP_BIN $(which composer) install --no-dev --optimize-autoloader 2>/dev/null
-            cd ~/astro.bcnco.site/httpdocs/backend-php && $PHP_BIN migrate.php
+            # 5️⃣ (Optionnel) forcer le bon .env du frontend
+            echo "PUBLIC_API_URL=https://astro.bcnco.site/api" > "$REMOTE_ROOT/frontend/.env"
 
-            # Install dépendances frontend et build
-            cd ~/astro.bcnco.site/httpdocs/frontend && npm install && npm run build
+            # 6️⃣ Créer le lien symbolique attendu par le backend (si nécessaire)
+            ln -sfn "../frontend/dist" "$REMOTE_ROOT/backend-php/dist"
 
-            # Symlink dist pour que le backend PHP serve le frontend
-            ln -sfn ../frontend/dist ~/astro.bcnco.site/httpdocs/backend-php/dist
+            echo "✅ Déploiement astro.bcnco.site terminé"
