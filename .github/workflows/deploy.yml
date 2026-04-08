@@ -32,4 +32,4 @@ jobs:
             ln -sfn ../frontend/dist backend-php/dist
 
             # Install dépendances PHP + migration DB
-            cd backend-php && composer install --no-dev --optimize-autoloader 2>/dev/null && php migrate.php; cd ..
+            cd ~/astro.bcnco.site/httpdocs/backend-php && composer install --no-dev --optimize-autoloader 2>/dev/null && php migrate.php; cd ..
