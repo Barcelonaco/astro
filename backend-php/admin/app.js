@@ -202,6 +202,9 @@ async function loadSection(section) {
     case 'users':
       content.innerHTML = await renderUsers();
       break;
+    case 'plugins':
+      content.innerHTML = await renderPluginsManager();
+      break;
     case 'forms':
       content.innerHTML = await renderFormsList();
       break;
@@ -414,7 +417,12 @@ async function loadPlugins() {
     return;
   }
 
-  for (const plugin of loadedPlugins) {
+  // Remove previously injected plugin sidebar entries before re-rendering
+  document.querySelectorAll('.nav-item[data-section^="cpt:"], .nav-sub-items[data-parent^="cpt:"], .nav-item[data-section^="plugin-options:"]').forEach(el => el.remove());
+
+  const activePlugins = loadedPlugins.filter(p => p._active !== false);
+
+  for (const plugin of activePlugins) {
     // Register plugin modules in MODULE_CATEGORIES and BLOCK_TYPES
     if (plugin.modules && plugin.modules.category && plugin.modules.items) {
       const cat = {
@@ -13391,5 +13399,92 @@ async function deleteEntryConfirm(formId, entryId) {
   } catch (e) {
     hideLoading();
     showToast('Erreur: ' + e.message, 'error');
+  }
+}
+
+// ========== PLUGINS MANAGER ==========
+
+async function renderPluginsManager() {
+  let plugins = [];
+  try {
+    const data = await apiFetch('/plugins');
+    plugins = data.plugins || [];
+  } catch {
+    return '<h1>Plugins</h1><p>Erreur lors du chargement des plugins.</p>';
+  }
+
+  if (plugins.length === 0) {
+    return '<h1>Plugins</h1><p>Aucun plugin installé.</p>';
+  }
+
+  const rows = plugins.map(p => {
+    const isActive = p._active !== false;
+    const dir = escapeHtml(p._dir || '');
+    const name = escapeHtml(p.label || p.name || p._dir || '');
+    const desc = escapeHtml(p.description || '');
+    const modules = (p.modules?.items || []).length;
+    const cpts = (p.postTypes || []).length;
+
+    let details = [];
+    if (modules > 0) details.push(`${modules} module${modules > 1 ? 's' : ''}`);
+    if (cpts > 0) details.push(`${cpts} CPT`);
+    if (p.options?.length > 0) details.push(`${p.options.length} option${p.options.length > 1 ? 's' : ''}`);
+
+    return `
+      <div class="plugin-item">
+        <div class="plugin-item__info">
+          <div class="plugin-item__name">${name}</div>
+          ${desc ? `<div class="plugin-item__desc">${desc}</div>` : ''}
+          ${details.length ? `<div class="plugin-item__meta">${details.join(' &middot; ')}</div>` : ''}
+        </div>
+        <div class="plugin-item__toggle">
+          <label class="toggle-switch" title="${isActive ? 'Désactiver' : 'Activer'}">
+            <input type="checkbox" ${isActive ? 'checked' : ''} onchange="togglePlugin('${dir}', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <h1>Plugins</h1>
+    <div class="card">
+      <div class="plugin-list-header">
+        <span class="plugin-list-header__label">Plugin</span>
+        <span class="plugin-list-header__label">Actif</span>
+      </div>
+      ${rows}
+    </div>
+    <style>
+      .plugin-list-header { display:flex; justify-content:space-between; padding:10px 20px; border-bottom:1px solid var(--gray-100); }
+      .plugin-list-header__label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--gray-400); }
+      .plugin-item { display:flex; align-items:center; gap:16px; padding:16px 20px; border-bottom:1px solid var(--gray-100); transition:background .15s; }
+      .plugin-item:last-child { border-bottom:none; }
+      .plugin-item:hover { background:var(--gray-50); }
+      .plugin-item__info { flex:1; min-width:0; }
+      .plugin-item__name { font-size:15px; font-weight:600; color:var(--gray-900); }
+      .plugin-item__desc { font-size:13px; color:var(--gray-500); margin-top:2px; }
+      .plugin-item__meta { font-size:12px; color:var(--gray-400); margin-top:2px; }
+      .plugin-item__toggle { flex-shrink:0; }
+    </style>
+  `;
+}
+
+async function togglePlugin(dir, active) {
+  try {
+    await apiFetch(`/plugins/${dir}/toggle`, {
+      method: 'PUT',
+      body: JSON.stringify({ active })
+    });
+    showToast(active ? 'Plugin activé' : 'Plugin désactivé', 'success');
+    // Reload plugins to update sidebar
+    await loadPlugins();
+    // Re-render plugin manager
+    document.getElementById('content').innerHTML = await renderPluginsManager();
+  } catch (e) {
+    showToast('Erreur: ' + e.message, 'error');
+    // Re-render to reset toggle state
+    document.getElementById('content').innerHTML = await renderPluginsManager();
   }
 }

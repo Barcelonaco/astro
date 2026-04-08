@@ -250,6 +250,7 @@ if (!table_exists($db, 'settings')) {
         ['posts_per_page', '10'],
         ['theme_use_child', '0'],
         ['active_theme', 'default'],
+        ['active_plugins', '["references","actualites","evenements"]'],
     ];
     $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)");
     foreach ($defaults as [$key, $val]) {

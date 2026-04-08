@@ -525,10 +525,18 @@ try {
         ModuleTemplatesController::getModuleTemplate();
     }
 
-    // ── Plugins (admin) ──
+    // ── Plugins ──
     elseif ($method === 'GET' && $path === '/plugins') {
         $user = authenticate_token();
         PluginController::getPlugins();
+    }
+    elseif ($method === 'GET' && $path === '/plugins/active') {
+        PluginController::getActivePlugins();
+    }
+    elseif ($method === 'PUT' && preg_match('#^/plugins/([a-zA-Z0-9_-]+)/toggle$#', $path, $m)) {
+        $user = authenticate_token();
+        require_admin($user);
+        PluginController::togglePlugin($m[1]);
     }
 
     // ── Google Reviews ──
