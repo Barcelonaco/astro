@@ -1,1 +1,0 @@
-<link href="https://fonts.googleapis.com/css2?family=Anek+Odia:wght@100..800&display=swap" rel="stylesheet">
