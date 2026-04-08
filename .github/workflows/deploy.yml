@@ -36,8 +36,12 @@ jobs:
             echo "PUBLIC_API_URL=https://astro.bcnco.site/api" > frontend/.env
 
             # Install dépendances PHP + migration DB (avant le build frontend)
-            cd ~/astro.bcnco.site/httpdocs/backend-php && composer install --no-dev --optimize-autoloader 2>/dev/null && php migrate.php; cd ..
-            cd frontend && npm install && npm run build && cd ..
+            cd ~/astro.bcnco.site/httpdocs/backend-php && composer install --no-dev --optimize-autoloader 2>/dev/null
+            cd ~/astro.bcnco.site/httpdocs/backend-php && php migrate.php
+            ls -la ~/astro.bcnco.site/httpdocs/plugins/*/plugin.json
+
+            # Install dépendances frontend et build
+            cd ~/astro.bcnco.site/httpdocs/frontend && npm install && npm run build
 
             # Symlink dist pour que le backend PHP serve le frontend
             ln -sfn ../frontend/dist backend-php/dist
