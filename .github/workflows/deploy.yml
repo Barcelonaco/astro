@@ -35,13 +35,17 @@ jobs:
             # S'assurer que le frontend .env est correct
             echo "PUBLIC_API_URL=https://astro.bcnco.site/api" > frontend/.env
 
+            # Trouver PHP 8.x sur le serveur Plesk
+            PHP_BIN=$(ls /opt/plesk/php/8.*/bin/php 2>/dev/null | sort -V | tail -1)
+            if [ -z "$PHP_BIN" ]; then PHP_BIN=php; fi
+            echo "Using PHP: $PHP_BIN ($($PHP_BIN -v | head -1))"
+
             # Install dépendances PHP + migration DB (avant le build frontend)
-            cd ~/astro.bcnco.site/httpdocs/backend-php && composer install --no-dev --optimize-autoloader 2>/dev/null
-            cd ~/astro.bcnco.site/httpdocs/backend-php && php migrate.php
-            ls -la ~/astro.bcnco.site/httpdocs/plugins/*/plugin.json
+            cd ~/astro.bcnco.site/httpdocs/backend-php && $PHP_BIN $(which composer) install --no-dev --optimize-autoloader 2>/dev/null
+            cd ~/astro.bcnco.site/httpdocs/backend-php && $PHP_BIN migrate.php
 
             # Install dépendances frontend et build
             cd ~/astro.bcnco.site/httpdocs/frontend && npm install && npm run build
 
             # Symlink dist pour que le backend PHP serve le frontend
-            ln -sfn ../frontend/dist backend-php/dist
+            ln -sfn ../frontend/dist ~/astro.bcnco.site/httpdocs/backend-php/dist
