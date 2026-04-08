@@ -1,62 +1,93 @@
-# Dependencies
+# -------------------------------------------------
+# 1️⃣ Dépendances
+# -------------------------------------------------
 node_modules/
 **/node_modules/
 
-# Environment variables
+# -------------------------------------------------
+# 2️⃣ Variables d’environnement
+# -------------------------------------------------
 .env
 .env.local
 .env.production
 .env.*.local
 
-# Build outputs
-dist/
-!frontend/dist/
+# -------------------------------------------------
+# 3️⃣ Artefacts de build
+# -------------------------------------------------
+dist/                # ignore tous les dossiers dist…
+!frontend/dist/      # …sauf le build du frontend que l’on veut versionner
 build/
 .astro/
 .tmp/
-.claude
+.claude               # (le répertoire .claude est déjà ignoré dans la section IDE)
 
-# Logs
+# -------------------------------------------------
+# 4️⃣ Logs
+# -------------------------------------------------
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# OS files
+# -------------------------------------------------
+# 5️⃣ Fichiers système
+# -------------------------------------------------
 .DS_Store
 Thumbs.db
 
-# IDE / editor files
+# -------------------------------------------------
+# 6️⃣ IDE / fichiers d’édition
+# -------------------------------------------------
 .claude/
 .agent/
+# (les dossiers .vscode, .idea, .sublime‑workspace, .sublime‑project ont été retirés
+#  car vous ne voulez plus les ignorer)
 
-# Media uploads (keep the folder in Git)
+# -------------------------------------------------
+# 7️⃣ Uploads médias (conserver le dossier dans le repo)
+# -------------------------------------------------
 backend/media/*
 !backend/media/.gitkeep
 backend-php/uploads/media/
 backend/uploads/media/
 
-# Database files
+# -------------------------------------------------
+# 8️⃣ Bases de données locales
+# -------------------------------------------------
 *.db
 *.sqlite
 
-# Cache directories
+# -------------------------------------------------
+# 9️⃣ Cache
+# -------------------------------------------------
 .cache/
 .parcel-cache/
 
-# Miscellaneous
+# -------------------------------------------------
+# 🔟 Divers
+# -------------------------------------------------
 .turbo/
 coverage/
 
-# Project documentation
+# -------------------------------------------------
+# 11️⃣ Documentation du projet
+# -------------------------------------------------
 CLAUDE.md
 COMMANDES.md
 GUIDE_DEMARRAGE.md
 MULTISITE.md
 
-# Custom directories
+# -------------------------------------------------
+# 12️⃣ Répertoires personnalisés
+# -------------------------------------------------
 nickl/
 
-package-lock.json
-frontend/package-lock.json
+# -------------------------------------------------
+# 13️⃣ Fichiers lock (on veut les versionner → **ne pas ignorer**)
+# -------------------------------------------------
+# (les lignes suivantes sont **décommentées** pour s’assurer qu’elles ne sont pas
+#  ignorées ; elles restent ici uniquement à titre d’information)
+# package-lock.json
+# frontend/package-lock.json
