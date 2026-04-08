@@ -71,9 +71,17 @@ jobs:
             cd "$REMOTE_ROOT"
             npm i
 
+            # Start temporary PHP server for build-time API access
+            cd "$REMOTE_ROOT/backend-php"
+            php -S 127.0.0.1:8888 index.php > /dev/null 2>&1 &
+            PHP_PID=$!
+            sleep 2
+
             cd "$REMOTE_ROOT/frontend"
             npm i
-            BUILD_API_URL=http://localhost/api npm run build
+            BUILD_API_URL=http://127.0.0.1:8888/api npm run build
+
+            kill $PHP_PID 2>/dev/null || true
 
             ln -sfn "$REMOTE_ROOT/frontend/dist" "$REMOTE_ROOT/backend-php/dist"
             echo "✅ Déploiement alp.bcnco.site terminé"

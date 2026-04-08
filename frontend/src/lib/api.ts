@@ -96,7 +96,7 @@ async function fetchAPI(endpoint: string, options?: RequestInit) {
     return data
   } catch (error) {
     console.error(`Error fetching ${endpoint}:`, error)
-    throw error
+    return null
   }
 }
 
