@@ -25,6 +25,7 @@ jobs:
             git reset --hard origin/main
 
             # Install dépendances frontend et build
+            echo "PUBLIC_API_URL=https://astro.bcnco.site/api" > frontend/.env
             cd frontend && npm install && npm run build && cd ..
 
             # Symlink dist pour que le backend PHP serve le frontend
