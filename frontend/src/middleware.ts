@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 
-const BACKEND_URL = import.meta.env.PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000';
+const BACKEND_URL = (import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL)?.replace('/api', '') || 'http://localhost:3000';
 
 // Resolve filesystem paths relative to the project root
 const rootDir = path.resolve(new URL('.', import.meta.url).pathname, '../../..');

@@ -15,7 +15,7 @@ interface Props {
 
 const { data } = Astro.props;
 
-const API_URL = import.meta.env.PUBLIC_API_URL || 'https://astro.lan/api';
+const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'https://astro.lan/api';
 const apiOrigin = new URL(API_URL).origin;
 
 // --- Fetch pages ---

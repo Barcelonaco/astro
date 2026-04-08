@@ -32,7 +32,7 @@ const gtmCode = s.gtm_code || '';
 const metaPixelCode = s.meta_pixel_code || '';
 
 // Favicon
-const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
 const apiOrigin = API_URL.replace(/\/api\/?$/, '');
 const faviconSetting = s.favicon || '';
 const faviconUrl = faviconSetting ? (faviconSetting.startsWith('http') ? faviconSetting : `${apiOrigin}${faviconSetting.startsWith('/') ? '' : '/'}${faviconSetting}`) : '';

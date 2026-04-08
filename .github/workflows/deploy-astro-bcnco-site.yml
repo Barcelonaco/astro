@@ -73,7 +73,7 @@ jobs:
 
             cd "$REMOTE_ROOT/frontend"
             npm i
-            npm run build
+            BUILD_API_URL=http://localhost/api npm run build
 
             ln -sfn "$REMOTE_ROOT/frontend/dist" "$REMOTE_ROOT/backend-php/dist"
             echo "✅ Déploiement astro.bcnco.site terminé"
