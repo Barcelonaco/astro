@@ -10,6 +10,7 @@ node_modules/
 
 # Build outputs
 dist/
+!frontend/dist/
 build/
 .astro/
 .tmp/
@@ -26,35 +27,36 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# IDE
-.vscode/
+# IDE / editor files
 .claude/
-.idea/
 .agent/
-*.sublime-workspace
-*.sublime-project
 
-# Media uploads
+# Media uploads (keep the folder in Git)
 backend/media/*
 !backend/media/.gitkeep
 backend-php/uploads/media/
 backend/uploads/media/
 
-# Database
+# Database files
 *.db
 *.sqlite
 
-# Cache
+# Cache directories
 .cache/
 .parcel-cache/
 
-# Misc
+# Miscellaneous
 .turbo/
 coverage/
 
+# Project documentation
 CLAUDE.md
 COMMANDES.md
 GUIDE_DEMARRAGE.md
 MULTISITE.md
 
+# Custom directories
 nickl/
+
+package-lock.json
+frontend/package-lock.json

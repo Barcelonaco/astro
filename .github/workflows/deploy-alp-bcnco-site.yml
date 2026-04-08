@@ -1,0 +1,51 @@
+name: Deploy to Production
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Deploy via SSH
+              uses: appleboy/ssh-action@v1
+              with:
+                  host: 162.19.56.20
+                  username: bcnco
+                  key: ${{ secrets.SSH_PRIVATE_KEY }}
+                  script: |
+                      cd ~/alp.bcnco.site/httpdocs
+
+                      # Sauvegarder les .env avant reset
+                      cp -f backend-php/.env /tmp/backend-php.env 2>/dev/null || true
+                      cp -f frontend/.env /tmp/frontend.env 2>/dev/null || true
+
+                      # Pull les derniers changements (force reset si historique réécrit)
+                      git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/Barcelonaco/astro.git
+                      git fetch origin main
+                      git reset --hard origin/main
+
+                      # Restaurer les .env
+                      cp -f /tmp/backend-php.env backend-php/.env 2>/dev/null || true
+                      cp -f /tmp/frontend.env frontend/.env 2>/dev/null || true
+
+                      # S'assurer que le frontend .env est correct
+                      echo "PUBLIC_API_URL=https://alp.bcnco.site/api" > frontend/.env
+
+                      # Trouver PHP 8.x sur le serveur Plesk
+                      PHP_BIN=$(ls /opt/plesk/php/8.*/bin/php 2>/dev/null | sort -V | tail -1)
+                      if [ -z "$PHP_BIN" ]; then PHP_BIN=php; fi
+                      echo "Using PHP: $PHP_BIN ($($PHP_BIN -v | head -1))"
+
+                      # Install dépendances PHP + migration DB (avant le build frontend)
+                      cd ~/alp.bcnco.site/httpdocs/backend-php && $PHP_BIN $(which composer) install --no-dev --optimize-autoloader 2>/dev/null
+                      cd ~/alp.bcnco.site/httpdocs/backend-php && $PHP_BIN migrate.php
+
+                      # Install dépendances frontend et build
+                      cd ~/alp.bcnco.site/httpdocs/frontend && npm install && npm run build
+
+                      # Symlink dist pour que le backend PHP serve le frontend
+                      ln -sfn ../frontend/dist ~/alp.bcnco.site/httpdocs/backend-php/dist
