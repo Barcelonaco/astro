@@ -46,6 +46,16 @@ jobs:
             --exclude='node_modules/' \
             ./frontend/ ${{ secrets.ALP_SSH_USER }}@${{ secrets.ALP_SSH_HOST }}:~/alp.bcnco.site/httpdocs/frontend/
 
+      - name: Deploy root package.json
+        run: |
+          rsync -avz \
+            ./package.json ${{ secrets.ALP_SSH_USER }}@${{ secrets.ALP_SSH_HOST }}:~/alp.bcnco.site/httpdocs/
+
+      - name: Deploy plugins
+        run: |
+          rsync -avz --delete \
+            ./plugins/ ${{ secrets.ALP_SSH_USER }}@${{ secrets.ALP_SSH_HOST }}:~/alp.bcnco.site/httpdocs/plugins/
+
       - name: Post-deploy
         uses: appleboy/ssh-action@v1
         with:

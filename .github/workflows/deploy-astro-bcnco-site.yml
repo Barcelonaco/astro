@@ -46,6 +46,16 @@ jobs:
             --exclude='node_modules/' \
             ./frontend/ ${{ secrets.ASTRO_SSH_USER }}@${{ secrets.ASTRO_SSH_HOST }}:~/astro.bcnco.site/httpdocs/frontend/
 
+      - name: Deploy root package.json
+        run: |
+          rsync -avz \
+            ./package.json ${{ secrets.ASTRO_SSH_USER }}@${{ secrets.ASTRO_SSH_HOST }}:~/astro.bcnco.site/httpdocs/
+
+      - name: Deploy plugins
+        run: |
+          rsync -avz --delete \
+            ./plugins/ ${{ secrets.ASTRO_SSH_USER }}@${{ secrets.ASTRO_SSH_HOST }}:~/astro.bcnco.site/httpdocs/plugins/
+
       - name: Post-deploy
         uses: appleboy/ssh-action@v1
         with:
