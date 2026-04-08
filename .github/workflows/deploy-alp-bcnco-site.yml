@@ -8,28 +8,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: astro_blog_cms
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -38,62 +19,34 @@ jobs:
           extensions: mbstring, intl, zip, pdo_mysql
           coverage: none
 
-      # Start local API so Astro can fetch data at build time
-      - name: Install backend deps (Composer)
+      - name: Install backend PHP deps
         working-directory: ./backend-php
         run: composer install --no-dev --optimize-autoloader
 
-      - name: Setup database & start API
-        working-directory: ./backend-php
+      - name: Setup SSH
         run: |
-          cat > .env <<'EOF'
-          APP_ENV=production
-          DB_HOST=127.0.0.1
-          DB_PORT=3306
-          DB_NAME=astro_blog_cms
-          DB_USER=root
-          DB_PASSWORD=root
-          JWT_SECRET=ci-build-key
-          ADMIN_URL=http://localhost:8000/admin
-          FRONTEND_URL=http://localhost:4321
-          EOF
-          php migrate.php
-          php -S 0.0.0.0:8000 index.php &
-          sleep 2
-          curl -sf http://localhost:8000/api/settings/site || echo "API check: endpoint may return empty (first deploy)"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.ALP_SSH_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Install frontend deps
-        working-directory: ./frontend
-        run: npm ci
+      - name: Deploy backend-php
+        run: |
+          rsync -avz --delete \
+            --exclude='.env' \
+            --exclude='dist' \
+            --exclude='uploads/' \
+            ./backend-php/ ${{ secrets.ALP_SSH_USER }}@${{ secrets.ALP_SSH_HOST }}:~/alp.bcnco.site/httpdocs/backend-php/
 
-      - name: Build frontend
-        working-directory: ./frontend
-        env:
-          PUBLIC_API_URL: http://localhost:8000/api
-        run: npm run build
+      - name: Deploy frontend
+        run: |
+          rsync -avz --delete \
+            --exclude='.env' \
+            --exclude='dist/' \
+            --exclude='node_modules/' \
+            ./frontend/ ${{ secrets.ALP_SSH_USER }}@${{ secrets.ALP_SSH_HOST }}:~/alp.bcnco.site/httpdocs/frontend/
 
-      # Deploy built files to server
-      - name: Copy backend to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.ALP_SSH_HOST }}
-          username: ${{ secrets.ALP_SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "backend-php/"
-          target: "~/alp.bcnco.site/httpdocs/"
-          overwrite: true
-
-      - name: Copy frontend dist to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.ALP_SSH_HOST }}
-          username: ${{ secrets.ALP_SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "frontend/dist/"
-          target: "~/alp.bcnco.site/httpdocs/"
-          overwrite: true
-
-      - name: Post-deploy setup
+      - name: Post-deploy
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.ALP_SSH_HOST }}
@@ -102,13 +55,5 @@ jobs:
           script: |
             set -e
             REMOTE_ROOT=~/alp.bcnco.site/httpdocs
-
-            # Symlink dist for backend
             ln -sfn "$REMOTE_ROOT/frontend/dist" "$REMOTE_ROOT/backend-php/dist"
-
-            # Warn if no .env
-            if [ ! -f "$REMOTE_ROOT/backend-php/.env" ]; then
-              echo "⚠️  No .env found — create $REMOTE_ROOT/backend-php/.env manually"
-            fi
-
             echo "✅ Déploiement alp.bcnco.site terminé"
