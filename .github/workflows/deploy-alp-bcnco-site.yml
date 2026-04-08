@@ -1,71 +1,114 @@
 name: Deploy to Production alp.bcnco.site
 
 on:
-    push:
-        branches: [main]
+  push:
+    branches: [main]
 
 jobs:
-    deploy:
-        runs-on: ubuntu-latest
+  deploy:
+    runs-on: ubuntu-latest
 
-        steps:
-            # 1️⃣ Checkout du code
-            - name: Checkout repository
-              uses: actions/checkout@v4
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: astro_blog_cms
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
-            # 2️⃣ Installer Node & Composer (PHP)
-            - name: Set up Node
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "20" # version LTS
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Set API URL for build
-              run: |
-                  echo "PUBLIC_API_URL=https://alp.bcnco.site/api" >> $GITHUB_ENV
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-            - name: Install frontend dependencies
-              working-directory: ./frontend
-              run: npm ci
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, intl, zip, pdo_mysql
+          coverage: none
 
-            - name: Build frontend
-              working-directory: ./frontend
-              run: npm run build
+      # Start local API so Astro can fetch data at build time
+      - name: Install backend deps (Composer)
+        working-directory: ./backend-php
+        run: composer install --no-dev --optimize-autoloader
 
-            # 3️⃣ Installer PHP dependencies (Composer)
-            - name: Set up PHP
-              uses: shivammathur/setup-php@v2
-              with:
-                  php-version: "8.4"
-                  extensions: mbstring, intl, zip
-                  coverage: none
+      - name: Setup database & start API
+        working-directory: ./backend-php
+        run: |
+          cat > .env <<'EOF'
+          APP_ENV=production
+          DB_HOST=127.0.0.1
+          DB_PORT=3306
+          DB_NAME=astro_blog_cms
+          DB_USER=root
+          DB_PASSWORD=root
+          JWT_SECRET=ci-build-key
+          ADMIN_URL=http://localhost:8000/admin
+          FRONTEND_URL=http://localhost:4321
+          EOF
+          php migrate.php
+          php -S 0.0.0.0:8000 index.php &
+          sleep 2
+          curl -sf http://localhost:8000/api/settings/site || echo "API check: endpoint may return empty (first deploy)"
 
-            - name: Install backend dependencies
-              working-directory: ./backend-php
-              run: composer install --no-dev --optimize-autoloader
+      - name: Install frontend deps
+        working-directory: ./frontend
+        run: npm ci
 
-            # 4️⃣ Deploy via SSH (simple rsync)
-            - name: Deploy via SSH (rsync)
-              uses: appleboy/ssh-action@v1
-              with:
-                  host: ${{ secrets.ALP_SSH_HOST }} # 162.19.56.20
-                  username: ${{ secrets.ALP_SSH_USER }} # bcnco
-                  key: ${{ secrets.SSH_PRIVATE_KEY }}
-                  # Crée le répertoire httpdocs s’il n’existe pas, puis synchronise
-                  script: |
-                      set -e
-                      REMOTE_ROOT=~/alp.bcnco.site/httpdocs
-                      mkdir -p "$REMOTE_ROOT"
+      - name: Build frontend
+        working-directory: ./frontend
+        env:
+          PUBLIC_API_URL: http://localhost:8000/api
+        run: npm run build
 
-                      # Nettoyer le répertoire (optionnel, à faire avec précaution)
-                      # rm -rf "$REMOTE_ROOT"/*
+      # Deploy built files to server
+      - name: Copy backend to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ALP_SSH_HOST }}
+          username: ${{ secrets.ALP_SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "backend-php/"
+          target: "~/alp.bcnco.site/httpdocs/"
+          overwrite: true
 
-                      # Copie du backend
-                      rsync -avz --delete ./backend-php/ "$REMOTE_ROOT/backend-php/"
+      - name: Copy frontend dist to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ALP_SSH_HOST }}
+          username: ${{ secrets.ALP_SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "frontend/dist/"
+          target: "~/alp.bcnco.site/httpdocs/"
+          overwrite: true
 
-                      # Copie du frontend build
-                      rsync -avz --delete ./frontend/dist/ "$REMOTE_ROOT/frontend/dist/"
+      - name: Post-deploy setup
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.ALP_SSH_HOST }}
+          username: ${{ secrets.ALP_SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            REMOTE_ROOT=~/alp.bcnco.site/httpdocs
 
-                      # (Optionnel) créer un lien symbolique si votre backend attend /dist
-                      # ln -sfn "$REMOTE_ROOT/frontend/dist" "$REMOTE_ROOT/backend-php/dist"
+            # Symlink dist for backend
+            ln -sfn "$REMOTE_ROOT/frontend/dist" "$REMOTE_ROOT/backend-php/dist"
 
-                      echo "✅ Déploiement terminé sur $REMOTE_ROOT"
+            # Warn if no .env
+            if [ ! -f "$REMOTE_ROOT/backend-php/.env" ]; then
+              echo "⚠️  No .env found — create $REMOTE_ROOT/backend-php/.env manually"
+            fi
+
+            echo "✅ Déploiement alp.bcnco.site terminé"

@@ -8,20 +8,59 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: astro_blog_cms
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
-      # 1️⃣ Checkout du repo (dans le runner GitHub)
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Installer Node & PHP (Composer)
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20" # LTS
+          node-version: "20"
 
-      - name: Set API URL for build
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, intl, zip, pdo_mysql
+          coverage: none
+
+      # Start local API so Astro can fetch data at build time
+      - name: Install backend deps (Composer)
+        working-directory: ./backend-php
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Setup database & start API
+        working-directory: ./backend-php
         run: |
-          echo "PUBLIC_API_URL=https://astro.bcnco.site/api" >> $GITHUB_ENV
+          cat > .env <<'EOF'
+          APP_ENV=production
+          DB_HOST=127.0.0.1
+          DB_PORT=3306
+          DB_NAME=astro_blog_cms
+          DB_USER=root
+          DB_PASSWORD=root
+          JWT_SECRET=ci-build-key
+          ADMIN_URL=http://localhost:8000/admin
+          FRONTEND_URL=http://localhost:4321
+          EOF
+          php migrate.php
+          php -S 0.0.0.0:8000 index.php &
+          sleep 2
+          curl -sf http://localhost:8000/api/settings/site || echo "API check: endpoint may return empty (first deploy)"
 
       - name: Install frontend deps
         working-directory: ./frontend
@@ -29,58 +68,47 @@ jobs:
 
       - name: Build frontend
         working-directory: ./frontend
+        env:
+          PUBLIC_API_URL: http://localhost:8000/api
         run: npm run build
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+      # Deploy built files to server
+      - name: Copy backend to server
+        uses: appleboy/scp-action@v0.1.7
         with:
-          php-version: "8.4"
-          extensions: mbstring, intl, zip
-          coverage: none
+          host: ${{ secrets.ASTRO_SSH_HOST }}
+          username: ${{ secrets.ASTRO_SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "backend-php/"
+          target: "~/astro.bcnco.site/httpdocs/"
+          overwrite: true
 
-      - name: Install backend deps (Composer)
-        working-directory: ./backend-php
-        run: composer install --no-dev --optimize-autoloader
+      - name: Copy frontend dist to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ASTRO_SSH_HOST }}
+          username: ${{ secrets.ASTRO_SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "frontend/dist/"
+          target: "~/astro.bcnco.site/httpdocs/"
+          overwrite: true
 
-      - name: Deploy via SSH (rsync)
+      - name: Post-deploy setup
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.ASTRO_SSH_HOST }} # 162.19.56.20
-          username: ${{ secrets.ASTRO_SSH_USER }} # bcnco
+          host: ${{ secrets.ASTRO_SSH_HOST }}
+          username: ${{ secrets.ASTRO_SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
             REMOTE_ROOT=~/astro.bcnco.site/httpdocs
 
-            # Crée le répertoire s’il n’existe pas
-            mkdir -p "$REMOTE_ROOT"
+            # Symlink dist for backend
+            ln -sfn "$REMOTE_ROOT/frontend/dist" "$REMOTE_ROOT/backend-php/dist"
 
-            # 1️⃣ Pull du dépôt distant (si le repo existe déjà sur le serveur)
-            if [ -d "$REMOTE_ROOT/.git" ]; then
-              cd "$REMOTE_ROOT"
-              git fetch origin main
-              git merge --ff-only origin/main || true   # garde les fichiers locaux non‑versionnés
-            else
-              # Si le repo n’est pas encore présent, le cloner
-              git clone https://github.com/Barcelonaco/astro.git "$REMOTE_ROOT"
+            # Restore .env if it exists (don't overwrite prod config)
+            if [ ! -f "$REMOTE_ROOT/backend-php/.env" ]; then
+              echo "⚠️  No .env found — create $REMOTE_ROOT/backend-php/.env manually"
             fi
-
-            # 2️⃣ Sauvegarder les .env existants (s’ils existent)
-            [ -f "$REMOTE_ROOT/backend-php/.env" ] && cp -f "$REMOTE_ROOT/backend-php/.env" /tmp/backend-php.env || true
-            [ -f "$REMOTE_ROOT/frontend/.env" ] && cp -f "$REMOTE_ROOT/frontend/.env" /tmp/frontend.env || true
-
-            # 3️⃣ Copier les nouvelles dépendances et le build
-            rsync -avz --delete ./backend-php/ "$REMOTE_ROOT/backend-php/"
-            rsync -avz --delete ./frontend/dist/ "$REMOTE_ROOT/frontend/dist/"
-
-            # 4️⃣ Restaurer les .env si on les avait sauvegardés
-            [ -f /tmp/backend-php.env ] && cp -f /tmp/backend-php.env "$REMOTE_ROOT/backend-php/.env" || true
-            [ -f /tmp/frontend.env ] && cp -f /tmp/frontend.env "$REMOTE_ROOT/frontend/.env" || true
-
-            # 5️⃣ (Optionnel) forcer le bon .env du frontend
-            echo "PUBLIC_API_URL=https://astro.bcnco.site/api" > "$REMOTE_ROOT/frontend/.env"
-
-            # 6️⃣ Créer le lien symbolique attendu par le backend (si nécessaire)
-            ln -sfn "../frontend/dist" "$REMOTE_ROOT/backend-php/dist"
 
             echo "✅ Déploiement astro.bcnco.site terminé"
