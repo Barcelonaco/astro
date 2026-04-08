@@ -1,6 +1,6 @@
 ---
 import { cleanHtml } from '../../lib/module-classes';
-import { optimizedImageUrl } from '../../lib/module-helpers';
+import { optimizedImageUrl, getDefaultImageUrl } from '../../lib/module-helpers';
 
 const { data = {} } = Astro.props as { data: Record<string, any> };
 
@@ -42,14 +42,14 @@ function normalizeCta(cta: any): { url: string; title: string; target: string } 
                   <picture>
                     <source
                       media="(min-width: 601px)"
-                      srcset={optimizedImageUrl(slide.image?.url ?? '', 1440, 80)}
+                      srcset={optimizedImageUrl(slide.image?.url || getDefaultImageUrl(), 1440, 80)}
                     />
                     <source
                       media="(max-width: 600px)"
-                      srcset={optimizedImageUrl(slide.image_mobile?.url ?? slide.image?.url ?? '', 600, 70)}
+                      srcset={optimizedImageUrl(slide.image_mobile?.url || slide.image?.url || getDefaultImageUrl(), 600, 70)}
                     />
                     <img
-                      src={optimizedImageUrl(slide.image_mobile?.url ?? slide.image?.url ?? '', 600, 70)}
+                      src={optimizedImageUrl(slide.image_mobile?.url || slide.image?.url || getDefaultImageUrl(), 600, 70)}
                       alt={slide.image?.alt ?? ''}
                       class="illus"
                       width="1920"
@@ -121,8 +121,8 @@ function normalizeCta(cta: any): { url: string; title: string; target: string } 
             <li class={`item ${hasDesc ? 'has-desc' : 'no-desc'}`} role="article">
               <div class="link">
                 <div class="background">
-                  {bloc.image?.url && (
-                    <img src={optimizedImageUrl(bloc.image.url, 960, 80)} alt={bloc.image.alt || ''} class="illus" width="960" height="540" loading="lazy" decoding="async" />
+                  {(bloc.image?.url || getDefaultImageUrl()) && (
+                    <img src={optimizedImageUrl(bloc.image?.url || getDefaultImageUrl(), 960, 80)} alt={bloc.image?.alt || ''} class="illus" width="960" height="540" loading="lazy" decoding="async" />
                   )}
                 </div>
                 <div class="desc">

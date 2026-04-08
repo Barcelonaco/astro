@@ -1,6 +1,6 @@
 ---
 import { buildModuleClasses, cleanHtml } from '../../lib/module-classes';
-import { optimizedImageUrl, responsiveSrcset } from '../../lib/module-helpers';
+import { optimizedImageUrl, responsiveSrcset, getDefaultImageUrl } from '../../lib/module-helpers';
 
 interface NicklGalleryProps {
   data: Record<string, any>;
@@ -74,7 +74,7 @@ const list = (data.list as any[]) ?? [];
       {list.map((gallery, index) => {
         const image = gallery.image || {};
         const imgSizes = image.sizes || {};
-        const imgUrl = imgSizes[sizes] || image.url || '';
+        const imgUrl = imgSizes[sizes] || image.url || getDefaultImageUrl();
         return (
           <li class="item">
             <button
@@ -136,7 +136,7 @@ const list = (data.list as any[]) ?? [];
                   return (
                     <div class={`swiper-slide item ${hasDesc ? 'has-desc' : 'no-desc'}`}>
                       <div class="illus-wrapper">
-                        <img src={optimizedImageUrl(image.url || '', 800, 75)} srcset={responsiveSrcset(image.url || '', [400, 600, 800], 75) || undefined} sizes="100vw" alt={image.alt || ''} class="illus" width="600" height="450" loading="lazy" />
+                        <img src={optimizedImageUrl(image.url || getDefaultImageUrl(), 800, 75)} srcset={responsiveSrcset(image.url || getDefaultImageUrl(), [400, 600, 800], 75) || undefined} sizes="100vw" alt={image.alt || ''} class="illus" width="600" height="450" loading="lazy" />
                       </div>
                       {hasDesc && (
                         <div class="container-large container-2">

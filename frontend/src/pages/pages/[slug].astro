@@ -8,7 +8,7 @@ import DeferredLoader from '../../components/DeferredLoader.astro';
 import SiteOverlays from '../../components/SiteOverlays.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
 import { getAllPages, getPageBySlug, formatContent, getFrontendBootstrap } from '../../lib/api';
-import { optimizedImageUrl } from '../../lib/module-helpers';
+import { optimizedImageUrl, setDefaultImageUrl } from '../../lib/module-helpers';
 
 export async function getStaticPaths() {
   const pages = await getAllPages();
@@ -52,6 +52,7 @@ const [page, { siteInfo, styleSettings, siteSettings, navigation: navigationData
 ]);
 const siteName = siteInfo.siteName || SITE_TITLE;
 const siteDescription = siteInfo.siteDescription || SITE_DESCRIPTION;
+setDefaultImageUrl(siteSettings.replacement_image || '');
 
 if (!page) {
   throw new Error(`Page not found: ${slug}`);

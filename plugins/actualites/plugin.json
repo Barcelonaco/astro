@@ -1,0 +1,33 @@
+{
+  "name": "actualites",
+  "label": "Actualités",
+  "version": "1.0.0",
+  "description": "Custom Post Type Actualités avec archive, vue single et module news-slider.",
+
+  "modules": {
+    "category": {
+      "id": "actualites",
+      "label": "Actualités",
+      "icon": "📰"
+    },
+    "items": [
+      {
+        "name": "NewsSlider",
+        "label": "Actualités à la une"
+      }
+    ]
+  },
+
+  "postTypes": [
+    {
+      "slug": "actualites",
+      "label": "Actualité",
+      "labelPlural": "Actualités",
+      "icon": "📰",
+      "supports": ["title", "slug", "featured_image", "content", "excerpt", "status"],
+      "fields": [],
+      "hasCategories": true,
+      "categoryLabel": "Catégories d'actualités"
+    }
+  ]
+}

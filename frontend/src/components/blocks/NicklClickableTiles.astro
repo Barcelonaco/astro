@@ -1,6 +1,6 @@
 ---
 import { buildModuleClasses } from '../../lib/module-classes';
-import { optimizedImageUrl, responsiveSrcset } from '../../lib/module-helpers';
+import { optimizedImageUrl, responsiveSrcset, getDefaultImageUrl } from '../../lib/module-helpers';
 
 interface Props {
   data: Record<string, any>;
@@ -60,10 +60,10 @@ const otherItemsFrom2 = listItems.slice(2); // for 6-item case
 const otherItems = listItems.slice(1);       // for standard col case
 
 function resolveFileUrl(file: any): string {
-  if (!file) return '';
-  const url = typeof file === 'string' ? file : (file.url || '');
-  if (!url) return '';
-  const fullUrl = url.startsWith('http') ? url : apiOrigin + url;
+  const url = file ? (typeof file === 'string' ? file : (file.url || '')) : '';
+  const finalUrl = url || getDefaultImageUrl();
+  if (!finalUrl) return '';
+  const fullUrl = finalUrl.startsWith('http') ? finalUrl : apiOrigin + finalUrl;
   return optimizedImageUrl(fullUrl, 700, 75);
 }
 

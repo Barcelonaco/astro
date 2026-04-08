@@ -83,7 +83,7 @@ for (const [name, file] of Object.entries(allEntries)) {
     const result = sass.compile(inputPath, {
       style: 'compressed',
       loadPaths: [srcDir],
-      silenceDeprecations: ['import'],
+      silenceDeprecations: ['import', 'global-builtin'],
     });
     writeFileSync(outputPath, result.css);
     compiled++;

@@ -156,12 +156,6 @@ async function loadSection(section) {
     case 'dashboard':
       content.innerHTML = await renderDashboard();
       break;
-    case 'posts':
-      content.innerHTML = await renderPosts();
-      break;
-    case 'categories':
-      content.innerHTML = await renderCategories();
-      break;
     case 'pages':
       content.innerHTML = await renderPages();
       break;
@@ -193,12 +187,24 @@ async function loadSection(section) {
       if (section.startsWith('cpt-add:')) {
         const slug = section.split(':')[1];
         const ptDef = findPostTypeDef(slug);
-        if (ptDef) { content.innerHTML = await renderCPTEditPage(ptDef, null); attachCPTFormEvents(ptDef); }
+        if (ptDef) {
+          if (ptDef.supports?.includes('content') && (!ptDef.fields || ptDef.fields.length === 0)) {
+            await openCPTBuilder(ptDef, null);
+          } else {
+            content.innerHTML = await renderCPTEditPage(ptDef, null); attachCPTFormEvents(ptDef);
+          }
+        }
       } else if (section.startsWith('cpt-edit:')) {
         const parts = section.split(':');
         const slug = parts[1]; const itemId = parseInt(parts[2]);
         const ptDef = findPostTypeDef(slug);
-        if (ptDef) { content.innerHTML = await renderCPTEditPage(ptDef, itemId); attachCPTFormEvents(ptDef); }
+        if (ptDef) {
+          if (ptDef.supports?.includes('content') && (!ptDef.fields || ptDef.fields.length === 0)) {
+            await openCPTBuilder(ptDef, itemId);
+          } else {
+            content.innerHTML = await renderCPTEditPage(ptDef, itemId); attachCPTFormEvents(ptDef);
+          }
+        }
       } else if (section.startsWith('cpt-categories:')) {
         const slug = section.split(':')[1];
         const ptDef = findPostTypeDef(slug);
@@ -236,17 +242,7 @@ async function loadSection(section) {
 async function renderDashboard() {
   showLoading();
   try {
-    const [postsRes, categoriesRes, pagesRes] = await Promise.all([
-      apiFetch('/posts'),
-      apiFetch('/categories'),
-      apiFetch('/pages')
-    ]);
-
-    const posts = postsRes;
-    const categories = categoriesRes;
-    const pages = pagesRes;
-    const publishedPosts = posts.filter(p => p.status === 'published').length;
-    const draftPosts = posts.filter(p => p.status === 'draft').length;
+    const pages = await apiFetch('/pages');
 
     hideLoading();
 
@@ -257,62 +253,14 @@ async function renderDashboard() {
 
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="label">Total Articles</div>
-          <div class="value">${posts.length}</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">Publiés</div>
-          <div class="value" style="color: var(--success)">${publishedPosts}</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">Brouillons</div>
-          <div class="value" style="color: var(--warning)">${draftPosts}</div>
-        </div>
-        <div class="stat-card">
           <div class="label">Pages</div>
           <div class="value">${pages.length}</div>
         </div>
-      </div>
-
-      <div class="card">
-        <h3 style="margin-bottom: 16px">Articles récents</h3>
-        ${posts.length > 0 ? renderPostsTable(posts.slice(0, 5)) : '<p class="empty-state">Aucun article</p>'}
       </div>
     `;
   } catch (error) {
     hideLoading();
     return `<div class="card"><p style="color: var(--danger)">Erreur: ${error.message}</p></div>`;
-  }
-}
-
-// ========== POSTS ==========
-async function renderPosts() {
-  showLoading();
-  try {
-    const posts = await apiFetch('/posts');
-    const categories = await apiFetch('/categories');
-    hideLoading();
-
-    return `
-      <div class="page-header">
-        <h1>Articles</h1>
-        <button class="btn btn-primary" onclick="showPostForm()">
-          <span class="icon">➕</span>
-          Nouvel article
-        </button>
-      </div>
-
-      <div class="card">
-        ${posts.length > 0 ? renderPostsTable(posts) : renderEmptyState('📄', 'Aucun article', 'Créez votre premier article pour commencer')}
-      </div>
-
-      <!-- Modal Form -->
-      <div id="postModal" style="display: none;"></div>
-    `;
-  } catch (error) {
-    hideLoading();
-    showToast('Erreur lors du chargement des articles', 'error');
-    return '<div class="card"><p>Erreur de chargement</p></div>';
   }
 }
 
@@ -326,334 +274,6 @@ const _svgCopy = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" st
 const _svgDownload = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 const _svgTrash = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
 const _svgX = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-
-function renderPostsTable(posts) {
-  return `
-    <div class="pages-list">
-      <div class="pages-list-header">
-        <span class="page-item__info">Article</span>
-        <span class="page-item__parent">Catégories</span>
-        <span class="page-item__meta">Date</span>
-        <span class="page-item__badges">Statut</span>
-        <span class="page-item__actions" style="opacity:1">Actions</span>
-      </div>
-      ${posts.map(post => {
-        const safeTitle = escapeHtml(post.title).replace(/'/g, "\\'");
-        const cats = post.categories?.map(c => escapeHtml(c.name)).join(', ') || '';
-        const dateStr = new Date(post.published_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
-        return '<div class="page-item">'
-          + '<div class="page-item__info" style="cursor:pointer" onclick="editPost(' + post.id + ')">'
-          +   '<div class="page-item__title">' + escapeHtml(post.title) + '</div>'
-          +   '<div class="page-item__slug">' + escapeHtml(post.author?.name || '') + '</div>'
-          + '</div>'
-          + '<div class="page-item__parent">' + (cats || '<span style="color:var(--gray-400);">—</span>') + '</div>'
-          + '<div class="page-item__meta"><span class="page-item__date">' + dateStr + '</span></div>'
-          + '<div class="page-item__badges"><span class="badge ' + (post.status === 'published' ? 'badge-success' : 'badge-warning') + '">' + (post.status === 'published' ? 'Publié' : 'Brouillon') + '</span></div>'
-          + '<div class="page-item__actions">'
-          +   '<button class="btn-icon-action" onclick="editPost(' + post.id + ')" title="Modifier">' + _svgEdit + '</button>'
-          +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deletePost(' + post.id + ', \'' + safeTitle + '\')" title="Supprimer">' + _svgDelete + '</button>'
-          + '</div>'
-        + '</div>';
-      }).join('')}
-    </div>
-  `;
-}
-
-async function showPostForm(postId = null) {
-  showLoading();
-  const categories = await apiFetch('/categories');
-
-  let post = null;
-  if (postId) {
-    const posts = await apiFetch('/posts');
-    post = posts.find(p => p.id === postId);
-  }
-
-  hideLoading();
-
-  const modal = document.getElementById('postModal');
-  modal.style.display = 'block';
-  modal.innerHTML = `
-    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;" onclick="if(event.target === this) closeModal()">
-      <div class="card" style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-          <h2>${postId ? 'Modifier l\'article' : 'Nouvel article'}</h2>
-          <button class="btn btn-outline btn-sm" onclick="closeModal()">✕</button>
-        </div>
-
-        <form id="postForm" onsubmit="savePost(event, ${postId})">
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Titre *</label>
-              <input type="text" class="form-input" id="postTitle" name="title" value="${post?.title || ''}" oninput="generatePostSlug(${postId})" required>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Slug *</label>
-              <input type="text" class="form-input" id="postSlug" name="slug" value="${post?.slug || ''}" required>
-              <div class="form-help" id="postSlugHelp">URL de l'article (ex: mon-article)</div>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Extrait *</label>
-            <textarea class="form-textarea" name="excerpt" rows="3" required>${post?.excerpt || ''}</textarea>
-            <div class="form-help">Courte description pour l'aperçu</div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Contenu *</label>
-            <textarea class="form-textarea" name="content" rows="10" required>${post?.content || ''}</textarea>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Date de publication *</label>
-              <input type="datetime-local" class="form-input" name="published_date"
-                value="${post?.published_date ? new Date(post.published_date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16)}" required>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Statut *</label>
-              <select class="form-select" name="status" required>
-                <option value="draft" ${post?.status === 'draft' ? 'selected' : ''}>Brouillon</option>
-                <option value="published" ${post?.status === 'published' ? 'selected' : ''}>Publié</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Catégories</label>
-            <select class="form-select" name="categories" multiple size="5">
-              ${categories.map(cat => `
-                <option value="${cat.id}" ${post?.categories?.find(c => c.id === cat.id) ? 'selected' : ''}>
-                  ${cat.name}
-                </option>
-              `).join('')}
-            </select>
-            <div class="form-help">Maintenez Ctrl/Cmd pour sélectionner plusieurs</div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Tags</label>
-            <input type="text" class="form-input" name="tags" value="${post?.tags?.join(', ') || ''}" placeholder="tag1, tag2, tag3">
-            <div class="form-help">Séparez les tags par des virgules</div>
-          </div>
-
-          <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 32px;">
-            <button type="button" class="btn btn-outline" onclick="closeModal()">Annuler</button>
-            <button type="submit" class="btn btn-primary">
-              ${postId ? 'Mettre à jour' : 'Créer'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  `;
-}
-
-async function savePost(event, postId) {
-  event.preventDefault();
-  const form = event.target;
-  const formData = new FormData(form);
-
-  const data = {
-    title: formData.get('title'),
-    slug: formData.get('slug'),
-    excerpt: formData.get('excerpt'),
-    content: formData.get('content'),
-    published_date: formData.get('published_date'),
-    status: formData.get('status'),
-    categories: Array.from(form.categories.selectedOptions).map(opt => parseInt(opt.value)),
-    tags: formData.get('tags')?.split(',').map(t => t.trim()).filter(t => t) || []
-  };
-
-  showLoading();
-  try {
-    if (postId) {
-      await apiFetch(`/posts/${postId}`, { method: 'PUT', body: JSON.stringify(data) });
-      showToast('Article mis à jour avec succès', 'success');
-    } else {
-      await apiFetch('/posts', { method: 'POST', body: JSON.stringify(data) });
-      showToast('Article créé avec succès', 'success');
-    }
-    closeModal();
-    loadSection('posts');
-  } catch (error) {
-    hideLoading();
-    showToast('Erreur: ' + error.message, 'error');
-  }
-}
-
-async function editPost(id) {
-  await showPostForm(id);
-}
-
-async function deletePost(id, title) {
-  const ok = await confirmModal(`Voulez-vous vraiment supprimer l'article "${title}" ?`);
-  if (!ok) return;
-
-  showLoading();
-  try {
-    await apiFetch(`/posts/${id}`, { method: 'DELETE' });
-    showToast('Article supprimé', 'success');
-    loadSection('posts');
-  } catch (error) {
-    hideLoading();
-    showToast('Erreur: ' + error.message, 'error');
-  }
-}
-
-// ========== CATEGORIES ==========
-async function renderCategories() {
-  showLoading();
-  try {
-    const categories = await apiFetch('/categories');
-    hideLoading();
-
-    return `
-      <div class="page-header">
-        <h1>Catégories</h1>
-        <button class="btn btn-primary" onclick="showCategoryForm()">
-          <span class="icon">➕</span>
-          Nouvelle catégorie
-        </button>
-      </div>
-
-      <div class="card">
-        ${categories.length > 0 ? renderCategoriesTable(categories) : renderEmptyState('🏷️', 'Aucune catégorie', 'Créez votre première catégorie')}
-      </div>
-
-      <div id="categoryModal" style="display: none;"></div>
-    `;
-  } catch (error) {
-    hideLoading();
-    return '<div class="card"><p>Erreur de chargement</p></div>';
-  }
-}
-
-function renderCategoriesTable(categories) {
-  return `
-    <div class="pages-list">
-      <div class="pages-list-header">
-        <span class="page-item__info">Nom</span>
-        <span class="page-item__parent">Slug</span>
-        <span class="page-item__meta">Description</span>
-        <span class="page-item__actions" style="opacity:1">Actions</span>
-      </div>
-      ${categories.map(cat => {
-        const safeName = escapeHtml(cat.name).replace(/'/g, "\\'");
-        return '<div class="page-item">'
-          + '<div class="page-item__info" style="cursor:pointer" onclick="editCategory(' + cat.id + ')">'
-          +   '<div class="page-item__title">' + escapeHtml(cat.name) + '</div>'
-          + '</div>'
-          + '<div class="page-item__parent"><span class="page-item__slug" style="display:inline">' + escapeHtml(cat.slug) + '</span></div>'
-          + '<div class="page-item__meta">' + escapeHtml(cat.description || '—') + '</div>'
-          + '<div class="page-item__actions">'
-          +   '<button class="btn-icon-action" onclick="editCategory(' + cat.id + ')" title="Modifier">' + _svgEdit + '</button>'
-          +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteCategory(' + cat.id + ', \'' + safeName + '\')" title="Supprimer">' + _svgDelete + '</button>'
-          + '</div>'
-        + '</div>';
-      }).join('')}
-    </div>
-  `;
-}
-
-async function showCategoryForm(catId = null) {
-  showLoading();
-
-  let category = null;
-  if (catId) {
-    const categories = await apiFetch('/categories');
-    category = categories.find(c => c.id === catId);
-  }
-
-  hideLoading();
-
-  const modal = document.getElementById('categoryModal');
-  modal.style.display = 'block';
-  modal.innerHTML = `
-    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;" onclick="if(event.target === this) closeModal()">
-      <div class="card" style="max-width: 600px; width: 90%;" onclick="event.stopPropagation()">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-          <h2>${catId ? 'Modifier la catégorie' : 'Nouvelle catégorie'}</h2>
-          <button class="btn btn-outline btn-sm" onclick="closeModal()">✕</button>
-        </div>
-
-        <form id="categoryForm" onsubmit="saveCategory(event, ${catId})">
-          <div class="form-group">
-            <label class="form-label">Nom *</label>
-            <input type="text" class="form-input" id="categoryName" name="name" value="${category?.name || ''}" oninput="generateCategorySlug(${catId})" required>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Slug *</label>
-            <input type="text" class="form-input" id="categorySlug" name="slug" value="${category?.slug || ''}" required>
-            <div class="form-help" id="categorySlugHelp">URL de la catégorie (ex: technologie)</div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Description</label>
-            <textarea class="form-textarea" name="description" rows="4">${category?.description || ''}</textarea>
-          </div>
-
-          <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
-            <button type="button" class="btn btn-outline" onclick="closeModal()">Annuler</button>
-            <button type="submit" class="btn btn-primary">
-              ${catId ? 'Mettre à jour' : 'Créer'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  `;
-}
-
-async function saveCategory(event, catId) {
-  event.preventDefault();
-  const formData = new FormData(event.target);
-
-  const data = {
-    name: formData.get('name'),
-    slug: formData.get('slug'),
-    description: formData.get('description')
-  };
-
-  showLoading();
-  try {
-    if (catId) {
-      await apiFetch(`/categories/${catId}`, { method: 'PUT', body: JSON.stringify(data) });
-      showToast('Catégorie mise à jour', 'success');
-    } else {
-      await apiFetch('/categories', { method: 'POST', body: JSON.stringify(data) });
-      showToast('Catégorie créée', 'success');
-    }
-    closeModal();
-    loadSection('categories');
-  } catch (error) {
-    hideLoading();
-    showToast('Erreur: ' + error.message, 'error');
-  }
-}
-
-async function editCategory(id) {
-  await showCategoryForm(id);
-}
-
-async function deleteCategory(id, name) {
-  const ok = await confirmModal(`Voulez-vous vraiment supprimer la catégorie "${name}" ?`);
-  if (!ok) return;
-
-  showLoading();
-  try {
-    await apiFetch(`/categories/${id}`, { method: 'DELETE' });
-    showToast('Catégorie supprimée', 'success');
-    loadSection('categories');
-  } catch (error) {
-    hideLoading();
-    showToast('Erreur: ' + error.message, 'error');
-  }
-}
 
 // ========== PAGES & PAGE BUILDER ==========
 const LEGACY_BLOCK_TYPES = {
@@ -821,8 +441,12 @@ async function loadPlugins() {
         a.href = '#';
         a.className = 'nav-item nav-item-parent';
         a.dataset.section = `cpt:${pt.slug}`;
-        a.innerHTML = `${pt.icon || '📁'} ${escapeHtml(pt.labelPlural || pt.label)}`;
-        if (settingsLink) nav.insertBefore(a, settingsLink);
+        a.innerHTML = escapeHtml(pt.labelPlural || pt.label);
+        // Insert after Pages link
+        const pagesLink = nav.querySelector('[data-section="pages"]');
+        const pagesSubItems = pagesLink ? pagesLink.nextElementSibling : null;
+        const insertRef = pagesSubItems && pagesSubItems.classList.contains('nav-sub-items') ? pagesSubItems.nextSibling : (pagesLink ? pagesLink.nextSibling : settingsLink);
+        if (insertRef) nav.insertBefore(a, insertRef);
         else nav.appendChild(a);
 
         // Sub-items container
@@ -861,7 +485,8 @@ async function loadPlugins() {
         subOpt.textContent = 'Options';
         sub.appendChild(subOpt);
 
-        if (settingsLink) nav.insertBefore(sub, settingsLink);
+        // Insert sub-items right after the parent link
+        if (a.nextSibling) nav.insertBefore(sub, a.nextSibling);
         else nav.appendChild(sub);
 
         // Toggle sub-items on parent click
@@ -1036,11 +661,11 @@ function renderCPTListRows() {
 
     return '<div class="page-item">'
       + '<div class="page-item__info" style="cursor:pointer" onclick="loadSection(\'cpt-edit:' + escapeHtml(ptDef.slug) + ':' + item.id + '\')">'
-      +   '<div style="display:flex;align-items:center;gap:12px;">'
+      +   '<div style="display:flex;align-items:center;gap:12px;min-width:0;">'
       +     (thumbUrl
             ? '<img src="' + escapeHtml(thumbUrl) + '" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;">'
             : '<div style="width:48px;height:48px;background:var(--gray-100);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);flex-shrink:0;font-size:18px;">' + (ptDef.icon || '📷') + '</div>')
-      +     '<div>'
+      +     '<div style="min-width:0;overflow:hidden;">'
       +       '<div class="page-item__title">' + escapeHtml(item.title) + '</div>'
       +       '<div class="page-item__slug">/' + escapeHtml(ptDef.slug) + '/' + escapeHtml(item.slug) + '</div>'
       +     '</div>'
@@ -1055,6 +680,7 @@ function renderCPTListRows() {
       + '</div>'
       + '<div class="page-item__actions">'
       +   '<button class="btn-icon-action" onclick="loadSection(\'cpt-edit:' + escapeHtml(ptDef.slug) + ':' + item.id + '\')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+      +   '<button class="btn-icon-action" onclick="duplicateCPTItem(\'' + escapeHtml(ptDef.slug) + '\', ' + item.id + ')" title="Dupliquer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
       +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteCPTItemUI(\'' + escapeHtml(ptDef.slug) + '\', ' + item.id + ', \'' + safeTitle + '\')" title="Supprimer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
       + '</div>'
     + '</div>';
@@ -1103,13 +729,17 @@ async function renderCPTEditPage(ptDef, itemId) {
   const cf = item ? (typeof item.custom_fields === 'string' ? JSON.parse(item.custom_fields) : (item.custom_fields || {})) : {};
   const fi = item?.featured_image || null;
   const itemCategories = item?.categories || [];
+  const supports = ptDef.supports || ['title', 'slug', 'featured_image', 'content', 'status'];
+  const hasCustomFields = ptDef.fields && ptDef.fields.length > 0;
+  const hasExcerpt = supports.includes('excerpt');
+  const hasContent = supports.includes('content');
 
-  // Parse photos gallery
+  // Parse photos gallery (for CPTs with photos custom field)
   let photos = [];
   try { photos = JSON.parse(cf.photos || '[]'); } catch { photos = []; }
   if (!Array.isArray(photos)) photos = [];
 
-  // Parse link
+  // Parse link (for CPTs with link custom field)
   let linkObj = { url: '', title: '', target: '_self' };
   try { if (cf.link) linkObj = typeof cf.link === 'string' ? JSON.parse(cf.link) : cf.link; } catch { /* keep defaults */ }
 
@@ -1140,11 +770,215 @@ async function renderCPTEditPage(ptDef, itemId) {
       ? `<div class="form-group"><label class="form-label">${escapeHtml(ptDef.categoryLabel || 'Catégories')}</label><p style="color:#999;font-size:13px;">Aucune catégorie. <a href="#" onclick="loadSection('cpt-categories:${escapeHtml(ptDef.slug)}');return false;">Créer des catégories</a></p></div>`
       : '';
 
+  // --- Build custom fields HTML dynamically ---
+  function buildCustomFieldsHtml() {
+    if (!hasCustomFields) return '';
+    return ptDef.fields.map(field => {
+      const val = cf[field.name] || '';
+      const ftype = (field.type || 'Text').toLowerCase();
+      const w = field.width ? ` style="width:${field.width}%;display:inline-block;vertical-align:top;padding-right:12px;box-sizing:border-box;"` : '';
+
+      // --- Photos gallery ---
+      if (field.name === 'photos' || ftype === 'photos') {
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <div id="cptPhotosPreview" style="margin-bottom:8px;">${photosPreview}</div>
+          <input type="hidden" name="cf_photos" id="cptPhotosInput" value="${escapeHtml(JSON.stringify(photos))}">
+          <button type="button" class="btn btn-outline btn-sm" onclick="openCPTPhotoPicker()">📸 Ajouter des photos</button>
+        </div>`;
+      }
+
+      // --- Link (generic — works for any field name) ---
+      if (ftype === 'link') {
+        let lObj = { url: '', title: '', target: '_self' };
+        try { if (val) lObj = typeof val === 'string' ? JSON.parse(val) : val; } catch { /* keep defaults */ }
+        const fnEsc = escapeHtml(field.name);
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <div class="form-row" style="display:grid;grid-template-columns:1fr 2fr 1fr auto;gap:8px;">
+            <div class="form-group" style="margin:0;">
+              <select class="form-input cpt-link-page-select" data-target="cf_${fnEsc}_url">
+                <option value="">— Page du site —</option>
+                ${allPages.filter(p => p.status === 'published').map(p => `<option value="/pages/${escapeHtml(p.slug)}" ${lObj.url === '/pages/' + p.slug ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <input type="text" class="form-input" name="cf_${fnEsc}_url" value="${escapeHtml(lObj.url || '')}" placeholder="URL (ou choisir une page)">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <input type="text" class="form-input" name="cf_${fnEsc}_title" value="${escapeHtml(lObj.title || '')}" placeholder="Titre du lien">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <select class="form-input" name="cf_${fnEsc}_target">
+                <option value="_self" ${lObj.target !== '_blank' ? 'selected' : ''}>Même fenêtre</option>
+                <option value="_blank" ${lObj.target === '_blank' ? 'selected' : ''}>Nouvel onglet</option>
+              </select>
+            </div>
+          </div>
+        </div>`;
+      }
+
+      // --- WYSIWYG (Quill editor) ---
+      if (ftype === 'wysiwyg') {
+        const editorId = `cptQuillEditor_${field.name}`;
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <div id="${editorId}" class="cpt-quill-editor" style="min-height:200px;" data-field="${escapeHtml(field.name)}"></div>
+          <input type="hidden" name="cf_${escapeHtml(field.name)}" value="${escapeHtml(val)}">
+        </div>`;
+      }
+
+      // --- Textarea ---
+      if (ftype === 'textarea') {
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <textarea class="form-textarea" name="cf_${escapeHtml(field.name)}" rows="4">${escapeHtml(val)}</textarea>
+        </div>`;
+      }
+
+      // --- TrueFalse (toggle slider) ---
+      if (ftype === 'truefalse') {
+        const isOn = val === true || val === 1 || val === '1' || val === 'true';
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <div style="padding:6px 0;">
+            <label class="cpt-toggle" style="display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">
+              <input type="hidden" name="cf_${escapeHtml(field.name)}" value="0">
+              <input type="checkbox" name="cf_${escapeHtml(field.name)}" value="1" ${isOn ? 'checked' : ''} style="display:none;">
+              <span class="cpt-toggle-track" style="position:relative;width:44px;height:24px;border-radius:12px;background:${isOn ? 'var(--primary,#224f5a)' : '#ccc'};transition:background .2s;">
+                <span class="cpt-toggle-thumb" style="position:absolute;top:2px;left:${isOn ? '22px' : '2px'};width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .2s;"></span>
+              </span>
+              <span class="cpt-toggle-label" style="font-size:14px;color:#666;">${isOn ? 'Oui' : 'Non'}</span>
+            </label>
+          </div>
+        </div>`;
+      }
+
+      // --- Date ---
+      if (ftype === 'date') {
+        // Convert stored format YYYY/MM/DD to YYYY-MM-DD for input[type=date]
+        const dateVal = val ? val.replace(/\//g, '-') : '';
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <input type="date" class="form-input" name="cf_${escapeHtml(field.name)}" value="${escapeHtml(dateVal)}">
+        </div>`;
+      }
+
+      // --- Time ---
+      if (ftype === 'time') {
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <input type="time" class="form-input" name="cf_${escapeHtml(field.name)}" value="${escapeHtml(val)}">
+        </div>`;
+      }
+
+      // --- Email ---
+      if (ftype === 'email') {
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <input type="email" class="form-input" name="cf_${escapeHtml(field.name)}" value="${escapeHtml(val)}">
+        </div>`;
+      }
+
+      // --- URL ---
+      if (ftype === 'url') {
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <input type="url" class="form-input" name="cf_${escapeHtml(field.name)}" value="${escapeHtml(val)}" placeholder="https://...">
+        </div>`;
+      }
+
+      // --- Number ---
+      if (ftype === 'number') {
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <input type="number" class="form-input" name="cf_${escapeHtml(field.name)}" value="${escapeHtml(val)}">
+        </div>`;
+      }
+
+      // --- Address (Mapbox geocoding + mini-map) ---
+      if (ftype === 'address') {
+        let addr = { address: '', city: '', post_code: '', street_name: '', street_number: '', lat: '', lng: '' };
+        try { if (val) addr = typeof val === 'string' ? JSON.parse(val) : val; } catch { /* keep defaults */ }
+        const fnEsc = escapeHtml(field.name);
+        const uid = `cptAddress_${fnEsc}_${Date.now()}`;
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <div id="${uid}" class="cpt-address-field" data-field="${fnEsc}" style="position:relative;">
+            <div style="position:relative;margin-bottom:8px;">
+              <input type="text" class="form-input googlemap-search" value="${escapeHtml(addr.address || '')}" placeholder="Rechercher une adresse..." autocomplete="off">
+              <div class="googlemap-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid var(--border);border-top:0;border-radius:0 0 6px 6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1);"></div>
+            </div>
+            <div class="googlemap-preview" style="height:${(addr.lat && addr.lng) ? '200px' : '0'};border-radius:8px;overflow:hidden;margin-bottom:8px;"></div>
+            <input type="hidden" name="cf_${fnEsc}__street_number" value="${escapeHtml(addr.street_number || '')}">
+            <input type="hidden" name="cf_${fnEsc}__street_name" value="${escapeHtml(addr.street_name || '')}">
+            <input type="hidden" name="cf_${fnEsc}__post_code" value="${escapeHtml(addr.post_code || '')}">
+            <input type="hidden" name="cf_${fnEsc}__city" value="${escapeHtml(addr.city || '')}">
+            <input type="hidden" name="cf_${fnEsc}__address" value="${escapeHtml(addr.address || '')}">
+            <input type="hidden" name="cf_${fnEsc}__lat" value="${escapeHtml(addr.lat || '')}">
+            <input type="hidden" name="cf_${fnEsc}__lng" value="${escapeHtml(addr.lng || '')}">
+            <input type="hidden" name="cf_${fnEsc}__place_id" value="">
+            <input type="hidden" name="cf_${fnEsc}__name" value="">
+            <input type="hidden" name="cf_${fnEsc}__street_name_short" value="">
+          </div>
+        </div>`;
+      }
+
+      // Default: Text
+      return `<div class="form-group"${w}>
+        <label class="form-label">${escapeHtml(field.label)}</label>
+        <input type="text" class="form-input" name="cf_${escapeHtml(field.name)}" value="${escapeHtml(val)}">
+      </div>`;
+    }).join('');
+  }
+
+  // --- Build tabs and content area ---
+  const customFieldsHtml = buildCustomFieldsHtml();
+  const needsTabs = hasCustomFields && hasContent;
+  const firstTab = hasCustomFields ? 'popup' : 'contenu';
+
+  let tabsHtml = '';
+  let contentAreaHtml = '';
+
+  if (needsTabs) {
+    // Both custom fields and content: show tabs
+    tabsHtml = `
+      <div class="cpt-tabs" style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px;">
+        <button type="button" class="cpt-tab active" data-tab="popup" style="padding:10px 20px;border:0;background:0;cursor:pointer;font-weight:600;border-bottom:2px solid var(--primary);margin-bottom:-2px;">Champs</button>
+        <button type="button" class="cpt-tab" data-tab="contenu" style="padding:10px 20px;border:0;background:0;cursor:pointer;font-weight:600;color:#999;border-bottom:2px solid transparent;margin-bottom:-2px;">Contenu</button>
+      </div>`;
+    contentAreaHtml = `
+      <div class="cpt-tab-content" data-tab="popup">${customFieldsHtml}</div>
+      <div class="cpt-tab-content" data-tab="contenu" style="display:none;">
+        <p style="color:#999;font-size:13px;">Le contenu flexible (modules) est géré via le champ contenu du CPT. Vous pouvez y ajouter du JSON de blocs.</p>
+        <div class="form-group">
+          <label class="form-label">Contenu (JSON blocs)</label>
+          <textarea class="form-textarea" name="content" rows="12" style="font-family:monospace;font-size:13px;">${escapeHtml(item?.content || '')}</textarea>
+        </div>
+      </div>`;
+  } else if (hasCustomFields) {
+    // Only custom fields, no content
+    contentAreaHtml = customFieldsHtml;
+  } else if (hasContent) {
+    // Only content (like actualités)
+    contentAreaHtml = `
+      ${hasExcerpt ? `
+        <div class="form-group">
+          <label class="form-label">Extrait</label>
+          <textarea class="form-textarea" name="excerpt" rows="3" placeholder="Résumé court de l'article…">${escapeHtml(item?.excerpt || '')}</textarea>
+        </div>
+      ` : ''}
+      <div class="form-group">
+        <label class="form-label">Contenu (JSON blocs)</label>
+        <textarea class="form-textarea" name="content" rows="12" style="font-family:monospace;font-size:13px;">${escapeHtml(item?.content || '')}</textarea>
+      </div>`;
+  }
+
   return `
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:12px;">
         <button class="btn btn-outline btn-sm" onclick="loadSection('cpt:${escapeHtml(ptDef.slug)}')">← Retour</button>
-        <h1>${itemId ? 'Modifier' : 'Nouvelle'} ${escapeHtml(ptDef.label)}</h1>
+        <h1>${itemId ? 'Modifier' : (ptDef.isFemale ? 'Nouvelle' : 'Nouveau')} ${escapeHtml(ptDef.label)}</h1>
       </div>
     </div>
 
@@ -1163,66 +997,9 @@ async function renderCPTEditPage(ptDef, itemId) {
             </div>
           </div>
 
-          <!-- Tabs: Popup / Contenu -->
           <div class="card" style="margin-bottom:24px;">
-            <div class="cpt-tabs" style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px;">
-              <button type="button" class="cpt-tab active" data-tab="popup" style="padding:10px 20px;border:0;background:0;cursor:pointer;font-weight:600;border-bottom:2px solid var(--primary);margin-bottom:-2px;">Popup</button>
-              <button type="button" class="cpt-tab" data-tab="contenu" style="padding:10px 20px;border:0;background:0;cursor:pointer;font-weight:600;color:#999;border-bottom:2px solid transparent;margin-bottom:-2px;">Contenu</button>
-            </div>
-
-            <!-- Tab: Popup -->
-            <div class="cpt-tab-content" data-tab="popup">
-              <div class="form-group">
-                <label class="form-label">Sous-titre / Nom du client</label>
-                <input type="text" class="form-input" name="cf_customer_name" value="${escapeHtml(cf.customer_name || '')}">
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Texte / Description</label>
-                <div id="cptQuillEditor" style="min-height:200px;"></div>
-                <input type="hidden" name="cf_text" value="${escapeHtml(cf.text || '')}">
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Photos</label>
-                <div id="cptPhotosPreview" style="margin-bottom:8px;">${photosPreview}</div>
-                <input type="hidden" name="cf_photos" id="cptPhotosInput" value="${escapeHtml(JSON.stringify(photos))}">
-                <button type="button" class="btn btn-outline btn-sm" onclick="openCPTPhotoPicker()">📸 Ajouter des photos</button>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Lien</label>
-                <div class="form-row" style="grid-template-columns:1fr 2fr 1fr auto;">
-                  <div class="form-group">
-                    <select class="form-input" id="cptLinkPageSelect">
-                      <option value="">— Page du site —</option>
-                      ${allPages.filter(p => p.status === 'published').map(p => `<option value="/pages/${escapeHtml(p.slug)}" ${linkObj.url === '/pages/' + p.slug ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <input type="text" class="form-input" name="cf_link_url" id="cptLinkUrlInput" value="${escapeHtml(linkObj.url || '')}" placeholder="URL (ou choisir une page)">
-                  </div>
-                  <div class="form-group">
-                    <input type="text" class="form-input" name="cf_link_title" value="${escapeHtml(linkObj.title || '')}" placeholder="Titre du lien">
-                  </div>
-                  <div class="form-group">
-                    <select class="form-input" name="cf_link_target">
-                      <option value="_self" ${linkObj.target !== '_blank' ? 'selected' : ''}>Même fenêtre</option>
-                      <option value="_blank" ${linkObj.target === '_blank' ? 'selected' : ''}>Nouvel onglet</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Tab: Contenu (flexible modules - stored in content field) -->
-            <div class="cpt-tab-content" data-tab="contenu" style="display:none;">
-              <p style="color:#999;font-size:13px;">Le contenu flexible (modules) est géré via le champ contenu du CPT. Vous pouvez y ajouter du JSON de blocs.</p>
-              <div class="form-group">
-                <label class="form-label">Contenu (JSON blocs)</label>
-                <textarea class="form-textarea" name="content" rows="12" style="font-family:monospace;font-size:13px;">${escapeHtml(item?.content || '')}</textarea>
-              </div>
-            </div>
+            ${tabsHtml}
+            ${contentAreaHtml}
           </div>
         </div>
 
@@ -1280,17 +1057,39 @@ function attachCPTFormEvents(ptDef) {
     });
   });
 
-  // Link page selector → URL sync
-  const pageSelect = document.getElementById('cptLinkPageSelect');
-  const linkUrlInput = document.getElementById('cptLinkUrlInput');
-  if (pageSelect && linkUrlInput) {
-    pageSelect.addEventListener('change', () => {
-      if (pageSelect.value) linkUrlInput.value = pageSelect.value;
-    });
-  }
+  // Link page selectors → URL sync (generic, supports multiple link fields)
+  document.querySelectorAll('.cpt-link-page-select').forEach(sel => {
+    const targetName = sel.dataset.target;
+    if (!targetName) return;
+    const urlInput = document.querySelector(`input[name="${targetName}"]`);
+    if (urlInput) {
+      sel.addEventListener('change', () => { if (sel.value) urlInput.value = sel.value; });
+    }
+  });
 
-  // Init Quill editor for text field
-  initCPTQuillEditor();
+  // TrueFalse toggle slider sync
+  document.querySelectorAll('.cpt-toggle').forEach(wrapper => {
+    const cb = wrapper.querySelector('input[type="checkbox"]');
+    if (!cb) return;
+    const track = wrapper.querySelector('.cpt-toggle-track');
+    const thumb = wrapper.querySelector('.cpt-toggle-thumb');
+    const lbl = wrapper.querySelector('.cpt-toggle-label');
+    function sync() {
+      if (track) track.style.background = cb.checked ? 'var(--primary,#224f5a)' : '#ccc';
+      if (thumb) thumb.style.left = cb.checked ? '22px' : '2px';
+      if (lbl) lbl.textContent = cb.checked ? 'Oui' : 'Non';
+    }
+    // The <label> already toggles the checkbox on click, just sync the visuals
+    cb.addEventListener('change', sync);
+  });
+
+  // Init all Quill editors (supports multiple WYSIWYG fields)
+  initCPTQuillEditors();
+
+  // Init Address fields (Mapbox geocoding + mini-map)
+  document.querySelectorAll('.cpt-address-field').forEach(el => {
+    initGoogleMapField(el.id);
+  });
 
   // Form submit
   const form = document.getElementById('cptEditForm');
@@ -1302,10 +1101,9 @@ function attachCPTFormEvents(ptDef) {
   }
 }
 
-function initCPTQuillEditor() {
-  const container = document.getElementById('cptQuillEditor');
-  const hiddenInput = document.querySelector('input[name="cf_text"]');
-  if (!container || !hiddenInput) return;
+function initCPTQuillEditors() {
+  const editors = document.querySelectorAll('.cpt-quill-editor');
+  if (editors.length === 0) return;
 
   // Load Quill if not already loaded
   if (typeof Quill === 'undefined') {
@@ -1314,16 +1112,21 @@ function initCPTQuillEditor() {
     document.head.appendChild(link);
     const script = document.createElement('script');
     script.src = 'https://cdn.quilljs.com/1.3.7/quill.min.js';
-    script.onload = () => createCPTQuill(container, hiddenInput);
+    script.onload = () => editors.forEach(el => createCPTQuill(el));
     document.head.appendChild(script);
   } else {
-    createCPTQuill(container, hiddenInput);
+    editors.forEach(el => createCPTQuill(el));
   }
 }
 
-let _cptQuill = null;
-function createCPTQuill(container, hiddenInput) {
-  _cptQuill = new Quill(container, {
+let _cptQuills = {};
+let _cptQuill = null; // backward compat
+function createCPTQuill(container) {
+  const fieldName = container.dataset.field || 'text';
+  const hiddenInput = document.querySelector(`input[name="cf_${fieldName}"]`);
+  if (!hiddenInput) return;
+
+  const q = new Quill(container, {
     theme: 'snow',
     modules: {
       toolbar: [
@@ -1338,12 +1141,14 @@ function createCPTQuill(container, hiddenInput) {
   });
   // Set initial content
   if (hiddenInput.value) {
-    _cptQuill.root.innerHTML = hiddenInput.value;
+    q.root.innerHTML = hiddenInput.value;
   }
   // Sync on change
-  _cptQuill.on('text-change', () => {
-    hiddenInput.value = _cptQuill.root.innerHTML;
+  q.on('text-change', () => {
+    hiddenInput.value = q.root.innerHTML;
   });
+  _cptQuills[fieldName] = q;
+  if (fieldName === 'text') _cptQuill = q;
 }
 
 // Featured image picker
@@ -1376,6 +1181,39 @@ function openCPTFeaturedPicker() {
 function clearCPTFeatured() {
   document.getElementById('cptFeaturedInput').value = '';
   document.getElementById('cptFeaturedPreview').innerHTML = '<div style="width:200px;height:150px;background:#f5f5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#999;">Aucune image</div>';
+}
+
+// CPT Builder featured image picker (for page builder CPT mode)
+function openCPTBuilderFeaturedPicker() {
+  mediaPickerState = {
+    isOpen: true,
+    blockId: '__cpt_builder_featured__',
+    fieldName: 'featured_image',
+    type: 'image',
+    folderId: null,
+    folders: [],
+    items: [],
+    multiple: false,
+    selectedIds: []
+  };
+  ensureMediaPickerModal();
+  showLoading();
+  Promise.all([apiFetch('/media/folders'), apiFetch('/media?all=1')])
+    .then(([res, items]) => {
+      mediaPickerState.folders = res.folders || [];
+      mediaPickerState.totalCount = res.total || 0;
+      mediaPickerState.items = items;
+      hideLoading();
+      document.getElementById('mediaPickerModal').classList.add('is-open');
+      updateMediaPickerContent();
+    })
+    .catch(() => hideLoading());
+}
+
+function clearCPTBuilderFeatured() {
+  document.getElementById('cptBuilderFeaturedInput').value = '';
+  pageBuilderState.cptFeaturedImage = null;
+  document.getElementById('cptBuilderFeaturedPreview').innerHTML = '<div style="width:100%;height:100px;background:#f5f5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;">Aucune image</div>';
 }
 
 // Photos gallery picker
@@ -1440,25 +1278,56 @@ async function saveCPTItemFromForm(ptDef) {
 
   const formData = new FormData(form);
   const itemId = form.dataset.itemId ? parseInt(form.dataset.itemId) : null;
+  const hasCustomFields = ptDef.fields && ptDef.fields.length > 0;
 
-  // Sync Quill content
-  if (_cptQuill) {
-    form.querySelector('input[name="cf_text"]').value = _cptQuill.root.innerHTML;
+  // Sync all Quill editors content
+  for (const [fieldName, q] of Object.entries(_cptQuills)) {
+    const inp = form.querySelector(`input[name="cf_${fieldName}"]`);
+    if (inp && q) inp.value = q.root.innerHTML;
   }
 
-  // Build link object
-  const linkUrl = formData.get('cf_link_url') || '';
-  const linkTitle = formData.get('cf_link_title') || '';
-  const linkTarget = formData.get('cf_link_target') || '_self';
-  const linkObj = linkUrl ? JSON.stringify({ url: linkUrl, title: linkTitle, target: linkTarget }) : '';
+  // Build custom_fields dynamically from ptDef.fields
+  const custom_fields = {};
+  if (hasCustomFields) {
+    for (const field of ptDef.fields) {
+      const ftype = (field.type || 'Text').toLowerCase();
 
-  // Build custom_fields
-  const custom_fields = {
-    customer_name: formData.get('cf_customer_name') || '',
-    text: formData.get('cf_text') || '',
-    photos: formData.get('cf_photos') || '[]',
-    link: linkObj
-  };
+      if (ftype === 'link') {
+        // Link type: compose JSON from sub-inputs
+        const fn = field.name;
+        const linkUrl = formData.get(`cf_${fn}_url`) || '';
+        const linkTitle = formData.get(`cf_${fn}_title`) || '';
+        const linkTarget = formData.get(`cf_${fn}_target`) || '_self';
+        custom_fields[fn] = linkUrl ? JSON.stringify({ url: linkUrl, title: linkTitle, target: linkTarget }) : '';
+      } else if (ftype === 'address') {
+        // Address type: compose JSON from sub-inputs (double underscore matches initGoogleMapField)
+        const fn = field.name;
+        const addr = {
+          address: formData.get(`cf_${fn}__address`) || '',
+          street_number: formData.get(`cf_${fn}__street_number`) || '',
+          street_name: formData.get(`cf_${fn}__street_name`) || '',
+          post_code: formData.get(`cf_${fn}__post_code`) || '',
+          city: formData.get(`cf_${fn}__city`) || '',
+          lat: formData.get(`cf_${fn}__lat`) || '',
+          lng: formData.get(`cf_${fn}__lng`) || ''
+        };
+        const hasAny = Object.values(addr).some(v => v !== '');
+        custom_fields[fn] = hasAny ? JSON.stringify(addr) : '';
+      } else if (field.name === 'photos' || ftype === 'photos') {
+        custom_fields.photos = formData.get('cf_photos') || '[]';
+      } else if (ftype === 'truefalse') {
+        // Checkbox: last value wins (hidden=0, checked=1)
+        const vals = formData.getAll(`cf_${field.name}`);
+        custom_fields[field.name] = vals.includes('1') ? '1' : '0';
+      } else if (ftype === 'date') {
+        // Convert YYYY-MM-DD back to YYYY/MM/DD for consistency with ACF
+        const dateVal = formData.get(`cf_${field.name}`) || '';
+        custom_fields[field.name] = dateVal.replace(/-/g, '/');
+      } else {
+        custom_fields[field.name] = formData.get(`cf_${field.name}`) || '';
+      }
+    }
+  }
 
   // Featured image
   const fiRaw = document.getElementById('cptFeaturedInput')?.value || '';
@@ -1471,14 +1340,17 @@ async function saveCPTItemFromForm(ptDef) {
     categories.push(parseInt(cb.value));
   });
 
+  const _status = formData.get('status') || 'draft';
   const payload = {
     title: formData.get('title'),
     slug: formData.get('slug'),
+    excerpt: formData.get('excerpt') || '',
     content: formData.get('content') || '',
-    status: formData.get('status') || 'draft',
+    status: _status,
     featured_image,
     custom_fields,
-    categories
+    categories,
+    published_date: _status === 'published' ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null
   };
 
   try {
@@ -1495,6 +1367,47 @@ async function saveCPTItemFromForm(ptDef) {
   } catch (error) {
     hideLoading();
     showToast(error.message || 'Erreur lors de la sauvegarde', 'error');
+  }
+}
+
+async function duplicateCPTItem(postTypeSlug, itemId) {
+  showLoading();
+  try {
+    const source = await apiFetch(`/cpt/${postTypeSlug}/by-id/${itemId}`);
+    if (!source) { hideLoading(); showToast('Élément introuvable', 'error'); return; }
+
+    // Generate unique slug
+    const allItems = await apiFetch(`/cpt/${postTypeSlug}`);
+    const existingSlugs = new Set(allItems.map(i => i.slug));
+    const baseSlug = source.slug + '-copie';
+    let slug = baseSlug;
+    let counter = 1;
+    while (existingSlugs.has(slug)) {
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+
+    const cf = typeof source.custom_fields === 'string' ? JSON.parse(source.custom_fields) : (source.custom_fields || {});
+    const categories = (source.categories || []).map(c => c.id);
+
+    await apiFetch(`/cpt/${postTypeSlug}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        title: source.title + ' (copie)',
+        slug,
+        excerpt: source.excerpt || '',
+        content: source.content || '',
+        status: 'draft',
+        featured_image: source.featured_image || null,
+        custom_fields: cf,
+        categories,
+      }),
+    });
+    showToast('Élément dupliqué', 'success');
+    loadSection(`cpt:${postTypeSlug}`);
+  } catch (error) {
+    hideLoading();
+    showToast('Erreur: ' + error.message, 'error');
   }
 }
 
@@ -1584,11 +1497,55 @@ async function createCPTCategoryUI(event, postTypeSlug) {
   }
 }
 
-async function editCPTCategory(postTypeSlug, catId, currentName) {
-  const newName = prompt('Nouveau nom :', currentName);
-  if (!newName || newName === currentName) return;
+function editCPTCategory(postTypeSlug, catId, currentName) {
+  // Remove previous modal if any
+  const prev = document.getElementById('cptCatModal');
+  if (prev) prev.remove();
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-overlay active" id="cptCatModal">
+      <div class="modal" style="max-width:420px">
+        <div class="modal-header">
+          <h2>Modifier la catégorie</h2>
+          <button class="modal-close" onclick="closeCPTCatModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="cptCatEditForm" onsubmit="submitCPTCatEdit(event, '${escapeHtml(postTypeSlug)}', ${catId})">
+            <div class="form-group">
+              <label class="form-label">Nom</label>
+              <input type="text" class="form-input" name="name" value="${escapeHtml(currentName)}" required autofocus>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" onclick="closeCPTCatModal()">Annuler</button>
+              <button type="submit" class="btn btn-primary">Enregistrer</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  `);
+
+  // Focus input & select text
+  const input = document.querySelector('#cptCatEditForm input[name="name"]');
+  if (input) { input.focus(); input.select(); }
+
+  // Close on overlay click
+  document.getElementById('cptCatModal').addEventListener('click', function(e) {
+    if (e.target === this) closeCPTCatModal();
+  });
+}
+
+function closeCPTCatModal() {
+  const m = document.getElementById('cptCatModal');
+  if (m) m.remove();
+}
+
+async function submitCPTCatEdit(event, postTypeSlug, catId) {
+  event.preventDefault();
+  const name = new FormData(event.target).get('name');
   try {
-    await apiFetch(`/cpt/${postTypeSlug}/categories/${catId}`, { method: 'PUT', body: JSON.stringify({ name: newName }) });
+    await apiFetch(`/cpt/${postTypeSlug}/categories/${catId}`, { method: 'PUT', body: JSON.stringify({ name }) });
+    closeCPTCatModal();
     showToast('Catégorie mise à jour', 'success');
     loadSection(`cpt-categories:${postTypeSlug}`);
   } catch (error) {
@@ -1596,10 +1553,38 @@ async function editCPTCategory(postTypeSlug, catId, currentName) {
   }
 }
 
-async function deleteCPTCategory(postTypeSlug, catId, name) {
-  if (!confirm(`Supprimer la catégorie "${name}" ?`)) return;
+function deleteCPTCategory(postTypeSlug, catId, name) {
+  const prev = document.getElementById('cptCatModal');
+  if (prev) prev.remove();
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-overlay active" id="cptCatModal">
+      <div class="modal" style="max-width:420px">
+        <div class="modal-header">
+          <h2>Supprimer la catégorie</h2>
+          <button class="modal-close" onclick="closeCPTCatModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>Supprimer la catégorie <strong>${escapeHtml(name)}</strong> ?</p>
+          <p style="color:var(--gray-500);font-size:13px;margin-top:4px;">Cette action est irréversible.</p>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" onclick="closeCPTCatModal()">Annuler</button>
+            <button type="button" class="btn btn-danger" onclick="confirmDeleteCPTCategory('${escapeHtml(postTypeSlug)}', ${catId})">Supprimer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('cptCatModal').addEventListener('click', function(e) {
+    if (e.target === this) closeCPTCatModal();
+  });
+}
+
+async function confirmDeleteCPTCategory(postTypeSlug, catId) {
   try {
     await apiFetch(`/cpt/${postTypeSlug}/categories/${catId}`, { method: 'DELETE' });
+    closeCPTCatModal();
     showToast('Catégorie supprimée', 'success');
     loadSection(`cpt-categories:${postTypeSlug}`);
   } catch {
@@ -1946,7 +1931,7 @@ async function saveCPTOptions(event, postTypeSlug) {
   }
 }
 
-let pageBuilderState = { editingPageId: null, blocks: [], meta: { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null }, colorOverrides: { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' }, seoMeta: { enabled: false, meta_title: '', meta_description: '', schema_org: '' } };
+let pageBuilderState = { editingPageId: null, blocks: [], meta: { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null }, colorOverrides: { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' }, seoMeta: { enabled: false, meta_title: '', meta_description: '', schema_org: '' }, cptMode: null, cptExcerpt: '', cptFeaturedImage: null, cptCategories: [], cptItemCategories: [] };
 let selectedBlockId = null;
 let reusableBlocBuilderMode = false;
 let _inlineEditingBlockId = null;
@@ -2058,6 +2043,126 @@ function blockId() {
   return 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
 }
 
+// ========== CPT BUILDER MODE ==========
+// Reuses the page builder for CPTs that have content support and no custom fields
+
+async function openCPTBuilder(ptDef, itemId) {
+  pageBuilderState.editingPageId = itemId;
+  pageBuilderState.blocks = [];
+  pageBuilderState.meta = { title: '', slug: '', status: 'draft', show_in_menu: false, menu_order: 0, parent_id: null };
+  pageBuilderState.colorOverrides = { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' };
+  pageBuilderState.seoMeta = { enabled: false, meta_title: '', meta_description: '' };
+  pageBuilderState.cptMode = ptDef;
+  pageBuilderState.cptExcerpt = '';
+  pageBuilderState.cptFeaturedImage = null;
+  pageBuilderState.cptCategories = [];
+  pageBuilderState.cptItemCategories = [];
+  pageBuilderState.pageMenus = [];
+  selectedBlockId = null;
+
+  localStorage.setItem('adminLastView', `cpt-${itemId ? 'edit' : 'add'}:${ptDef.slug}${itemId ? ':' + itemId : ''}`);
+  await loadModuleFieldSchema();
+  ensureBaseModuleStyles();
+
+  if (itemId) {
+    showLoading();
+    try {
+      const fetches = [
+        apiFetch(`/cpt/${ptDef.slug}/by-id/${itemId}`),
+        ptDef.hasCategories ? apiFetch(`/cpt/${ptDef.slug}/categories`) : Promise.resolve([]),
+      ];
+      const [item, categories] = await Promise.all(fetches);
+      if (item) {
+        pageBuilderState.blocks = parsePageContent(item.content);
+        pageBuilderState.meta = { title: item.title, slug: item.slug, status: item.status, show_in_menu: false, menu_order: 0, parent_id: null };
+        pageBuilderState.cptExcerpt = item.excerpt || '';
+        pageBuilderState.cptFeaturedImage = item.featured_image || null;
+        pageBuilderState.cptItemCategories = item.categories || [];
+      }
+      pageBuilderState.cptCategories = categories || [];
+    } catch (e) { console.error(e); }
+    hideLoading();
+  } else {
+    // New item — load categories
+    if (ptDef.hasCategories) {
+      try { pageBuilderState.cptCategories = await apiFetch(`/cpt/${ptDef.slug}/categories`) || []; } catch {}
+    }
+  }
+
+  document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+  document.getElementById('content').innerHTML = await renderPageBuilder();
+  attachPageBuilderListeners();
+  if (siteSettingsCache) {
+    const canvas = document.getElementById('builderCanvas');
+    if (canvas) canvas.classList.toggle('border-rounded', siteSettingsCache.rounded === '1');
+  }
+}
+
+async function saveCPTBuilder() {
+  const ptDef = pageBuilderState.cptMode;
+  if (!ptDef) return;
+
+  // Sync inline editing
+  if (_inlineEditingBlockId && _inlineEditingElement) {
+    _syncInlineContentToBlockData(_inlineEditingElement);
+  }
+  syncBuilderMetaFromDOM();
+  // Sync all Quill editors
+  _quillInstances.forEach((quill, id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const textarea = el.parentElement?.querySelector('.wysiwyg-source');
+    if (textarea) textarea.value = quill.getSemanticHTML();
+  });
+  // Sync currently open block settings
+  const panel = document.getElementById('builderSettings');
+  const form = panel?.querySelector('form.builder-block-form');
+  if (form && selectedBlockId) {
+    liveUpdateFromSettingsForm(form);
+  }
+
+  const { title, slug, status } = pageBuilderState.meta;
+  if (!title || !slug) { showToast('Titre et slug requis', 'error'); return; }
+
+  const content = JSON.stringify(pageBuilderState.blocks);
+
+  // Read excerpt from DOM
+  const excerptEl = document.getElementById('cptBuilderExcerpt');
+  const excerpt = excerptEl ? excerptEl.value : pageBuilderState.cptExcerpt;
+
+  // Read featured image
+  const fiInput = document.getElementById('cptBuilderFeaturedInput');
+  let featured_image = null;
+  try { if (fiInput?.value) featured_image = JSON.parse(fiInput.value); } catch {}
+
+  // Read categories
+  const categories = [];
+  document.querySelectorAll('.cpt-builder-categories input[type="checkbox"]:checked').forEach(cb => {
+    categories.push(parseInt(cb.value));
+  });
+
+  const published_date = status === 'published' ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null;
+  const payload = { title, slug, excerpt, content, status, featured_image, custom_fields: {}, categories, published_date };
+
+  showLoading();
+  try {
+    if (pageBuilderState.editingPageId) {
+      await apiFetch(`/cpt/${ptDef.slug}/${pageBuilderState.editingPageId}`, { method: 'PUT', body: JSON.stringify(payload) });
+      showToast(`${ptDef.label} mis à jour`, 'success');
+    } else {
+      const res = await apiFetch(`/cpt/${ptDef.slug}`, { method: 'POST', body: JSON.stringify(payload) });
+      showToast(`${ptDef.label} créé`, 'success');
+      if (res?.id) {
+        pageBuilderState.editingPageId = res.id;
+        localStorage.setItem('adminLastView', `cpt-edit:${ptDef.slug}:${res.id}`);
+      }
+    }
+  } catch (error) {
+    showToast(error.message || 'Erreur lors de la sauvegarde', 'error');
+  }
+  hideLoading();
+}
+
 function parsePageContent(content) {
   if (!content || !content.trim()) return [];
   try {
@@ -2074,6 +2179,7 @@ async function openPageBuilder(pageId) {
   pageBuilderState.meta = { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null };
   pageBuilderState.colorOverrides = { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' };
   pageBuilderState.seoMeta = { enabled: false, meta_title: '', meta_description: '' };
+  pageBuilderState.cptMode = null;
   pageBuilderState.pageMenus = [];       // menus with per-menu toggle/position state
   selectedBlockId = null;
   // Mémoriser la dernière vue comme "builder" pour restaurer après rafraîchissement
@@ -2129,17 +2235,68 @@ async function openPageBuilder(pageId) {
 
 async function renderPageBuilder() {
   const m = pageBuilderState.meta;
-  const pages = await apiFetch('/pages').catch(() => []);
+  const isCPT = !!pageBuilderState.cptMode;
+  const cptDef = pageBuilderState.cptMode;
+  const pages = isCPT ? [] : await apiFetch('/pages').catch(() => []);
   pageBuilderState._allPages = pages || [];
+
+  const backSection = isCPT ? `cpt:${cptDef.slug}` : 'pages';
+  const saveFunc = isCPT ? 'saveCPTBuilder()' : 'savePageBuilder()';
+  const viewUrl = isCPT
+    ? `${siteSettingsCache?.frontend_url || 'http://localhost:4321'}/${cptDef.slug}/${encodeURIComponent(m.slug)}`
+    : `${siteSettingsCache?.frontend_url || 'http://localhost:4321'}/pages/${encodeURIComponent(m.slug)}`;
+  const titlePlaceholder = isCPT ? `Titre de l'${cptDef.label.toLowerCase()}` : 'Titre de la page';
+
+  // CPT sidebar: featured image, excerpt, categories
+  let cptSidebarHtml = '';
+  if (isCPT) {
+    const fi = pageBuilderState.cptFeaturedImage;
+    const fiPreview = fi
+      ? `<img src="${escapeHtml(getOptimizedUrl(fi.sizes?.thumbnail || fi.url || '', 200, 60))}" alt="" style="max-width:100%;max-height:150px;object-fit:cover;border-radius:8px;">`
+      : '<div style="width:100%;height:100px;background:#f5f5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;">Aucune image</div>';
+
+    const hasExcerpt = cptDef.supports?.includes('excerpt');
+    const catsHtml = cptDef.hasCategories && pageBuilderState.cptCategories.length > 0
+      ? `<div style="margin-top:16px;">
+          <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">${escapeHtml(cptDef.categoryLabel || 'Catégories')}</label>
+          <div class="cpt-builder-categories" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px;">
+            ${pageBuilderState.cptCategories.map(cat => `
+              <label style="display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="cat_${cat.id}" value="${cat.id}" ${pageBuilderState.cptItemCategories.find(c => c.id === cat.id) ? 'checked' : ''}>
+                ${escapeHtml(cat.name)}
+              </label>
+            `).join('')}
+          </div>
+        </div>`
+      : '';
+
+    cptSidebarHtml = `
+      <div style="padding:12px;border-bottom:1px solid var(--border);">
+        <h4 style="margin:0 0 8px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gray-400);">Image à la une</h4>
+        <div id="cptBuilderFeaturedPreview" style="margin-bottom:8px;">${fiPreview}</div>
+        <input type="hidden" id="cptBuilderFeaturedInput" value="${fi ? escapeHtml(JSON.stringify(fi)) : ''}">
+        <div style="display:flex;gap:6px;">
+          <button type="button" class="btn btn-outline btn-xs" onclick="openCPTBuilderFeaturedPicker()">Choisir</button>
+          ${fi ? '<button type="button" class="btn btn-xs btn-danger-outline" onclick="clearCPTBuilderFeatured()">Supprimer</button>' : ''}
+        </div>
+        ${hasExcerpt ? `
+          <div style="margin-top:16px;">
+            <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">Extrait</label>
+            <textarea class="form-input" id="cptBuilderExcerpt" rows="3" placeholder="Résumé court…" style="font-size:13px;resize:vertical;">${escapeHtml(pageBuilderState.cptExcerpt)}</textarea>
+          </div>
+        ` : ''}
+        ${catsHtml}
+      </div>`;
+  }
 
   return `
     <div class="page-builder">
       <header class="builder-header">
-        <button type="button" class="btn btn-danger" onclick="loadSection('pages')">← Retour</button>
+        <button type="button" class="btn btn-danger" onclick="loadSection('${backSection}')">← Retour</button>
         <div class="builder-meta">
           <div class="builder-field-group">
             <label class="builder-field-label">Titre</label>
-            <input type="text" class="form-input builder-title" placeholder="Titre de la page" value="${escapeHtml(m.title)}" data-field="title">
+            <input type="text" class="form-input builder-title" placeholder="${titlePlaceholder}" value="${escapeHtml(m.title)}" data-field="title">
           </div>
           <div class="builder-field-group">
             <label class="builder-field-label">Slug URL</label>
@@ -2154,12 +2311,13 @@ async function renderPageBuilder() {
           </div>
         </div>
         <div class="builder-actions">
-          <button type="button" class="btn btn-primary" onclick="savePageBuilder()">Enregistrer</button>
-          <a href="${(siteSettingsCache?.frontend_url || 'http://localhost:4321')}/pages/${encodeURIComponent(m.slug)}" target="_blank" class="btn btn-outline" id="viewPageBtn">Voir la page</a>
+          <button type="button" class="btn btn-primary" onclick="${saveFunc}">Enregistrer</button>
+          <a href="${viewUrl}" target="_blank" class="btn btn-outline" id="viewPageBtn">Voir ${isCPT ? "l'" + cptDef.label.toLowerCase() : 'la page'}</a>
         </div>
       </header>
       <div class="builder-body">
         <aside class="builder-sidebar">
+          ${cptSidebarHtml}
           <!-- Menu settings panel (collapsible) -->
           <div class="builder-menu-settings-panel" id="builderMenuSettingsPanel" style="display:none">
             <div class="builder-menu-settings-header">
@@ -2281,9 +2439,9 @@ async function renderPageBuilder() {
             </div>
           </div>
           <div class="builder-modules-panel" id="builderModulesPanel" style="${selectedBlockId ? 'display:none' : ''}">
-            <button type="button" class="btn btn-sm btn-outline builder-menu-settings-btn" onclick="toggleMenuSettingsPanel(true)" style="${m.status === 'draft' ? 'display:none' : ''}">Parametres menu</button>
+            ${isCPT ? '' : `<button type="button" class="btn btn-sm btn-outline builder-menu-settings-btn" onclick="toggleMenuSettingsPanel(true)" style="${m.status === 'draft' ? 'display:none' : ''}">Parametres menu</button>
             <button type="button" class="btn btn-sm btn-outline builder-color-overrides-btn" onclick="toggleColorOverridesPanel(true)">Surcharge des couleurs</button>
-            <button type="button" class="btn btn-sm btn-outline builder-seo-btn" onclick="toggleSeoPanel(true)">SEO Meta</button>
+            <button type="button" class="btn btn-sm btn-outline builder-seo-btn" onclick="toggleSeoPanel(true)">SEO Meta</button>`}
             <h3 style="margin-top:18px">Modules</h3>
             <p class="form-help">Glissez un module dans la zone de droite.</p>
             <div class="builder-modules-list">
@@ -2342,7 +2500,7 @@ function renderBlockCard(block) {
   const hiddenIcon = isHidden
     ? '<svg class="builder-block-hidden-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
     : '';
-  const richPreview = renderBlockPreviewHtml(block);
+  const richPreview = replaceEmptyImages(renderBlockPreviewHtml(block));
   return `
     <div class="builder-block-card builder-block-card--visual${selectedBlockId === block.id ? ' is-selected' : ''}${isHidden ? ' is-hidden-block' : ''}" data-block-id="${block.id}" draggable="true">
       <div class="builder-block-chrome">
@@ -2402,7 +2560,7 @@ function renderHeroPreviewHtml(data) {
     const title = slide.title || '';
     const catchphrase = slide.catchphrase || '';
     return `<div class="preview-hero-banner">
-      ${imgUrl ? `<img src="${escapeHtml(imgUrl)}" class="preview-hero-bg" alt="">` : '<div class="preview-hero-bg-placeholder"></div>'}
+      ${imgUrl ? `<img src="${escapeHtml(imgUrl)}" class="preview-hero-bg" alt="">` : _noImagePlaceholderHtml}
       <div class="preview-hero-desc">
         ${title ? `<p class="preview-hero-title">${escapeHtml(title)}</p>` : ''}
         ${catchphrase ? `<p class="preview-hero-sub">${escapeHtml(catchphrase)}</p>` : ''}
@@ -2419,7 +2577,7 @@ function renderHeroPreviewHtml(data) {
   const parts = blocs.map((bloc) => {
     const imgUrl = bloc.image?.url || '';
     return `<div class="preview-hero-bloc">
-      ${imgUrl ? `<img src="${escapeHtml(imgUrl)}" class="preview-hero-bloc-img" alt="">` : ''}
+      ${imgUrl ? `<img src="${escapeHtml(imgUrl)}" class="preview-hero-bloc-img" alt="">` : _noImagePlaceholderHtml}
       ${bloc.title ? `<p class="preview-hero-bloc-title">${escapeHtml(bloc.title)}</p>` : ''}
     </div>`;
   });
@@ -2548,7 +2706,7 @@ function renderColumnsTabPreviewHtml(data) {
       // is both a legacy block AND the Nickl TextSimple module slug)
       const subBlock = { id: 'sub-' + Math.random().toString(36).slice(2), type: layout, data: { ...subModule, columns: 1 }, _isSubModule: true };
       let subHtml = '';
-      try { subHtml = renderBlockPreviewHtml(subBlock); } catch (e) { console.warn('Sub-module render error:', layout, e); }
+      try { subHtml = replaceEmptyImages(renderBlockPreviewHtml(subBlock)); } catch (e) { console.warn('Sub-module render error:', layout, e); }
       // If template rendering produced empty/whitespace-only output (no text
       // AND no images), show a meaningful fallback so the column isn't invisible.
       if (!subHtml || (!subHtml.replace(/<[^>]*>/g, '').trim() && !/<img\s/i.test(subHtml) && !/<video\s/i.test(subHtml))) {
@@ -2606,7 +2764,7 @@ function renderBlockPreviewHtml(block) {
     if (block.type === 'text') return `<div class="preview-title">${escapeHtml(d.title || '')}</div><div class="preview-text">${escapeHtml(d.body || '')}</div>`;
     if (block.type === 'hero') return `<div class="preview-hero"><div class="preview-title">${escapeHtml(d.title || '')}</div><div class="preview-text">${escapeHtml(d.subtitle || '')}</div></div>`;
     if (block.type === 'cta') return `<div class="preview-cta"><div class="preview-title">${escapeHtml(d.title || '')}</div><div class="preview-text">${escapeHtml(d.description || '')}</div></div>`;
-    if (block.type === 'image') return d.src ? `<img class="preview-image" src="${escapeHtml(d.src)}" alt="${escapeHtml(d.alt || '')}">` : '';
+    if (block.type === 'image') return d.src ? `<img class="preview-image" src="${escapeHtml(d.src)}" alt="${escapeHtml(d.alt || '')}">` : _noImagePlaceholderHtml;
     if (block.type === 'spacer') return `<div class="preview-spacer">Espace: ${escapeHtml(d.size || 'medium')}</div>`;
     if (block.type === 'html') return d.content ? `<div class="preview-html">${escapeHtml(String(d.content).slice(0, 240))}</div>` : '';
   }
@@ -2625,6 +2783,54 @@ function renderBlockPreviewHtml(block) {
     const isFs = d.is_fullscreen === true || d.is_fullscreen === 1 || d.is_fullscreen === '1';
     const cls = [isFs ? 'full-width' : '', d.bloc_color || '', d.padding_top || '', d.padding_bottom || ''].filter(Boolean).join(' ');
     return `<div class="module module-illustration-video ${escapeHtml(cls)}"><div class="container-large"><div class="video-wrapper" style="height:calc(100vh / ${ratio});position:relative"><video class="video" autoplay loop muted playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"><source src="${escapeHtml(url)}" type="video/mp4"></video></div></div></div>`;
+  }
+  // NewsSlider — custom preview (fetches actualités from CPT API)
+  if (block.type === 'news-slider' || block.type === 'NewsSlider') {
+    const nsCols = d.display_posts || '1';
+    const nsExtraCls = [d.bloc_color || '', d.padding_top || '', d.padding_bottom || ''].filter(Boolean).join(' ');
+    let nsBgHtml = '';
+    const nsBgImg = d.bg_img;
+    if (nsBgImg) {
+      const nsBgUrl = typeof nsBgImg === 'string' ? nsBgImg : (nsBgImg.url || '');
+      const nsBgOpacity = (d.bg_opacity ?? 10) / 100;
+      if (nsBgUrl) nsBgHtml = `<div class="background" style="background-image:url(${escapeHtml(nsBgUrl)});opacity:${nsBgOpacity};background-size:cover;background-position:center;position:absolute;inset:0;"></div>`;
+    }
+    let nsTitleHtml = '';
+    const nsTitleBloc = d.title_bloc || d.title || '';
+    if (nsTitleBloc) {
+      const nsTitleStyle = d.title_style || 2;
+      const nsTitleAlign = d.title_align || 'center';
+      nsTitleHtml = `<h${nsTitleStyle} class="title-module title-section-${nsTitleStyle} align-${escapeHtml(String(nsTitleAlign))}">${escapeHtml(String(nsTitleBloc))}</h${nsTitleStyle}>`;
+    }
+    const nsShowLink = d.display_archive_link === true || d.display_archive_link === 1 || d.display_archive_link === '1';
+    const nsLinkLabel = d.archive_link_label || 'Voir toutes les actualités';
+    const nsLinkHtml = nsShowLink ? `<div class="btn-more-wrapper"><a href="/actualites" class="btn btn-tertiary">${escapeHtml(nsLinkLabel)}</a></div>` : '';
+    const nsId = 'ns_preview_' + Math.random().toString(36).slice(2, 8);
+
+    // Async fetch actualités and inject
+    setTimeout(async () => {
+      const el = document.getElementById(nsId);
+      if (!el) return;
+      try {
+        const data = await apiFetch('/cpt/actualites?status=published&limit=6');
+        const items = data.items || data || [];
+        if (items.length === 0) { el.innerHTML = '<p class="no-content">Aucune actualité publiée</p>'; return; }
+        el.innerHTML = items.map(item => {
+          const fi = item.featured_image;
+          const imgUrl = fi ? (fi.sizes?.half || fi.url || '') : '';
+          const cat = (item.categories || [])[0]?.name || '';
+          const date = item.published_date || item.created_at;
+          const dateStr = date ? new Date(date).toLocaleDateString('fr-FR') : '';
+          return `<div class="swiper-slide item"><a href="#" class="link" onclick="return false"><div class="illus-wrapper">${imgUrl ? `<img src="${escapeHtml(getOptimizedUrl(imgUrl, 600, 70))}" alt="${escapeHtml(item.title)}" class="illus">` : _noImagePlaceholderHtml}<div class="overlay"><span>Lire l'actualité</span></div></div><div class="desc">${cat ? `<p class="category">${escapeHtml(cat)}</p>` : ''}${dateStr ? `<time class="date">${dateStr}</time>` : ''}<h3 class="title">${escapeHtml(item.title)}</h3>${item.excerpt ? `<p class="txt">${escapeHtml(item.excerpt)}</p>` : ''}</div></a></div>`;
+        }).join('');
+      } catch (e) {
+        el.innerHTML = '<p style="text-align:center;opacity:.5">Erreur de chargement</p>';
+      }
+    }, 50);
+
+    // Ensure CSS is loaded
+    if (!moduleTemplateCache['news-slider']) queueModuleTemplateLoad('news-slider');
+    return `<div class="module module-news-slider ${escapeHtml(nsExtraCls)}" style="position:relative">${nsBgHtml}<div class="container-large">${nsTitleHtml}<div class="slider-wrapper"><div class="swiper slider js_news-slider columns-${escapeHtml(nsCols)}"><div class="swiper-wrapper" id="${nsId}"><p style="text-align:center;opacity:.5">Chargement des actualités…</p></div></div></div>${nsLinkHtml}</div></div>`;
   }
   // Accordion — empty state: render add button directly
   if ((block.type === 'accordion' || block.type === 'Accordion') && (!Array.isArray(d.accordions) || d.accordions.length === 0)) {
@@ -2672,7 +2878,7 @@ function renderBlockPreviewHtml(block) {
       const titre = logo.titre || '';
       const desc = logo.desc || '';
       const imgCls = `illus${!iconType ? ' icon_type_jpg' : ''}`;
-      let inner = `<div class="illus-wrapper"><img src="${escapeHtml(imgUrl)}" alt="" class="${imgCls}"></div>`;
+      let inner = `<div class="illus-wrapper">${imgUrl ? `<img src="${escapeHtml(imgUrl)}" alt="" class="${imgCls}">` : _noImagePlaceholderHtml}</div>`;
       if (titre || desc) {
         inner += `<div class="desc">${titre ? `<p class="title">${escapeHtml(titre)}</p>` : ''}${desc ? `<div class="txt editor"><p>${desc.replace(/\n/g, '<br>')}</p></div>` : ''}</div>`;
       }
@@ -2769,7 +2975,7 @@ function renderBlockPreviewHtml(block) {
     if (!isMapMode) {
       const photoObj = d.photo || {};
       const photoUrl = typeof photoObj === 'string' ? photoObj : (photoObj.url || '');
-      if (photoUrl) col2Html = `<img src="${escapeHtml(photoUrl)}" alt="" class="illus">`;
+      col2Html = photoUrl ? `<img src="${escapeHtml(photoUrl)}" alt="" class="illus">` : _noImagePlaceholderHtml;
     } else if (cMarkers.length > 0) {
       const contactMapId = 'contact-map-preview-' + (block.id || Math.random().toString(36).slice(2));
       let gpsHtml = '';
@@ -2973,7 +3179,7 @@ function renderBlockPreviewHtml(block) {
         let html = '';
         for (const sub of subBlocks) {
           try {
-            const subHtml = renderBlockPreviewHtml(sub);
+            const subHtml = replaceEmptyImages(renderBlockPreviewHtml(sub));
             if (subHtml) html += subHtml;
           } catch (e) { console.warn('ReusableBloc sub-block render error:', e); }
         }
@@ -6779,7 +6985,7 @@ function updateBlockCardPreview(blockId) {
   }
 
   let rich;
-  try { rich = renderBlockPreviewHtml(block); } catch (e) { console.warn('Preview render error:', e); }
+  try { rich = replaceEmptyImages(renderBlockPreviewHtml(block)); } catch (e) { console.warn('Preview render error:', e); }
   let richEl = card.querySelector('.builder-block-render');
   if (rich) {
     if (!richEl) {
@@ -7900,6 +8106,22 @@ async function renderMediaLibrary() {
   `;
 }
 
+const _noImagePlaceholderHtml = '<div class="no-image-placeholder">Aucune image choisie</div>';
+
+/**
+ * Post-process preview HTML: replace empty <img> tags (src="" or src="undefined")
+ * and empty .illus-wrapper divs with a "no image" placeholder.
+ */
+function replaceEmptyImages(html) {
+  if (!html) return html;
+  // Replace <img> with empty/undefined/null src
+  html = html.replace(/<img\b[^>]*\bsrc=["']\s*["'][^>]*>/gi, _noImagePlaceholderHtml);
+  html = html.replace(/<img\b[^>]*\bsrc=["'](?:undefined|null)["'][^>]*>/gi, _noImagePlaceholderHtml);
+  // Replace empty .illus-wrapper divs (no meaningful content inside)
+  html = html.replace(/<div class="illus-wrapper[^"]*">\s*<\/div>/gi, '<div class="illus-wrapper">' + _noImagePlaceholderHtml + '</div>');
+  return html;
+}
+
 function getOptimizedUrl(url, width = 400, quality = 70) {
   if (!url) return url;
   if (url.startsWith('http') || !url.includes('/uploads/media/')) return url;
@@ -8696,6 +8918,16 @@ function selectMediaFromPicker(id) {
     return;
   }
 
+  // CPT Builder featured image picker
+  if (mediaPickerState.blockId === '__cpt_builder_featured__') {
+    const payload = { id: item.id, url: item.url, alt: item.alt || item.original_name || '', title: item.title || '', caption: item.caption || '', width: item.width || null, height: item.height || null, sizes: { thumbnail: item.url, half: item.url, banner: item.url } };
+    document.getElementById('cptBuilderFeaturedInput').value = JSON.stringify(payload);
+    pageBuilderState.cptFeaturedImage = payload;
+    document.getElementById('cptBuilderFeaturedPreview').innerHTML = `<img src="${escapeHtml(getOptimizedUrl(item.url, 400, 70))}" style="max-width:100%;max-height:150px;object-fit:cover;border-radius:8px;">`;
+    closeMediaPicker();
+    return;
+  }
+
   // CPT Options image picker (header_img)
   if (mediaPickerState.blockId === '__cpt_options_img__') {
     const input = document.getElementById('cptOptionsImgInput');
@@ -8900,6 +9132,7 @@ function initGoogleMapField(uid) {
   const suggestionsEl = root.querySelector('.googlemap-suggestions');
   const latInput = root.querySelector('[name$="__lat"]');
   const lngInput = root.querySelector('[name$="__lng"]');
+  const addressInput = root.querySelector('[name$="__address"]');
   const placeIdInput = root.querySelector('[name$="__place_id"]');
   const streetNumberInput = root.querySelector('[name$="__street_number"]');
   const streetNameInput = root.querySelector('[name$="__street_name"]');
@@ -8967,6 +9200,7 @@ function initGoogleMapField(uid) {
           if (postCodeInput) postCodeInput.value = getCtx('postcode');
           if (cityInput) cityInput.value = getCtx('place');
           if (nameInput) nameInput.value = feature.place_name || '';
+          if (addressInput) addressInput.value = feature.place_name || '';
           suggestionsEl.innerHTML = '';
           suggestionsEl.style.display = 'none';
           showMiniMap(lat, lng);
@@ -10741,48 +10975,6 @@ function slugify(text) {
     .replace(/-+/g, '-');               // Replace multiple - with single -
 }
 
-async function generatePostSlug(editingPostId = null) {
-  const titleInput = document.getElementById('postTitle');
-  const slugInput = document.getElementById('postSlug');
-  const slugHelp = document.getElementById('postSlugHelp');
-
-  if (!titleInput || !slugInput) return;
-
-  const title = titleInput.value;
-  if (!title) {
-    slugInput.value = '';
-    return;
-  }
-
-  let slug = slugify(title);
-
-  // Check if slug already exists
-  try {
-    const posts = await apiFetch('/posts');
-    const existingSlugs = posts
-      .filter(p => p.id !== editingPostId)
-      .map(p => p.slug);
-
-    if (existingSlugs.includes(slug)) {
-      // Add number suffix if slug exists
-      let counter = 1;
-      let newSlug = slug;
-      while (existingSlugs.includes(newSlug)) {
-        newSlug = `${slug}-${counter}`;
-        counter++;
-      }
-      slug = newSlug;
-      slugHelp.innerHTML = `<span style="color: var(--warning)">⚠️ Slug modifié (original déjà utilisé)</span>`;
-    } else {
-      slugHelp.innerHTML = `<span style="color: var(--success)">✓ Slug disponible</span>`;
-    }
-  } catch (error) {
-    console.error('Error checking slug:', error);
-  }
-
-  slugInput.value = slug;
-}
-
 async function generateBuilderSlug() {
   const titleInput = document.querySelector('.builder-title');
   const slugInput = document.querySelector('.builder-slug');
@@ -10863,57 +11055,11 @@ async function generatePageSlug(editingPageId = null) {
   slugInput.value = slug;
 }
 
-async function generateCategorySlug(editingCatId = null) {
-  const nameInput = document.getElementById('categoryName');
-  const slugInput = document.getElementById('categorySlug');
-  const slugHelp = document.getElementById('categorySlugHelp');
-
-  if (!nameInput || !slugInput) return;
-
-  const name = nameInput.value;
-  if (!name) {
-    slugInput.value = '';
-    return;
-  }
-
-  let slug = slugify(name);
-
-  // Check if slug already exists
-  try {
-    const categories = await apiFetch('/categories');
-    const existingSlugs = categories
-      .filter(c => c.id !== editingCatId)
-      .map(c => c.slug);
-
-    if (existingSlugs.includes(slug)) {
-      // Add number suffix if slug exists
-      let counter = 1;
-      let newSlug = slug;
-      while (existingSlugs.includes(newSlug)) {
-        newSlug = `${slug}-${counter}`;
-        counter++;
-      }
-      slug = newSlug;
-      slugHelp.innerHTML = `<span style="color: var(--warning)">⚠️ Slug modifié (original déjà utilisé)</span>`;
-    } else {
-      slugHelp.innerHTML = `<span style="color: var(--success)">✓ Slug disponible</span>`;
-    }
-  } catch (error) {
-    console.error('Error checking slug:', error);
-  }
-
-  slugInput.value = slug;
-}
-
 // ========== UTILITIES ==========
 function closeModal() {
-  const postModal = document.getElementById('postModal');
-  const categoryModal = document.getElementById('categoryModal');
   const pageModal = document.getElementById('pageModal');
   const userModal = document.getElementById('userModal');
 
-  if (postModal) postModal.style.display = 'none';
-  if (categoryModal) categoryModal.style.display = 'none';
   if (pageModal) pageModal.style.display = 'none';
   if (userModal) userModal.style.display = 'none';
 }

@@ -7,7 +7,7 @@ import DeferredLoader from '../../components/DeferredLoader.astro';
 import SiteOverlays from '../../components/SiteOverlays.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
 import { getReferences, getReferenceCategories, getFrontendBootstrap, getCPTOptions, type ReferenceItem } from '../../lib/api';
-import { optimizedImageUrl } from '../../lib/module-helpers';
+import { optimizedImageUrl, setDefaultImageUrl, getDefaultImageUrl } from '../../lib/module-helpers';
 
 const REFS_PER_PAGE = 6;
 
@@ -19,6 +19,7 @@ const [{ siteInfo, styleSettings, siteSettings, navigation: navigationData, seco
 
 const siteName = siteInfo.siteName || SITE_TITLE;
 const siteDescription = siteInfo.siteDescription || SITE_DESCRIPTION;
+setDefaultImageUrl(siteSettings.replacement_image || '');
 
 // CPT options
 const archiveTitle = cptOptions.archive_title || 'Références';
@@ -55,9 +56,9 @@ function getMainImage(ref: ReferenceItem): string {
   if (photos.length > 0) return photos[0];
   if (ref.featured_image) {
     const fi = ref.featured_image as Record<string, any>;
-    return fi.sizes?.half || fi.url || '';
+    return fi.sizes?.half || fi.url || getDefaultImageUrl();
   }
-  return '';
+  return getDefaultImageUrl();
 }
 
 function getCategoryNames(ref: ReferenceItem): string {
@@ -367,7 +368,7 @@ function getCategoryNames(ref: ReferenceItem): string {
             </div>
           )}
 
-          <div class="module-references js_refs-container">
+          <div class="module-references js_refs-container" data-default-image={getDefaultImageUrl() || ''}>
             {/* Category filter tabs */}
             {categories.length > 0 && (
               <ul class="tabs">
@@ -484,6 +485,7 @@ function getCategoryNames(ref: ReferenceItem): string {
 
   var container = document.querySelector('.js_refs-container');
   if (!container) return;
+  var defaultImage = container.getAttribute('data-default-image') || '';
 
   var listEl = container.querySelector('.js_list-refs');
   var paginationEl = container.querySelector('.js_list-pagination');
@@ -563,7 +565,7 @@ function getCategoryNames(ref: ReferenceItem): string {
     var cf = ref.custom_fields || {};
     var photos = [];
     try { photos = JSON.parse(cf.photos || '[]'); } catch(e) {}
-    var mainImage = photos[0] || (ref.featured_image ? (ref.featured_image.sizes?.half || ref.featured_image.url || '') : '');
+    var mainImage = photos[0] || (ref.featured_image ? (ref.featured_image.sizes?.half || ref.featured_image.url || '') : '') || defaultImage;
     var categoryNames = ref.categories ? ref.categories.map(function(c) { return c.name; }).join(' - ') : '';
     var customerName = cf.customer_name || '';
     var slug = ref.slug;

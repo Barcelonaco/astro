@@ -488,7 +488,7 @@ body.scroll-up #header.transition .header-wrapper, body.scroll-down #header.tran
   opacity: 0;
   right: 5vw;
   transition: ease 0.5s;
-  *z-index: -1;
+  z-index: -1;
 }
 #header .top-menu {
   display: flex;

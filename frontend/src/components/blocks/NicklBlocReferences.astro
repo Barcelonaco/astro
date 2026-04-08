@@ -6,7 +6,7 @@
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { resolveLink } from '../../lib/module-classes';
-import { resolveImageUrl, resolveImageAlt, optimizedImageUrl, responsiveSrcset } from '../../lib/module-helpers';
+import { resolveImageUrl, resolveImageAlt, optimizedImageUrl, responsiveSrcset, getDefaultImageUrl } from '../../lib/module-helpers';
 import { getReferences, type ReferenceItem } from '../../lib/api';
 
 interface Props {
@@ -56,7 +56,7 @@ function getFeaturedImageUrl(ref: ReferenceItem): string {
   if (ref.featured_image) {
     return resolveImageUrl(ref.featured_image, apiOrigin, 'half');
   }
-  return '';
+  return getDefaultImageUrl() ? optimizedImageUrl(getDefaultImageUrl(), 600, 75) : '';
 }
 
 function getCategory(ref: ReferenceItem): string {

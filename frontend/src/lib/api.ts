@@ -342,6 +342,145 @@ export async function getGoogleReviews(limit?: number, minRating?: number): Prom
   }
 }
 
+// ============ ACTUALITES (CPT) ============
+
+export interface ActualiteItem {
+  id: number
+  title: string
+  slug: string
+  excerpt: string
+  content: string
+  featured_image: Record<string, any> | null
+  custom_fields: Record<string, any>
+  categories: Array<{ id: number; name: string; slug: string }>
+  status: 'draft' | 'published'
+  published_date: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ActualiteCategory {
+  id: number
+  name: string
+  slug: string
+}
+
+export async function getActualites(options?: {
+  status?: string
+  category?: string
+  limit?: number
+  offset?: number
+}): Promise<{ items: ActualiteItem[]; total: number } | ActualiteItem[]> {
+  const params = new URLSearchParams()
+  if (options?.status) params.set('status', options.status)
+  if (options?.category) params.set('category', options.category)
+  if (options?.limit) params.set('limit', String(options.limit))
+  if (options?.offset) params.set('offset', String(options.offset))
+  const qs = params.toString()
+  try {
+    const data = await fetchAPI(`/cpt/actualites${qs ? '?' + qs : ''}`)
+    return data || []
+  } catch {
+    return options?.limit ? { items: [], total: 0 } : []
+  }
+}
+
+export async function getActualiteBySlug(slug: string): Promise<ActualiteItem | null> {
+  try {
+    const data = await fetchAPI(`/cpt/actualites/${slug}`)
+    return data || null
+  } catch {
+    return null
+  }
+}
+
+export async function getActualiteCategories(): Promise<ActualiteCategory[]> {
+  try {
+    const data = await fetchAPI('/cpt/actualites/categories')
+    return data || []
+  } catch {
+    return []
+  }
+}
+
+// ============ EVENEMENTS (CPT) ============
+
+export interface EvenementItem {
+  id: number
+  title: string
+  slug: string
+  excerpt: string
+  content: string
+  featured_image: Record<string, any> | null
+  custom_fields: {
+    is_sticky?: boolean | string
+    sold_out?: boolean | string
+    cta?: string
+    desc?: string
+    text?: string
+    start_date?: string
+    end_date?: string
+    start_time?: string
+    end_time?: string
+    contact_name?: string
+    contact_phone?: string
+    contact_email?: string
+    website?: string
+    price?: string
+    location_name?: string
+    location?: string
+  }
+  categories: Array<{ id: number; name: string; slug: string }>
+  status: 'draft' | 'published'
+  published_date: string
+  created_at: string
+  updated_at: string
+}
+
+export interface EvenementCategory {
+  id: number
+  name: string
+  slug: string
+}
+
+export async function getEvenements(options?: {
+  status?: string
+  category?: string
+  limit?: number
+  offset?: number
+}): Promise<{ items: EvenementItem[]; total: number } | EvenementItem[]> {
+  const params = new URLSearchParams()
+  if (options?.status) params.set('status', options.status)
+  if (options?.category) params.set('category', options.category)
+  if (options?.limit) params.set('limit', String(options.limit))
+  if (options?.offset) params.set('offset', String(options.offset))
+  const qs = params.toString()
+  try {
+    const data = await fetchAPI(`/cpt/evenements${qs ? '?' + qs : ''}`)
+    return data || []
+  } catch {
+    return options?.limit ? { items: [], total: 0 } : []
+  }
+}
+
+export async function getEvenementBySlug(slug: string): Promise<EvenementItem | null> {
+  try {
+    const data = await fetchAPI(`/cpt/evenements/${slug}`)
+    return data || null
+  } catch {
+    return null
+  }
+}
+
+export async function getEvenementCategories(): Promise<EvenementCategory[]> {
+  try {
+    const data = await fetchAPI('/cpt/evenements/categories')
+    return data || []
+  } catch {
+    return []
+  }
+}
+
 // Helper to format content (since it's now plain text/HTML from MySQL)
 export function formatContent(content: string): string {
   if (!content) return ''

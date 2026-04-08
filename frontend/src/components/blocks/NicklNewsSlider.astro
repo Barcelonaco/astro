@@ -1,10 +1,12 @@
 ---
 /**
  * Module NewsSlider — Reproduit news-slider.blade.php
- * Slider d'actualités. Fetch les posts depuis l'API CMS au build time.
+ * Slider d'actualités. Fetch les actualités depuis le CPT actualites au build time.
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
-import { isTruthy, resolveLink } from '../../lib/module-classes';
+import { isTruthy } from '../../lib/module-classes';
+import { optimizedImageUrl, responsiveSrcset, getDefaultImageUrl } from '../../lib/module-helpers';
+import { getActualites, type ActualiteItem } from '../../lib/api';
 
 interface Props {
   data: Record<string, any>;
@@ -12,58 +14,167 @@ interface Props {
 
 const { data } = Astro.props;
 
-const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
-
 const displayPosts = (data.display_posts as string) || '1';
 const isManual = isTruthy(data.is_manual);
 const displayArchiveLink = isTruthy(data.display_archive_link);
 const archiveLinkLabel = (data.archive_link_label as string) || 'Voir toutes les actualités';
 
-// Fetch posts depuis l'API CMS
-let posts: any[] = [];
-try {
-  const res = await fetch(`${API_URL}/posts?status=published&limit=6`);
-  if (res.ok) {
-    const json = await res.json();
-    posts = json.posts || json || [];
-    if (!Array.isArray(posts)) posts = [];
+// Fetch actualités depuis le CPT
+let posts: ActualiteItem[] = [];
+if (isManual && data.news_id) {
+  const ids = Array.isArray(data.news_id) ? data.news_id : [];
+  if (ids.length > 0) {
+    const allResult = await getActualites({ status: 'published', limit: 100 });
+    const allItems = Array.isArray(allResult) ? allResult : allResult.items;
+    posts = ids
+      .map((id: number) => allItems.find(a => a.id === id))
+      .filter((a): a is ActualiteItem => !!a)
+      .slice(0, 6);
   }
-} catch {
-  // Silently fail — module sera vide
+} else {
+  const result = await getActualites({ status: 'published', limit: 6 });
+  posts = Array.isArray(result) ? result.slice(0, 6) : result.items.slice(0, 6);
+}
+
+function getImage(item: ActualiteItem): string {
+  if (item.featured_image) {
+    const fi = item.featured_image as Record<string, any>;
+    return fi.sizes?.['module-news-slider'] || fi.sizes?.half || fi.url || getDefaultImageUrl();
+  }
+  return getDefaultImageUrl();
+}
+
+function getCategory(item: ActualiteItem): string {
+  return item.categories?.[0]?.name || '';
+}
+
+function getDate(item: ActualiteItem): string {
+  const d = item.published_date || item.created_at;
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('fr-FR');
 }
 ---
 
 <NicklModuleWrapper data={data} moduleName="news-slider" containerLarge>
-  <div class="slider-wrapper">
-    <div class={`swiper slider js_news-slider columns-${displayPosts}`}>
-      <div class="swiper-wrapper">
-        {posts.map((post) => (
-          <div class="swiper-slide item">
-            <a href={`/blog/${post.slug}`} class="link">
-              {post.featured_image && (
-                <div class="illus-wrapper">
-                  <img src={post.featured_image} srcset={responsiveSrcset(post.featured_image, [300, 450, 600], 75) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw" alt={post.title || ''} class="illus" width="600" height="400" loading="lazy" />
-                </div>
-              )}
-              <div class="desc">
-                {post.published_date && (
-                  <time class="date">{new Date(post.published_date).toLocaleDateString('fr-FR')}</time>
-                )}
-                <h3 class="title">{post.title}</h3>
-                {post.excerpt && <p class="txt">{post.excerpt}</p>}
+  {posts.length > 0 ? (
+    <div class="slider-wrapper">
+      <div class={`swiper slider js_news-slider columns-${displayPosts}`}>
+        <div class="swiper-wrapper">
+          {posts.map((post) => {
+            const image = getImage(post);
+            const category = getCategory(post);
+            const date = getDate(post);
+            return (
+              <div class="swiper-slide item">
+                <a href={`/actualites/${post.slug}`} class="link">
+                  <div class="illus-wrapper">
+                    {image ? (
+                      <img
+                        src={optimizedImageUrl(image, 600, 75)}
+                        srcset={responsiveSrcset(image, [300, 450, 600], 75) || undefined}
+                        sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw"
+                        alt={post.title || ''}
+                        class="illus"
+                        width="600"
+                        height="400"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div class="illus" style="background:var(--color-primary, #eee);"></div>
+                    )}
+                    <div class="overlay">
+                      <span class="icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>
+                      </span>
+                      <span>Lire l'actualit&eacute;</span>
+                    </div>
+                  </div>
+                  <div class="desc">
+                    {category && <p class="category">{category}</p>}
+                    {date && <time class="date">{date}</time>}
+                    <h3 class="title">{post.title}</h3>
+                    {post.excerpt && <p class="txt">{post.excerpt}</p>}
+                    <div class="btn-wrapper">
+                      <span class="fake-link btn btn-tertiary color-primary">Lire l'actualit&eacute;</span>
+                    </div>
+                  </div>
+                </a>
               </div>
-            </a>
-          </div>
-        ))}
+            );
+          })}
+        </div>
       </div>
+      <button type="button" class="slider-navigation prev"></button>
+      <button type="button" class="slider-navigation next"></button>
     </div>
-    <button type="button" class="slider-navigation prev"></button>
-    <button type="button" class="slider-navigation next"></button>
-  </div>
+  ) : (
+    <p class="no-content">Aucune actualité pour le moment.</p>
+  )}
 
   {displayArchiveLink && (
     <div class="btn-more-wrapper">
-      <a href="/blog" class="btn btn-tertiary">{archiveLinkLabel}</a>
+      <a href="/actualites" class="btn btn-tertiary">{archiveLinkLabel}</a>
     </div>
   )}
 </NicklModuleWrapper>
+
+<style is:global>
+  /* Fix: Nickl CSS overrides tertiary bg with --color-default (text color swap).
+     Use the actual tertiary color instead. */
+  .module-news-slider.has-background-tertiary:not(.cols_have_background) {
+    background-color: var(--color-tertiary, #d6d6d6);
+  }
+</style>
+
+<script is:inline>
+(function() {
+  function initNewsSliders() {
+    if (!window.Swiper) return;
+    document.querySelectorAll('.module-news-slider .js_news-slider').forEach(function(el) {
+      if (el.swiper) return;
+
+      var slidesPerView = 1;
+      var breakpoints = {};
+
+      if (el.classList.contains('columns-2')) {
+        breakpoints = { 601: { slidesPerView: 2 } };
+      } else if (el.classList.contains('columns-3')) {
+        breakpoints = { 601: { slidesPerView: 1 }, 1025: { slidesPerView: 3 } };
+      } else if (el.classList.contains('columns-4')) {
+        breakpoints = { 601: { slidesPerView: 1 }, 1025: { slidesPerView: 4 } };
+      }
+
+      // Check if we have enough slides to need a slider
+      var items = el.querySelectorAll('.item');
+      var w = window.innerWidth;
+      var currentPerView = slidesPerView;
+      for (var bp in breakpoints) {
+        if (w >= parseInt(bp)) currentPerView = breakpoints[bp].slidesPerView;
+      }
+      if (items.length <= currentPerView) return;
+
+      var wrapper = el.closest('.slider-wrapper') || el.parentElement;
+      new window.Swiper(el, {
+        loop: true,
+        speed: 750,
+        slidesPerView: slidesPerView,
+        breakpoints: breakpoints,
+        spaceBetween: 26,
+        navigation: {
+          nextEl: wrapper.querySelector('.next'),
+          prevEl: wrapper.querySelector('.prev')
+        }
+      });
+    });
+  }
+
+  if (window.Swiper) {
+    initNewsSliders();
+  } else {
+    var check = setInterval(function() {
+      if (window.Swiper) { clearInterval(check); initNewsSliders(); }
+    }, 500);
+    setTimeout(function() { clearInterval(check); }, 15000);
+  }
+})();
+</script>

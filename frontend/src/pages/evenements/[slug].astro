@@ -1,0 +1,697 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import ModuleStyles from '../../components/ModuleStyles.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import BlockRenderer from '../../components/BlockRenderer.astro';
+import DeferredLoader from '../../components/DeferredLoader.astro';
+import SiteOverlays from '../../components/SiteOverlays.astro';
+import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
+import { getEvenements, getEvenementBySlug, getFrontendBootstrap, type EvenementItem } from '../../lib/api';
+import { cleanHtml } from '../../lib/module-classes';
+import { optimizedImageUrl, responsiveSrcset, setDefaultImageUrl, getDefaultImageUrl } from '../../lib/module-helpers';
+
+export async function getStaticPaths() {
+  const result = await getEvenements({ status: 'published', limit: 10000 });
+  const items = Array.isArray(result) ? result : result.items;
+  return items.map((item: any) => ({ params: { slug: item.slug } }));
+}
+
+const { slug } = Astro.params;
+
+const [item, { siteInfo, styleSettings, siteSettings, navigation: navigationData, secondaryNavigation }] = await Promise.all([
+  getEvenementBySlug(slug as string),
+  getFrontendBootstrap(),
+]);
+
+const siteName = siteInfo.siteName || SITE_TITLE;
+const siteDescription = siteInfo.siteDescription || SITE_DESCRIPTION;
+setDefaultImageUrl(siteSettings.replacement_image || '');
+
+if (!item) {
+  throw new Error(`Événement not found: ${slug}`);
+}
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ');
+
+const cf = item.custom_fields || {};
+const category = item.categories?.[0]?.name || '';
+
+// Date formatting
+function formatEventDate(): string {
+  const startDate = cf.start_date;
+  const endDate = cf.end_date;
+  const startTime = cf.start_time;
+  const endTime = cf.end_time;
+  if (!startDate) return '';
+
+  let html = '';
+  const sd = new Date(startDate.replace(/\//g, '-'));
+  const fmt = (d: Date) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  if (endDate && endDate !== startDate) {
+    const ed = new Date(endDate.replace(/\//g, '-'));
+    html += `Du ${fmt(sd)} au ${fmt(ed)}`;
+  } else {
+    html += `Le ${fmt(sd)}`;
+  }
+
+  if (startTime) {
+    const st = startTime.replace(':', 'h');
+    if (endTime) {
+      html += ` de ${st} à ${endTime.replace(':', 'h')}`;
+    } else {
+      html += ` à partir de ${st}`;
+    }
+  }
+
+  return html;
+}
+
+const eventDate = formatEventDate();
+const soldOut = cf.sold_out === true || cf.sold_out === '1' || cf.sold_out === 1;
+
+// Featured image
+let featuredImage = '';
+if (item.featured_image) {
+  const fi = item.featured_image as Record<string, any>;
+  featuredImage = fi.sizes?.banner || fi.url || '';
+}
+if (!featuredImage) featuredImage = getDefaultImageUrl();
+
+// Location
+let location: Record<string, any> | null = null;
+if (cf.location) {
+  try {
+    location = typeof cf.location === 'string' ? JSON.parse(cf.location) : cf.location;
+  } catch {}
+}
+
+// CTA link
+let ctaLink: { url: string; title: string; target: string } | null = null;
+if (cf.cta) {
+  try {
+    ctaLink = typeof cf.cta === 'string' ? JSON.parse(cf.cta) : cf.cta;
+  } catch {}
+}
+
+// Parse content blocks
+let blocks: any[] | null = null;
+if (item.content) {
+  try {
+    const parsed = JSON.parse(item.content);
+    if (Array.isArray(parsed) && parsed.every((b: any) => b && typeof b.type === 'string')) {
+      blocks = parsed;
+    }
+  } catch {}
+}
+
+// Location helpers
+function getLocationFullAddress(): string {
+  if (!location) return '';
+  const parts = [];
+  if (location.street_number) parts.push(location.street_number);
+  if (location.street_name) parts.push(location.street_name);
+  const line1 = parts.join(' ');
+  const line2 = [location.post_code, location.city].filter(Boolean).join(' ');
+  return [line1, line2].filter(Boolean).join(', ');
+}
+
+const locationAddress = location?.address || getLocationFullAddress();
+const hasMap = location && location.lat && location.lng;
+
+// Calendar data
+const calStart = `${cf.start_date || ''} ${cf.start_time || ''}`.trim();
+const calEnd = `${cf.end_date || cf.start_date || ''} ${cf.end_time || ''}`.trim();
+---
+
+<!doctype html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`${item.title} | ${siteName}`} description={cf.desc || siteDescription} styleSettings={styleSettings} siteSettings={siteSettings} />
+    {blocks && <ModuleStyles blocks={blocks} />}
+    {hasMap && <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />}
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigationData} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+    <main id="main" class="main-page page-single-event" role="main">
+      <section>
+        <article>
+          <div class="head">
+            <div class="container">
+              <div class="head-top">
+                {category && <span class="category">{category}</span>}
+                <a class="btn btn-tertiary btn-back" href="/evenements">
+                  <span class="icon" aria-hidden="true">&lsaquo;</span>
+                  Retour aux événements
+                </a>
+              </div>
+              <h1 class="title title-section-1 title-page">{item.title}</h1>
+              <div class="head-bottom">
+                {eventDate && <p class="date">{eventDate}</p>}
+                {cf.price && <p class="price">{cf.price}{soldOut ? ' - Complet' : ''}</p>}
+              </div>
+            </div>
+          </div>
+
+          <div class="container">
+            {/* Featured image */}
+            <div class="content-main">
+              {featuredImage && (
+                <div class="illus-wrapper">
+                  <img
+                    src={optimizedImageUrl(featuredImage, 1200, 80)}
+                    srcset={responsiveSrcset(featuredImage, [600, 900, 1200], 80) || undefined}
+                    sizes="(max-width: 720px) 100vw, 720px"
+                    alt={item.title}
+                    class="illus"
+                    loading="eager"
+                  />
+                </div>
+              )}
+
+              {/* Description */}
+              {cf.text && (
+                <div class="editor txt">
+                  <Fragment set:html={cf.text} />
+                </div>
+              )}
+            </div>
+
+            {/* Buttons */}
+            <div class="btn-wrapper">
+              {cf.start_date && (
+                <div class="atc-wrapper" id="atcWrapper">
+                  <button
+                    type="button"
+                    id="addToCal"
+                    data-atc-start={calStart}
+                    data-atc-end={calEnd}
+                    data-atc-title={`${siteName} - ${item.title}`}
+                    data-atc-description={cf.desc || ''}
+                    data-atc-location={locationAddress || undefined}
+                    class="btn btn-primary"
+                  >+ Ajouter au calendrier</button>
+                  <div class="atc-dropdown" id="atcDropdown">
+                    <button type="button" class="atc-option" data-cal="apple">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="#333"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                      <span>Apple</span>
+                    </button>
+                    <button type="button" class="atc-option" data-cal="google">
+                      <svg width="24" height="24" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                      <span>Google</span>
+                    </button>
+                    <button type="button" class="atc-option" data-cal="yahoo">
+                      <svg width="24" height="24" viewBox="0 0 24 24"><path d="M5.55 3l4.07 8.19L13.7 3h4.29l-6.47 12.58V21h-3.9v-5.42L1.26 3h4.29z" fill="#6001D2"/></svg>
+                      <span>Yahoo</span>
+                    </button>
+                    <button type="button" class="atc-option" data-cal="outlook">
+                      <svg width="24" height="24" viewBox="0 0 24 24"><path d="M24 7.387v10.478c0 .23-.08.424-.238.576-.16.154-.352.23-.578.23h-8.547v-6.959l1.6 1.229c.1.077.212.116.337.116s.237-.04.337-.116L24 7.387z" fill="#0364B8"/><path d="M16.514 7.143l-1.229.945L12 5.209l-3.286 2.88-1.228-.946L12 3.857l4.514 3.286z" fill="#0A2767" opacity=".5"/><path d="M15.637 12.672v-1.37L12.308 14H7.437v6.67c0 .23.08.423.238.577.16.154.353.23.578.23h8.547V12.672h-1.163z" fill="#28A8EA"/><path d="M7.437 6.711v6.959l-1.6-1.229a.502.502 0 0 0-.337-.116.502.502 0 0 0-.337.116L0 17.865V7.387l5.163-3.53L7.437 6.712z" fill="#0078D4"/><path d="M7.437 6.711L0 12.441v5.424c0 .23.08.424.237.576.16.154.353.23.579.23h6.621V6.712z" fill="#0364B8"/><path d="M12.457 5.209l-5.02 1.502V20.67h9.2V6.712l-4.18-1.503z" fill="#000" opacity=".1"/><path d="M2.37 19.44c0 .662.53 1.198 1.185 1.198h13.57c.654 0 1.184-.536 1.184-1.199V8.67L12.457 5.21 2.37 8.67v10.77z" fill="#0A2767" opacity=".2"/><path d="M1.763 8.422v9.94a1.26 1.26 0 0 0 1.258 1.259h13.957a1.26 1.26 0 0 0 1.259-1.258V8.422L12 12.441 1.763 8.422z" fill="#28A8EA"/><path d="M1.763 8.422L12 12.441l6.237-4.019v-.863L12 11.578 1.763 7.559v.863z" fill="#0A2767" opacity=".1"/><path d="M1.763 8.422L12 12.441l6.237-4.019V6.711L12 10.73 1.763 6.711v1.711z" fill="#0A2767" opacity=".05"/></svg>
+                      <span>Outlook</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+              {ctaLink?.url && (
+                <a class="btn btn-secondary color-secondary-full" href={ctaLink.url} target={ctaLink.target || '_self'}>{ctaLink.title || 'En savoir plus'}</a>
+              )}
+            </div>
+
+            {/* Récapitulatif */}
+            <div class="event-recapitulatif">
+              <div class="event-recapitulatif-title">
+                <h4>Récapitulatif</h4>
+                <span></span>
+              </div>
+              <div class="event-recapitulatif-content">
+                {/* Date + Lieu */}
+                <div class="event-recapitulatif-item">
+                  <div class="event-recapitulatif-sub-item">
+                    <h5>Date et heure</h5>
+                    <p>{eventDate}</p>
+                  </div>
+                  {location && (
+                    <div class="event-recapitulatif-sub-item">
+                      <h5>Lieu</h5>
+                      <p>
+                        {cf.location_name && <><strong>{cf.location_name}</strong><br /></>}
+                        {location.street_number} {location.street_name}
+                        {(location.street_number || location.street_name) && <br />}
+                        {location.post_code} {location.city}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Map */}
+                {hasMap && (
+                  <div class="event-map-wrapper">
+                    <div
+                      id="eventMap"
+                      class="event-map"
+                      data-lat={location!.lat}
+                      data-lng={location!.lng}
+                    ></div>
+                  </div>
+                )}
+
+                {/* Comment s'y rendre */}
+                {hasMap && (
+                  <div class="event-recapitulatif-item">
+                    <div class="event-recapitulatif-sub-item">
+                      <h5>Comment s'y rendre</h5>
+                      <div class="locomotion">
+                        <a target="_blank" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(locationAddress)}&travelmode=walking`} class="locomotion-link" title="À pied">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>
+                        </a>
+                        <span class="locomotion-sep">|</span>
+                        <a target="_blank" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(locationAddress)}&travelmode=bicycling`} class="locomotion-link" title="À vélo">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5 2.1v-2c-1.4 0-2.5-.5-3.4-1.4L13.1 5.2c-.4-.4-1-.6-1.6-.6s-1.1.2-1.4.6L7.8 7.5c-.4.4-.6.9-.6 1.4 0 .6.2 1.1.6 1.4L11 13v5h2v-6.2l-2.2-2.3zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z"/></svg>
+                        </a>
+                        <span class="locomotion-sep">|</span>
+                        <a target="_blank" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(locationAddress)}&travelmode=driving`} class="locomotion-link" title="En voiture">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+                        </a>
+                        <span class="locomotion-sep">|</span>
+                        <a target="_blank" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(locationAddress)}&travelmode=transit`} class="locomotion-link" title="En transport">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c-4.42 0-8 .5-8 4v9.5C4 17.43 5.57 19 7.5 19L6 20.5v.5h12v-.5L16.5 19c1.93 0 3.5-1.57 3.5-3.5V6c0-3.5-3.58-4-8-4zM7.5 17c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm3.5-6H6V6h5v5zm5.5 6c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6h-5V6h5v5z"/></svg>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Organisateur + Site Web */}
+                {(cf.contact_name || cf.website) && (
+                  <div class="event-recapitulatif-item">
+                    {cf.contact_name && (
+                      <div class="event-recapitulatif-sub-item">
+                        <h5>Organisateur</h5>
+                        <p>{cf.contact_name}</p>
+                      </div>
+                    )}
+                    {cf.website && (
+                      <div class="event-recapitulatif-sub-item">
+                        <h5>Site Web</h5>
+                        <p><a href={cf.website} target="_blank" class="btn btn-tertiary">{cf.website}</a></p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Contact */}
+                {(cf.contact_email || cf.contact_phone) && (
+                  <div class="event-recapitulatif-item">
+                    <div class="event-recapitulatif-sub-item">
+                      <h5>Contact</h5>
+                      <div class="txt editor">
+                        {cf.contact_phone && (
+                          <a href={`tel:${cf.contact_phone.replace(/\s/g, '')}`} class="phone">{cf.contact_phone}</a>
+                        )}
+                        {cf.contact_email && cf.contact_phone && ' - '}
+                        {cf.contact_email && (
+                          <a href={`mailto:${cf.contact_email}`}>{cf.contact_email}</a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Flexible content modules */}
+          {blocks && blocks.length > 0 && (
+            <div class="content content-blocks">
+              <BlockRenderer blocks={blocks} />
+            </div>
+          )}
+        </article>
+      </section>
+    </main>
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+  </body>
+</html>
+
+<style is:global>
+  .page-single-event {
+    padding-bottom: 60px;
+  }
+
+  /* Head */
+  .page-single-event .head {
+    padding-top: 60px;
+    padding-bottom: 0;
+  }
+  .page-single-event .head-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: .75rem;
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+  .page-single-event .head-top .category {
+    font-size: 14px;
+    line-height: 1.4;
+    letter-spacing: .05em;
+    color: var(--color-default, #333);
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .page-single-event .head-top .btn-back .icon {
+    margin-right: .25rem;
+  }
+  .page-single-event .title-page {
+    margin: 0 0 .5rem;
+    color: var(--color-primary, #224f5a);
+    text-transform: uppercase;
+  }
+  .page-single-event .head-bottom {
+    display: flex;
+    align-items: baseline;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 2rem;
+  }
+  .page-single-event .head-bottom .date {
+    font-size: 16px;
+    color: var(--color-default, #333);
+  }
+  .page-single-event .head-bottom .price {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-primary, #224f5a);
+  }
+
+  /* Content */
+  .page-single-event .content-main {
+    margin-bottom: 2rem;
+  }
+  .page-single-event .content-main .illus-wrapper {
+    position: relative;
+    width: 100%;
+    margin-bottom: 2rem;
+    overflow: hidden;
+    aspect-ratio: 16 / 7;
+  }
+  .border-rounded .page-single-event .content-main .illus-wrapper {
+    border-radius: var(--border-radius, 0);
+  }
+  .page-single-event .content-main .illus {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+  }
+  .page-single-event .content-main .editor {
+    font-size: 16px;
+    line-height: 1.7;
+  }
+
+  /* Buttons */
+  .page-single-event .btn-wrapper {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 3rem;
+  }
+  .page-single-event .atc-wrapper {
+    position: relative;
+  }
+  .page-single-event .atc-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.12);
+    padding: 8px;
+    z-index: 10;
+    white-space: nowrap;
+  }
+  .page-single-event .atc-dropdown::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    box-shadow: -2px -2px 4px rgba(0,0,0,.04);
+  }
+  .page-single-event .atc-dropdown.open {
+    display: flex;
+    gap: 4px;
+  }
+  .page-single-event .atc-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 16px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    color: #333;
+    transition: all .15s ease;
+  }
+  .page-single-event .atc-option:hover {
+    background: #f5f5f5;
+    border-color: #ddd;
+  }
+
+  /* Récapitulatif */
+  .page-single-event .event-recapitulatif {
+    margin-bottom: 3rem;
+  }
+  .page-single-event .event-recapitulatif-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 0;
+  }
+  .page-single-event .event-recapitulatif-title h4 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--color-default, #333);
+    white-space: nowrap;
+  }
+  .page-single-event .event-recapitulatif-title span {
+    flex: 1;
+    height: 1px;
+    background: var(--color-default, #333);
+    opacity: .2;
+  }
+  .page-single-event .event-recapitulatif-content {
+    padding: 1.5rem 0;
+  }
+  .page-single-event .event-recapitulatif-item {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    padding: 1rem 0;
+  }
+  .page-single-event .event-recapitulatif-sub-item {
+    flex: 1;
+    min-width: 200px;
+  }
+  .page-single-event .event-recapitulatif-sub-item h5 {
+    margin: 0 0 .5rem;
+    font-size: .8125rem;
+    text-transform: none;
+    letter-spacing: .02em;
+    color: var(--color-default, #333);
+    font-weight: 700;
+  }
+  .page-single-event .event-recapitulatif-sub-item p {
+    margin: 0;
+    font-size: .9375rem;
+    line-height: 1.6;
+  }
+
+  /* Map */
+  .page-single-event .event-map-wrapper {
+    margin: 1rem 0;
+  }
+  .page-single-event .event-map {
+    width: 100%;
+    height: 300px;
+    border-radius: var(--border-radius, 0);
+  }
+
+  /* Locomotion */
+  .page-single-event .locomotion {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-top: .5rem;
+  }
+  .page-single-event .locomotion-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-primary, #224f5a);
+    transition: opacity .2s ease;
+    border: 0;
+  }
+  .page-single-event .locomotion-link:hover {
+    opacity: .6;
+  }
+  .page-single-event .locomotion-link svg {
+    fill: var(--color-primary, #224f5a);
+  }
+  .page-single-event .locomotion-sep {
+    color: var(--color-primary, #224f5a);
+    opacity: .4;
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  /* Content blocks */
+  .page-single-event .content-blocks {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+  }
+
+  @media (max-width: 720px) {
+    .page-single-event .head {
+      padding-top: 30px;
+    }
+    .page-single-event .head-top {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .page-single-event .event-map {
+      height: 200px;
+    }
+  }
+</style>
+
+<script is:inline>
+(function() {
+  var btn = document.getElementById('addToCal');
+  var dropdown = document.getElementById('atcDropdown');
+  if (!btn || !dropdown) return;
+
+  var start = btn.getAttribute('data-atc-start') || '';
+  var end = btn.getAttribute('data-atc-end') || '';
+  var title = btn.getAttribute('data-atc-title') || '';
+  var desc = btn.getAttribute('data-atc-description') || '';
+  var loc = btn.getAttribute('data-atc-location') || '';
+
+  // Toggle dropdown
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+  });
+  document.addEventListener('click', function() {
+    dropdown.classList.remove('open');
+  });
+  dropdown.addEventListener('click', function(e) { e.stopPropagation(); });
+
+  // Format helpers
+  function formatICS(dateStr) {
+    if (!dateStr) return '';
+    var d = dateStr.replace(/[\/\-]/g, '').replace(/\s+/, 'T').replace(/:/g, '');
+    if (d.indexOf('T') === -1) return d;
+    return d.substring(0, 8) + 'T' + d.substring(9).padEnd(4, '0') + '00';
+  }
+  function formatGoogle(dateStr) {
+    return formatICS(dateStr);
+  }
+  function formatYahoo(dateStr) {
+    return formatICS(dateStr);
+  }
+
+  // Download .ics (Apple / Outlook)
+  function downloadICS() {
+    var icsStart = formatICS(start);
+    var icsEnd = formatICS(end) || icsStart;
+    var ics = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Event//FR', 'BEGIN:VEVENT',
+      'DTSTART:' + icsStart, 'DTEND:' + icsEnd,
+      'SUMMARY:' + title, 'DESCRIPTION:' + desc.replace(/\n/g, '\\n'),
+      'LOCATION:' + loc, 'END:VEVENT', 'END:VCALENDAR'
+    ].join('\r\n');
+    var blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'event.ics'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Calendar option handlers
+  dropdown.querySelectorAll('.atc-option').forEach(function(opt) {
+    opt.addEventListener('click', function() {
+      var cal = opt.getAttribute('data-cal');
+      var gs = formatGoogle(start);
+      var ge = formatGoogle(end) || gs;
+
+      if (cal === 'apple') {
+        downloadICS();
+      } else if (cal === 'google') {
+        var url = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+          + '&text=' + encodeURIComponent(title)
+          + '&dates=' + gs + '/' + ge
+          + '&details=' + encodeURIComponent(desc)
+          + '&location=' + encodeURIComponent(loc);
+        window.open(url, '_blank');
+      } else if (cal === 'yahoo') {
+        var url = 'https://calendar.yahoo.com/?v=60'
+          + '&title=' + encodeURIComponent(title)
+          + '&st=' + gs + '&et=' + ge
+          + '&desc=' + encodeURIComponent(desc)
+          + '&in_loc=' + encodeURIComponent(loc);
+        window.open(url, '_blank');
+      } else if (cal === 'outlook') {
+        var url = 'https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent'
+          + '&subject=' + encodeURIComponent(title)
+          + '&startdt=' + gs + '&enddt=' + ge
+          + '&body=' + encodeURIComponent(desc)
+          + '&location=' + encodeURIComponent(loc);
+        window.open(url, '_blank');
+      }
+      dropdown.classList.remove('open');
+    });
+  });
+
+  // Mapbox map
+  var mapEl = document.getElementById('eventMap');
+  if (mapEl) {
+    var lat = parseFloat(mapEl.dataset.lat);
+    var lng = parseFloat(mapEl.dataset.lng);
+    if (lat && lng) {
+      var script = document.createElement('script');
+      script.src = 'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js';
+      script.onload = function() {
+        mapboxgl.accessToken = 'pk.eyJ1IjoiYmFyY2Vsb25hLWNvIiwiYSI6ImNsbm9mZmN3bzBpM2Yya29kcWYxbnZpcGkifQ.gsHaJQAk_Ua4vBbt3DxNGQ';
+        var map = new mapboxgl.Map({
+          container: mapEl,
+          style: 'mapbox://styles/mapbox/streets-v12',
+          center: [lng, lat],
+          zoom: 15,
+          pitch: 50
+        });
+        map.addControl(new mapboxgl.NavigationControl());
+        new mapboxgl.Marker().setLngLat([lng, lat]).addTo(map);
+      };
+      document.head.appendChild(script);
+    }
+  }
+})();
+</script>

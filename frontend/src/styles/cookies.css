@@ -21,8 +21,6 @@
   right: 120px;
   width: 227px;
   height: 242px;
-  background: url("~@images/svg/cookies-light.svg") no-repeat center;
-  background-size: contain;
   content: "";
   transform: translate(50%, -50%);
 }
@@ -181,8 +179,7 @@
   width: 62px;
   height: 66px;
   margin-left: 20px;
-  background: url("~@images/svg/cookies-light.svg") no-repeat center;
-  background-size: contain;
+  /* cookie icon removed — SVG not available in Astro build */
   content: "";
 }
 #cc-main .pm-wrapper .pm--box {
@@ -230,8 +227,7 @@
   width: 62px;
   height: 66px;
   margin-left: 20px;
-  background: url("~@images/svg/cookies-light.svg") no-repeat center;
-  background-size: contain;
+  /* cookie icon removed — SVG not available in Astro build */
   content: "";
 }
 #cc-main .cc-preferences-modal .cm__btn .cc-btn-title {

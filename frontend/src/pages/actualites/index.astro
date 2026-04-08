@@ -1,0 +1,457 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import ModuleStyles from '../../components/ModuleStyles.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import DeferredLoader from '../../components/DeferredLoader.astro';
+import SiteOverlays from '../../components/SiteOverlays.astro';
+import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
+import { getActualites, getActualiteCategories, getFrontendBootstrap, getCPTOptions, type ActualiteItem } from '../../lib/api';
+import { optimizedImageUrl, responsiveSrcset, setDefaultImageUrl, getDefaultImageUrl } from '../../lib/module-helpers';
+
+const NEWS_PER_PAGE = 7;
+
+const [{ siteInfo, styleSettings, siteSettings, navigation: navigationData, secondaryNavigation }, categories, cptOptions] = await Promise.all([
+  getFrontendBootstrap(),
+  getActualiteCategories(),
+  getCPTOptions('actualites'),
+]);
+
+const siteName = siteInfo.siteName || SITE_TITLE;
+const siteDescription = siteInfo.siteDescription || SITE_DESCRIPTION;
+setDefaultImageUrl(siteSettings.replacement_image || '');
+
+// CPT options
+const archiveTitle = cptOptions.archive_title || cptOptions.title || 'Actualités';
+const showTitle = cptOptions.title_in_header !== 'hideTitle';
+const useH1 = cptOptions.h1_in_header !== 'no';
+const archiveDisplay = cptOptions.archive_display || 'column-1';
+
+// Initial load
+const initialResult = await getActualites({ status: 'published', limit: NEWS_PER_PAGE });
+const initialNews = Array.isArray(initialResult) ? initialResult : initialResult.items;
+const totalNews = Array.isArray(initialResult) ? initialResult.length : initialResult.total;
+const hasMore = totalNews > NEWS_PER_PAGE;
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ');
+
+function getMainImage(item: ActualiteItem): string {
+  if (item.featured_image) {
+    const fi = item.featured_image as Record<string, any>;
+    return fi.sizes?.['module-news-slider'] || fi.sizes?.half || fi.url || getDefaultImageUrl();
+  }
+  return getDefaultImageUrl();
+}
+
+function getCategoryNames(item: ActualiteItem): string {
+  if (!item.categories || item.categories.length === 0) return '';
+  return item.categories.map(c => c.name).join(' - ');
+}
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+---
+
+<!doctype html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`${archiveTitle} | ${siteName}`} description={siteDescription} styleSettings={styleSettings} siteSettings={siteSettings} />
+    <ModuleStyles blocks={null} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigationData} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+    <main id="main" class="main-page page-archive-news js_actu-container" role="main" data-default-image={getDefaultImageUrl() || ''}>
+      <section>
+        <div class="container-large">
+          {showTitle && (
+            <div class="archive-top">
+              {useH1 ? (
+                <h1 class="title title-section-1">{archiveTitle}</h1>
+              ) : (
+                <p class="title title-section-1">{archiveTitle}</p>
+              )}
+            </div>
+          )}
+
+          {/* Category filter tabs */}
+          {categories.length > 0 && (
+            <ul class="tabs">
+              <li class="tab">
+                <button type="button" class="link active js_change-term" data-value="all">Tout</button>
+              </li>
+              {categories.map((cat) => (
+                <li class="tab">
+                  <button type="button" class="link js_change-term" data-value={cat.slug}>{cat.name}</button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* News list */}
+          <ul class="list-single js_list-actu">
+            {initialNews.map((item, k) => {
+              const image = getMainImage(item);
+              const category = getCategoryNames(item);
+              const date = formatDate(item.published_date || item.created_at);
+
+              return (
+                <li class="swiper-slide item">
+                  <a href={`/actualites/${item.slug}`} class="link">
+                    {image && (
+                      <div class="illus-wrapper">
+                        <img
+                          src={optimizedImageUrl(image, 600, 75)}
+                          srcset={responsiveSrcset(image, [300, 450, 600], 75) || undefined}
+                          sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw"
+                          alt={item.title || ''}
+                          class="illus"
+                          width="600"
+                          height="400"
+                          loading={k === 0 ? 'eager' : 'lazy'}
+                        />
+                        <div class="overlay">
+                          <span class="icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>
+                          </span>
+                          <span>Lire l'actualit&eacute;</span>
+                        </div>
+                      </div>
+                    )}
+                    <div class="desc">
+                      {category && <p class="category">{category}</p>}
+                      <h3 class="title title-section-3">{item.title}</h3>
+                      {item.excerpt && (
+                        <div class="editor txt">
+                          <Fragment set:html={item.excerpt.replace(/\n/g, '<br />')} />
+                        </div>
+                      )}
+                      <div class="btn-wrapper">
+                        <span class="fake-link btn btn-tertiary color-primary">Lire l'actualit&eacute;</span>
+                      </div>
+                      {date && <time class="date">{date}</time>}
+                    </div>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Load more */}
+          <div class="pagination">
+            {hasMore && (
+              <div class="btn-more-wrapper js_list-pagination">
+                <button type="button" class="btn btn-tertiary js_load-more" data-page="2">Voir plus d'actualit&eacute;s</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    </main>
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+  </body>
+</html>
+
+<style is:inline>
+  .page-archive-news { padding-top: 60px; padding-bottom: 60px; }
+  .page-archive-news .archive-top { margin-bottom: 2rem; }
+  .page-archive-news .archive-top .title { margin: 0; }
+</style>
+
+<style is:global>
+  .page-archive-news .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 2.5rem;
+  }
+  .page-archive-news .tabs .link {
+    display: inline-block;
+    padding: .5rem 1.25rem;
+    border: 1px solid var(--color-default, #224f5a);
+    background: none;
+    cursor: pointer;
+    font-size: .9375rem;
+    line-height: 1.2;
+    letter-spacing: -.02em;
+    color: var(--color-default, #224f5a);
+    transition: all .3s ease;
+  }
+  .border-rounded .page-archive-news .tabs .link {
+    border-radius: 2rem;
+  }
+  .page-archive-news .tabs .link:hover,
+  .page-archive-news .tabs .link.active {
+    background-color: var(--color-default, #224f5a);
+    color: #fff;
+  }
+
+  .page-archive-news .list-single {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .page-archive-news .list-single .item {
+    width: calc(33.333% - 1.35rem);
+  }
+  .page-archive-news .list-single .item:first-child {
+    width: 100%;
+  }
+  .page-archive-news .list-single .item:first-child .link {
+    display: flex;
+    align-items: flex-start;
+    gap: 2rem;
+  }
+  .page-archive-news .list-single .item:first-child .illus-wrapper {
+    flex: 0 0 60%;
+    max-width: 60%;
+    aspect-ratio: 16 / 10;
+  }
+  .page-archive-news .list-single .item:first-child .desc {
+    flex: 1;
+    padding-top: 1rem;
+  }
+  .page-archive-news .list-single .item:first-child .title {
+    font-size: 2rem;
+    line-height: 1.15;
+  }
+  .page-archive-news .list-single .item:first-child .txt,
+  .page-archive-news .list-single .item:first-child .btn-wrapper {
+    display: block;
+  }
+  .page-archive-news .list-single .item:first-child .date {
+    margin-top: 1.5rem;
+  }
+  .page-archive-news .list-single .item .link {
+    text-decoration: none;
+    color: inherit;
+    border: 0;
+  }
+  .page-archive-news .list-single .item:not(:first-child) .link {
+    display: block;
+  }
+  .page-archive-news .list-single .illus-wrapper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+  }
+  .border-rounded .page-archive-news .list-single .illus-wrapper {
+    border-radius: .75rem;
+  }
+  .page-archive-news .list-single .illus {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+  }
+  .page-archive-news .list-single .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    z-index: 2;
+    background-color: rgba(0,0,0,.4);
+    color: #fff;
+    font-size: .9375rem;
+    font-weight: 700;
+    transition: opacity .3s ease;
+  }
+  .page-archive-news .list-single .overlay .icon {
+    display: block;
+    margin-bottom: .3125rem;
+  }
+  .page-archive-news .list-single .overlay svg * {
+    fill: #fff;
+  }
+  .page-archive-news .list-single .item:hover .overlay {
+    opacity: 1;
+  }
+  .page-archive-news .list-single .desc {
+    padding-top: 1rem;
+  }
+  .page-archive-news .list-single .category {
+    margin-bottom: .25rem;
+    font-size: .875rem;
+    line-height: 1.2;
+    letter-spacing: -.04em;
+    color: var(--color-primary, #666);
+    text-transform: uppercase;
+  }
+  .page-archive-news .list-single .title {
+    margin: 0;
+    text-align: inherit;
+  }
+  .page-archive-news .list-single .txt {
+    margin-top: .5rem;
+    font-size: .9375rem;
+    line-height: 1.6;
+    color: #666;
+  }
+  .page-archive-news .list-single .btn-wrapper {
+    margin-top: .75rem;
+  }
+  .page-archive-news .list-single .date {
+    display: block;
+    margin-top: .5rem;
+    font-size: .8125rem;
+    color: #999;
+  }
+  .page-archive-news .pagination {
+    margin-top: 3rem;
+    text-align: center;
+  }
+
+  @media (max-width: 960px) {
+    .page-archive-news .list-single .item {
+      width: calc(50% - 1rem);
+    }
+    .page-archive-news .list-single .item:first-child {
+      width: 100%;
+    }
+  }
+  @media (max-width: 600px) {
+    .page-archive-news .list-single .item,
+    .page-archive-news .list-single .item:first-child {
+      width: 100%;
+    }
+    .page-archive-news .list-single .item:first-child .link {
+      display: block;
+    }
+    .page-archive-news .list-single .item:first-child .illus-wrapper {
+      flex: none;
+      max-width: 100%;
+      aspect-ratio: 16 / 9;
+    }
+  }
+</style>
+
+<script is:inline>
+(function() {
+  var API_URL = document.querySelector('meta[name="x-api-url"]')?.getAttribute('content') || '/api';
+  if (API_URL === '/api') API_URL = window.location.origin.replace(':4321', ':3000') + '/api';
+
+  var container = document.querySelector('.js_actu-container');
+  if (!container) return;
+  var defaultImage = container.getAttribute('data-default-image') || '';
+
+  var listEl = container.querySelector('.js_list-actu');
+  var paginationWrapper = container.querySelector('.pagination');
+  var currentTerm = 'all';
+  var perPage = 7;
+
+  // Tab click: filter by category
+  container.querySelectorAll('.js_change-term').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      container.querySelectorAll('.js_change-term').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentTerm = btn.getAttribute('data-value');
+      loadNews(currentTerm, 0, true);
+    });
+  });
+
+  // Load more click (event delegation)
+  container.addEventListener('click', function(e) {
+    var btn = e.target.closest('.js_load-more');
+    if (!btn) return;
+    var page = parseInt(btn.getAttribute('data-page')) || 2;
+    var offset = (page - 1) * perPage;
+    loadNews(currentTerm, offset, false, page);
+  });
+
+  function loadNews(term, offset, replace, nextPage) {
+    var url = API_URL + '/cpt/actualites?status=published&limit=' + perPage + '&offset=' + (offset || 0);
+    if (term && term !== 'all') url += '&category=' + encodeURIComponent(term);
+
+    fetch(url)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var items = data.items || data;
+        var total = data.total || items.length;
+        var html = items.map(function(item) { return renderNewsItem(item); }).join('');
+
+        if (replace) {
+          listEl.innerHTML = html;
+        } else {
+          listEl.insertAdjacentHTML('beforeend', html);
+        }
+
+        // Update pagination
+        var loaded = listEl.querySelectorAll('.item').length;
+        if (loaded < total) {
+          var np = replace ? 2 : ((nextPage || 2) + 1);
+          paginationWrapper.innerHTML = '<div class="btn-more-wrapper js_list-pagination"><button type="button" class="btn btn-tertiary js_load-more" data-page="' + np + '">Voir plus d\'actualit\u00e9s</button></div>';
+        } else {
+          paginationWrapper.innerHTML = '';
+        }
+      })
+      .catch(function(err) { console.error('News load error:', err); });
+  }
+
+  function renderNewsItem(item) {
+    var fi = item.featured_image || {};
+    var image = fi.sizes ? (fi.sizes['module-news-slider'] || fi.sizes.half || fi.url || '') : (fi.url || '');
+    if (!image) image = defaultImage;
+    var cats = item.categories || [];
+    var category = cats.map(function(c) { return c.name; }).join(' - ');
+    var date = item.published_date || item.created_at;
+    if (date) {
+      var d = new Date(date);
+      date = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+    var excerpt = item.excerpt || '';
+
+    function optImg(url) {
+      if (!url) return '';
+      var m = url.match(/\/uploads\/media\/([^/?#]+)$/);
+      if (m && !/\.(mp4|webm|mov|avi)$/i.test(m[1])) {
+        return '/uploads/media/_optimized/' + m[1] + '?w=600&q=75&f=webp';
+      }
+      return url;
+    }
+
+    var imgHtml = image
+      ? '<div class="illus-wrapper"><img src="' + optImg(image) + '" alt="' + escHtml(item.title) + '" class="illus" loading="lazy" /><div class="overlay"><span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg></span><span>Lire l\u2019actualit\u00e9</span></div></div>'
+      : '';
+    var catHtml = category ? '<p class="category">' + escHtml(category) + '</p>' : '';
+    var excerptHtml = excerpt ? '<div class="editor txt">' + excerpt.replace(/\n/g, '<br />') + '</div>' : '';
+    var dateHtml = date ? '<time class="date">' + date + '</time>' : '';
+
+    return '<li class="swiper-slide item"><a href="/actualites/' + item.slug + '" class="link">'
+      + imgHtml
+      + '<div class="desc">'
+      + catHtml
+      + '<h3 class="title title-section-3">' + escHtml(item.title) + '</h3>'
+      + excerptHtml
+      + '<div class="btn-wrapper"><span class="fake-link btn btn-tertiary color-primary">Lire l\u2019actualit\u00e9</span></div>'
+      + dateHtml
+      + '</div></a></li>';
+  }
+
+  function escHtml(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+})();
+</script>

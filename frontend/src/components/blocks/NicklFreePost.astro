@@ -1,6 +1,6 @@
 ---
 import { cleanHtml } from '../../lib/module-classes';
-import { optimizedImageUrl, responsiveSrcset } from '../../lib/module-helpers';
+import { optimizedImageUrl, responsiveSrcset, getDefaultImageUrl } from '../../lib/module-helpers';
 
 interface NicklFreePostProps {
   data: Record<string, any>;
@@ -53,7 +53,8 @@ function resolveImage(img: any): { url: string; alt: string } | null {
   if (!img) return null;
   const url = typeof img === 'string' ? img : img.url || img.sizes?.half || '';
   const alt = typeof img === 'string' ? '' : img.alt || '';
-  return url ? { url: optimizedImageUrl(resolveUrl(url), 600, 75), srcset: responsiveSrcset(url, [300, 450, 600], 75), alt } : null;
+  const finalUrl = url || getDefaultImageUrl();
+  return finalUrl ? { url: optimizedImageUrl(resolveUrl(finalUrl), 600, 75), srcset: responsiveSrcset(finalUrl, [300, 450, 600], 75), alt } : null;
 }
 ---
 

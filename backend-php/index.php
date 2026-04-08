@@ -106,7 +106,22 @@ if (preg_match('#^/admin(?:/(.*))?$#', $uri, $m)) {
     if (empty($path) || $path === '/') {
         // /admin → serve index.html (app.js handles auth check)
         header('Content-Type: text/html; charset=utf-8');
-        readfile(__DIR__ . '/admin/index.html');
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        // Inject cache-busting timestamps into asset URLs
+        $html = file_get_contents(__DIR__ . '/admin/index.html');
+        $html = preg_replace_callback('/href="([^"]+\.css)(?:\?[^"]*)?"/i', function($match) {
+            $file = __DIR__ . '/admin/' . basename($match[1]);
+            $v = file_exists($file) ? filemtime($file) : time();
+            return 'href="' . $match[1] . '?v=' . $v . '"';
+        }, $html);
+        $html = preg_replace_callback('/src="([^"]+\.js)(?:\?[^"]*)?"/i', function($match) {
+            $file = __DIR__ . '/admin/' . basename($match[1]);
+            $v = file_exists($file) ? filemtime($file) : time();
+            return 'src="' . $match[1] . '?v=' . $v . '"';
+        }, $html);
+        echo $html;
         exit;
     }
     $file = __DIR__ . '/admin/' . $path;
@@ -115,6 +130,12 @@ if (preg_match('#^/admin(?:/(.*))?$#', $uri, $m)) {
         $mimeMap = ['html' => 'text/html', 'css' => 'text/css', 'js' => 'application/javascript', 'json' => 'application/json', 'svg' => 'image/svg+xml', 'png' => 'image/png', 'jpg' => 'image/jpeg', 'ico' => 'image/x-icon'];
         $mime = $mimeMap[$ext] ?? mime_content_type($file);
         header("Content-Type: $mime; charset=utf-8");
+        // Prevent caching for CSS/JS/HTML so changes appear immediately
+        if (in_array($ext, ['css', 'js', 'html'])) {
+            header('Cache-Control: no-cache, no-store, must-revalidate');
+            header('Pragma: no-cache');
+            header('Expires: 0');
+        }
         readfile($file);
         exit;
     }

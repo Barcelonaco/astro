@@ -8,7 +8,7 @@ import DeferredLoader from '../components/DeferredLoader.astro';
 import SiteOverlays from '../components/SiteOverlays.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
 import { formatContent, getFrontendBootstrap } from '../lib/api';
-import { optimizedImageUrl } from '../lib/module-helpers';
+import { optimizedImageUrl, setDefaultImageUrl } from '../lib/module-helpers';
 
 function parseBlocks(content: string): unknown[] | null {
   if (!content || !content.trim()) return null;
@@ -41,6 +41,7 @@ function extractLcpImages(blocks: any[] | null): { desktop: string; mobile: stri
 const { siteInfo, styleSettings, siteSettings, navigation: navigationData, secondaryNavigation, frontPage } = await getFrontendBootstrap();
 const siteName = siteInfo.siteName || SITE_TITLE;
 const siteDescription = siteInfo.siteDescription || SITE_DESCRIPTION;
+setDefaultImageUrl(siteSettings.replacement_image || '');
 
 const page = frontPage;
 const hasPage = !!page;

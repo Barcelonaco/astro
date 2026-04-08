@@ -4,10 +4,13 @@ import Footer from '../../components/Footer.astro';
 import FormattedDate from '../../components/FormattedDate.astro';
 import Header from '../../components/Header.astro';
 import { getSiteInfo } from '../../consts';
-import { getAllPosts } from '../../lib/api';
+import { getAllPosts, getFrontendBootstrap } from '../../lib/api';
+import { setDefaultImageUrl, getDefaultImageUrl, optimizedImageUrl } from '../../lib/module-helpers';
 
 const posts = await getAllPosts();
 const { siteName, siteDescription } = await getSiteInfo();
+const { siteSettings } = await getFrontendBootstrap();
+setDefaultImageUrl(siteSettings.replacement_image || '');
 ---
 
 <!doctype html>
@@ -93,8 +96,8 @@ const { siteName, siteDescription } = await getSiteInfo();
 						posts.map((post) => (
 							<li>
 								<a href={`/blog/${post.slug}/`}>
-									{post.featured_image && (
-										<img width={720} height={360} src={post.featured_image} alt={post.title} />
+									{(post.featured_image || getDefaultImageUrl()) && (
+										<img width={720} height={360} src={optimizedImageUrl(post.featured_image || getDefaultImageUrl(), 720, 80)} alt={post.title} />
 									)}
 									<h4 class="title">{post.title}</h4>
 									<p class="date">

@@ -1,10 +1,12 @@
 ---
 /**
  * Module EventsSlider — Reproduit events-slider.blade.php
- * Slider d'événements. Stub — les événements sont un CPT WordPress.
+ * Slider d'événements à la une (automatique ou manuel).
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { isTruthy } from '../../lib/module-classes';
+import { getEvenements, getEvenementBySlug, type EvenementItem } from '../../lib/api';
+import { optimizedImageUrl, responsiveSrcset, getDefaultImageUrl } from '../../lib/module-helpers';
 
 interface Props {
   data: Record<string, any>;
@@ -14,15 +16,156 @@ const { data } = Astro.props;
 
 const displayArchiveLink = isTruthy(data.display_archive_link);
 const archiveLinkLabel = (data.archive_link_label as string) || 'Voir tous les événements';
+const isManual = isTruthy(data.is_manual);
+
+// Fetch events
+let events: EvenementItem[] = [];
+
+if (isManual && data.events_id) {
+  // Manual selection: fetch by IDs
+  const ids = Array.isArray(data.events_id) ? data.events_id : [];
+  const promises = ids.map(async (id: any) => {
+    try {
+      // Try by slug first, fallback to id
+      const result = await getEvenements({ status: 'published', limit: 10000 });
+      const items = Array.isArray(result) ? result : result.items;
+      return items.find((item: EvenementItem) => item.id === Number(id)) || null;
+    } catch {
+      return null;
+    }
+  });
+  const results = await Promise.all(promises);
+  events = results.filter((e): e is EvenementItem => e !== null);
+} else {
+  // Automatic: fetch next upcoming events (limit 4)
+  try {
+    const result = await getEvenements({ status: 'published', limit: 4 });
+    events = Array.isArray(result) ? result : result.items;
+  } catch {
+    events = [];
+  }
+}
+
+function getMainImage(item: EvenementItem): string {
+  if (item.featured_image) {
+    const fi = item.featured_image as Record<string, any>;
+    return fi.sizes?.['module-gallery-fixe'] || fi.sizes?.half || fi.url || getDefaultImageUrl();
+  }
+  return getDefaultImageUrl();
+}
+
+function formatEventDate(item: EvenementItem): string {
+  const cf = item.custom_fields || {};
+  const startDate = cf.start_date;
+  const endDate = cf.end_date;
+  const startTime = cf.start_time;
+  const endTime = cf.end_time;
+  if (!startDate) return '';
+
+  let html = '';
+  const sd = new Date(startDate.replace(/\//g, '-'));
+  const fmt = (d: Date) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  if (endDate && endDate !== startDate) {
+    const ed = new Date(endDate.replace(/\//g, '-'));
+    html += `Du ${fmt(sd)} au ${fmt(ed)}`;
+  } else {
+    html += `Le ${fmt(sd)}`;
+  }
+
+  if (startTime) {
+    const st = startTime.replace(':', 'h');
+    if (endTime) {
+      html += ` de ${st} à ${endTime.replace(':', 'h')}`;
+    } else {
+      html += ` à partir de ${st}`;
+    }
+  }
+
+  return html;
+}
+
+function getLocationText(item: EvenementItem): string {
+  const cf = item.custom_fields || {};
+  let parts: string[] = [];
+  if (cf.location_name) parts.push(cf.location_name);
+  if (cf.location) {
+    try {
+      const loc = typeof cf.location === 'string' ? JSON.parse(cf.location) : cf.location;
+      if (loc?.city) parts.push(loc.city);
+    } catch {}
+  }
+  return parts.join(', ');
+}
 ---
 
 <NicklModuleWrapper data={data} moduleName="event-slider">
-  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
-    Les événements ne sont pas disponibles en mode statique.
-  </p>
+  {events.length > 0 ? (
+    <div class="slider-wrapper">
+      <div class={`swiper slider js_events-slider columns-${events.length}`}>
+        <div class="swiper-wrapper">
+          {events.map((item) => {
+            const image = getMainImage(item);
+            const cf = item.custom_fields || {};
+            const isSticky = isTruthy(cf.is_sticky);
+            const soldOut = isTruthy(cf.sold_out);
+            const hasBanner = isSticky || soldOut;
+            const category = item.categories?.map(c => c.name).join(' - ') || '';
+            const dateText = formatEventDate(item);
+            const location = getLocationText(item);
+
+            return (
+              <div class={`swiper-slide item ${hasBanner ? 'vedette' : ''}`}>
+                <a href={`/evenements/${item.slug}`} class="link">
+                  {hasBanner && (
+                    <span class="vedette-tag">
+                      {soldOut ? 'Complet' : 'En vedette'}
+                    </span>
+                  )}
+                  <div class="illus-wrapper">
+                    {image && (
+                      <img
+                        src={optimizedImageUrl(image, 600, 75)}
+                        srcset={responsiveSrcset(image, [300, 450, 600], 75) || undefined}
+                        sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw"
+                        alt={item.title || ''}
+                        class="illus"
+                        loading="lazy"
+                      />
+                    )}
+                    <div class="overlay">
+                      <span class="icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>
+                      </span>
+                      <span>En savoir plus</span>
+                    </div>
+                  </div>
+                  <div class="desc">
+                    {category && <span class="category">{category}</span>}
+                    <h3 class="title">{item.title}</h3>
+                    {dateText && <p class="date">{dateText}</p>}
+                    {location && (
+                      <p class="location">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="18" viewBox="0 0 14 18" fill="currentColor"><path d="M7 0C3.13 0 0 3.13 0 7c0 5.25 7 11 7 11s7-5.75 7-11c0-3.87-3.13-7-7-7zm0 9.5C5.62 9.5 4.5 8.38 4.5 7S5.62 4.5 7 4.5 9.5 5.62 9.5 7 8.38 9.5 7 9.5z"/></svg>
+                        {location}
+                      </p>
+                    )}
+                  </div>
+                </a>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <button type="button" class="slider-navigation prev"></button>
+      <button type="button" class="slider-navigation next"></button>
+    </div>
+  ) : (
+    <p style="text-align:center;opacity:0.6;">Il n'y a aucun événement à venir pour le moment.</p>
+  )}
   {displayArchiveLink && (
     <div class="btn-more-wrapper">
-      <a href="#" class="btn btn-tertiary">{archiveLinkLabel}</a>
+      <a href="/evenements" class="btn btn-tertiary">{archiveLinkLabel}</a>
     </div>
   )}
 </NicklModuleWrapper>

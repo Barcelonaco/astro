@@ -55,7 +55,10 @@ function shouldCompress(contentType: string | null): boolean {
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname, search } = context.url;
-  const acceptEncoding = context.request.headers.get('accept-encoding') || '';
+
+  // During prerendering, request.headers is not available
+  const isPrerendered = context.isPrerendered;
+  const acceptEncoding = isPrerendered ? '' : context.request.headers.get('accept-encoding') || '';
   const supportsGzip = acceptEncoding.includes('gzip');
 
   // Serve /nickl-assets/ directly from nickl/public/

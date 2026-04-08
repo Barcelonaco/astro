@@ -6,7 +6,7 @@
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { resolveLink } from '../../lib/module-classes';
-import { resolveImageUrl, resolveImageAlt, optimizedImageUrl, responsiveSrcset } from '../../lib/module-helpers';
+import { resolveImageUrl, resolveImageAlt, optimizedImageUrl, responsiveSrcset, getDefaultImageUrl } from '../../lib/module-helpers';
 
 interface Props {
   data: Record<string, any>;
@@ -22,7 +22,7 @@ const rawSliders = (data.sliders as any[]) || [];
 const images = rawSliders.map((slide) => ({
   image_url: (() => {
     const img = slide.image;
-    if (!img) return '';
+    if (!img) return getDefaultImageUrl() ? optimizedImageUrl(getDefaultImageUrl(), 1600, 80) : '';
     let rawUrl = '';
     if (typeof img === 'string') {
       rawUrl = img.startsWith('http') ? img : apiOrigin + img;
@@ -30,6 +30,7 @@ const images = rawSliders.map((slide) => ({
       rawUrl = img.sizes?.banner || img.url || '';
       if (rawUrl && !rawUrl.startsWith('http')) rawUrl = apiOrigin + rawUrl;
     }
+    if (!rawUrl) return getDefaultImageUrl() ? optimizedImageUrl(getDefaultImageUrl(), 1600, 80) : '';
     return optimizedImageUrl(rawUrl, 1600, 80);
   })(),
   image_srcset: responsiveSrcset(typeof slide.image === 'string' ? slide.image : (slide.image as any)?.url || '', [600, 900, 1440], 75),

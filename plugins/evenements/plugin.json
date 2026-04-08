@@ -1,0 +1,50 @@
+{
+  "name": "evenements",
+  "label": "Événements",
+  "version": "1.0.0",
+  "description": "Custom Post Type Événements avec archive, vue single et module events-slider.",
+
+  "modules": {
+    "category": {
+      "id": "evenements",
+      "label": "Événements",
+      "icon": "📅"
+    },
+    "items": [
+      {
+        "name": "EventsSlider",
+        "label": "Événements à la une"
+      }
+    ]
+  },
+
+  "postTypes": [
+    {
+      "slug": "evenements",
+      "label": "Événement",
+      "labelPlural": "Événements",
+      "icon": "📅",
+      "supports": ["title", "slug", "featured_image", "content", "excerpt", "status"],
+      "fields": [
+        { "name": "is_sticky", "label": "Mettre en avant", "type": "TrueFalse", "width": 50 },
+        { "name": "sold_out", "label": "Complet", "type": "TrueFalse", "width": 50 },
+        { "name": "cta", "label": "Lien personnalisé", "type": "Link" },
+        { "name": "desc", "label": "Description courte (vue liste)", "type": "Textarea" },
+        { "name": "text", "label": "Description longue", "type": "WYSIWYG" },
+        { "name": "start_date", "label": "Date de début", "type": "Date", "width": 50 },
+        { "name": "end_date", "label": "Date de fin", "type": "Date", "width": 50 },
+        { "name": "start_time", "label": "Heure de début", "type": "Time", "width": 50 },
+        { "name": "end_time", "label": "Heure de fin", "type": "Time", "width": 50 },
+        { "name": "contact_name", "label": "Nom de l'organisateur", "type": "Text", "width": 50 },
+        { "name": "contact_phone", "label": "Téléphone", "type": "Text", "width": 50 },
+        { "name": "contact_email", "label": "Email", "type": "Email", "width": 50 },
+        { "name": "website", "label": "Site web", "type": "URL", "width": 50 },
+        { "name": "price", "label": "Entrée (ex: Gratuit, 5€ - 15€)", "type": "Text", "width": 50 },
+        { "name": "location_name", "label": "Nom du lieu", "type": "Text", "width": 50 },
+        { "name": "location", "label": "Adresse complète", "type": "Address" }
+      ],
+      "hasCategories": true,
+      "categoryLabel": "Catégories d'événements"
+    }
+  ]
+}

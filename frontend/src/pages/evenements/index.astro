@@ -1,0 +1,1013 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import ModuleStyles from '../../components/ModuleStyles.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import DeferredLoader from '../../components/DeferredLoader.astro';
+import SiteOverlays from '../../components/SiteOverlays.astro';
+import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
+import { getEvenements, getEvenementCategories, getFrontendBootstrap, getCPTOptions, type EvenementItem } from '../../lib/api';
+import { optimizedImageUrl, responsiveSrcset, setDefaultImageUrl, getDefaultImageUrl } from '../../lib/module-helpers';
+import { isTruthy } from '../../lib/module-classes';
+
+const [{ siteInfo, styleSettings, siteSettings, navigation: navigationData, secondaryNavigation }, categories, cptOptions] = await Promise.all([
+  getFrontendBootstrap(),
+  getEvenementCategories(),
+  getCPTOptions('evenements'),
+]);
+
+const siteName = siteInfo.siteName || SITE_TITLE;
+const siteDescription = siteInfo.siteDescription || SITE_DESCRIPTION;
+setDefaultImageUrl(siteSettings.replacement_image || '');
+
+const archiveTitle = cptOptions.archive_title || cptOptions.title || 'Événements';
+const showTitle = cptOptions.title_in_header !== 'hideTitle';
+const useH1 = cptOptions.h1_in_header !== 'no';
+
+// Load all events (sorted by start_date)
+const allResult = await getEvenements({ status: 'published', limit: 10000 });
+const allEvents = (Array.isArray(allResult) ? allResult : allResult.items) as EvenementItem[];
+
+// Sort by start_date ASC
+allEvents.sort((a, b) => {
+  const da = (a.custom_fields?.start_date || '').replace(/\//g, '-');
+  const db = (b.custom_fields?.start_date || '').replace(/\//g, '-');
+  return da.localeCompare(db);
+});
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ');
+
+// Helpers
+function getMainImage(item: EvenementItem): string {
+  if (item.featured_image) {
+    const fi = item.featured_image as Record<string, any>;
+    return fi.sizes?.['module-gallery-fixe'] || fi.sizes?.half || fi.url || getDefaultImageUrl();
+  }
+  return getDefaultImageUrl();
+}
+
+function getStartDate(item: EvenementItem): Date | null {
+  const sd = item.custom_fields?.start_date;
+  if (!sd) return null;
+  return new Date(sd.replace(/\//g, '-'));
+}
+
+function getDayAbbr(d: Date): string {
+  return d.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '');
+}
+
+function getDayNum(d: Date): string {
+  return d.toLocaleDateString('fr-FR', { day: '2-digit' });
+}
+
+function getMonthYear(d: Date): string {
+  const s = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function getDateShort(d: Date): string {
+  const day = getDayAbbr(d);
+  const num = getDayNum(d);
+  const month = d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '');
+  const cap = day.charAt(0).toUpperCase() + day.slice(1);
+  return `${cap} ${num} ${month.charAt(0).toUpperCase() + month.slice(1)}.`;
+}
+
+function formatEventDate(item: EvenementItem): string {
+  const cf = item.custom_fields || {};
+  if (!cf.start_date) return '';
+  const sd = new Date(cf.start_date.replace(/\//g, '-'));
+  const fmt = (d: Date) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  let html = '';
+  if (cf.end_date && cf.end_date !== cf.start_date) {
+    const ed = new Date(cf.end_date.replace(/\//g, '-'));
+    html += `Du ${fmt(sd)} au ${fmt(ed)}`;
+  } else {
+    html += `Le ${fmt(sd)}`;
+  }
+  if (cf.start_time) {
+    const st = cf.start_time.replace(':', 'h');
+    if (cf.end_time) {
+      html += ` de ${st} à ${cf.end_time.replace(':', 'h')}`;
+    } else {
+      html += ` à partir de ${st}`;
+    }
+  }
+  return html;
+}
+
+function getLocationText(item: EvenementItem): string {
+  const cf = item.custom_fields || {};
+  const parts: string[] = [];
+  if (cf.location_name) parts.push(cf.location_name);
+  if (cf.location) {
+    try {
+      const loc = typeof cf.location === 'string' ? JSON.parse(cf.location) : cf.location;
+      if (loc?.city) parts.push(loc.city);
+    } catch {}
+  }
+  return parts.join(', ');
+}
+
+// Group events by month
+type MonthGroup = { label: string; key: string; events: EvenementItem[] };
+const monthGroups: MonthGroup[] = [];
+let currentMonthKey = '';
+for (const item of allEvents) {
+  const d = getStartDate(item);
+  if (!d) continue;
+  const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+  if (key !== currentMonthKey) {
+    currentMonthKey = key;
+    monthGroups.push({ label: getMonthYear(d), key, events: [] });
+  }
+  monthGroups[monthGroups.length - 1].events.push(item);
+}
+---
+
+<!doctype html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`${archiveTitle} | ${siteName}`} description={siteDescription} styleSettings={styleSettings} siteSettings={siteSettings} />
+    <ModuleStyles blocks={null} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigationData} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+    <main id="main" class="main-page page-archive-event js_event-container" role="main">
+      <section>
+        <div class="container-large">
+          {showTitle && (
+            <div class="archive-top">
+              {useH1 ? (
+                <h1 class="title title-section-1">{allEvents.length > 0 ? archiveTitle : "Aucun événement à venir"}</h1>
+              ) : (
+                <p class="title title-section-1">{allEvents.length > 0 ? archiveTitle : "Aucun événement à venir"}</p>
+              )}
+            </div>
+          )}
+
+          {/* Top option bar: tabs + view toggle */}
+          <div class="event-top-option">
+            {categories.length > 0 && (
+              <ul class="tabs">
+                <li class="tab">
+                  <button type="button" class="link active js_change-term" data-value="all">Tout</button>
+                </li>
+                {categories.map((cat) => (
+                  <li class="tab">
+                    <button type="button" class="link js_change-term" data-value={cat.slug}>{cat.name}</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div class="event-toggle" id="js_event-toggle">
+              <span id="toggle-text">Vue liste</span>
+              <span class="icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+              </span>
+              <div class="event-toggle-list">
+                <p id="js_select-list" class="selected">Vue liste</p>
+                <p id="js_select-grid">Vue photo</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Events list grouped by month */}
+          <ul class="list-events js_list-events">
+            {monthGroups.map((group) => (
+              <>
+                <li class="month-header">
+                  <span>{group.label}</span>
+                  <hr />
+                </li>
+                {group.events.map((item) => {
+                  const d = getStartDate(item)!;
+                  const image = getMainImage(item);
+                  const cf = item.custom_fields || {};
+                  const category = item.categories?.map(c => c.name).join(' - ') || '';
+                  const dateText = formatEventDate(item);
+                  const location = getLocationText(item);
+                  const isSticky = isTruthy(cf.is_sticky);
+                  const soldOut = isTruthy(cf.sold_out);
+                  const hasBanner = isSticky || soldOut;
+
+                  return (
+                    <li class={`item ${hasBanner ? 'vedette' : ''}`} data-categories={item.categories?.map(c => c.slug).join(',') || ''}>
+                      <div class="date-col">
+                        <p class="date-day">{getDayAbbr(d)}<span class="show-list">.</span></p>
+                        <p class="date-num">{getDayNum(d)}</p>
+                      </div>
+                      <a class="link" href={`/evenements/${item.slug}`}></a>
+                      <div class="illus-wrapper">
+                        {image && (
+                          <img
+                            src={optimizedImageUrl(image, 400, 75)}
+                            alt={item.title || ''}
+                            class="illus"
+                            loading="lazy"
+                          />
+                        )}
+                        <div class="overlay">
+                          <span class="icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>
+                          </span>
+                          <span>En savoir plus</span>
+                        </div>
+                      </div>
+                      <div class="desc">
+                        <div class="desc-container">
+                          {hasBanner && (
+                            <div class={`vedette-tag ${soldOut ? 'sold-out' : 'sticky'}`}>
+                              {soldOut ? (
+                                <><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg> Complet</>
+                              ) : (
+                                <><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg> En vedette</>
+                              )}
+                            </div>
+                          )}
+                          {category && <span class="category">{category}</span>}
+                          <h3 class="title">{item.title}</h3>
+                          {dateText && <p class="date">{dateText}</p>}
+                          {location && (
+                            <p class="location">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="18" viewBox="0 0 14 18" fill="currentColor"><path d="M7 0C3.13 0 0 3.13 0 7c0 5.25 7 11 7 11s7-5.75 7-11c0-3.87-3.13-7-7-7zm0 9.5C5.62 9.5 4.5 8.38 4.5 7S5.62 4.5 7 4.5 9.5 5.62 9.5 7 8.38 9.5 7 9.5z"/></svg>
+                              {location}
+                            </p>
+                          )}
+                          {cf.desc && <p class="description">{cf.desc}</p>}
+                          {cf.price && <p class="price">{cf.price}</p>}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </>
+            ))}
+          </ul>
+
+          {/* Grid view (hidden by default) */}
+          <div class="grid-events js_grid-events" style="display:none;">
+            {monthGroups.map((group, gi) => (
+              <div class={`month-list ${gi % 2 === 0 ? 'odd' : 'even'}`}>
+                <div class="item date-month">
+                  <span>{group.label}</span>
+                </div>
+                {group.events.map((item) => {
+                  const d = getStartDate(item)!;
+                  const image = getMainImage(item);
+                  const cf = item.custom_fields || {};
+                  const category = item.categories?.map(c => c.name).join(' - ') || '';
+                  const dateText = formatEventDate(item);
+                  const location = getLocationText(item);
+                  const isSticky = isTruthy(cf.is_sticky);
+                  const soldOut = isTruthy(cf.sold_out);
+                  const hasBanner = isSticky || soldOut;
+
+                  return (
+                    <div class={`item ${hasBanner ? 'vedette' : ''}`} data-categories={item.categories?.map(c => c.slug).join(',') || ''}>
+                      <a class="link" href={`/evenements/${item.slug}`}></a>
+                      <div class="illus-wrapper">
+                        {image && (
+                          <img
+                            src={optimizedImageUrl(image, 600, 75)}
+                            alt={item.title || ''}
+                            class="illus"
+                            loading="lazy"
+                          />
+                        )}
+                        <div class="overlay">
+                          <span class="icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>
+                          </span>
+                          <span>En savoir plus</span>
+                        </div>
+                        <div class="date-grid">
+                          <span class="date-short">{getDateShort(d)}</span>
+                        </div>
+                        {hasBanner && (
+                          <div class="vedette-tag-grid">
+                            {soldOut ? (
+                              <><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg> Complet</>
+                            ) : (
+                              <><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg> En vedette</>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div class="desc">
+                        {category && <span class="category">{category}</span>}
+                        <h3 class="title">{item.title}</h3>
+                        {dateText && <p class="date">{dateText}</p>}
+                        {location && (
+                          <p class="location">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="18" viewBox="0 0 14 18" fill="currentColor"><path d="M7 0C3.13 0 0 3.13 0 7c0 5.25 7 11 7 11s7-5.75 7-11c0-3.87-3.13-7-7-7zm0 9.5C5.62 9.5 4.5 8.38 4.5 7S5.62 4.5 7 4.5 9.5 5.62 9.5 7 8.38 9.5 7 9.5z"/></svg>
+                            {location}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </main>
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+  </body>
+</html>
+
+<style is:inline>
+  .page-archive-event { padding-top: 60px; padding-bottom: 60px; }
+  .page-archive-event .archive-top { margin-bottom: 2.5rem; }
+  .page-archive-event .archive-top .title { margin: 0; }
+</style>
+
+<style is:global>
+  /* Top option bar */
+  .page-archive-event .event-top-option {
+    display: flex;
+    margin-bottom: 2.5rem;
+    position: relative;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* View toggle */
+  .page-archive-event .event-toggle {
+    display: flex;
+    gap: .625rem;
+    font-size: 1rem;
+    font-weight: 700;
+    padding-left: 1rem;
+    cursor: pointer;
+    position: relative;
+    white-space: nowrap;
+    color: var(--color-default, #333);
+  }
+  .page-archive-event .event-toggle .icon svg {
+    transform: rotate(0);
+    fill: var(--color-primary, #224f5a);
+    transition: transform .3s ease;
+  }
+  .page-archive-event .event-toggle.active .icon svg {
+    transform: rotate(180deg);
+  }
+  .page-archive-event .event-toggle-list {
+    position: absolute;
+    right: 0;
+    top: 80%;
+    opacity: 0;
+    visibility: hidden;
+    background: #fff;
+    padding: .5rem 1rem;
+    transition: all .3s ease;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0,0,0,.1);
+    border-radius: .375rem;
+  }
+  .page-archive-event .event-toggle.active .event-toggle-list {
+    top: 100%;
+    opacity: 1;
+    visibility: visible;
+  }
+  .page-archive-event .event-toggle-list p {
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: .25rem 0;
+    color: var(--color-default, #333);
+  }
+  .page-archive-event .event-toggle-list p.selected {
+    opacity: .7;
+    font-weight: 800;
+  }
+  .page-archive-event .event-toggle-list p:first-child {
+    padding-bottom: .25rem;
+  }
+
+  /* Tabs */
+  .page-archive-event .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 2.5rem;
+  }
+  .page-archive-event .tabs .link {
+    display: inline-block;
+    padding: .5rem 1.25rem;
+    border: 1px solid var(--color-default, #224f5a);
+    background: none;
+    cursor: pointer;
+    font-size: .9375rem;
+    line-height: 1.2;
+    letter-spacing: -.02em;
+    color: var(--color-default, #224f5a);
+    transition: all .3s ease;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .border-rounded .page-archive-event .tabs .link {
+    border-radius: 2rem;
+  }
+  .page-archive-event .tabs .link:hover,
+  .page-archive-event .tabs .link.active {
+    background-color: var(--color-default, #224f5a);
+    color: #fff;
+  }
+
+  /* List */
+  .page-archive-event .list-events {
+    list-style: none;
+    padding: 0 0 3.125rem;
+    margin: 0;
+  }
+
+  /* Month header */
+  .page-archive-event .month-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 3.375rem 0 3.375rem;
+  }
+  .page-archive-event .list-events .month-header:first-child {
+    padding-top: 0;
+  }
+  .page-archive-event .month-header span {
+    font-family: var(--font-title), arial, sans-serif;
+    font-size: 2.1875rem;
+    line-height: 2.1875rem;
+    font-weight: 700;
+    color: var(--color-default, #333);
+    white-space: nowrap;
+  }
+  .mode-uppercase .page-archive-event .month-header span {
+    text-transform: uppercase;
+  }
+  .page-archive-event .month-header hr {
+    flex: 1;
+    height: 2px;
+    background-color: var(--color-tertiary, #e0e0e0);
+    border: 0;
+    margin: 0;
+  }
+
+  /* Event item */
+  .page-archive-event .list-events .item {
+    position: relative;
+    display: flex;
+    gap: 3.125rem;
+    padding-bottom: 5.75rem;
+  }
+  .page-archive-event .list-events .item > .link {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 6;
+    border: 0;
+  }
+
+  /* Date column */
+  .page-archive-event .date-col {
+    display: flex;
+    width: 6%;
+    flex-direction: column;
+  }
+  .mode-uppercase .page-archive-event .date-col {
+    text-transform: uppercase;
+  }
+  .page-archive-event .date-day {
+    font-size: 1.375rem;
+    font-weight: 700;
+    text-align: center;
+    color: var(--color-default, #333);
+    line-height: 1.2;
+  }
+  .page-archive-event .date-num {
+    font-family: var(--font-title), arial, sans-serif;
+    font-size: 6.25rem;
+    line-height: 6.25rem;
+    font-weight: 600;
+    color: var(--color-secondary, #e8734a);
+    letter-spacing: -.04em;
+    text-align: center;
+    margin-left: -.625rem;
+  }
+
+  /* Image — order 3, right side */
+  .page-archive-event .list-events .illus-wrapper {
+    order: 3;
+    max-width: 25%;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .page-archive-event .list-events .illus-wrapper::after {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    opacity: 0;
+    background-color: var(--color-primary, #224f5a);
+    content: '';
+    transition: all .3s ease;
+  }
+  .border-rounded .page-archive-event .list-events .illus-wrapper,
+  .border-rounded .page-archive-event .list-events .illus-wrapper::after {
+    border-radius: var(--border-radius, .5rem);
+  }
+  .page-archive-event .list-events .item:hover .illus-wrapper::after {
+    opacity: .5;
+  }
+  .page-archive-event .list-events .illus {
+    display: block;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 16 / 11;
+    object-fit: cover;
+    object-position: center;
+  }
+  .border-rounded .page-archive-event .list-events .illus {
+    border-radius: var(--border-radius, .5rem);
+  }
+  .page-archive-event .list-events .overlay {
+    position: absolute;
+    top: 1.75rem; right: 1.75rem;
+    opacity: 0;
+    z-index: 5;
+    text-align: center;
+    font-size: .9375rem;
+    line-height: 1;
+    font-weight: 700;
+    color: #fff;
+    transform: translateY(-.625rem);
+    transition: all .3s ease;
+  }
+  .page-archive-event .list-events .overlay .icon {
+    display: block;
+    margin-bottom: .3125rem;
+  }
+  .page-archive-event .list-events .overlay svg * {
+    fill: #fff;
+  }
+  .page-archive-event .list-events .item:hover .overlay {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Desc */
+  .page-archive-event .list-events .desc {
+    display: flex;
+    flex-direction: column;
+    width: 75%;
+    flex: 1;
+  }
+  .page-archive-event .list-events .desc-container {
+    flex: 1;
+  }
+  .page-archive-event .list-events .category {
+    display: block;
+    font-size: .875rem;
+    font-weight: 500;
+    color: var(--color-secondary, #e8734a);
+    margin-bottom: .1875rem;
+  }
+  .mode-uppercase .page-archive-event .list-events .category {
+    text-transform: uppercase;
+  }
+  .page-archive-event .list-events .item .title {
+    font-family: var(--font-title), arial, sans-serif;
+    font-size: 2.5rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -.04em;
+    margin: 0 0 .375rem;
+    color: var(--color-default, #333);
+    transition: color .3s ease;
+  }
+  .mode-uppercase .page-archive-event .list-events .item .title {
+    text-transform: uppercase;
+  }
+  .page-archive-event .list-events .item:hover .title {
+    color: var(--color-primary, #224f5a);
+  }
+  .page-archive-event .list-events .date {
+    font-size: 1.3125rem;
+    color: var(--color-default, #333);
+    font-weight: 400;
+    margin-bottom: .25rem;
+  }
+  .page-archive-event .list-events .location {
+    display: flex;
+    align-items: center;
+    gap: .625rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-default, #333);
+    margin-bottom: 1.25rem;
+    line-height: 1.25rem;
+  }
+  .page-archive-event .list-events .location svg {
+    flex-shrink: 0;
+    height: 1.25rem;
+    fill: var(--color-primary, #224f5a);
+  }
+  .page-archive-event .list-events .description {
+    font-size: .9375rem;
+    line-height: 1.6;
+    color: var(--color-default, #333);
+    margin-bottom: .375rem;
+  }
+  .page-archive-event .list-events .price {
+    font-size: 1.5625rem;
+    font-weight: 500;
+    color: var(--color-secondary, #e8734a);
+    margin-top: .9375rem;
+  }
+  .mode-uppercase .page-archive-event .list-events .price {
+    text-transform: uppercase;
+  }
+
+  /* Vedette */
+  .page-archive-event .list-events .vedette-tag {
+    display: flex;
+    align-items: center;
+    gap: .625rem;
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.5625rem;
+    color: var(--color-primary, #224f5a);
+    margin-bottom: .625rem;
+  }
+  .mode-uppercase .page-archive-event .list-events .vedette-tag {
+    text-transform: uppercase;
+  }
+  .page-archive-event .list-events .vedette-tag svg {
+    flex-shrink: 0;
+    width: 1.5625rem;
+    fill: var(--color-primary, #224f5a);
+  }
+  .page-archive-event .list-events .item.vedette .desc-container {
+    padding-left: 1.25rem;
+    border-left: 4px solid var(--color-primary, #224f5a);
+  }
+  .page-archive-event .list-events .item.vedette .date-num {
+    color: var(--color-primary, #224f5a);
+  }
+  .page-archive-event .list-events .item.vedette .title {
+    color: var(--color-primary, #224f5a);
+  }
+  .page-archive-event .list-events .item.vedette .category {
+    color: var(--color-default, #333);
+    font-weight: 600;
+  }
+  .page-archive-event .list-events .item.vedette .price {
+    color: var(--color-primary, #224f5a);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  /* ============ GRID VIEW ============ */
+  .page-archive-event .grid-events {
+    padding-bottom: 3.125rem;
+  }
+  .page-archive-event .grid-events .month-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.625rem;
+    row-gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .page-archive-event .grid-events .month-list > * {
+    flex-basis: calc(33.333% - 1.0833rem);
+  }
+  .page-archive-event .grid-events .date-month {
+    font-family: var(--font-title), arial, sans-serif;
+    font-size: 3.5rem;
+    font-weight: 600;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 560 / 375;
+    padding: 1.25rem;
+    margin-bottom: auto;
+  }
+  .mode-uppercase .page-archive-event .grid-events .date-month {
+    text-transform: uppercase;
+  }
+  .border-rounded .page-archive-event .grid-events .date-month {
+    border-radius: var(--border-radius, .5rem);
+  }
+  .page-archive-event .grid-events .month-list.odd .date-month {
+    background-color: var(--color-primary, #224f5a);
+  }
+  .page-archive-event .grid-events .month-list.even .date-month {
+    background-color: var(--color-secondary, #e8734a);
+  }
+
+  .page-archive-event .grid-events .item:not(.date-month) {
+    position: relative;
+    transition: all .5s ease;
+  }
+  .page-archive-event .grid-events .item .link {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 6;
+    border: 0;
+  }
+  .page-archive-event .grid-events .illus-wrapper {
+    position: relative;
+    overflow: hidden;
+  }
+  .page-archive-event .grid-events .illus-wrapper::after {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    opacity: 0;
+    background-color: var(--color-primary, #224f5a);
+    content: '';
+    transition: all .3s ease;
+  }
+  .border-rounded .page-archive-event .grid-events .illus-wrapper,
+  .border-rounded .page-archive-event .grid-events .illus-wrapper::after {
+    border-radius: var(--border-radius, .5rem);
+  }
+  .page-archive-event .grid-events .item:hover .illus-wrapper::after {
+    opacity: .5;
+  }
+  .page-archive-event .grid-events .illus {
+    display: block;
+    width: 100%;
+    aspect-ratio: 5.5 / 3.65;
+    object-fit: cover;
+    object-position: center;
+  }
+  .border-rounded .page-archive-event .grid-events .illus {
+    border-radius: var(--border-radius, .5rem);
+  }
+  .page-archive-event .grid-events .overlay {
+    position: absolute;
+    top: 1.75rem; right: 1.75rem;
+    opacity: 0;
+    z-index: 5;
+    text-align: center;
+    font-size: .9375rem;
+    line-height: 1;
+    font-weight: 700;
+    color: #fff;
+    transform: translateY(-.625rem);
+    transition: all .3s ease;
+  }
+  .page-archive-event .grid-events .overlay .icon {
+    display: block;
+    margin-bottom: .3125rem;
+  }
+  .page-archive-event .grid-events .overlay svg * { fill: #fff; }
+  .page-archive-event .grid-events .item:hover .overlay {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .page-archive-event .grid-events .date-grid {
+    position: absolute;
+    bottom: 1.25rem; right: 1.25rem;
+    z-index: 6;
+    background-color: var(--color-primary, #224f5a);
+    padding: .5rem 1rem;
+    font-size: 2rem;
+    color: #fff;
+    font-weight: 700;
+    font-family: var(--font-title), arial, sans-serif;
+  }
+  .mode-uppercase .page-archive-event .grid-events .date-grid {
+    text-transform: uppercase;
+  }
+  .border-rounded .page-archive-event .grid-events .date-grid {
+    border-radius: var(--border-radius, .5rem);
+  }
+  .page-archive-event .grid-events .month-list.even .date-grid {
+    background-color: var(--color-secondary, #e8734a);
+  }
+
+  /* Grid vedette */
+  .page-archive-event .grid-events .vedette-tag-grid {
+    position: absolute;
+    top: -.375rem; left: -.5rem;
+    z-index: 7;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+    background-color: var(--color-primary, #224f5a);
+    padding: .375rem .75rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    line-height: 1;
+  }
+  .mode-uppercase .page-archive-event .grid-events .vedette-tag-grid {
+    text-transform: uppercase;
+  }
+  .page-archive-event .grid-events .vedette-tag-grid svg {
+    fill: #fff;
+    max-height: 1.125rem;
+  }
+  .border-rounded .page-archive-event .grid-events .vedette-tag-grid {
+    border-radius: 3rem;
+    top: 1.25rem; left: 1.25rem;
+  }
+
+  /* Grid desc */
+  .page-archive-event .grid-events .desc {
+    padding: 1rem;
+  }
+  .page-archive-event .grid-events .category {
+    font-size: .875rem;
+    font-weight: 600;
+    margin-bottom: .1875rem;
+  }
+  .mode-uppercase .page-archive-event .grid-events .category {
+    text-transform: uppercase;
+  }
+  .page-archive-event .grid-events .month-list.odd .category {
+    color: var(--color-primary, #224f5a);
+  }
+  .page-archive-event .grid-events .month-list.even .category {
+    color: var(--color-secondary, #e8734a);
+  }
+  .page-archive-event .grid-events .item .title {
+    font-family: var(--font-title), arial, sans-serif;
+    font-size: 2.5rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -.04em;
+    margin: 0 0 .375rem;
+    color: var(--color-default, #333);
+    transition: color .3s ease;
+  }
+  .page-archive-event .grid-events .month-list.odd .item:hover .title {
+    color: var(--color-primary, #224f5a);
+  }
+  .page-archive-event .grid-events .month-list.even .item:hover .title {
+    color: var(--color-secondary, #e8734a);
+  }
+  .page-archive-event .grid-events .date {
+    font-size: 1.3125rem;
+    color: var(--color-default, #333);
+    margin-bottom: .3125rem;
+  }
+  .page-archive-event .grid-events .location {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-default, #333);
+  }
+  .page-archive-event .grid-events .location svg {
+    flex-shrink: 0;
+    fill: var(--color-primary, #224f5a);
+  }
+
+  @media (max-width: 1024px) {
+    .page-archive-event .list-events .illus-wrapper {
+      max-width: 30%;
+    }
+    .page-archive-event .list-events .item {
+      gap: 1.5rem;
+    }
+    .page-archive-event .event-toggle {
+      display: none;
+    }
+    .page-archive-event .grid-events .month-list > * {
+      flex-basis: calc(50% - .8125rem);
+    }
+  }
+  @media (max-width: 720px) {
+    .page-archive-event .date-col {
+      width: auto;
+      flex: 0 0 60px;
+    }
+    .page-archive-event .date-num {
+      font-size: 3.75rem;
+      line-height: 3.75rem;
+      margin-left: 0;
+    }
+    .page-archive-event .month-header span {
+      font-size: 1.5rem;
+    }
+    .page-archive-event .list-events .item .title {
+      font-size: 1.5rem;
+    }
+    .page-archive-event .list-events .item {
+      gap: 1rem;
+      padding-bottom: 3rem;
+    }
+    .page-archive-event .list-events .illus-wrapper {
+      display: none;
+    }
+    .page-archive-event .grid-events .month-list > * {
+      flex-basis: 100%;
+    }
+    .page-archive-event .list-events .date {
+      font-size: 1rem;
+    }
+    .page-archive-event .list-events .location {
+      font-size: 1rem;
+    }
+  }
+</style>
+
+<script is:inline>
+(function() {
+  var container = document.querySelector('.js_event-container');
+  if (!container) return;
+  var listView = container.querySelector('.js_list-events');
+  var gridView = container.querySelector('.js_grid-events');
+  var toggle = document.getElementById('js_event-toggle');
+  var toggleText = document.getElementById('toggle-text');
+  var selectList = document.getElementById('js_select-list');
+  var selectGrid = document.getElementById('js_select-grid');
+
+  // View toggle
+  if (toggle) {
+    toggle.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggle.classList.toggle('active');
+    });
+    document.addEventListener('click', function() { toggle.classList.remove('active'); });
+  }
+  if (selectList) {
+    selectList.addEventListener('click', function() {
+      listView.style.display = '';
+      gridView.style.display = 'none';
+      toggleText.textContent = 'Vue liste';
+      selectList.classList.add('selected');
+      selectGrid.classList.remove('selected');
+    });
+  }
+  if (selectGrid) {
+    selectGrid.addEventListener('click', function() {
+      listView.style.display = 'none';
+      gridView.style.display = '';
+      toggleText.textContent = 'Vue photo';
+      selectGrid.classList.add('selected');
+      selectList.classList.remove('selected');
+    });
+  }
+
+  // Tab click: filter by category (both views)
+  container.querySelectorAll('.js_change-term').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      container.querySelectorAll('.js_change-term').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      var term = btn.getAttribute('data-value');
+
+      // Filter list view
+      var items = container.querySelectorAll('.list-events .item');
+      var months = container.querySelectorAll('.list-events .month-header');
+      items.forEach(function(item) {
+        if (term === 'all') { item.style.display = ''; }
+        else {
+          var cats = (item.getAttribute('data-categories') || '').split(',');
+          item.style.display = cats.indexOf(term) !== -1 ? '' : 'none';
+        }
+      });
+      months.forEach(function(mh) {
+        var next = mh.nextElementSibling;
+        var hasVisible = false;
+        while (next && !next.classList.contains('month-header')) {
+          if (next.classList.contains('item') && next.style.display !== 'none') { hasVisible = true; break; }
+          next = next.nextElementSibling;
+        }
+        mh.style.display = hasVisible ? '' : 'none';
+      });
+
+      // Filter grid view
+      var gridItems = container.querySelectorAll('.grid-events .item:not(.date-month)');
+      var gridMonths = container.querySelectorAll('.grid-events .month-list');
+      gridItems.forEach(function(item) {
+        if (term === 'all') { item.style.display = ''; }
+        else {
+          var cats = (item.getAttribute('data-categories') || '').split(',');
+          item.style.display = cats.indexOf(term) !== -1 ? '' : 'none';
+        }
+      });
+      gridMonths.forEach(function(ml) {
+        var hasVisible = false;
+        ml.querySelectorAll('.item:not(.date-month)').forEach(function(item) {
+          if (item.style.display !== 'none') hasVisible = true;
+        });
+        ml.style.display = hasVisible ? '' : 'none';
+      });
+    });
+  });
+})();
+</script>

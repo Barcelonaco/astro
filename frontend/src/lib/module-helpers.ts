@@ -3,6 +3,19 @@
  * Remplace les helpers PHP GlobalHelper::getVideoID, etc.
  */
 
+/** URL de l'image de remplacement du site (settings.replacement_image) */
+let _defaultImageUrl = '';
+
+/** Définit l'URL de l'image par défaut du site (à appeler au chargement de chaque page) */
+export function setDefaultImageUrl(url: string): void {
+  _defaultImageUrl = url || '';
+}
+
+/** Retourne l'URL de l'image par défaut du site */
+export function getDefaultImageUrl(): string {
+  return _defaultImageUrl;
+}
+
 /** Extrait l'ID YouTube depuis une URL (watch?v=, youtu.be/, embed/) */
 export function extractYouTubeId(url: string): string {
   if (!url) return '';
@@ -36,7 +49,7 @@ export function resolveImageUrl(
   apiOrigin: string,
   preferredSize?: string
 ): string {
-  if (!img) return '';
+  if (!img) return _defaultImageUrl ? optimizedImageUrl(_defaultImageUrl, 900, 80) : '';
   let rawUrl = '';
   if (typeof img === 'string') {
     rawUrl = img.startsWith('http') ? img : apiOrigin + img;
@@ -47,7 +60,7 @@ export function resolveImageUrl(
     } else {
       rawUrl = obj.url || obj.sizes?.banner || '';
     }
-    if (!rawUrl) return '';
+    if (!rawUrl) return _defaultImageUrl ? optimizedImageUrl(_defaultImageUrl, 900, 80) : '';
     rawUrl = rawUrl.startsWith('http') ? rawUrl : apiOrigin + rawUrl;
   }
   // Auto-optimize local uploads to WebP

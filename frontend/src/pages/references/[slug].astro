@@ -9,7 +9,7 @@ import SiteOverlays from '../../components/SiteOverlays.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
 import { getReferences, getReferenceBySlug, getFrontendBootstrap } from '../../lib/api';
 import { cleanHtml, resolveLink } from '../../lib/module-classes';
-import { optimizedImageUrl } from '../../lib/module-helpers';
+import { optimizedImageUrl, setDefaultImageUrl, getDefaultImageUrl } from '../../lib/module-helpers';
 
 export async function getStaticPaths() {
   const result = await getReferences({ status: 'published', limit: 10000 });
@@ -26,6 +26,7 @@ const [ref, { siteInfo, styleSettings, siteSettings, navigation: navigationData,
 
 const siteName = siteInfo.siteName || SITE_TITLE;
 const siteDescription = siteInfo.siteDescription || SITE_DESCRIPTION;
+setDefaultImageUrl(siteSettings.replacement_image || '');
 
 if (!ref) {
   throw new Error(`Reference not found: ${slug}`);
@@ -53,6 +54,10 @@ if (photos.length === 0 && ref.featured_image) {
   const fi = ref.featured_image as Record<string, any>;
   const url = fi.sizes?.banner || fi.url || '';
   if (url) photos = [url];
+}
+// Fallback to default image if still no photos
+if (photos.length === 0 && getDefaultImageUrl()) {
+  photos = [getDefaultImageUrl()];
 }
 
 // Parse link
