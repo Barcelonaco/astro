@@ -64,6 +64,16 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
             REMOTE_ROOT=~/astro.bcnco.site/httpdocs
+
+            cd "$REMOTE_ROOT"
+            npm i
+
+            cd "$REMOTE_ROOT/frontend"
+            npm i
+            npm run build
+
             ln -sfn "$REMOTE_ROOT/frontend/dist" "$REMOTE_ROOT/backend-php/dist"
             echo "✅ Déploiement astro.bcnco.site terminé"
