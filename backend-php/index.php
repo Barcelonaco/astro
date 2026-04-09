@@ -61,6 +61,7 @@ require_once __DIR__ . '/controllers/RenderBlockController.php';
 require_once __DIR__ . '/controllers/PluginController.php';
 require_once __DIR__ . '/controllers/GoogleReviewsController.php';
 require_once __DIR__ . '/controllers/AiController.php';
+require_once __DIR__ . '/controllers/SearchController.php';
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 $allowedOrigins = [
@@ -707,6 +708,11 @@ try {
         $user = authenticate_token();
         require_admin($user);
         FormController::delete((int) $params['id']);
+    }
+
+    // ── Search ──
+    elseif ($method === 'GET' && $path === '/search') {
+        SearchController::search();
     }
 
     // ── Custom Post Types (dynamic) ──

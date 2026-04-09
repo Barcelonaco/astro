@@ -481,6 +481,29 @@ export async function getEvenementCategories(): Promise<EvenementCategory[]> {
   }
 }
 
+// ── Search ──
+export interface SearchResult {
+  id: number
+  title: string
+  slug: string
+  excerpt: string
+  featured_image: string | { url?: string; sizes?: Record<string, string> } | null
+  published_date: string
+  result_type: string
+  base_url: string
+}
+
+export interface SearchResponse {
+  results: SearchResult[]
+  total: number
+  query: string
+}
+
+export async function searchSite(query: string, limit = 20, offset = 0): Promise<SearchResponse> {
+  const data = await fetchAPI(`/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`)
+  return data || { results: [], total: 0, query }
+}
+
 // Helper to format content (since it's now plain text/HTML from MySQL)
 export function formatContent(content: string): string {
   if (!content) return ''

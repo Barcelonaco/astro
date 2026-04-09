@@ -12,7 +12,7 @@ import { optimizedImageUrl, setDefaultImageUrl } from '../lib/module-helpers';
 
 export async function getStaticPaths() {
   // Slugs réservés — correspondent aux dossiers/fichiers dans src/pages/
-  const RESERVED_SLUGS = ['about', 'actualites', 'blog', 'category', 'evenements', 'pages', 'references', 'rss.xml'];
+  const RESERVED_SLUGS = ['about', 'actualites', 'blog', 'category', 'evenements', 'pages', 'references', 'rss.xml', 'search'];
   const pages = await getAllPages();
   return pages
     .filter((p: any) => p.status === 'published' && !RESERVED_SLUGS.includes(p.slug))

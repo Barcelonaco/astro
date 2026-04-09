@@ -78,7 +78,7 @@
   padding-right: 0.9666666667em;
   border-radius: 0;
   border: 0;
-  border-bottom: 1px solid var(--color-primary, #3ee98d);
+  border-bottom: 0;
   font-family: var(--font-title), arial, sans-serif;
   font-size: 3.75em;
   line-height: 1.3;
@@ -92,7 +92,10 @@
   color: var(--color-primary, #3ee98d);
 }
 .search-form .search-field:focus {
-  border-color: var(--color-primary-bis, #1dbe68);
+  outline: none;
+}
+.search-form .search-field:focus::placeholder {
+  opacity: 0.35;
 }
 .search-form .search-submit {
   position: absolute;

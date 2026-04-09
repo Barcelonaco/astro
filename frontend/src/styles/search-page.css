@@ -1,0 +1,152 @@
+/**
+ * Search results page styles
+ * Adapted from nickl/pages/_search.scss
+ */
+
+/* GENERAL
+---------------------------------------- */
+.page-search {
+  padding-top: 2.5rem;
+  padding-bottom: 5rem;
+}
+.page-search .title-page {
+  margin-bottom: 0;
+}
+.page-search .nbr-results {
+  margin-top: 1.5625rem;
+  font-size: 1.5rem;
+  line-height: 1.45;
+  letter-spacing: -0.04em;
+  font-weight: 700;
+}
+.page-search .no-results {
+  margin-top: 6.25rem;
+  text-align: center;
+}
+.page-search .no-results .txt {
+  font-size: 1.5rem;
+}
+.page-search .no-results .btn-wrapper {
+  margin-top: 1.5rem;
+}
+.page-search .list-results {
+  position: relative;
+  margin-top: 3.75rem;
+  padding-top: 3.75rem;
+  list-style: none;
+  padding-left: 0;
+}
+.page-search .list-results::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 43.9375rem;
+  max-width: 75%;
+  height: 1px;
+  background-color: var(--color-primary, #333);
+  content: '';
+}
+.page-search .list-results .item {
+  margin-top: 1.875rem;
+  padding-bottom: 2.8125rem;
+  border-bottom: 1px solid #e5e5e5;
+}
+.page-search .list-results .item:first-child {
+  margin-top: 0;
+}
+.page-search .list-results .link {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-decoration: none;
+  color: inherit;
+}
+.page-search .list-results .link:not(:active) .category,
+.page-search .list-results .link:not(:active) .title,
+.page-search .list-results .link:not(:active) .illus-wrapper::after {
+  transition: all 0.3s ease;
+}
+.page-search .list-results .link:hover .category {
+  color: var(--color-secondary, #666);
+}
+.page-search .list-results .link:hover .title {
+  color: var(--color-primary, #333);
+}
+.page-search .list-results .link:hover .illus-wrapper::after {
+  opacity: 0.25;
+}
+.page-search .list-results .illus-wrapper {
+  position: relative;
+  overflow: hidden;
+  margin-left: 1.5625rem;
+  flex-basis: calc(38.11% - 1.5625rem);
+  flex-shrink: 0;
+  order: 5;
+  background-color: rgba(0, 0, 0, 0.05);
+  aspect-ratio: 1;
+}
+.page-search .list-results .illus-wrapper::after {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  background-color: var(--color-secondary, #333);
+  content: '';
+}
+.border-rounded .page-search .list-results .illus-wrapper {
+  border-radius: var(--border-radius, 8px);
+}
+.page-search .list-results .illus {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.page-search .list-results .desc {
+  flex-basis: 61.88%;
+}
+.page-search .list-results .category {
+  margin-bottom: 0.4375rem;
+  font-size: 0.875rem;
+  line-height: 1;
+  color: var(--color-primary, #333);
+  text-transform: uppercase;
+}
+.page-search .list-results .title {
+  margin: 0;
+  text-align: inherit;
+}
+.page-search .list-results .txt {
+  margin-top: 0.9375rem;
+}
+.page-search .list-results .btn-wrapper {
+  margin-top: 0.5625rem;
+}
+.page-search .list-results .date {
+  display: block;
+  margin-top: 0.5625rem;
+  font-size: 1rem;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 960px) {
+  .page-search .list-results .link {
+    display: block;
+  }
+  .page-search .list-results .illus-wrapper {
+    margin-left: 0;
+    max-width: 100%;
+    aspect-ratio: 16/9;
+  }
+  .page-search .list-results .desc {
+    margin-top: 1.25rem;
+  }
+}
