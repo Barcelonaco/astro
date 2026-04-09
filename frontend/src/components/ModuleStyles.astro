@@ -62,9 +62,10 @@ const blockToCss: Record<string, string> = {
 };
 
 /**
- * Collect all block types including sub-modules nested inside ColumnsTab.
+ * Collect all block types including sub-modules nested inside ColumnsTab
+ * and ReusableBloc (fetched from API).
  */
-function collectAllBlockTypes(blocks: { type: string; data?: any }[]): string[] {
+function collectNestedTypes(blocks: { type: string; data?: any }[]): string[] {
   const types: string[] = [];
   for (const b of blocks) {
     types.push(b.type);
@@ -81,6 +82,30 @@ function collectAllBlockTypes(blocks: { type: string; data?: any }[]): string[] 
   return types;
 }
 
+async function collectAllBlockTypes(blocks: { type: string; data?: any }[]): Promise<string[]> {
+  const types = collectNestedTypes(blocks);
+
+  // Fetch reusable blocs to discover their nested module types
+  const reusableBlocks = blocks.filter(b => b.type === 'reusable-bloc' && b.data?.bloc_id);
+  if (reusableBlocks.length > 0) {
+    const { getReusableBlocById } = await import('../lib/api');
+    const fetches = reusableBlocks.map(async (b) => {
+      try {
+        const bloc = await getReusableBlocById(Number(b.data.bloc_id));
+        if (bloc?.content) {
+          const parsed = JSON.parse(bloc.content);
+          if (Array.isArray(parsed)) {
+            types.push(...collectNestedTypes(parsed));
+          }
+        }
+      } catch { /* skip on error */ }
+    });
+    await Promise.all(fetches);
+  }
+
+  return types;
+}
+
 /** Read a CSS file from public/nickl-assets/css/ at build time */
 const cssDir = path.join(process.cwd(), 'public', 'nickl-assets', 'css');
 function readCss(filename: string): string {
@@ -91,7 +116,7 @@ function readCss(filename: string): string {
   }
 }
 
-const allTypes = blocks ? collectAllBlockTypes(blocks as any) : [];
+const allTypes = blocks ? await collectAllBlockTypes(blocks as any) : [];
 
 const cssFileNames = [
   ...new Set(
