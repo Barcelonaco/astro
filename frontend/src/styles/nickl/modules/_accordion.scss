@@ -131,6 +131,9 @@
             }
         }
         &.active {
+            &, &:focus:not(:active), &:hover:not(:active) {
+                color: inherit;
+            }
             &::before {
                 opacity: 0;
             }
@@ -138,7 +141,7 @@
                 opacity: .15;
             }
             .icon svg {
-                fill: $color3;                
+                fill: $color3;
                 transform: rotate(0deg);
             }
         }

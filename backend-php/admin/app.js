@@ -4158,17 +4158,21 @@ function buildTemplateContext(block) {
       || moduleData.img_to_left === true || moduleData.img_to_left === 1 || moduleData.img_to_left === '1';
     ctx.placement = imgToLeft ? 'img-left' : 'img-right';
     const ratio = data.media_ratio || moduleData.media_ratio || '';
-    const ratioMap = { 'full-height': 'full-height', landscape: 'banner', portrait: 'portrait', square: 'square-large' };
-    ctx.ratioImg = ratioMap[ratio] || 'background-module';
+    // In admin preview, full-height uses 100vh + absolute positioning which breaks
+    // the preview layout. Treat it as landscape instead.
+    const adminRatio = ratio === 'full-height' ? 'landscape' : ratio;
+    const ratioMap = { landscape: 'banner', portrait: 'portrait', square: 'square-large' };
+    ctx.ratioImg = ratioMap[adminRatio] || 'background-module';
     ctx.link_align = data.link_align || moduleData.link_align || '';
     ctx.link_style = data.link_style || moduleData.link_style || '';
-    if (ratio) extraClasses.push(ratio);
+    if (adminRatio) extraClasses.push(adminRatio);
     const imgParallax = data.img_parallax === true || data.img_parallax === 1 || data.img_parallax === '1';
     const mediaChoice = data.media_choice === true || data.media_choice === 1 || data.media_choice === '1';
     if (imgParallax && mediaChoice) extraClasses.push('img-parallax');
     // Normalize media_choice to numeric 1/0 so Blade @if ($module['media_choice'] == 1) works
     // (PHP loose comparison: true == 1 is true, but JS String(true) !== '1')
-    ctx.module = { ...ctx.module, media_choice: mediaChoice ? 1 : 0 };
+    // Also override media_ratio in module context so Blade template uses adminRatio
+    ctx.module = { ...ctx.module, media_choice: mediaChoice ? 1 : 0, media_ratio: adminRatio };
     // Replicate the @php block that creates $img (stripped by the JS Blade engine)
     const imgData = data.image || moduleData.image || ctx.image;
     if (imgData) {
@@ -5167,6 +5171,7 @@ function attachPageBuilderListeners() {
 
     if (btn.classList.contains('active')) {
       btn.classList.remove('active');
+      btn.blur();
       adminSlideUp(targetTxt, speed);
     } else {
       accordion.querySelectorAll('.title').forEach(t => {
@@ -12334,12 +12339,18 @@ async function apiUpload(endpoint, formData) {
 }
 
 let _loadingTimer = null;
+let _loadingDelayTimer = null;
 
 function showLoading(text = '') {
   const overlay = document.getElementById('loadingOverlay');
   const textEl = document.getElementById('loadingText');
   if (textEl) textEl.textContent = text;
-  overlay.classList.add('show');
+
+  // Delay showing the overlay to avoid flash on fast navigations
+  clearTimeout(_loadingDelayTimer);
+  _loadingDelayTimer = setTimeout(() => {
+    overlay.classList.add('show');
+  }, 300);
 
   // If no explicit text, show "Publication en cours…" after 2s (rebuild is running)
   clearTimeout(_loadingTimer);
@@ -12354,7 +12365,9 @@ function showLoading(text = '') {
 
 function hideLoading() {
   clearTimeout(_loadingTimer);
+  clearTimeout(_loadingDelayTimer);
   _loadingTimer = null;
+  _loadingDelayTimer = null;
   const overlay = document.getElementById('loadingOverlay');
   const textEl = document.getElementById('loadingText');
   if (textEl) textEl.textContent = '';

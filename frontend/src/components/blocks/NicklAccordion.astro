@@ -129,6 +129,7 @@ if (!window.__nicklAccordionInit) {
 
     if (btn.classList.contains('active')) {
       btn.classList.remove('active');
+      btn.blur();
       slideUp(targetTxt, speed);
     } else {
       // Fermer les autres (pas celui qu'on va ouvrir)

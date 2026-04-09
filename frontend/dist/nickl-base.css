@@ -1,0 +1,93 @@
+/* Minimal Nickl base styles — replaces 1.3MB app.css for Astro frontend */
+/* Only includes styles actually used by Nickl modules in the Astro context */
+
+/* ── Layout containers ── */
+.container,.container-large{margin-left:auto;margin-right:auto;padding-left:5vw;padding-right:5vw;width:100%;position:relative;box-sizing:border-box}
+.container-large{max-width:120rem}
+.module .container{max-width:120rem}
+
+/* ── Module base ── */
+.module{padding-bottom:calc(75px + 3.90625vw);padding-top:calc(75px + 3.90625vw);position:relative}
+
+/* ── Padding utilities ── */
+.no-padding-top{padding-top:0!important}
+.no-padding-bottom{padding-bottom:0!important}
+.padding-top-small{padding-top:calc(37.5px + 1.95313vw)}
+.padding-bottom-small{padding-bottom:calc(37.5px + 1.95313vw)}
+
+/* ── Background utilities ── */
+.has-background-primary{background-color:var(--color-primary)}
+.has-background-primary,.has-background-secondary{color:#fff}
+.has-background-secondary{background-color:var(--color-secondary)}
+.has-background-tertiary{background-color:var(--color-tertiary)}
+.has-background-image{overflow:hidden;position:relative}
+.has-background-image .background{position:absolute;top:0;left:0;width:100%;height:100%;background:no-repeat center;background-size:cover;pointer-events:none}
+.has-background-image.background-parallax .background{top:-25%;height:125%}
+.img-parallax .illus-wrapper{overflow:hidden}
+.img-parallax .illus{height:calc(100% + 200px);margin-top:-200px;object-fit:cover}
+.img-parallax .illus-wrapper.full-height{max-height:100vh}
+.img-parallax .illus-wrapper.full-height .illus{height:calc(100vh + 200px)}
+.no-background-color{background-color:transparent}
+
+/* ── Border rounded mode ── */
+.border-rounded .btn-primary,.border-rounded .btn-secondary{border-radius:3rem}
+.border-rounded .alert-content{border-radius:1rem}
+.border-rounded .floating-btn{border-radius:50%}
+.border-rounded input,.border-rounded textarea,.border-rounded select,.border-rounded .form-input,.border-rounded .newsletter-input{border-radius:.5rem}
+.border-rounded .newsletter-btn{border-radius:.5rem}
+
+/* ── Uppercase mode ── */
+.mode-uppercase .title-section-1,.mode-uppercase .title-section-2,.mode-uppercase .title-section-3,.mode-uppercase .title-section-4{text-transform:uppercase}
+.mode-uppercase .btn-primary,.mode-uppercase .btn-secondary,.mode-uppercase .btn-tertiary{text-transform:uppercase}
+.mode-uppercase nav a{text-transform:uppercase}
+
+/* ── Buttons ── */
+.btn{display:inline-block;text-decoration:none;transition:all .3s;cursor:pointer}
+.btn-primary{background-color:var(--color-primary);border:0;border-radius:0;color:#fff;font-family:var(--font-title),sans-serif;font-size:1.25rem;font-weight:500;letter-spacing:-.04em;line-height:1.2;padding:.6875rem 1.625rem;text-align:center}
+.btn-secondary{background-color:transparent;border:2px solid #fff;border-radius:0;color:#fff;font-family:var(--font-title),sans-serif;font-size:1.25rem;font-weight:500;letter-spacing:-.04em;line-height:1.2;padding:.6875rem 1.625rem;text-align:center}
+.btn-tertiary{background:linear-gradient(90deg,currentColor,currentColor) no-repeat 100% 100%;background-size:0 .0625rem;border:0;color:var(--color-default);font-family:var(--font-title),sans-serif;font-size:1.25rem;font-weight:700;line-height:1.2;padding:.3125rem 0;text-align:center}
+.btn-tertiary:hover{background-size:100% .0625rem}
+.btn-wrapper{margin-top:1.875rem;display:flex;flex-wrap:wrap;gap:.75rem}
+.color-primary{color:var(--color-primary)}
+
+/* ── Titles ── */
+.title-section-1{font-family:var(--font-title),sans-serif;font-size:5rem;font-weight:700;letter-spacing:-.04em;line-height:1.05}
+.title-section-2{font-family:var(--font-title),sans-serif;font-size:2.625rem;font-weight:600;letter-spacing:-.04em;line-height:1}
+.title-section-3{font-family:var(--font-title),sans-serif;font-size:2.25rem;font-weight:700;letter-spacing:-.04em;line-height:1.1;margin-bottom:1rem}
+.title-section-4{font-family:var(--font-title),sans-serif;font-size:1.875rem;font-weight:600;letter-spacing:-.04em;line-height:1.1}
+
+/* ── Editor/text ── */
+.editor p{margin:0 0 1em}
+.editor h1,.editor h2,.editor h3{font-family:var(--font-title),sans-serif;letter-spacing:-.04em;margin:0 0 .5em}
+.editor h1{font-size:2.5rem;font-weight:700;line-height:1.1}
+.editor h2{font-size:2rem;font-weight:600;line-height:1.15}
+.editor h3{font-size:1.5rem;font-weight:600;line-height:1.2}
+.editor a{color:var(--color-primary);text-decoration:underline}
+
+/* ── Alignment ── */
+.align-left{text-align:left}
+.align-left .btn-wrapper{justify-content:flex-start}
+.align-center{text-align:center}
+.align-center .btn-wrapper{justify-content:center}
+.align-right{text-align:right}
+
+/* ── Columns layout ── */
+.cols-wrapper{display:flex;flex-wrap:nowrap;column-gap:1.625rem;align-items:flex-start}
+.columns-2>.col{flex:1 1 50%}
+.col .module{padding-top:0;padding-bottom:0}
+
+/* ── Full width ── */
+.full-width .container-large{max-width:100%;padding-left:0;padding-right:0}
+
+/* ── Responsive ── */
+@media(max-width:960px){
+  .title-section-1{font-size:3rem}
+  .title-section-2{font-size:2rem}
+  .cols-wrapper{flex-wrap:wrap}
+  .columns-2>.col{flex:1 1 100%}
+}
+@media(max-width:600px){
+  .title-section-1{font-size:2.25rem}
+  .title-section-2{font-size:1.75rem}
+  .title-section-3{font-size:1.75rem}
+}

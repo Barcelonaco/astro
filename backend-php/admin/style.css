@@ -1255,6 +1255,17 @@ tr:hover {
   border-top: 1px solid rgba(15, 23, 42, 0.06);
 }
 
+/* ── Text-image full-height → landscape fallback in admin preview ─────────── */
+/* The full-height ratio uses 100vh + negative margins + absolute positioning
+   that breaks inside the admin preview. The JS replaces "full-height" with
+   "admin-full-height landscape" so the module renders like a normal landscape
+   image. We just hide the leftover parallax artefacts. */
+.builder-block-render .module-text-image.img-parallax .illus {
+  margin-top: 0 !important;
+  transform: none !important;
+  height: 100% !important;
+}
+
 /* ── Banner preview height overrides ──────────────────────────────────────── */
 .builder-block-render .module-banner-page .desc::before {
   min-height: 0 !important;

@@ -76,7 +76,116 @@
   background-color: transparent !important;
 }
 
-/* 6. LIENS : reset pour hériter la couleur du parent (idem au reset Nickl) */
+/* 6. BOUTONS dans le builder : reset des styles admin (gradient, shadow, radius)
+   pour laisser les styles Nickl du module CSS s'appliquer correctement */
+.builder-canvas-inner .module .btn-primary {
+  background: var(--color-primary, #3ee98d);
+  box-shadow: none;
+  border-radius: 0;
+  transform: none;
+}
+.builder-canvas-inner .module .btn-primary:hover,
+.builder-canvas-inner .module .btn-primary:focus {
+  background: var(--color-secondary, #02bd9c);
+  box-shadow: none;
+  transform: none;
+}
+.builder-canvas-inner .module .btn-secondary {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+.builder-canvas-inner .module .btn-tertiary {
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+.builder-canvas-inner.border-rounded .module .btn-primary {
+  border-radius: 3rem;
+}
+.builder-canvas-inner.border-rounded .module .btn-secondary {
+  border-radius: 3rem;
+}
+
+/* 6a. BOUTONS sur fonds colorés (primary + secondary) — règles Nickl */
+.builder-canvas-inner .module.has-background-primary .btn-primary,
+.builder-canvas-inner .module.has-background-secondary .btn-primary {
+  background: #fff;
+}
+.builder-canvas-inner .module.has-background-primary .btn-primary:hover,
+.builder-canvas-inner .module.has-background-primary .btn-primary:focus,
+.builder-canvas-inner .module.has-background-secondary .btn-primary:hover,
+.builder-canvas-inner .module.has-background-secondary .btn-primary:focus {
+  color: #fff;
+}
+.builder-canvas-inner .module.has-background-primary .btn-secondary,
+.builder-canvas-inner .module.has-background-secondary .btn-secondary {
+  border-color: currentColor;
+}
+.builder-canvas-inner .module.has-background-primary .btn-tertiary,
+.builder-canvas-inner .module.has-background-secondary .btn-tertiary {
+  color: #fff;
+}
+/* --- has-background-primary : couleurs spécifiques --- */
+.builder-canvas-inner .module.has-background-primary .btn-primary {
+  color: var(--color-primary, #3ee98d);
+}
+.builder-canvas-inner .module.has-background-primary .btn-primary:hover,
+.builder-canvas-inner .module.has-background-primary .btn-primary:focus {
+  background: var(--color-primary-bis, #1dbe68);
+}
+.builder-canvas-inner .module.has-background-primary .btn-secondary:hover,
+.builder-canvas-inner .module.has-background-primary .btn-secondary:focus {
+  background: var(--color-primary-bis, #1dbe68);
+  border-color: var(--color-primary-bis, #1dbe68);
+}
+/* --- has-background-secondary : couleurs spécifiques --- */
+.builder-canvas-inner .module.has-background-secondary .btn-primary {
+  color: var(--color-secondary, #02bd9c);
+}
+.builder-canvas-inner .module.has-background-secondary .btn-primary:hover,
+.builder-canvas-inner .module.has-background-secondary .btn-primary:focus {
+  background: var(--color-secondary-bis, #149b82);
+}
+.builder-canvas-inner .module.has-background-secondary .btn-secondary:hover,
+.builder-canvas-inner .module.has-background-secondary .btn-secondary:focus {
+  background: var(--color-secondary-bis, #149b82);
+  border-color: var(--color-secondary-bis, #149b82);
+}
+/* --- has-background-tertiary --- */
+.builder-canvas-inner .module.has-background-tertiary .btn-primary {
+  background: #fff;
+  color: var(--color-default, #224f5a);
+}
+.builder-canvas-inner .module.has-background-tertiary .btn-primary:hover,
+.builder-canvas-inner .module.has-background-tertiary .btn-primary:focus {
+  background: var(--color-default, #224f5a);
+  color: #fff;
+}
+.builder-canvas-inner .module.has-background-tertiary .btn-secondary {
+  border-color: currentColor;
+}
+.builder-canvas-inner .module.has-background-tertiary .btn-tertiary {
+  color: currentColor;
+}
+/* --- has-background-dark --- */
+.builder-canvas-inner .module.has-background-dark .btn-primary {
+  background: #fff;
+  color: var(--color-default, #224f5a);
+}
+.builder-canvas-inner .module.has-background-dark .btn-primary:hover,
+.builder-canvas-inner .module.has-background-dark .btn-primary:focus {
+  background: var(--color-default, #224f5a);
+  color: #fff;
+}
+.builder-canvas-inner .module.has-background-dark .btn-secondary {
+  border-color: currentColor;
+}
+.builder-canvas-inner .module.has-background-dark .btn-tertiary {
+  color: #fff;
+}
+
+/* 6b. LIENS : reset pour hériter la couleur du parent (idem au reset Nickl) */
 .builder-canvas-inner .module a:not(.btn):not(.btn-primary):not(.btn-secondary):not(.btn-tertiary) {
   color: inherit;
 }
