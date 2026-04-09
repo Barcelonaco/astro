@@ -1,0 +1,129 @@
+@import '../base/common';
+/**
+ * GENERAL
+ * MEDIA QUERIES
+ */
+
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.module-posts-list {
+    &.image-shadow .item .background-item::before {
+        background: linear-gradient(0deg, rgba($color2, .5) 50%, rgba($color1, 0) 100%);
+    }
+    .list {
+        @include flex(flex-start, stretch, wrap, 4, rem(26px), 1);
+        row-gap: rem(26px);
+        &.columns-4 {
+            .title {
+                font-size: rem(32px);
+            }
+            .txt {
+                margin-top: rem(11px);
+                font-size: rem(16px);
+            }
+        }
+    }
+    .item {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+        @include flex(flex-start, flex-end);
+        background-color: rgba($color2, .1);
+        color: $color1;
+        @include fake-flex-col(73%);
+        .border-rounded & {
+            border-radius: $border-radius-default;
+        }
+        &.no-desc .background-item::before {
+            display: none;
+        }
+    }
+    .background-item {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        &::before {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 65%;
+            z-index: 5;
+            background: transparent;
+            content: '';
+        }
+    }
+    .illus {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+    }
+    .desc {
+        position: relative;
+        width: 100%;
+        padding: 6.94%;
+        z-index: 5;
+        text-shadow: 0 0 rem(20px) rgba($color2, .5);
+    }
+    .title {
+        margin: 0;
+        text-align: inherit;
+        font-size: rem(35px);
+    }
+    .txt {
+        margin-top: 3px;
+    }
+    .btn-wrapper {
+        margin-top: rem(25px);
+        @include flex(flex-start, flex-start, wrap);
+        gap: rem(9px) rem(19px);
+    }
+}
+
+
+
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 1300px) {
+    .module-posts-list .item:nth-child(4) {
+        display: none;
+    }
+}
+
+
+
+@media only screen and (max-width: 1024px) {
+    .module-posts-list .item {
+        flex-basis: calc(50% - 1.625rem);
+        &:nth-child(3):last-child {
+            display: none;
+        }
+        &:nth-child(4) {
+            display: flex;
+        }
+    }
+}
+
+
+
+@media only screen and (max-width: 600px) {
+    .module-posts-list .item {
+        flex-basis: 100%;
+        &:nth-child(3):last-child {
+            display: flex;
+        }
+    }
+}

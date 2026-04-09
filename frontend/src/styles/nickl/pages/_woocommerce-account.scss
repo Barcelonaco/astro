@@ -1,0 +1,129 @@
+/**
+ * GENERAL
+ * MEDIA QUERIES
+ */
+
+
+
+
+
+/* GENERAL
+---------------------------------------- */
+.page-account {
+    padding-top: spacing($module-spacing-small);
+    padding-bottom: spacing($module-spacing);
+
+
+    // Connexion / Mot de passe perdu
+    .login-block .title-page-wrapper {
+        text-align: center;
+        h2 {
+            text-align: center;
+        }
+    }
+    form.woocommerce-form-login, form.woocommerce-form-register, form.woocommerce-ResetPassword {
+        max-width: rem(500px);
+        margin-right: auto;
+        margin-left: auto;
+        padding: 0;
+        border: 0;
+        .button {
+            @extend .btn;
+            @extend .btn-primary;
+            min-width: rem(150px);
+            margin-top: rem(calc($form-row-spacing-top / 3));
+            float: none;
+            margin-right: 0;
+        }
+    }
+
+    /* Styles identiques à la page tunnel (pages/woocommerce-checkout.scss) */
+    form.woocommerce-form-login {
+        .form-row:nth-last-child(2) {
+            text-align: center;
+        }
+        .woocommerce-form-login__rememberme {
+            display: block;
+            width: 100%;
+            text-align: center;
+            @extend .input-radio-checkbox;
+            span {
+                display: inline-block;
+            }
+        }
+        .woocommerce-LostPassword {
+            margin-top: rem(calc($form-row-spacing-top / 3));
+            text-align: center;
+            a {
+                @include animation-underline();
+                display: inline-block;
+                padding: rem(5px) 0;
+                background-position: 0 100%;
+                background-size: 100% 1px;
+                border: 0;
+                line-height: $line-height-default;
+                font-weight: 600;
+                @include hover {
+                    background-position: 100% 100%;
+                    background-size: 0 1px;
+                    color: $color3;
+                }
+            }
+        }
+    }
+
+    form.woocommerce-form-register .form-row:last-child {
+        text-align: center;
+    }
+
+    form.woocommerce-ResetPassword {
+        .form-row-first {
+            width: 100%;
+            float: none;
+        }
+        .form-row:nth-last-child(3) {
+            text-align: center;
+        }
+    }
+
+
+    // Navigation
+    .woocommerce-MyAccount-navigation {
+        li.is-active a {
+            color: $color3;
+        }
+        a {
+            display: inline-block;
+            padding: rem(10px) 0;
+            font-family: $font2;
+            font-size: rem(20px);
+            line-height: $line-height-default;
+            font-weight: 600;
+            @include hover {
+                color: $color3;
+            }
+        }
+    }
+
+
+    // Title H2 / H3
+    /* Styles identiques à la page tunnel (pages/woocommerce-checkout.scss) */
+    h2, h3 {
+        @extend .title-section-4;
+        margin-bottom: rem(15px);
+        color: currentColor;
+        text-align: left;
+    }
+}
+
+
+
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 768px) {
+    .page-account .woocommerce-MyAccount-navigation {
+        margin-bottom: 3.125rem;
+    }
+}

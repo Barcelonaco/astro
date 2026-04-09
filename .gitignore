@@ -82,7 +82,7 @@ MULTISITE.md
 # -------------------------------------------------
 # 12️⃣ Répertoires personnalisés
 # -------------------------------------------------
-nickl/
+/nickl/
 
 # -------------------------------------------------
 # 13️⃣ Fichiers lock (on veut les versionner → **ne pas ignorer**)
