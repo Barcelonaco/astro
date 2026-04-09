@@ -15,7 +15,7 @@ node_modules/
 # -------------------------------------------------
 # 3️⃣ Artefacts de build
 # -------------------------------------------------
-dist/                # ignore tous les dossiers dist…
+**/dist/              # ignore tous les dossiers dist…
 build/
 .astro/
 .tmp/
