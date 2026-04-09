@@ -16,7 +16,6 @@ node_modules/
 # 3️⃣ Artefacts de build
 # -------------------------------------------------
 dist/                # ignore tous les dossiers dist…
-!frontend/dist/      # …sauf le build du frontend que l’on veut versionner
 build/
 .astro/
 .tmp/
