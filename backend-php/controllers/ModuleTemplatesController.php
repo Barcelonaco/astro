@@ -11,11 +11,16 @@ class ModuleTemplatesController {
             error_response('Missing layout', 400);
         }
 
+        $backendRoot = realpath(__DIR__ . '/..');
         $repoRoot = realpath(__DIR__ . '/../..');
 
-        // Look for template: first in nickl, then in plugins
-        $templatePath = $repoRoot . '/nickl/resources/views/modules/' . $layout . '.blade.php';
+        // Look for template: first in backend-php/templates, then nickl/, then plugins/
+        $templatePath = $backendRoot . '/templates/modules/' . $layout . '.blade.php';
         $pluginDir = null;
+
+        if (!file_exists($templatePath)) {
+            $templatePath = $repoRoot . '/nickl/resources/views/modules/' . $layout . '.blade.php';
+        }
 
         if (!file_exists($templatePath)) {
             $pluginsDir = $repoRoot . '/plugins';
@@ -40,13 +45,13 @@ class ModuleTemplatesController {
 
         // Resolve CSS
         $cssUrl = null;
-        $nicklCssPath = $repoRoot . '/nickl/public/css/' . $layout . '.css';
         $adminModuleCssPath = __DIR__ . '/../admin/modules/' . $layout . '.css';
-        if (file_exists($nicklCssPath)) {
-            $cssUrl = '/nickl-assets/css/' . $layout . '.css';
-        } elseif (file_exists($adminModuleCssPath)) {
-            // Fallback: use admin compiled CSS when nickl/public/css is not built
+        $nicklCssPath = $repoRoot . '/nickl/public/css/' . $layout . '.css';
+        if (file_exists($adminModuleCssPath)) {
             $cssUrl = '/admin/modules/' . $layout . '.css';
+        } elseif (file_exists($nicklCssPath)) {
+            // Fallback: nickl compiled CSS (local dev)
+            $cssUrl = '/nickl-assets/css/' . $layout . '.css';
         } elseif ($pluginDir) {
             $pluginCssPath = $repoRoot . '/plugins/' . $pluginDir . '/css/' . $layout . '.css';
             if (file_exists($pluginCssPath)) {

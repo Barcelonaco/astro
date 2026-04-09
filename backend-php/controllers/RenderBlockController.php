@@ -22,9 +22,14 @@ class RenderBlockController {
     }
 
     private static function findTemplate(string $layout): ?string {
+        $backendRoot = realpath(__DIR__ . '/..');
         $repoRoot = realpath(__DIR__ . '/../..');
 
-        // Try nickl first
+        // Try backend-php/templates first
+        $localPath = $backendRoot . '/templates/modules/' . $layout . '.blade.php';
+        if (file_exists($localPath)) return file_get_contents($localPath);
+
+        // Try nickl (local dev fallback)
         $nicklPath = $repoRoot . '/nickl/resources/views/modules/' . $layout . '.blade.php';
         if (file_exists($nicklPath)) return file_get_contents($nicklPath);
 
