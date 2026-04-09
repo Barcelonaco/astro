@@ -30,6 +30,7 @@ class MediaController {
     private static function detectType(string $mime): ?string {
         if (str_starts_with($mime, 'image/')) return 'image';
         if (str_starts_with($mime, 'video/')) return 'video';
+        if ($mime === 'application/pdf') return 'document';
         return null;
     }
 

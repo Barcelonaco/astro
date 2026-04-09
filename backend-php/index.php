@@ -60,6 +60,7 @@ require_once __DIR__ . '/controllers/ModuleTemplatesController.php';
 require_once __DIR__ . '/controllers/RenderBlockController.php';
 require_once __DIR__ . '/controllers/PluginController.php';
 require_once __DIR__ . '/controllers/GoogleReviewsController.php';
+require_once __DIR__ . '/controllers/AiController.php';
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 $allowedOrigins = [
@@ -537,6 +538,11 @@ try {
         $user = authenticate_token();
         require_admin($user);
         PluginController::togglePlugin($m[1]);
+    }
+
+    // ── AI Generation (SSE streaming) ──
+    elseif ($method === 'POST' && $path === '/ai/generate') {
+        AiController::generateStream();
     }
 
     // ── Google Reviews ──

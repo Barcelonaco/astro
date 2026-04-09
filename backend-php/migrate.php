@@ -315,6 +315,13 @@ if (!table_exists($db, 'media_items')) {
     if (ensure_column($db, 'media_items', 'description', 'TEXT', 'caption')) $changes++;
     if (ensure_column($db, 'media_items', 'width', 'INT', 'size')) $changes++;
     if (ensure_column($db, 'media_items', 'height', 'INT', 'width')) $changes++;
+    // Ensure type column supports 'document' (migrate from ENUM to VARCHAR if needed)
+    $typeCol = $db->query("SHOW COLUMNS FROM media_items LIKE 'type'")->fetch();
+    if ($typeCol && stripos($typeCol['Type'], 'enum') !== false && stripos($typeCol['Type'], 'document') === false) {
+        $db->exec("ALTER TABLE media_items MODIFY COLUMN type VARCHAR(20) NOT NULL");
+        echo "  ~ type column: ENUM → VARCHAR(20)\n";
+        $changes++;
+    }
     if ($changes === 0) echo "  OK\n";
 }
 

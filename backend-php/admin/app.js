@@ -314,29 +314,28 @@ const MODULE_LABELS = {
   Banner: 'Bannière',
   Hero: 'Hero banner',
   TextSimple: 'Texte simple',
-  TextImage: 'Texte + image',
+  TextImage: 'Texte + image/vidéo',
 
-  SliderTextVideo: 'Slider texte / vidéo',
+  SliderTextVideo: 'Texte + vidéo (slider)',
   Accordion: 'Accordéons',
   KeyFigures: 'Chiffres clés',
   Quote: 'Citation',
-  TextScrolling: 'Texte défilant',
-  LinkAlone: 'Lien seul',
+  TextScrolling: 'Texte défilement',
+  LinkAlone: 'Liens',
   Gallery: 'Galerie',
-  Video: 'Vidéo',
-  ImagesSlider: 'Slider d\'images',
-  Files: 'Fichiers',
-  ImagesVideosParallax: 'Images/Vidéos parallax',
-  IconLogo: 'Logos (icônes)',
-  SliderLogo: 'Slider de logos',
+  Video: 'Image / Vidéo',
+  ImagesSlider: 'Carrousel d\'images',
+  Files: 'Aperçu (pdf)',
+  ImagesVideosParallax: 'Images vidéos parallaxe',
+  IconLogo: 'Icône + texte',
+  SliderLogo: 'Slider de logo',
   Ornament: 'Ornement',
-  IllusVideo: 'Illustration vidéo',
+  IllusVideo: 'Séparateur vidéo',
   ClickableTiles: 'Tuiles cliquables',
-  FreePost: 'Article libre',
-  NewsSlider: 'Slider d\'actualités',
-  EventsSlider: 'Slider d\'événements',
-  BlocReferences: 'Bloc références',
-  Team: 'Équipe',
+  NewsSlider: 'Actualités à la une',
+  EventsSlider: 'Événements à la une',
+  BlocReferences: 'Références à la une',
+  Team: 'Trombinoscope',
   Contact: 'Contact',
   Map: 'Carte',
   GoogleReviews: 'Avis Google',
@@ -345,13 +344,12 @@ const MODULE_LABELS = {
   ReusableBloc: 'Bloc réutilisable',
   ColumnsTab: 'Colonnes',
   Separator: 'Séparateur',
-  NewsletterForm: 'Formulaire newsletter',
-  Review: 'Avis',
+  Review: 'Avis client',
   Widget: 'Widget',
   PlanSite: 'Plan du site',
-  InstaFeed: 'Flux Instagram',
-  ThreadsFeed: 'Flux Threads',
-  Product: 'Produit'
+  InstaFeed: 'Feed Instagram',
+  ThreadsFeed: 'Feed Threads',
+  Product: 'Produits à la une'
 };
 
 const MODULE_CATEGORIES = [
@@ -377,7 +375,7 @@ const MODULE_CATEGORIES = [
     id: 'tools',
     label: 'Fonctionnels & outils',
     icon: '🧰',
-    modules: ['FreePost', 'Team', 'Contact', 'Map', 'Summary', 'Form', 'ReusableBloc', 'ColumnsTab', 'Separator', 'NewsletterForm', 'Widget', 'PlanSite']
+    modules: ['Team', 'Contact', 'Map', 'Summary', 'Form', 'ReusableBloc', 'ColumnsTab', 'Separator', 'Widget', 'PlanSite']
   },
 ];
 
@@ -2183,7 +2181,7 @@ async function saveCPTOptions(event, postTypeSlug) {
   }
 }
 
-let pageBuilderState = { editingPageId: null, blocks: [], meta: { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null }, colorOverrides: { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' }, seoMeta: { enabled: false, meta_title: '', meta_description: '', schema_org: '' }, cptMode: null, cptExcerpt: '', cptFeaturedImage: null, cptCategories: [], cptItemCategories: [], cptCustomFields: {} };
+let pageBuilderState = { editingPageId: null, blocks: [], meta: { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null }, colorOverrides: { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' }, seoMeta: { enabled: true, meta_title: '', meta_description: '', schema_org: '' }, cptMode: null, cptExcerpt: '', cptFeaturedImage: null, cptCategories: [], cptItemCategories: [], cptCustomFields: {} };
 let selectedBlockId = null;
 let reusableBlocBuilderMode = false;
 let _inlineEditingBlockId = null;
@@ -2303,7 +2301,7 @@ async function openCPTBuilder(ptDef, itemId) {
   pageBuilderState.blocks = [];
   pageBuilderState.meta = { title: '', slug: '', status: 'draft', show_in_menu: false, menu_order: 0, parent_id: null };
   pageBuilderState.colorOverrides = { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' };
-  pageBuilderState.seoMeta = { enabled: false, meta_title: '', meta_description: '' };
+  pageBuilderState.seoMeta = { enabled: true, meta_title: '', meta_description: '' };
   pageBuilderState.cptMode = ptDef;
   pageBuilderState.cptExcerpt = '';
   pageBuilderState.cptFeaturedImage = null;
@@ -2341,7 +2339,7 @@ async function openCPTBuilder(ptDef, itemId) {
         };
         if (item.seo_meta) {
           const seo = typeof item.seo_meta === 'string' ? JSON.parse(item.seo_meta) : item.seo_meta;
-          pageBuilderState.seoMeta = { enabled: seo.enabled || false, meta_title: seo.meta_title || '', meta_description: seo.meta_description || '', schema_org: seo.schema_org || '' };
+          pageBuilderState.seoMeta = { enabled: true, meta_title: seo.meta_title || '', meta_description: seo.meta_description || '', schema_org: seo.schema_org || '' };
         }
       }
       pageBuilderState.cptCategories = categories || [];
@@ -2451,7 +2449,7 @@ async function saveCPTBuilder() {
   if (titleCb) custom_fields.title_in_header = titleCb.checked ? 'showTitle' : 'hideTitle';
 
   const published_date = status === 'published' ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null;
-  const seo_meta = pageBuilderState.seoMeta.enabled ? JSON.stringify(pageBuilderState.seoMeta) : null;
+  const seo_meta = JSON.stringify(pageBuilderState.seoMeta);
   const payload = { title, slug, excerpt, content, status, featured_image, custom_fields, categories, published_date, seo_meta };
 
   showLoading();
@@ -2488,7 +2486,7 @@ async function openPageBuilder(pageId) {
   pageBuilderState.blocks = [];
   pageBuilderState.meta = { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null };
   pageBuilderState.colorOverrides = { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' };
-  pageBuilderState.seoMeta = { enabled: false, meta_title: '', meta_description: '' };
+  pageBuilderState.seoMeta = { enabled: true, meta_title: '', meta_description: '' };
   pageBuilderState.cptMode = null;
   pageBuilderState.pageMenus = [];       // menus with per-menu toggle/position state
   selectedBlockId = null;
@@ -2515,7 +2513,7 @@ async function openPageBuilder(pageId) {
         // Load SEO meta
         try {
           const seo = page.seo_meta ? JSON.parse(page.seo_meta) : null;
-          if (seo) pageBuilderState.seoMeta = { enabled: !!seo.enabled, meta_title: seo.meta_title || '', meta_description: seo.meta_description || '', schema_org: seo.schema_org || '' };
+          if (seo) pageBuilderState.seoMeta = { enabled: true, meta_title: seo.meta_title || '', meta_description: seo.meta_description || '', schema_org: seo.schema_org || '' };
         } catch (e) {}
       }
       pageBuilderState.pageMenus = pageMenus?.menus || [];
@@ -2729,6 +2727,7 @@ async function renderPageBuilder() {
           </div>
         </div>
         <div class="builder-actions">
+          <button type="button" class="btn btn-ai" onclick="openAiModal()" title="Générer avec l'IA">✨ IA</button>
           <button type="button" class="btn btn-primary" onclick="${saveFunc}">Enregistrer</button>
           <a href="${viewUrl}" target="_blank" class="btn btn-outline" id="viewPageBtn">Voir ${isCPT ? (cptDef.isFemale ? 'la ' : "l'") + cptDef.label.toLowerCase() : 'la page'}</a>
         </div>
@@ -2747,120 +2746,14 @@ async function renderPageBuilder() {
               ${pageBuilderState.pageMenus.length === 0 ? '<p class="text-muted" style="font-size:0.85rem">Aucun menu créé. <a href="#" onclick="loadSection(\'menus\');return false">Créer un menu</a></p>' : ''}
             </div>
           </div>
-          <!-- Color overrides panel (collapsible) -->
-          <div class="builder-color-overrides-panel" id="builderColorOverridesPanel" style="display:none">
-            <div class="builder-menu-settings-header">
-              <h3>Surcharge des couleurs</h3>
-              <button type="button" class="btn btn-xs" onclick="toggleColorOverridesPanel(false)">&times;</button>
-            </div>
-            <div class="builder-color-overrides-body">
-              <div class="form-group" style="margin-bottom:12px">
-                <label class="toggle-switch-label" style="display:flex;align-items:center;cursor:pointer">
-                  <span class="toggle-switch">
-                    <input type="checkbox" id="colorOverrideEnabled" ${pageBuilderState.colorOverrides.enabled ? 'checked' : ''} onchange="onColorOverrideToggle(this.checked)" />
-                    <span class="toggle-slider"></span>
-                  </span>
-                  <span style="margin-left:8px;font-weight:600;font-size:14px">Activer la surcharge</span>
-                </label>
-              </div>
-              <div id="colorOverrideFields" style="${pageBuilderState.colorOverrides.enabled ? '' : 'display:none'}">
-                <div class="color-override-grid">
-                  <div class="form-group">
-                    <label class="form-label">Couleur Primaire</label>
-                    <div class="color-picker-wrapper">
-                      <input type="color" class="form-color" id="co_primary_color" value="${pageBuilderState.colorOverrides.primary_color || '#006a9b'}" onchange="onColorOverrideChange()" />
-                      <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.primary_color || ''}" oninput="syncColorFromText(this, 'co_primary_color')" placeholder="Défaut thème" />
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Couleur Secondaire</label>
-                    <div class="color-picker-wrapper">
-                      <input type="color" class="form-color" id="co_secondary_color" value="${pageBuilderState.colorOverrides.secondary_color || '#ea644e'}" onchange="onColorOverrideChange()" />
-                      <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.secondary_color || ''}" oninput="syncColorFromText(this, 'co_secondary_color')" placeholder="Défaut thème" />
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Couleur Tertiaire</label>
-                    <div class="color-picker-wrapper">
-                      <input type="color" class="form-color" id="co_tertiary_color" value="${pageBuilderState.colorOverrides.tertiary_color || '#d0d0d0'}" onchange="onColorOverrideChange()" />
-                      <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.tertiary_color || ''}" oninput="syncColorFromText(this, 'co_tertiary_color')" placeholder="Défaut thème" />
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Couleur des textes</label>
-                    <div class="color-picker-wrapper">
-                      <input type="color" class="form-color" id="co_text_color" value="${pageBuilderState.colorOverrides.text_color || '#001527'}" onchange="onColorOverrideChange()" />
-                      <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.text_color || ''}" oninput="syncColorFromText(this, 'co_text_color')" placeholder="Défaut thème" />
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Couleur de fond</label>
-                    <div class="color-picker-wrapper">
-                      <input type="color" class="form-color" id="co_background_color" value="${pageBuilderState.colorOverrides.background_color || '#ffffff'}" onchange="onColorOverrideChange()" />
-                      <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.background_color || ''}" oninput="syncColorFromText(this, 'co_background_color')" placeholder="Défaut thème" />
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Fond champs formulaire</label>
-                    <div class="color-picker-wrapper">
-                      <input type="color" class="form-color" id="co_bg_form_field" value="${pageBuilderState.colorOverrides.bg_form_field || '#e3f3fc'}" onchange="onColorOverrideChange()" />
-                      <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.bg_form_field || ''}" oninput="syncColorFromText(this, 'co_bg_form_field')" placeholder="Défaut thème" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          ${!(isCPT && cptDef?.hasModules !== false) ? `
-          <!-- SEO Meta panel (collapsible) -->
-          <div class="builder-seo-panel" id="builderSeoPanel" style="display:none">
-            <div class="builder-menu-settings-header">
-              <h3>SEO Meta</h3>
-              <button type="button" class="btn btn-xs" onclick="toggleSeoPanel(false)">&times;</button>
-            </div>
-            <div class="builder-seo-body">
-              <div class="seo-toggle">
-                <label>
-                  <span class="toggle-switch">
-                    <input type="checkbox" id="seoEnabled" ${pageBuilderState.seoMeta.enabled ? 'checked' : ''} onchange="onSeoToggle(this.checked)" />
-                    <span class="toggle-slider"></span>
-                  </span>
-                  <span>Activer les meta SEO</span>
-                </label>
-              </div>
-              <div id="seoFields" style="${pageBuilderState.seoMeta.enabled ? '' : 'display:none'}">
-                <button type="button" class="btn btn-primary seo-analyze-btn" onclick="analyzeSeoPage()">Analyser la page</button>
-                <div class="seo-field">
-                  <label class="form-label">Meta Title <span class="seo-counter" id="seoTitleCount">(${pageBuilderState.seoMeta.meta_title.length}/60)</span></label>
-                  <input type="text" class="form-input" id="seo_meta_title" value="${(pageBuilderState.seoMeta.meta_title || '').replace(/"/g, '&quot;')}" oninput="onSeoFieldChange()" maxlength="60" placeholder="Titre SEO de la page (max 60 car.)" />
-                  <div class="seo-progress-bar"><div id="seoTitleBar" style="width:${Math.min(100, (pageBuilderState.seoMeta.meta_title.length / 60) * 100)}%;background:${pageBuilderState.seoMeta.meta_title.length <= 60 ? '#22c55e' : '#ef4444'}"></div></div>
-                </div>
-                <div class="seo-field">
-                  <label class="form-label">Meta Description <span class="seo-counter" id="seoDescCount">(${pageBuilderState.seoMeta.meta_description.length}/160)</span></label>
-                  <textarea class="form-input" id="seo_meta_description" oninput="onSeoFieldChange()" maxlength="160" rows="3" placeholder="Description SEO de la page (max 160 car.)" style="resize:vertical">${(pageBuilderState.seoMeta.meta_description || '').replace(/</g, '&lt;')}</textarea>
-                  <div class="seo-progress-bar"><div id="seoDescBar" style="width:${Math.min(100, (pageBuilderState.seoMeta.meta_description.length / 160) * 100)}%;background:${pageBuilderState.seoMeta.meta_description.length <= 160 ? '#22c55e' : '#ef4444'}"></div></div>
-                </div>
-                <div class="seo-tabs">
-                  <button type="button" class="seo-tab-btn active" id="seoTabPreview" onclick="switchSeoTab('preview')">Apercu Google</button>
-                  <button type="button" class="seo-tab-btn" id="seoTabSchema" onclick="switchSeoTab('schema')">Schema.org</button>
-                </div>
-                <div id="seoPreview" class="seo-google-preview">
-                  <div class="seo-preview-title">${pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || 'Titre de la page'}</div>
-                  <div class="seo-preview-url">example.com/${isCPT ? cptDef.slug : 'pages'}/${pageBuilderState.meta.slug || 'slug'}</div>
-                  <div class="seo-preview-desc">${pageBuilderState.seoMeta.meta_description || 'Description de la page...'}</div>
-                </div>
-                <div id="seoSchemaPanel" class="seo-schema-panel" style="display:none">
-                  <button type="button" class="btn btn-sm btn-outline seo-generate-btn" onclick="generateSchemaOrg()">Generer depuis le contenu</button>
-                  <textarea class="form-input" id="seo_schema_org" oninput="onSchemaOrgChange()" rows="14" placeholder='{"@context":"https://schema.org",...}'>${(pageBuilderState.seoMeta.schema_org || '').replace(/</g, '&lt;')}</textarea>
-                  <p class="form-help">JSON-LD injecte dans &lt;head&gt;. Genere automatiquement selon les blocs de la page.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          ` : ''}
           <div class="builder-modules-panel" id="builderModulesPanel" style="${selectedBlockId ? 'display:none' : ''}">
-            ${isCPT ? '' : `<button type="button" class="btn btn-sm btn-outline builder-menu-settings-btn" onclick="toggleMenuSettingsPanel(true)" style="${m.status === 'draft' ? 'display:none' : ''}">Parametres menu</button>
-            <button type="button" class="btn btn-sm btn-outline builder-color-overrides-btn" onclick="toggleColorOverridesPanel(true)">Surcharge des couleurs</button>`}
+            ${isCPT ? '' : `<button type="button" class="btn btn-sm btn-outline builder-menu-settings-btn" onclick="toggleMenuSettingsPanel(true)" style="margin-bottom:12px;${m.status === 'draft' ? 'display:none' : ''}">Menu</button>
+            <div class="cpt-builder-tabs" style="display:flex;border-bottom:2px solid var(--border,#e5e7eb);margin-bottom:0;">
+              <button type="button" class="cpt-builder-tab active" data-tab="page-modules" style="flex:1;padding:10px 0;border:0;background:0;cursor:pointer;font-weight:600;font-size:13px;text-align:center;border-bottom:2px solid var(--primary,#224f5a);margin-bottom:-2px;color:var(--primary,#224f5a);">Modules</button>
+              <button type="button" class="cpt-builder-tab" data-tab="page-seo" style="flex:1;padding:10px 0;border:0;background:0;cursor:pointer;font-weight:600;font-size:13px;text-align:center;border-bottom:2px solid transparent;margin-bottom:-2px;color:#999;">SEO</button>
+              <button type="button" class="cpt-builder-tab" data-tab="page-colors" style="flex:1;padding:10px 0;border:0;background:0;cursor:pointer;font-weight:600;font-size:13px;text-align:center;border-bottom:2px solid transparent;margin-bottom:-2px;color:#999;">Couleurs</button>
+            </div>
+            <div class="cpt-builder-tab-content" data-tab="page-modules" style="padding-top:16px;">`}
             ${isCPT && !customFieldsSidebarHtml && cptDef?.hasModules !== false ? `
             <div class="cpt-builder-tabs" style="display:flex;border-bottom:2px solid var(--border,#e5e7eb);margin-bottom:0;">
               <button type="button" class="cpt-builder-tab active" data-tab="cpt-header" style="flex:1;padding:10px 0;border:0;background:0;cursor:pointer;font-weight:600;font-size:13px;border-bottom:2px solid var(--primary,#224f5a);margin-bottom:-2px;color:var(--primary,#224f5a);">Header</button>
@@ -2891,7 +2784,7 @@ async function renderPageBuilder() {
                 <div id="seoFields" style="${pageBuilderState.seoMeta.enabled ? '' : 'display:none'}">
                   <button type="button" class="btn btn-primary seo-analyze-btn" onclick="analyzeSeoPage()">Analyser la page</button>
                   <div class="seo-field">
-                    <label class="form-label">Meta Title <span class="seo-counter" id="seoTitleCount">(${pageBuilderState.seoMeta.meta_title.length}/60)</span></label>
+                    <label class="form-label">Balise Title <span class="seo-counter" id="seoTitleCount">(${pageBuilderState.seoMeta.meta_title.length}/60)</span></label>
                     <input type="text" class="form-input" id="seo_meta_title" value="${(pageBuilderState.seoMeta.meta_title || '').replace(/"/g, '&quot;')}" oninput="onSeoFieldChange()" maxlength="60" placeholder="Titre SEO de la page (max 60 car.)" />
                     <div class="seo-progress-bar"><div id="seoTitleBar" style="width:${Math.min(100, (pageBuilderState.seoMeta.meta_title.length / 60) * 100)}%;background:${pageBuilderState.seoMeta.meta_title.length <= 60 ? '#22c55e' : '#ef4444'}"></div></div>
                   </div>
@@ -2900,19 +2793,14 @@ async function renderPageBuilder() {
                     <textarea class="form-input" id="seo_meta_description" oninput="onSeoFieldChange()" maxlength="160" rows="3" placeholder="Description SEO de la page (max 160 car.)" style="resize:vertical">${(pageBuilderState.seoMeta.meta_description || '').replace(/</g, '&lt;')}</textarea>
                     <div class="seo-progress-bar"><div id="seoDescBar" style="width:${Math.min(100, (pageBuilderState.seoMeta.meta_description.length / 160) * 100)}%;background:${pageBuilderState.seoMeta.meta_description.length <= 160 ? '#22c55e' : '#ef4444'}"></div></div>
                   </div>
-                  <div class="seo-tabs">
-                    <button type="button" class="seo-tab-btn active" id="seoTabPreview" onclick="switchSeoTab('preview')">Apercu Google</button>
-                    <button type="button" class="seo-tab-btn" id="seoTabSchema" onclick="switchSeoTab('schema')">Schema.org</button>
+                  <div id="seoSchemaPanel" class="seo-schema-panel">
+                    <button type="button" class="btn btn-sm btn-outline seo-generate-btn" onclick="generateSchemaOrg()">Generer le schema.org</button>
+                    <textarea class="form-input" id="seo_schema_org" oninput="onSchemaOrgChange()" rows="14" placeholder='{"@context":"https://schema.org",...}'>${(pageBuilderState.seoMeta.schema_org || '').replace(/</g, '&lt;')}</textarea>
                   </div>
                   <div id="seoPreview" class="seo-google-preview">
                     <div class="seo-preview-title">${pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || 'Titre de la page'}</div>
                     <div class="seo-preview-url">example.com/${cptDef.slug}/${pageBuilderState.meta.slug || 'slug'}</div>
                     <div class="seo-preview-desc">${pageBuilderState.seoMeta.meta_description || 'Description de la page...'}</div>
-                  </div>
-                  <div id="seoSchemaPanel" class="seo-schema-panel" style="display:none">
-                    <button type="button" class="btn btn-sm btn-outline seo-generate-btn" onclick="generateSchemaOrg()">Generer depuis le contenu</button>
-                    <textarea class="form-input" id="seo_schema_org" oninput="onSchemaOrgChange()" rows="14" placeholder='{"@context":"https://schema.org",...}'>${(pageBuilderState.seoMeta.schema_org || '').replace(/</g, '&lt;')}</textarea>
-                    <p class="form-help">JSON-LD injecte dans &lt;head&gt;. Genere automatiquement selon les blocs de la page.</p>
                   </div>
                 </div>
               </div>
@@ -2958,19 +2846,14 @@ async function renderPageBuilder() {
                     <textarea class="form-input" id="seo_meta_description" oninput="onSeoFieldChange()" maxlength="160" rows="3" placeholder="Description SEO de la page (max 160 car.)" style="resize:vertical">${(pageBuilderState.seoMeta.meta_description || '').replace(/</g, '&lt;')}</textarea>
                     <div class="seo-progress-bar"><div id="seoDescBar" style="width:${Math.min(100, (pageBuilderState.seoMeta.meta_description.length / 160) * 100)}%;background:${pageBuilderState.seoMeta.meta_description.length <= 160 ? '#22c55e' : '#ef4444'}"></div></div>
                   </div>
-                  <div class="seo-tabs">
-                    <button type="button" class="seo-tab-btn active" id="seoTabPreview" onclick="switchSeoTab('preview')">Apercu Google</button>
-                    <button type="button" class="seo-tab-btn" id="seoTabSchema" onclick="switchSeoTab('schema')">Schema.org</button>
+                  <div id="seoSchemaPanel" class="seo-schema-panel">
+                    <button type="button" class="btn btn-sm btn-outline seo-generate-btn" onclick="generateSchemaOrg()">Generer le schema.org</button>
+                    <textarea class="form-input" id="seo_schema_org" oninput="onSchemaOrgChange()" rows="14" placeholder='{"@context":"https://schema.org",...}'>${(pageBuilderState.seoMeta.schema_org || '').replace(/</g, '&lt;')}</textarea>
                   </div>
                   <div id="seoPreview" class="seo-google-preview">
                     <div class="seo-preview-title">${pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || 'Titre de la page'}</div>
                     <div class="seo-preview-url">example.com/${cptDef.slug}/${pageBuilderState.meta.slug || 'slug'}</div>
                     <div class="seo-preview-desc">${pageBuilderState.seoMeta.meta_description || 'Description de la page...'}</div>
-                  </div>
-                  <div id="seoSchemaPanel" class="seo-schema-panel" style="display:none">
-                    <button type="button" class="btn btn-sm btn-outline seo-generate-btn" onclick="generateSchemaOrg()">Generer depuis le contenu</button>
-                    <textarea class="form-input" id="seo_schema_org" oninput="onSchemaOrgChange()" rows="14" placeholder='{"@context":"https://schema.org",...}'>${(pageBuilderState.seoMeta.schema_org || '').replace(/</g, '&lt;')}</textarea>
-                    <p class="form-help">JSON-LD injecte dans &lt;head&gt;. Genere automatiquement selon les blocs de la page.</p>
                   </div>
                 </div>
               </div>
@@ -2980,15 +2863,8 @@ async function renderPageBuilder() {
             </div>
             <div class="cpt-builder-tab-content" data-tab="cpt-modules" style="display:none;padding-top:16px;">
             ` : `
-            <button type="button" class="btn btn-sm btn-outline builder-seo-btn" onclick="toggleSeoPanel(true)">SEO Meta</button>
-            ${customFieldsSidebarHtml && cptDef?.hasModules === false ? `
-            <div style="padding-top:16px;">
-              ${customFieldsSidebarHtml}
-            </div>
-            ` : ''}
             `}
             ${cptDef?.hasModules !== false ? `
-            ${!customFieldsSidebarHtml && !(isCPT && !customFieldsSidebarHtml && cptDef?.hasModules !== false) ? `<h3 style="margin-top:18px">Modules</h3>` : ''}
             <p class="form-help">Glissez un module dans la zone de droite.</p>
             <input type="text" class="form-input builder-module-search" placeholder="Rechercher un module…" oninput="filterBuilderModules(this.value)" style="margin-bottom:12px;font-size:13px;">
             <div class="builder-modules-list">
@@ -3014,12 +2890,99 @@ async function renderPageBuilder() {
             </div>
             ` : ''}
             ${(customFieldsSidebarHtml && cptDef?.hasModules !== false) || (isCPT && !customFieldsSidebarHtml && cptDef?.hasModules !== false) ? `</div>` : ''}
+            ${!isCPT ? `</div>
+            <div class="cpt-builder-tab-content" data-tab="page-seo" style="display:none;padding-top:16px;">
+              <div class="builder-seo-body">
+                <button type="button" class="btn btn-primary seo-analyze-btn" onclick="analyzeSeoPage()">Analyser la page</button>
+                <div class="seo-field">
+                  <label class="form-label">Balise Title <span class="seo-counter" id="seoTitleCount">(${pageBuilderState.seoMeta.meta_title.length}/60)</span></label>
+                  <input type="text" class="form-input" id="seo_meta_title" value="${(pageBuilderState.seoMeta.meta_title || '').replace(/"/g, '&quot;')}" oninput="onSeoFieldChange()" maxlength="60" placeholder="Titre SEO de la page (max 60 car.)" />
+                  <div class="seo-progress-bar"><div id="seoTitleBar" style="width:${Math.min(100, (pageBuilderState.seoMeta.meta_title.length / 60) * 100)}%;background:${pageBuilderState.seoMeta.meta_title.length <= 60 ? '#22c55e' : '#ef4444'}"></div></div>
+                </div>
+                <div class="seo-field">
+                  <label class="form-label">Meta Description <span class="seo-counter" id="seoDescCount">(${pageBuilderState.seoMeta.meta_description.length}/160)</span></label>
+                  <textarea class="form-input" id="seo_meta_description" oninput="onSeoFieldChange()" maxlength="160" rows="3" placeholder="Description SEO de la page (max 160 car.)" style="resize:vertical">${(pageBuilderState.seoMeta.meta_description || '').replace(/</g, '&lt;')}</textarea>
+                  <div class="seo-progress-bar"><div id="seoDescBar" style="width:${Math.min(100, (pageBuilderState.seoMeta.meta_description.length / 160) * 100)}%;background:${pageBuilderState.seoMeta.meta_description.length <= 160 ? '#22c55e' : '#ef4444'}"></div></div>
+                </div>
+                <div id="seoSchemaPanel" class="seo-schema-panel">
+                  <button type="button" class="btn btn-sm btn-outline seo-generate-btn" onclick="generateSchemaOrg()">Generer le schema.org</button>
+                  <textarea class="form-input" id="seo_schema_org" oninput="onSchemaOrgChange()" rows="14" placeholder='{"@context":"https://schema.org",...}'>${(pageBuilderState.seoMeta.schema_org || '').replace(/</g, '&lt;')}</textarea>
+                </div>
+                <div id="seoPreview" class="seo-google-preview">
+                  <div class="seo-preview-title">${pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || 'Titre de la page'}</div>
+                  <div class="seo-preview-url">example.com/pages/${pageBuilderState.meta.slug || 'slug'}</div>
+                  <div class="seo-preview-desc">${pageBuilderState.seoMeta.meta_description || 'Description de la page...'}</div>
+                </div>
+              </div>
+            </div>
+            <div class="cpt-builder-tab-content" data-tab="page-colors" style="display:none;padding-top:16px;">
+              <div class="builder-color-overrides-body">
+                <div class="form-group" style="margin-bottom:12px">
+                  <label class="toggle-switch-label" style="display:flex;align-items:center;cursor:pointer">
+                    <span class="toggle-switch">
+                      <input type="checkbox" id="colorOverrideEnabled" ${pageBuilderState.colorOverrides.enabled ? 'checked' : ''} onchange="onColorOverrideToggle(this.checked)" />
+                      <span class="toggle-slider"></span>
+                    </span>
+                    <span style="margin-left:8px;font-weight:600;font-size:14px">Activer la surcharge</span>
+                  </label>
+                </div>
+                <div id="colorOverrideFields" style="${pageBuilderState.colorOverrides.enabled ? '' : 'display:none'}">
+                  <div class="color-override-grid">
+                    <div class="form-group">
+                      <label class="form-label">Couleur Primaire</label>
+                      <div class="color-picker-wrapper">
+                        <input type="color" class="form-color" id="co_primary_color" value="${pageBuilderState.colorOverrides.primary_color || '#006a9b'}" onchange="onColorOverrideChange()" />
+                        <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.primary_color || ''}" oninput="syncColorFromText(this, 'co_primary_color')" placeholder="Défaut thème" />
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Couleur Secondaire</label>
+                      <div class="color-picker-wrapper">
+                        <input type="color" class="form-color" id="co_secondary_color" value="${pageBuilderState.colorOverrides.secondary_color || '#ea644e'}" onchange="onColorOverrideChange()" />
+                        <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.secondary_color || ''}" oninput="syncColorFromText(this, 'co_secondary_color')" placeholder="Défaut thème" />
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Couleur Tertiaire</label>
+                      <div class="color-picker-wrapper">
+                        <input type="color" class="form-color" id="co_tertiary_color" value="${pageBuilderState.colorOverrides.tertiary_color || '#d0d0d0'}" onchange="onColorOverrideChange()" />
+                        <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.tertiary_color || ''}" oninput="syncColorFromText(this, 'co_tertiary_color')" placeholder="Défaut thème" />
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Couleur des textes</label>
+                      <div class="color-picker-wrapper">
+                        <input type="color" class="form-color" id="co_text_color" value="${pageBuilderState.colorOverrides.text_color || '#001527'}" onchange="onColorOverrideChange()" />
+                        <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.text_color || ''}" oninput="syncColorFromText(this, 'co_text_color')" placeholder="Défaut thème" />
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Couleur de fond</label>
+                      <div class="color-picker-wrapper">
+                        <input type="color" class="form-color" id="co_background_color" value="${pageBuilderState.colorOverrides.background_color || '#ffffff'}" onchange="onColorOverrideChange()" />
+                        <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.background_color || ''}" oninput="syncColorFromText(this, 'co_background_color')" placeholder="Défaut thème" />
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Fond champs formulaire</label>
+                      <div class="color-picker-wrapper">
+                        <input type="color" class="form-color" id="co_bg_form_field" value="${pageBuilderState.colorOverrides.bg_form_field || '#e3f3fc'}" onchange="onColorOverrideChange()" />
+                        <input type="text" class="form-input form-input-sm" value="${pageBuilderState.colorOverrides.bg_form_field || ''}" oninput="syncColorFromText(this, 'co_bg_form_field')" placeholder="Défaut thème" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>` : ''}
           </div>
           <div class="builder-settings" id="builderSettings" style="${selectedBlockId ? '' : 'display:none'}">
             ${renderBuilderSettingsPanel()}
           </div>
         </aside>
         ${cptDef?.hasModules === false ? '' : `<main class="builder-canvas" id="builderCanvas" data-drop-zone="true">
+          <div class="builder-canvas-toolbar" id="builderToolbar" style="${pageBuilderState.blocks.length ? '' : 'display:none'}">
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeAllBlocks()">Tout supprimer</button>
+          </div>
           <div class="builder-canvas-inner" id="builderCanvasInner" style="${buildColorOverrideStyle()}">
             <div class="builder-canvas-placeholder" id="builderPlaceholder">Glissez des modules ici ou cliquez sur un module à gauche pour l'ajouter.</div>
             <div class="builder-blocks" id="builderBlocks">
@@ -3634,6 +3597,94 @@ function renderBlockPreviewHtml(block) {
     const mapLayout = moduleFieldSchema?.modules?.Map?.layout || 'map';
     if (!moduleTemplateCache[mapLayout]) queueModuleTemplateLoad(mapLayout);
     return `<div class="module module-map ${mapExtraCls.join(' ')}" style="position:relative;">${mapBgHtml}${mapTitleHtml}${mapContentHtml}</div>`;
+  }
+  // Form — custom preview (Blade uses gravity_form() PHP function which JS can't execute)
+  if (block.type === 'form' || block.type === 'Form') {
+    const formId = d.form_id;
+    const formCls = [d.bloc_color || '', d.padding_top || '', d.padding_bottom || ''].filter(Boolean).join(' ');
+    let formBgHtml = '';
+    const formBgImg = d.bg_img;
+    if (formBgImg) {
+      const bgUrl = typeof formBgImg === 'string' ? formBgImg : (formBgImg.url || '');
+      const bgOpacity = (d.bg_opacity ?? 10) / 100;
+      if (bgUrl) {
+        formBgHtml = `<div class="background" style="background-image: url(${escapeHtml(bgUrl)}); opacity: ${bgOpacity}; background-size: cover; background-position: center; position: absolute; inset: 0;"></div>`;
+      }
+    }
+    let formTitleHtml = '';
+    const formTitle = d.title_bloc || d.title || '';
+    if (formTitle) {
+      const ts = d.title_style || 2;
+      const ta = d.title_align || 'center';
+      formTitleHtml = `<h${ts} class="title-module title-section-${ts} align-${escapeHtml(String(ta))}">${escapeHtml(String(formTitle))}</h${ts}>`;
+    }
+    if (!formId) {
+      return `<div class="module module-form ${escapeHtml(formCls)}" style="position:relative;">${formBgHtml}<div class="container">${formTitleHtml}<p style="text-align:center;opacity:0.5;">Aucun formulaire sélectionné.</p></div></div>`;
+    }
+    const formPreviewId = 'form-preview-' + (block.id || Math.random().toString(36).slice(2));
+    setTimeout(async () => {
+      const el = document.getElementById(formPreviewId);
+      if (!el || el.dataset.loaded) return;
+      el.dataset.loaded = '1';
+      try {
+        const formData = await apiFetch(`/forms/public/${formId}`);
+        if (!formData || !formData.fields || formData.fields.length === 0) {
+          el.innerHTML = '<p style="text-align:center;opacity:0.5;">Formulaire vide ou introuvable.</p>';
+          return;
+        }
+        const submitText = formData.settings?.submit_text || 'Envoyer';
+        const fieldsHtml = formData.fields.map(field => {
+          const width = field.settings?.width || '100';
+          const req = field.required;
+          const reqStar = req ? '<span style="color:#e53e3e;margin-left:2px;">*</span>' : '';
+          if (field.type === 'hidden') return '';
+          if (field.type === 'html') {
+            return `<div class="nickl-form-field nickl-form-field--html w-${escapeHtml(width)}">${field.settings?.html_content || ''}</div>`;
+          }
+          if (field.type === 'name') {
+            const firstLabel = field.settings?.first_label || 'Prénom';
+            const lastLabel = field.settings?.last_label || 'Nom';
+            return `<div class="nickl-form-field nickl-form-field--name w-${escapeHtml(width)}"><div class="nickl-form-name-row"><div class="nickl-form-name-col"><div class="nickl-form-floating"><input type="text" class="nickl-form-input" placeholder=" " disabled><label class="nickl-form-label">${escapeHtml(firstLabel)}${reqStar}</label></div></div><div class="nickl-form-name-col"><div class="nickl-form-floating"><input type="text" class="nickl-form-input" placeholder=" " disabled><label class="nickl-form-label">${escapeHtml(lastLabel)}${reqStar}</label></div></div></div></div>`;
+          }
+          const isFloatable = ['text', 'email', 'phone', 'number', 'url', 'date', 'time', 'textarea'].includes(field.type);
+          if (isFloatable) {
+            const inputEl = field.type === 'textarea'
+              ? `<textarea class="nickl-form-textarea" placeholder=" " rows="${field.settings?.rows || 4}" disabled></textarea>`
+              : `<input type="${field.type === 'phone' ? 'tel' : escapeHtml(field.type)}" class="nickl-form-input" placeholder=" " disabled>`;
+            return `<div class="nickl-form-field nickl-form-field--${escapeHtml(field.type)} w-${escapeHtml(width)}"><div class="nickl-form-floating">${inputEl}<label class="nickl-form-label">${escapeHtml(field.label)}${reqStar}</label></div></div>`;
+          }
+          if (field.type === 'select') {
+            const opts = (field.options || []).map(opt => {
+              const parts = opt.includes('|') ? opt.split('|') : [opt, opt];
+              return `<option>${escapeHtml(parts[0])}</option>`;
+            }).join('');
+            return `<div class="nickl-form-field nickl-form-field--select w-${escapeHtml(width)}"><label class="nickl-form-label nickl-form-label--static">${escapeHtml(field.label)}${reqStar}</label><select class="nickl-form-select" disabled><option>${escapeHtml(field.placeholder || '— Choisir —')}</option>${opts}</select></div>`;
+          }
+          if (field.type === 'radio') {
+            const opts = (field.options || []).map(opt => {
+              const parts = opt.includes('|') ? opt.split('|') : [opt, opt];
+              return `<label class="nickl-form-radio-label"><input type="radio" disabled><span>${escapeHtml(parts[0])}</span></label>`;
+            }).join('');
+            return `<div class="nickl-form-field nickl-form-field--radio w-${escapeHtml(width)}"><label class="nickl-form-label nickl-form-label--static">${escapeHtml(field.label)}${reqStar}</label><div class="nickl-form-radio-group">${opts}</div></div>`;
+          }
+          if (field.type === 'checkbox') {
+            const opts = (field.options || []).map(opt => {
+              const parts = opt.includes('|') ? opt.split('|') : [opt, opt];
+              return `<label class="nickl-form-checkbox-label"><input type="checkbox" disabled><span>${escapeHtml(parts[0])}</span></label>`;
+            }).join('');
+            return `<div class="nickl-form-field nickl-form-field--checkbox w-${escapeHtml(width)}"><label class="nickl-form-label nickl-form-label--static">${escapeHtml(field.label)}${reqStar}</label><div class="nickl-form-checkbox-group">${opts}</div></div>`;
+          }
+          if (field.type === 'file') {
+            return `<div class="nickl-form-field nickl-form-field--file w-${escapeHtml(width)}"><label class="nickl-form-label nickl-form-label--static">${escapeHtml(field.label)}${reqStar}</label><input type="file" class="nickl-form-input" disabled></div>`;
+          }
+          return `<div class="nickl-form-field w-${escapeHtml(width)}"><label class="nickl-form-label nickl-form-label--static">${escapeHtml(field.label)}${reqStar}</label><input type="text" class="nickl-form-input" placeholder=" " disabled></div>`;
+        }).join('');
+        el.innerHTML = `<form class="nickl-form" style="pointer-events:none;"><div class="nickl-form-fields">${fieldsHtml}</div><div class="nickl-form-submit"><button type="button" class="nickl-form-btn" disabled>${escapeHtml(submitText)}</button></div></form>`;
+      } catch (e) {
+        el.innerHTML = '<p style="text-align:center;color:red;">Erreur: ' + escapeHtml(e.message) + '</p>';
+      }
+    }, 50);
+    return `<div class="module module-form ${escapeHtml(formCls)}" style="position:relative;">${formBgHtml}<div class="container">${formTitleHtml}<div id="${formPreviewId}"><p style="text-align:center;opacity:0.5;">Chargement du formulaire…</p></div></div></div>`;
   }
   // PlanSite — custom preview (Blade calls do_shortcode which JS can't process)
   if (block.type === 'plansite' || block.type === 'plan-site' || block.type === 'PlanSite') {
@@ -4275,6 +4326,7 @@ function renderClickableItem(ctx) {
   const fileUrl = typeof file === 'string' ? file : (file.url || '');
   const mime = file.mime_type || file.type || '';
   const isVid = mime.startsWith('video/') || /\.(mp4|mov|mpeg|mpg)$/i.test(fileUrl);
+  const isPdf = mime === 'application/pdf' || /\.pdf$/i.test(fileUrl);
   const title = item.title || '';
   const catchphrase = item.catchphrase || '';
   const primaryLink = item.primary_link || {};
@@ -4284,7 +4336,9 @@ function renderClickableItem(ctx) {
   const orientClass = !orientation ? ' landscape' : '';
 
   let mediaHtml = '';
-  if (isVid && fileUrl) {
+  if (isPdf && fileUrl) {
+    mediaHtml = `<div class="illus-wrapper" style="display:flex;align-items:center;justify-content:center;background:#f8f9fa;min-height:120px;"><a href="${escapeHtml(fileUrl)}" target="_blank" style="display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none;color:#333;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg><span style="font-size:12px;">Visualiser</span></a></div>`;
+  } else if (isVid && fileUrl) {
     mediaHtml = `<div class="video-wrapper"><video class="background-video" autoplay loop muted playsinline><source src="${escapeHtml(fileUrl)}" type="video/mp4"></video></div>`;
   } else if (fileUrl) {
     mediaHtml = `<div class="illus-wrapper"><img src="${escapeHtml(fileUrl)}" alt="" class="illus"></div>`;
@@ -4651,7 +4705,7 @@ function evaluateCondition(cond, ctx) {
   const notEmptyMatch = expr.match(/^!empty\(\s*(.+)\s*\)$/);
   const issetMatch = expr.match(/^isset\(\s*(.+)\s*\)$/);
   const notIssetMatch = expr.match(/^!isset\(\s*(.+)\s*\)$/);
-  const equalityMatch = expr.match(/(.+?)(===|!==|==|!=|>=|<=|>|<)\s*(['"].*?['"]|\$[\w\[\]'".->]+|\d+)/);
+  const equalityMatch = expr.match(/(.+?)(===|!==|==|!=|>=|<=|>|<)\s*(['"].*?['"]|\$[\w\[\]'".->]+|\d+|true|false|null)/);
 
   if (notEmptyMatch) {
     const value = resolveValue(notEmptyMatch[1], ctx);
@@ -4667,10 +4721,13 @@ function evaluateCondition(cond, ctx) {
     result = value !== undefined && value !== null;
   } else if (equalityMatch) {
     const left = resolveValue(equalityMatch[1], ctx);
-    const right = resolveValue(equalityMatch[3], ctx);
+    const rightRaw = equalityMatch[3].trim();
+    const right = rightRaw === 'false' ? false : rightRaw === 'true' ? true : rightRaw === 'null' ? null : resolveValue(rightRaw, ctx);
     const op = equalityMatch[2];
-    if (op === '==' || op === '===') result = String(left) === String(right);
-    else if (op === '!=' || op === '!==') result = String(left) !== String(right);
+    if (op === '===') result = left === right;
+    else if (op === '==') result = left == right;
+    else if (op === '!==') result = left !== right;
+    else if (op === '!=') result = left != right;
     else if (op === '>') result = Number(left) > Number(right);
     else if (op === '>=') result = Number(left) >= Number(right);
     else if (op === '<') result = Number(left) < Number(right);
@@ -5251,7 +5308,6 @@ function renderPageMenuToggles() {
             </span>
             <span class="menu-toggle-name">${escapeHtml(menu.name)}</span>
           </label>
-          ${locLabel ? `<span class="menu-toggle-loc">${locLabel}</span>` : ''}
         </div>
         <div class="menu-toggle-options" data-menu-id="${menu.id}" style="${menu.enabled ? '' : 'display:none'}">
           <div class="form-group">
@@ -5448,11 +5504,6 @@ function toggleSeoPanel(show) {
   }
 }
 
-function onSeoToggle(enabled) {
-  pageBuilderState.seoMeta.enabled = enabled;
-  const fields = document.getElementById('seoFields');
-  if (fields) fields.style.display = enabled ? '' : 'none';
-}
 
 function onSeoFieldChange() {
   const titleInput = document.getElementById('seo_meta_title');
@@ -5546,19 +5597,10 @@ function stripHtml(html) {
 
 function switchSeoTab(tab) {
   const preview = document.getElementById('seoPreview');
-  const schema = document.getElementById('seoSchemaPanel');
   const btnPreview = document.getElementById('seoTabPreview');
-  const btnSchema = document.getElementById('seoTabSchema');
-  if (tab === 'schema') {
-    if (preview) preview.style.display = 'none';
-    if (schema) schema.style.display = '';
-    if (btnPreview) btnPreview.classList.remove('active');
-    if (btnSchema) btnSchema.classList.add('active');
-  } else {
-    if (preview) preview.style.display = '';
-    if (schema) schema.style.display = 'none';
-    if (btnPreview) btnPreview.classList.add('active');
-    if (btnSchema) btnSchema.classList.remove('active');
+  if (tab === 'preview') {
+    if (preview) preview.style.display = preview.style.display === 'none' ? '' : 'none';
+    if (btnPreview) btnPreview.classList.toggle('active');
   }
 }
 
@@ -5787,6 +5829,471 @@ async function generateSchemaOrg() {
   showToast('Schema.org genere depuis le contenu de la page', 'success');
 }
 
+// ========== AI PAGE GENERATION ==========
+
+function openAiModal() {
+  const existingBlocks = pageBuilderState.blocks.length;
+  const warningHtml = existingBlocks > 0
+    ? `<div class="ai-modal-warning">Cette page contient déjà ${existingBlocks} bloc(s). La génération IA remplacera tout le contenu existant.</div>`
+    : '';
+
+  openUiModal({
+    title: '✨ Générer la page avec l\'IA',
+    bodyHtml: `
+      <div class="ai-modal-content">
+        ${warningHtml}
+        <div class="ai-modal-field">
+          <label class="form-label">Décrivez la page que vous souhaitez créer</label>
+          <textarea class="form-input ai-prompt-input" id="aiPromptInput" rows="5" placeholder="Ex: Crée une page de présentation pour une agence web spécialisée en React et Node.js, avec nos services, l'équipe, des chiffres clés et un formulaire de contact..."></textarea>
+        </div>
+        <div class="ai-modal-options">
+          <div class="ai-modal-option">
+            <label class="form-label">Titre de la page (optionnel)</label>
+            <input type="text" class="form-input" id="aiPageTitle" value="${escapeHtml(pageBuilderState.meta.title || '')}" placeholder="Sera généré automatiquement si vide">
+          </div>
+        </div>
+        <div class="ai-modal-row">
+          <div class="ai-modal-checkboxes">
+            <label class="ai-checkbox-label"><input type="checkbox" id="aiGenSeo" checked> Générer le SEO (meta title + description)</label>
+            <label class="ai-checkbox-label"><input type="checkbox" id="aiGenSchema" checked> Générer le Schema.org</label>
+            <label class="ai-checkbox-label"><input type="checkbox" id="aiWebSearch" checked> 🔍 Recherche web (infos réelles)</label>
+          </div>
+          <div class="ai-modal-model">
+            <label class="form-label">Modèle</label>
+            <select class="form-select" id="aiModelSelect">
+              <option value="haiku" selected>Haiku (rapide, ~10s)</option>
+              <option value="sonnet">Sonnet (précis, ~30s)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    `,
+    actions: [
+      { label: 'Annuler', variant: 'btn-outline', onClick: () => closeUiModal() },
+      { label: '✨ Générer', variant: 'btn-ai', onClick: () => executeAiGeneration() }
+    ]
+  });
+  setTimeout(() => document.getElementById('aiPromptInput')?.focus(), 50);
+}
+
+async function executeAiGeneration() {
+  const prompt = document.getElementById('aiPromptInput')?.value?.trim();
+  if (!prompt) {
+    showToast('Veuillez saisir une description de la page', 'error');
+    return;
+  }
+
+  const pageTitle = document.getElementById('aiPageTitle')?.value?.trim() || '';
+  const genSeo = document.getElementById('aiGenSeo')?.checked ?? true;
+  const genSchema = document.getElementById('aiGenSchema')?.checked ?? true;
+
+  closeUiModal();
+
+  // Show loading overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'aiLoadingOverlay';
+  overlay.innerHTML = `
+    <div class="ai-loading-card">
+      <div class="ai-loading-spinner"></div>
+      <h3>Génération en cours...</h3>
+      <p id="aiCharCounter">Connexion à l'IA...</p>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  try {
+    // Stream response via SSE to avoid FastCGI timeout
+    const model = document.getElementById('aiModelSelect')?.value || 'haiku';
+    const webSearch = document.getElementById('aiWebSearch')?.checked ?? true;
+    const result = await streamAiGeneration(prompt, pageTitle, genSeo, model, webSearch);
+    const generated = result.generated;
+    if (!generated) throw new Error('Réponse IA vide');
+
+    // Apply generated title & slug
+    if (generated.title) {
+      pageBuilderState.meta.title = generated.title;
+      const titleInput = document.querySelector('.builder-title');
+      if (titleInput) titleInput.value = generated.title;
+    }
+    if (generated.slug) {
+      pageBuilderState.meta.slug = generated.slug;
+      const slugInput = document.querySelector('.builder-slug');
+      if (slugInput) slugInput.value = generated.slug;
+    }
+
+    // Apply generated blocks — resolve images + ensure repeater items
+    if (generated.blocks && Array.isArray(generated.blocks)) {
+      const defaultImg = siteSettingsCache?.replacement_image || '';
+      pageBuilderState.blocks = generated.blocks.map(block => ({
+        id: block.id || blockId(),
+        type: block.type,
+        data: processAiBlockData(normalizeAiBlock(block.type, block.data || {}), defaultImg)
+      }));
+      rebuildBuilderBlocksDOM();
+      reattachBlockCardListeners();
+
+      // Async post-processing: geocode addresses + resolve form IDs
+      Promise.all([
+        geocodeAiBlockAddresses(),
+        resolveAiFormIds()
+      ]).then(([geoChanged, formChanged]) => {
+        if (geoChanged || formChanged) { rebuildBuilderBlocksDOM(); reattachBlockCardListeners(); }
+      });
+    }
+
+    // Apply SEO
+    if (genSeo && generated.seo) {
+      pageBuilderState.seoMeta.enabled = true;
+      if (generated.seo.meta_title) {
+        pageBuilderState.seoMeta.meta_title = generated.seo.meta_title;
+      }
+      if (generated.seo.meta_description) {
+        pageBuilderState.seoMeta.meta_description = generated.seo.meta_description;
+      }
+      if (genSchema && generated.seo.schema_org) {
+        pageBuilderState.seoMeta.schema_org = typeof generated.seo.schema_org === 'string'
+          ? generated.seo.schema_org
+          : JSON.stringify(generated.seo.schema_org, null, 2);
+      }
+      // Update SEO fields if visible
+      const titleInput = document.getElementById('seo_meta_title');
+      const descInput = document.getElementById('seo_meta_description');
+      const schemaInput = document.getElementById('seo_schema_org');
+      if (titleInput) titleInput.value = pageBuilderState.seoMeta.meta_title;
+      if (descInput) descInput.value = pageBuilderState.seoMeta.meta_description;
+      if (schemaInput) schemaInput.value = pageBuilderState.seoMeta.schema_org;
+      onSeoFieldChange();
+    }
+
+    if (result.usage) {
+      console.log(`IA tokens — input: ${result.usage.input_tokens}, output: ${result.usage.output_tokens}`);
+    }
+
+    showToast(`Page générée avec succès (${pageBuilderState.blocks.length} blocs)`, 'success');
+
+  } catch (error) {
+    console.error('AI generation error:', error);
+    showToast(`Erreur IA : ${error.message}`, 'error');
+  } finally {
+    const loadingOverlay = document.getElementById('aiLoadingOverlay');
+    if (loadingOverlay) loadingOverlay.remove();
+  }
+}
+
+/**
+ * Geocode all addresses in contact/map blocks using Mapbox API.
+ * Resolves string addresses to full GoogleMap objects with lat/lng.
+ * Returns true if any block was updated.
+ */
+/**
+ * Auto-resolve form_id for form blocks. If form_id is "auto" or empty,
+ * fetch forms from API and assign the first active "contact" form (or first active form).
+ */
+async function resolveAiFormIds() {
+  const formBlocks = pageBuilderState.blocks.filter(b => b.type === 'form' && (!b.data.form_id || b.data.form_id === 'auto'));
+  if (formBlocks.length === 0) return false;
+  try {
+    const forms = await apiFetch('/forms');
+    const active = (forms || []).filter(f => f.status === 'active');
+    if (active.length === 0) return false;
+    // Prefer a form with "contact" in the title
+    const contactForm = active.find(f => /contact/i.test(f.title)) || active[0];
+    for (const block of formBlocks) {
+      block.data.form_id = String(contactForm.id);
+    }
+    return true;
+  } catch (e) {
+    console.warn('Could not resolve form IDs:', e);
+    return false;
+  }
+}
+
+async function geocodeAiBlockAddresses() {
+  let changed = false;
+  for (const block of pageBuilderState.blocks) {
+    if (block.type !== 'contact' && block.type !== 'map') continue;
+    const items = block.data.addresses || block.data.items || [];
+    for (const item of items) {
+      const addr = item.address;
+      if (!addr) continue;
+      // Get the address string — either from object or direct string
+      const query = typeof addr === 'object' ? (addr.address || '') : addr;
+      if (!query || query.length < 3) continue;
+      // Skip if already geocoded (has valid lat/lng)
+      if (typeof addr === 'object' && addr.lat && addr.lng && addr.lat !== 0 && addr.lng !== 0) continue;
+      try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&limit=1&language=fr`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.features && data.features.length > 0) {
+          const f = data.features[0];
+          const [lng, lat] = f.center;
+          const ctx = f.context || [];
+          const getCtx = (prefix) => { const c = ctx.find(c => c.id?.startsWith(prefix)); return c ? c.text : ''; };
+          item.address = {
+            address: f.place_name || query,
+            lat, lng,
+            place_id: f.id || '',
+            street_number: f.address || '',
+            street_name: f.text || '',
+            street_name_short: f.text || '',
+            post_code: getCtx('postcode'),
+            city: getCtx('place'),
+            name: f.place_name || query
+          };
+          changed = true;
+        }
+      } catch (e) {
+        console.warn('Geocoding failed for:', query, e);
+      }
+    }
+  }
+  return changed;
+}
+
+/**
+ * Normalize AI-generated block data to match the real module field schema.
+ * Fixes field name mismatches and injects required defaults.
+ */
+function normalizeAiBlock(type, data) {
+  if (!data || typeof data !== 'object') return data;
+
+  const RULES = {
+    'text-image': {
+      rename: { content: 'text' },
+      defaults: { media_choice: true }
+    },
+    'accordion': {
+      rename: { items: 'accordions' },
+      subRename: { accordions: { content: 'text' } }
+    },
+    'key-figures': {
+      rename: { items: 'key_list' },
+      subRename: { key_list: { title: 'titre', icon: 'icone' } }
+    },
+    'gallery': {
+      rename: { items: 'list', style: 'style_choice' },
+      subRename: { list: { title: 'titre' } }
+    },
+    'clickable-tiles': {
+      rename: { items: 'list_interlocking', is_clickable: 'clickable_block' },
+      subRename: { list_interlocking: { text: 'catchphrase', image: 'file', link: 'primary_link' } }
+    },
+    'team': {
+      rename: { items: 'list', members: 'list' }
+    },
+    'contact': {
+      rename: { items: 'addresses' }
+    },
+    'hero': {
+      defaults: { is_hero_banner_slider: true },
+      subRename: { hero_sliders: { subtitle: 'catchphrase' } }
+    },
+    'banner': {
+      rename: { bg_img: 'image', background: 'banner_height' }
+    }
+  };
+
+  const d = { ...data };
+
+  // Global rename: "background" → "bloc_color" (applies to ALL block types)
+  if (d.background !== undefined && d.bloc_color === undefined) {
+    d.bloc_color = d.background;
+    delete d.background;
+  }
+  // Ensure bloc_color always has a value (schema default)
+  if (!d.bloc_color) d.bloc_color = 'no-background-color';
+
+  const rules = RULES[type];
+  if (!rules) return d;
+
+  // Inject defaults for missing required fields
+  if (rules.defaults) {
+    for (const [key, val] of Object.entries(rules.defaults)) {
+      if (d[key] === undefined) d[key] = val;
+    }
+  }
+
+  // Rename top-level fields
+  if (rules.rename) {
+    for (const [from, to] of Object.entries(rules.rename)) {
+      if (d[from] !== undefined && d[to] === undefined) {
+        d[to] = d[from];
+        delete d[from];
+      }
+    }
+  }
+
+  // Rename sub-fields inside repeater arrays
+  if (rules.subRename) {
+    for (const [arrayKey, fieldMap] of Object.entries(rules.subRename)) {
+      if (Array.isArray(d[arrayKey])) {
+        d[arrayKey] = d[arrayKey].map(item => {
+          if (!item || typeof item !== 'object') return item;
+          const row = { ...item };
+          for (const [from, to] of Object.entries(fieldMap)) {
+            if (row[from] !== undefined && row[to] === undefined) {
+              row[to] = row[from];
+              delete row[from];
+            }
+          }
+          return row;
+        });
+      }
+    }
+  }
+
+  // Special: Contact addresses — convert string address to GoogleMap object + auto-enable map
+  if (type === 'contact' && Array.isArray(d.addresses)) {
+    let hasAddress = false;
+    d.addresses = d.addresses.map(addr => {
+      if (typeof addr.address === 'string' && addr.address.trim()) {
+        addr.address = { address: addr.address, lat: 0, lng: 0 };
+        hasAddress = true;
+      } else if (addr.address && typeof addr.address === 'object' && addr.address.address) {
+        hasAddress = true;
+      }
+      return addr;
+    });
+    // If addresses have location data, force map view (Carte) instead of photo
+    if (hasAddress) d.is_map = true;
+  }
+
+  return d;
+}
+
+/**
+ * Post-process AI-generated block data:
+ * - Replace "image-default" strings with the site's replacement_image as a media object
+ * - Ensure repeater fields (items, hero_sliders, columns_list) are proper arrays
+ * - Normalize sub-modules in columns-tab flexible content
+ */
+function processAiBlockData(data, defaultImgUrl) {
+  if (!data || typeof data !== 'object') return data;
+
+  // Image field names that should be media objects
+  const imageFields = ['image', 'bg_img', 'photo', 'picture', 'logo', 'icon', 'preview', 'file', 'icone'];
+  const logoUrl = siteSettingsCache?.logo || defaultImgUrl;
+
+  function makeImageObject(url) {
+    return { id: null, url: url || '', alt: '', title: '', caption: '', width: null, height: null };
+  }
+
+  function resolveValue(val, key) {
+    // "image-default" → media object with site default image
+    if (val === 'image-default' || val === 'image_default') {
+      return makeImageObject(defaultImgUrl);
+    }
+    // "logo-default" → media object with site logo
+    if (val === 'logo-default' || val === 'logo_default') {
+      return makeImageObject(logoUrl);
+    }
+    // If it's a string URL in an image field, wrap it as media object
+    if (imageFields.includes(key) && typeof val === 'string' && val !== '' && val !== 'image-default' && val !== 'logo-default') {
+      return makeImageObject(val);
+    }
+    // Recurse into objects
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      return processObject(val);
+    }
+    // Recurse into arrays
+    if (Array.isArray(val)) {
+      return val.map(item => {
+        if (item && typeof item === 'object') return processObject(item);
+        return item;
+      });
+    }
+    return val;
+  }
+
+  function processObject(obj) {
+    const result = {};
+    for (const [key, val] of Object.entries(obj)) {
+      result[key] = resolveValue(val, key);
+    }
+    return result;
+  }
+
+  return processObject(data);
+}
+
+/**
+ * Stream AI generation via SSE. Returns a Promise that resolves with the final result.
+ * Updates the loading overlay with a live character counter.
+ */
+function streamAiGeneration(prompt, pageTitle, genSeo, model, webSearch = true) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      prompt,
+      page_title: pageTitle,
+      context: genSeo ? 'Génère aussi le SEO et le Schema.org' : '',
+      model,
+      web_search: webSearch
+    });
+
+    fetch(`${API_BASE}/ai/generate`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body
+    }).then(response => {
+      if (!response.ok && !response.headers.get('content-type')?.includes('text/event-stream')) {
+        return response.json().then(err => { throw new Error(err.error || 'Request failed'); });
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let charCount = 0;
+      let currentEvent = '';
+      let resolved = false;
+
+      function handleLine(line) {
+        if (resolved) return;
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7).trim();
+          return;
+        }
+        if (!line.startsWith('data: ')) return;
+        const data = line.slice(6);
+
+        if (currentEvent === 'status') {
+          const counter = document.getElementById('aiCharCounter');
+          if (counter) counter.textContent = data;
+        } else if (currentEvent === 'chunk') {
+          charCount += data.length;
+          const counter = document.getElementById('aiCharCounter');
+          if (counter) counter.textContent = `${charCount} caractères générés...`;
+        } else if (currentEvent === 'done') {
+          resolved = true;
+          try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('Réponse finale JSON invalide')); }
+        } else if (currentEvent === 'error') {
+          resolved = true;
+          try { reject(new Error(JSON.parse(data).error || 'Erreur IA')); } catch (e) { reject(new Error(data)); }
+        }
+      }
+
+      function processChunks() {
+        reader.read().then(({ done, value }) => {
+          if (value) buffer += decoder.decode(value, { stream: true });
+
+          // Process all complete lines in buffer
+          const lines = buffer.split('\n');
+          buffer = done ? '' : lines.pop(); // on stream end, process everything
+          for (const line of lines) handleLine(line);
+          // If stream ended, also process remaining buffer
+          if (done && buffer) handleLine(buffer);
+
+          if (resolved) return;
+          if (done) { reject(new Error('Stream terminé sans résultat')); return; }
+          processChunks();
+        }).catch(reject);
+      }
+
+      processChunks();
+    }).catch(reject);
+  });
+}
+
 function onBuilderStatusChange(status) {
   const btn = document.querySelector('.builder-menu-settings-btn');
   if (btn) {
@@ -5799,8 +6306,11 @@ function onBuilderStatusChange(status) {
 }
 
 function updateBuilderPlaceholder() {
+  const hasBlocks = pageBuilderState.blocks.length > 0;
   const ph = document.getElementById('builderPlaceholder');
-  if (ph) ph.style.display = pageBuilderState.blocks.length === 0 ? 'block' : 'none';
+  if (ph) ph.style.display = hasBlocks ? 'none' : 'block';
+  const tb = document.getElementById('builderToolbar');
+  if (tb) tb.style.display = hasBlocks ? '' : 'none';
 }
 
 function updateBuilderParallax() {
@@ -6059,6 +6569,14 @@ function removeBlock(id) {
   if (selectedBlockId === id) {
     deselectBlock();
   }
+}
+
+async function removeAllBlocks() {
+  if (!pageBuilderState.blocks.length) return;
+  if (!await confirmModal('Supprimer tous les blocs ?')) return;
+  pageBuilderState.blocks = [];
+  rebuildBuilderBlocksDOM();
+  deselectBlock();
 }
 
 function updateSelectedBlockCard() {
@@ -6613,6 +7131,8 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
     const media = normalizeMediaValue(value);
     const url = media?.url || '';
     const isVideo = media?.type === 'video' || type === 'Video';
+    const isDocument = media?.type === 'document' || (media?.mime_type && media.mime_type === 'application/pdf');
+    const isPdf = isDocument || /\.pdf$/i.test(url);
     const pickerType = type === 'File' ? 'all' : (type === 'Video' ? 'video' : 'image');
     const meta = media?.original_name || media?.name || url || 'Aucun média sélectionné';
     return `
@@ -6620,7 +7140,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
         <label class="form-label">${escapeHtml(label)}</label>
         <div class="media-field" data-field="${escapeHtml(inputName)}">
           <div class="media-preview">
-            ${url ? (isVideo ? `<div class="media-preview-icon">🎬</div>` : `<img src="${escapeHtml(getOptimizedUrl(url, 400, 70))}" alt="${escapeHtml(meta)}">`) : ''}
+            ${url ? (isPdf ? `<div class="media-preview-icon" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f8f9fa;border-radius:8px;padding:1rem;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg></div>` : isVideo ? `<div class="media-preview-icon">🎬</div>` : `<img src="${escapeHtml(getOptimizedUrl(url, 400, 70))}" alt="${escapeHtml(meta)}">`) : ''}
           </div>
           <div class="media-preview-meta">${escapeHtml(meta)}</div>
           <input type="hidden" name="${escapeHtml(inputName)}"${rfieldAttr} value="${escapeHtml(media ? JSON.stringify(media) : '')}">
@@ -8103,7 +8623,7 @@ async function savePageBuilder() {
 
   const content = JSON.stringify(pageBuilderState.blocks);
   const color_overrides = pageBuilderState.colorOverrides.enabled ? JSON.stringify(pageBuilderState.colorOverrides) : null;
-  const seo_meta = pageBuilderState.seoMeta.enabled ? JSON.stringify(pageBuilderState.seoMeta) : null;
+  const seo_meta = JSON.stringify(pageBuilderState.seoMeta);
   showLoading();
   try {
     if (pageBuilderState.editingPageId) {
@@ -8734,7 +9254,7 @@ async function renderMediaLibrary() {
       <h1>Médiathèque</h1>
       <div class="actions">
         <label class="btn btn-outline media-upload-btn">
-          <input type="file" multiple accept="image/*,video/*" onchange="handleMediaUpload(event)" />
+          <input type="file" multiple accept="image/*,video/*,application/pdf,.pdf" onchange="handleMediaUpload(event)" />
           Importer
         </label>
         <button class="btn btn-outline" onclick="createMediaFolder()">+ Dossier</button>
@@ -8806,14 +9326,19 @@ function getOptimizedUrl(url, width = 400, quality = 70) {
 
 function renderMediaCard(item, forPicker = false) {
   const isImage = item.type === 'image';
+  const isVideo = item.type === 'video';
+  const isDocument = item.type === 'document';
   const isSelected = forPicker && mediaPickerState.multiple && Array.isArray(mediaPickerState.selectedIds)
     ? mediaPickerState.selectedIds.includes(String(item.id))
     : (!forPicker && Array.isArray(mediaState.selectedIds) && mediaState.selectedIds.includes(String(item.id)));
   const thumbUrl = isImage ? getOptimizedUrl(item.url, 400, 70) : item.url;
   const thumb = isImage
     ? `<img src="${escapeHtml(thumbUrl)}" alt="${escapeHtml(item.original_name)}" loading="lazy">`
+    : isDocument
+    ? `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f8f9fa;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg></div>`
     : `<video src="${escapeHtml(item.url)}#t=0.5" preload="metadata" muted></video>`;
-  const meta = `${isImage ? 'Image' : 'Vidéo'} · ${formatBytes(item.size)}`;
+  const typeLabel = isImage ? 'Image' : isDocument ? 'PDF' : 'Vidéo';
+  const meta = `${typeLabel} · ${formatBytes(item.size)}`;
   const folderSelect = forPicker ? '' : `
     <select class="media-move-select" onclick="event.stopPropagation()" onchange="moveMediaItem(${item.id}, this.value)">
       <option value="">Sans dossier</option>
@@ -8837,7 +9362,7 @@ function renderMediaCard(item, forPicker = false) {
           <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleMediaSelection(${item.id}, this.checked); event.stopPropagation();" />
         </label>
       ` : ''}
-      <div class="media-thumb ${isImage ? '' : 'is-video'}">${thumb}</div>
+      <div class="media-thumb ${isImage ? '' : isDocument ? 'is-document' : 'is-video'}">${thumb}</div>
       <div class="media-meta">
         <div class="media-name" title="${escapeHtml(item.original_name)}">${escapeHtml(item.original_name)}</div>
         <div class="media-info">${escapeHtml(meta)}</div>
@@ -9013,6 +9538,7 @@ function openMediaDetail(mediaId) {
   if (existing) existing.remove();
 
   const isImage = item.type === 'image';
+  const isDocument = item.type === 'document';
   const previewUrl = isImage ? getOptimizedUrl(item.url, 600, 80) : item.url;
   const dims = (item.width && item.height) ? `${item.width} × ${item.height} px` : '';
   const folderName = item.folder_id ? (mediaState.folders.find(f => String(f.id) === String(item.folder_id))?.name || '') : 'Aucun';
@@ -9030,6 +9556,12 @@ function openMediaDetail(mediaId) {
       <div class="media-detail-preview">
         ${isImage
           ? `<img src="${escapeHtml(previewUrl)}" alt="${escapeHtml(item.alt || item.original_name)}">`
+          : isDocument
+          ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;gap:1rem;background:#f8f9fa;border-radius:8px;min-height:200px;">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg>
+              <span style="font-weight:500">${escapeHtml(item.original_name)}</span>
+              <a href="${escapeHtml(item.url)}" target="_blank" class="btn btn-sm btn-primary" onclick="event.stopPropagation()">Ouvrir le PDF</a>
+            </div>`
           : `<video src="${escapeHtml(item.url)}" controls></video>`}
       </div>
       <div class="media-detail-infos">
@@ -9276,7 +9808,7 @@ function ensureMediaPickerModal() {
           <label class="btn-upload">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
             Importer
-            <input type="file" multiple accept="image/*,video/*" onchange="handleMediaPickerUpload(event)" style="display:none">
+            <input type="file" multiple accept="image/*,video/*,application/pdf,.pdf" onchange="handleMediaPickerUpload(event)" style="display:none">
           </label>
           <button class="btn-close-modal" onclick="closeMediaPicker()">Fermer</button>
         </div>
@@ -9425,7 +9957,13 @@ async function handleMediaPickerUpload(event) {
   try {
     await apiUpload('/media/upload', formData);
     showToast('Médias importés', 'success');
-    mediaPickerState.items = await apiFetch(`/media?${mediaPickerState.folderId === null ? 'all=1' : 'folder_id=' + mediaPickerState.folderId}`);
+    const [items, fRes] = await Promise.all([
+      apiFetch(`/media?${mediaPickerState.folderId === null ? 'all=1' : 'folder_id=' + mediaPickerState.folderId}`),
+      apiFetch('/media/folders')
+    ]);
+    mediaPickerState.items = items;
+    mediaPickerState.folders = fRes.folders || [];
+    mediaPickerState.totalCount = fRes.total || 0;
     updateMediaPickerContent();
   } catch (e) {
     showToast(e.message || "Erreur lors de l'import", 'error');
@@ -9666,8 +10204,11 @@ function applyMediaSelection(blockId, fieldName, item) {
   if (wrapper) {
     const preview = wrapper.querySelector('.media-preview');
     if (preview) {
+      const isPdfItem = item.type === 'document' || item.mime_type === 'application/pdf' || /\.pdf$/i.test(item.url);
       preview.innerHTML = item.type === 'image'
         ? `<img src="${escapeHtml(getOptimizedUrl(item.url, 400, 70))}" alt="${escapeHtml(item.original_name)}">`
+        : isPdfItem
+        ? `<div class="media-preview-icon" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f8f9fa;border-radius:8px;padding:1rem;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg></div>`
         : `<div class="media-preview-icon">🎬</div>`;
     }
     const meta = wrapper.querySelector('.media-preview-meta');
