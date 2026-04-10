@@ -582,6 +582,50 @@ if (is_dir($pluginsDir)) {
     echo "  No plugins directory found\n";
 }
 
+// ─── AI Credits ─────────────────────────────────────────────────────────────
+
+echo "\nAI Credits:\n";
+
+echo "Table: ai_credits\n";
+if (!table_exists($db, 'ai_credits')) {
+    $db->exec("
+        CREATE TABLE ai_credits (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            credits DECIMAL(12,4) NOT NULL DEFAULT 0,
+            source ENUM('manual', 'monthly_reset') NOT NULL DEFAULT 'manual',
+            note VARCHAR(255) DEFAULT NULL,
+            added_by INT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
+echo "Table: ai_credit_usage\n";
+if (!table_exists($db, 'ai_credit_usage')) {
+    $db->exec("
+        CREATE TABLE ai_credit_usage (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            model VARCHAR(50) NOT NULL,
+            input_tokens INT NOT NULL DEFAULT 0,
+            output_tokens INT NOT NULL DEFAULT 0,
+            credits_used DECIMAL(12,6) NOT NULL DEFAULT 0,
+            prompt_summary VARCHAR(255) DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_user_id (user_id),
+            INDEX idx_created_at (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    echo "  + Created table\n";
+    $changes++;
+} else {
+    echo "  OK\n";
+}
+
 // ─── Summary ────────────────────────────────────────────────────────────────
 
 echo "\n=== Done! ";

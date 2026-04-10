@@ -21,6 +21,7 @@
   --gray-800: #1f2937;
   --gray-900: #111827;
   --sidebar-width: 260px;
+  --sidebar-collapsed-width: 60px;
 }
 
 body {
@@ -51,15 +52,66 @@ a{
 }
 
 .sidebar.collapsed {
-  width: 0;
-  border-right: none;
+  width: var(--sidebar-collapsed-width);
 }
 
-.sidebar.collapsed .logo,
-.sidebar.collapsed .nav,
+.logo-icon {
+  display: none;
+}
+
+.sidebar.collapsed .logo h2,
+.sidebar.collapsed .logo .user-info {
+  display: none;
+}
+
+.sidebar.collapsed .logo-icon {
+  display: block;
+  font-size: 22px;
+  color: var(--primary);
+}
+
+.sidebar.collapsed .logo {
+  padding: 16px 0;
+  text-align: center;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.sidebar.collapsed .nav-item span {
+  display: none;
+}
+
+.sidebar.collapsed .nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 0;
+  margin: 0;
+}
+
+.sidebar.collapsed .nav-item i {
+  font-size: 18px;
+  width: var(--sidebar-collapsed-width);
+  text-align: center;
+}
+
+.sidebar.collapsed .nav-sub-items {
+  display: none !important;
+}
+
 .sidebar.collapsed .sidebar-footer {
-  opacity: 0;
-  pointer-events: none;
+  padding: 10px;
+}
+
+.sidebar.collapsed .btn-logout {
+  font-size: 0;
+  padding: 8px;
+}
+
+.sidebar.collapsed .btn-logout::before {
+  content: "\f2f5";
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  font-size: 16px;
 }
 
 .sidebar-toggle {
@@ -89,7 +141,7 @@ a{
 }
 
 body.sidebar-collapsed .sidebar-toggle {
-  left: 0;
+  left: calc(var(--sidebar-collapsed-width) - 14px);
   border-left: none;
   border-radius: 0 6px 6px 0;
 }
@@ -121,7 +173,9 @@ body.sidebar-collapsed .sidebar-toggle svg {
 }
 
 .nav-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 10px 20px;
   margin: 0 12px;
   color: var(--gray-700);
@@ -129,6 +183,15 @@ body.sidebar-collapsed .sidebar-toggle svg {
   transition: all 0.2s;
   border-bottom: 1px solid var(--gray-200);
   font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.nav-item i {
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 15px;
 }
 
 .nav-item:last-child,
@@ -1255,15 +1318,52 @@ tr:hover {
   border-top: 1px solid rgba(15, 23, 42, 0.06);
 }
 
-/* ── Text-image full-height → landscape fallback in admin preview ─────────── */
-/* The full-height ratio uses 100vh + negative margins + absolute positioning
-   that breaks inside the admin preview. The JS replaces "full-height" with
-   "admin-full-height landscape" so the module renders like a normal landscape
-   image. We just hide the leftover parallax artefacts. */
+/* ── Text-image full-height in admin preview ──────────────────────────────── */
+/* full-height uses 100vh + negative margins + absolute positioning on the
+   real site. Inside the admin preview container we neutralise those rules
+   and use a tall aspect-ratio (3/4) so the preview conveys the "full-height"
+   intent without breaking the layout. */
+
+/* Disable 100vh heights on cols-wrapper.full-height */
+.builder-block-render .module-text-image .cols-wrapper.full-height,
+.builder-block-render .module-text-image .cols-wrapper.full-height .col-1,
+.builder-block-render .module-text-image .cols-wrapper.full-height .illus-wrapper,
+.builder-block-render .module-text-image .cols-wrapper.full-height .video-wrapper,
+.builder-block-render .module-text-image .cols-wrapper.full-height .illus-video {
+  height: auto !important;
+  max-height: none !important;
+}
+
+/* Disable absolute positioning and 100vw widths from full-height */
+.builder-block-render .module-text-image .cols-wrapper.full-height .illus-wrapper,
+.builder-block-render .module-text-image .cols-wrapper.full-height .video-wrapper {
+  position: relative !important;
+  width: auto !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  aspect-ratio: 3/4 !important;
+}
+
+/* Fix image fill inside full-height wrapper in preview */
+.builder-block-render .module-text-image .cols-wrapper.full-height .illus-wrapper .illus {
+  height: 100% !important;
+  width: 100% !important;
+  object-fit: cover !important;
+}
+
+/* Fix parallax artefacts */
 .builder-block-render .module-text-image.img-parallax .illus {
   margin-top: 0 !important;
   transform: none !important;
   height: 100% !important;
+}
+
+/* Ensure illus-video doesn't overflow */
+.builder-block-render .module-text-image .illus-video {
+  position: relative !important;
+  height: auto !important;
+  max-height: 300px !important;
 }
 
 /* ── Banner preview height overrides ──────────────────────────────────────── */

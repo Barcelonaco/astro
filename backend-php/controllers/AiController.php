@@ -95,10 +95,18 @@ PROMPT;
             exit;
         }
 
-        $apiKey = $_ENV['ANTHROPIC_API_KEY'] ?? '';
+        $apiKey = AiCreditController::getDecryptedApiKey();
         if (empty($apiKey)) {
             self::startSSE();
             self::sendSSE('error', json_encode(['error' => 'Clé API Anthropic non configurée']));
+            exit;
+        }
+
+        // Check available credits
+        $available = AiCreditController::getAvailableCredits();
+        if ($available <= 0) {
+            self::startSSE();
+            self::sendSSE('error', json_encode(['error' => 'Crédits IA insuffisants. Ajoutez des crédits dans Crédits IA.']));
             exit;
         }
 
@@ -248,6 +256,19 @@ PROMPT;
                 'raw' => substr($allText, 0, 500)
             ]));
             exit;
+        }
+
+        // Log AI credit usage
+        try {
+            AiCreditController::logUsage(
+                (int) $user['id'],
+                $modelKey,
+                $inputTokens,
+                $outputTokens,
+                mb_substr($prompt, 0, 255)
+            );
+        } catch (\Exception $e) {
+            error_log('AI credit logging failed: ' . $e->getMessage());
         }
 
         // Send final complete result

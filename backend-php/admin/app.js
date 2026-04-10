@@ -208,6 +208,11 @@ async function loadSection(section) {
     case 'forms':
       content.innerHTML = await renderFormsList();
       break;
+    case 'ai-credits':
+      if (currentUser.role !== 'admin') { navigateTo('posts'); return; }
+      content.innerHTML = await renderAiCredits();
+      attachAiCreditsEvents();
+      break;
     default:
       if (section.startsWith('cpt-add:')) {
         const slug = section.split(':')[1];
@@ -451,7 +456,13 @@ async function loadPlugins() {
         a.href = '#';
         a.className = 'nav-item nav-item-parent';
         a.dataset.section = `cpt:${pt.slug}`;
-        a.innerHTML = escapeHtml(pt.labelPlural || pt.label);
+        const cptIconMap = {
+          references: 'fa-solid fa-star',
+          actualites: 'fa-solid fa-globe',
+          evenements: 'fa-solid fa-chart-bar',
+        };
+        const cptIconClass = cptIconMap[pt.slug] || pt.faIcon || 'fa-regular fa-folder-open';
+        a.innerHTML = `<i class="${cptIconClass}"></i><span>${escapeHtml(pt.labelPlural || pt.label)}</span>`;
         // Insert after Pages link
         const pagesLink = nav.querySelector('[data-section="pages"]');
         const pagesSubItems = pagesLink ? pagesLink.nextElementSibling : null;
@@ -535,7 +546,11 @@ async function loadPlugins() {
         a.className = 'nav-item admin-only';
         a.dataset.section = `plugin-options:${plugin.name}`;
         if (currentUser.role !== 'admin') a.style.display = 'none';
-        a.innerHTML = `${plugin.icon || '🔌'} ${escapeHtml(plugin.label || plugin.name)}`;
+        const pluginIconMap = {
+          'google-reviews': 'fa-brands fa-google',
+        };
+        const pluginIconClass = pluginIconMap[plugin.name] || plugin.faIcon || 'fa-solid fa-plug';
+        a.innerHTML = `<i class="${pluginIconClass}"></i><span>${escapeHtml(plugin.label || plugin.name)}</span>`;
         a.addEventListener('click', (ev) => {
           ev.preventDefault();
           document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -4158,21 +4173,20 @@ function buildTemplateContext(block) {
       || moduleData.img_to_left === true || moduleData.img_to_left === 1 || moduleData.img_to_left === '1';
     ctx.placement = imgToLeft ? 'img-left' : 'img-right';
     const ratio = data.media_ratio || moduleData.media_ratio || '';
-    // In admin preview, full-height uses 100vh + absolute positioning which breaks
-    // the preview layout. Treat it as landscape instead.
-    const adminRatio = ratio === 'full-height' ? 'landscape' : ratio;
+    // full-height is kept as-is; CSS overrides in style.css (.builder-block-render
+    // .module-text-image .cols-wrapper.full-height) neutralise 100vh / absolute
+    // positioning and apply a tall aspect-ratio instead.
     const ratioMap = { landscape: 'banner', portrait: 'portrait', square: 'square-large' };
-    ctx.ratioImg = ratioMap[adminRatio] || 'background-module';
+    ctx.ratioImg = ratioMap[ratio] || 'background-module';
     ctx.link_align = data.link_align || moduleData.link_align || '';
     ctx.link_style = data.link_style || moduleData.link_style || '';
-    if (adminRatio) extraClasses.push(adminRatio);
+    if (ratio) extraClasses.push(ratio);
     const imgParallax = data.img_parallax === true || data.img_parallax === 1 || data.img_parallax === '1';
     const mediaChoice = data.media_choice === true || data.media_choice === 1 || data.media_choice === '1';
     if (imgParallax && mediaChoice) extraClasses.push('img-parallax');
     // Normalize media_choice to numeric 1/0 so Blade @if ($module['media_choice'] == 1) works
     // (PHP loose comparison: true == 1 is true, but JS String(true) !== '1')
-    // Also override media_ratio in module context so Blade template uses adminRatio
-    ctx.module = { ...ctx.module, media_choice: mediaChoice ? 1 : 0, media_ratio: adminRatio };
+    ctx.module = { ...ctx.module, media_choice: mediaChoice ? 1 : 0, media_ratio: ratio };
     // Replicate the @php block that creates $img (stripped by the JS Blade engine)
     const imgData = data.image || moduleData.image || ctx.image;
     if (imgData) {
@@ -14041,4 +14055,399 @@ async function togglePlugin(dir, active) {
     // Re-render to reset toggle state
     document.getElementById('content').innerHTML = await renderPluginsManager();
   }
+}
+
+// ========== AI CREDITS ==========
+
+async function renderAiCredits() {
+  showLoading();
+  try {
+    const [overview, apiKeyInfo, perUser, entries, usageLog] = await Promise.all([
+      apiFetch('/ai-credits'),
+      apiFetch('/ai-credits/api-key'),
+      apiFetch('/ai-credits/per-user'),
+      apiFetch('/ai-credits/entries'),
+      apiFetch('/ai-credits/usage'),
+    ]);
+
+    hideLoading();
+
+    const availColor = overview.available > 1 ? 'var(--success, #28a745)' : overview.available > 0 ? 'var(--warning, #ffc107)' : 'var(--danger, #dc3545)';
+
+    const perUserRows = perUser.map(u => `
+      <tr>
+        <td>${u.name}</td>
+        <td>${u.email}</td>
+        <td style="text-align:center">${u.request_count}</td>
+        <td style="text-align:right">${Number(u.total_input_tokens).toLocaleString()}</td>
+        <td style="text-align:right">${Number(u.total_output_tokens).toLocaleString()}</td>
+        <td style="text-align:right;font-weight:600">${Number(u.total_credits_used).toFixed(4)} €</td>
+      </tr>
+    `).join('');
+
+    const entryRows = entries.map(e => `
+      <tr>
+        <td>${new Date(e.created_at).toLocaleDateString('fr-FR')}</td>
+        <td><span class="badge ${e.source === 'manual' ? 'badge-primary' : 'badge-success'}">${e.source === 'manual' ? 'Manuel' : 'Auto'}</span></td>
+        <td style="text-align:right;font-weight:600">${Number(e.credits).toFixed(4)} €</td>
+        <td>${e.note || '—'}</td>
+        <td>${e.added_by_name || 'Système'}</td>
+        <td>
+          ${e.source === 'manual' ? `<button class="btn btn-sm btn-danger" onclick="deleteAiCredit(${e.id})">Supprimer</button>` : ''}
+        </td>
+      </tr>
+    `).join('');
+
+    const usageRows = (usageLog.data || []).map(u => `
+      <tr>
+        <td>${new Date(u.created_at).toLocaleString('fr-FR')}</td>
+        <td>${u.user_name}</td>
+        <td><span class="badge badge-${u.model === 'sonnet' ? 'primary' : 'secondary'}">${u.model}</span></td>
+        <td style="text-align:right">${Number(u.input_tokens).toLocaleString()}</td>
+        <td style="text-align:right">${Number(u.output_tokens).toLocaleString()}</td>
+        <td style="text-align:right;font-weight:600">${Number(u.credits_used).toFixed(6)} €</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(u.prompt_summary || '').replace(/"/g, '&quot;')}">${u.prompt_summary || '—'}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <div class="page-header">
+        <h1>Crédits IA</h1>
+
+      </div>
+
+      <div class="stats-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:24px">
+        <div class="stat-card">
+          <div class="label">Disponible</div>
+          <div class="value" style="color:${availColor}">${overview.available.toFixed(4)} €</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Utilisé ce mois</div>
+          <div class="value">${overview.total_used.toFixed(4)} €</div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="ai-credits-tabs" style="display:flex;gap:8px;margin-bottom:20px">
+        <button class="btn btn-primary ai-tab active" data-tab="config">Configuration</button>
+        <button class="btn ai-tab" data-tab="users">Consommation par utilisateur</button>
+        <button class="btn ai-tab" data-tab="history">Historique</button>
+        <button class="btn ai-tab" data-tab="entries">Crédits ajoutés</button>
+      </div>
+
+      <!-- Tab: Configuration -->
+      <div class="ai-tab-content" id="tab-config">
+        <div class="card ai-config-card">
+          <div class="ai-config-section">
+            <div class="ai-config-header">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <h3>Clé API Anthropic</h3>
+            </div>
+            <div class="ai-input-row">
+              <div class="ai-input-group" style="flex:1">
+                <input type="password" id="aiApiKeyInput" class="form-input" placeholder="sk-ant-api03-..." />
+              </div>
+              <button class="btn ai-btn-icon" onclick="toggleApiKeyVisibility()" title="Afficher/masquer la saisie">
+                <svg id="aiKeyEyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+              <button class="btn btn-primary" onclick="saveAiApiKey()">Sauvegarder</button>
+            </div>
+            ${apiKeyInfo.has_key
+              ? `<div class="ai-key-status ai-key-status--ok">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  <span id="aiKeyDisplay">${apiKeyInfo.masked}</span>
+                  <button class="ai-reveal-btn" id="aiRevealBtn" onclick="revealAiApiKey()">Révéler</button>
+                </div>`
+              : '<div class="ai-key-status ai-key-status--warn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Aucune clé configurée</div>'}
+          </div>
+
+          <div class="ai-config-divider"></div>
+
+          <div class="ai-config-section">
+            <div class="ai-config-header">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <h3>Crédits mensuels</h3>
+            </div>
+            <div class="ai-input-row">
+              <div class="ai-input-group ai-input-euro">
+                <input type="number" id="aiMonthlyCreditsInput" class="form-input" step="0.01" min="0" value="${overview.monthly_credits}" />
+              </div>
+              <button class="btn btn-primary" onclick="saveAiMonthlyCredits()">Sauvegarder</button>
+            </div>
+            <p class="ai-hint">Montant rechargé automatiquement le 1er de chaque mois.</p>
+          </div>
+
+          <div class="ai-config-divider"></div>
+
+          <div class="ai-config-section">
+            <div class="ai-config-header">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              <h3>Ajouter des crédits</h3>
+            </div>
+            <div class="ai-input-row ai-add-credits-row">
+              <div class="ai-input-group ai-input-euro" style="flex:0 0 160px">
+                <label class="form-label">Montant</label>
+                <input type="number" id="aiAddCreditsAmount" class="form-input" step="0.01" min="0.01" placeholder="5.00" />
+              </div>
+              <div class="ai-input-group" style="flex:1">
+                <label class="form-label">Note <span style="font-weight:400;color:var(--gray-400)">(optionnel)</span></label>
+                <input type="text" id="aiAddCreditsNote" class="form-input" placeholder="Raison de l'ajout..." />
+              </div>
+              <button class="btn btn-primary ai-add-btn" onclick="addAiCredits()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Ajouter
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Per-user usage -->
+      <div class="ai-tab-content" id="tab-users" style="display:none">
+        <div class="card" style="padding:20px">
+          ${perUser.length === 0 ? '<p style="color:var(--gray-500)">Aucune utilisation ce mois-ci</p>' : `
+          <table class="ai-table">
+            <thead>
+              <tr>
+                <th>Utilisateur</th><th>Email</th><th style="text-align:center">Requêtes</th>
+                <th style="text-align:right">Tokens entrée</th><th style="text-align:right">Tokens sortie</th>
+                <th style="text-align:right">Coût</th>
+              </tr>
+            </thead>
+            <tbody>${perUserRows}</tbody>
+          </table>
+          `}
+        </div>
+      </div>
+
+      <!-- Tab: History -->
+      <div class="ai-tab-content" id="tab-history" style="display:none">
+        <div class="card" style="padding:20px">
+          ${(usageLog.data || []).length === 0 ? '<p style="color:var(--gray-500)">Aucun historique</p>' : `
+          <table class="ai-table">
+            <thead>
+              <tr>
+                <th>Date</th><th>Utilisateur</th><th>Modèle</th>
+                <th style="text-align:right">Input</th><th style="text-align:right">Output</th>
+                <th style="text-align:right">Coût</th><th>Prompt</th>
+              </tr>
+            </thead>
+            <tbody>${usageRows}</tbody>
+          </table>
+          ${usageLog.pages > 1 ? `<div style="margin-top:12px;text-align:center">${renderAiPagination(usageLog.page, usageLog.pages)}</div>` : ''}
+          `}
+        </div>
+      </div>
+
+      <!-- Tab: Credit entries -->
+      <div class="ai-tab-content" id="tab-entries" style="display:none">
+        <div class="card" style="padding:20px">
+          ${entries.length === 0 ? '<p style="color:var(--gray-500)">Aucun crédit ajouté ce mois-ci</p>' : `
+          <table class="ai-table">
+            <thead>
+              <tr>
+                <th>Date</th><th>Type</th><th style="text-align:right">Montant</th>
+                <th>Note</th><th>Ajouté par</th><th></th>
+              </tr>
+            </thead>
+            <tbody>${entryRows}</tbody>
+          </table>
+          `}
+        </div>
+      </div>
+
+      <style>
+        /* AI Credits — Config card */
+        .ai-config-card { padding:0 !important; overflow:hidden; }
+        .ai-config-section { padding:24px 28px; }
+        .ai-config-header { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+        .ai-config-header svg { color:var(--primary); flex-shrink:0; }
+        .ai-config-header h3 { font-size:15px; font-weight:600; color:var(--gray-800); margin:0; }
+        .ai-config-divider { height:1px; background:var(--gray-200, #e5e7eb); margin:0; }
+        .ai-config-grid { display:grid; grid-template-columns:1fr 1fr; }
+        .ai-config-grid > .ai-config-section:first-child { border-right:1px solid var(--gray-200, #e5e7eb); }
+
+        /* Input rows */
+        .ai-input-row { display:flex; gap:10px; align-items:flex-end; }
+        .ai-input-group { position:relative; }
+        .ai-input-group .form-label { font-size:13px; font-weight:600; color:var(--gray-600); margin-bottom:6px; display:block; }
+        .ai-input-euro { position:relative; }
+        .ai-input-euro .form-input { padding-left:26px; }
+        .ai-input-euro::after { content:'€'; position:absolute; bottom:11px; left:12px; color:var(--gray-400); font-size:14px; font-weight:500; pointer-events:none; }
+        .ai-hint { font-size:12px; color:var(--gray-400); margin-top:8px; }
+
+        /* Key status */
+        .ai-key-status { display:flex; align-items:center; gap:6px; font-size:13px; margin-top:10px; padding:8px 12px; border-radius:8px; }
+        .ai-key-status--ok { background:rgba(40,167,69,.08); color:#28a745; }
+        .ai-key-status--ok span { flex:1; word-break:break-all; font-family:monospace; font-size:12px; }
+        .ai-key-status--warn { background:rgba(255,152,0,.08); color:#ff9800; }
+        .ai-reveal-btn { background:none; border:1px solid currentColor; color:inherit; padding:2px 10px; border-radius:5px; font-size:11px; cursor:pointer; font-weight:600; white-space:nowrap; transition:all .2s; opacity:.7; }
+        .ai-reveal-btn:hover { opacity:1; background:rgba(40,167,69,.1); }
+
+        /* Icon button */
+        .ai-btn-icon { padding:10px 12px; background:var(--gray-100); border:1px solid var(--gray-300); border-radius:8px; cursor:pointer; display:flex; align-items:center; }
+        .ai-btn-icon:hover { background:var(--gray-200); }
+        .ai-btn-icon svg { color:var(--gray-600); }
+
+        /* Add credits row */
+        .ai-add-credits-row { align-items:flex-end; }
+        .ai-add-btn { display:flex; align-items:center; gap:6px; white-space:nowrap; height:41px; }
+
+        /* Tabs */
+        .ai-tab { background:var(--gray-100); color:var(--gray-600); border:none; padding:9px 18px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:500; transition:all .2s; }
+        .ai-tab:hover { background:var(--gray-200); color:var(--gray-800); }
+        .ai-tab.active { background:var(--primary); color:#fff; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+
+        /* Table */
+        .ai-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .ai-table th { text-align:left; padding:12px 14px; border-bottom:2px solid var(--gray-200); font-weight:600; color:var(--gray-500); font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
+        .ai-table td { padding:11px 14px; border-bottom:1px solid var(--gray-100); color:var(--gray-700); }
+        .ai-table tbody tr { transition:background .15s; }
+        .ai-table tbody tr:hover { background:var(--gray-50); }
+
+        /* Badges */
+        .badge-success { background:#d4edda; color:#155724; font-weight:500; }
+        .badge-secondary { background:var(--gray-100); color:var(--gray-600); font-weight:500; }
+        .btn-sm { padding:5px 12px; font-size:12px; border-radius:6px; }
+        .btn-danger { background:var(--danger, #dc3545); color:#fff; border:none; border-radius:6px; cursor:pointer; transition:opacity .2s; }
+        .btn-danger:hover { opacity:.85; }
+
+        /* Responsive */
+        @media (max-width:768px) {
+          .ai-config-grid { grid-template-columns:1fr; }
+          .ai-config-grid > .ai-config-section:first-child { border-right:none; border-bottom:1px solid var(--gray-200); }
+          .ai-add-credits-row { flex-wrap:wrap; }
+          .ai-add-credits-row > div:first-child { flex:1 1 100% !important; }
+        }
+      </style>
+    `;
+  } catch (error) {
+    hideLoading();
+    return `<div class="card" style="padding:20px"><p style="color:var(--danger)">Erreur : ${error.message}</p></div>`;
+  }
+}
+
+function renderAiPagination(current, total) {
+  let html = '';
+  for (let i = 1; i <= total; i++) {
+    html += `<button class="btn ${i === current ? 'btn-primary' : ''}" style="margin:0 2px;min-width:36px" onclick="loadAiUsagePage(${i})">${i}</button>`;
+  }
+  return html;
+}
+
+function attachAiCreditsEvents() {
+  document.querySelectorAll('.ai-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.ai-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.ai-tab-content').forEach(c => c.style.display = 'none');
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).style.display = 'block';
+    });
+  });
+}
+
+function toggleApiKeyVisibility() {
+  const input = document.getElementById('aiApiKeyInput');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+let _aiKeyRevealed = false;
+async function revealAiApiKey() {
+  const display = document.getElementById('aiKeyDisplay');
+  const btn = document.getElementById('aiRevealBtn');
+  if (_aiKeyRevealed) {
+    // Re-mask
+    try {
+      const data = await apiFetch('/ai-credits/api-key');
+      display.textContent = data.masked;
+      btn.textContent = 'Révéler';
+      _aiKeyRevealed = false;
+    } catch (e) { showToast('Erreur : ' + e.message, 'error'); }
+    return;
+  }
+  try {
+    btn.textContent = '...';
+    const data = await apiFetch('/ai-credits/api-key?reveal=1');
+    if (data.plain) {
+      display.textContent = data.plain;
+      btn.textContent = 'Masquer';
+      _aiKeyRevealed = true;
+    }
+  } catch (e) { showToast('Erreur : ' + e.message, 'error'); btn.textContent = 'Révéler'; }
+}
+
+async function saveAiApiKey() {
+  const apiKey = document.getElementById('aiApiKeyInput').value.trim();
+  if (!apiKey) return showToast('Saisissez une clé API', 'error');
+  try {
+    await apiFetch('/ai-credits/api-key', { method: 'PUT', body: JSON.stringify({ api_key: apiKey }) });
+    showToast('Clé API sauvegardée', 'success');
+    document.getElementById('content').innerHTML = await renderAiCredits();
+    attachAiCreditsEvents();
+  } catch (e) { showToast('Erreur : ' + e.message, 'error'); }
+}
+
+async function saveAiCreditLimit() {
+  const limit = parseFloat(document.getElementById('aiCreditLimitInput').value) || 0;
+  try {
+    await apiFetch('/ai-credits/limit', { method: 'PUT', body: JSON.stringify({ limit }) });
+    showToast('Limite mise à jour', 'success');
+  } catch (e) { showToast('Erreur : ' + e.message, 'error'); }
+}
+
+async function saveAiMonthlyCredits() {
+  const amount = parseFloat(document.getElementById('aiMonthlyCreditsInput').value) || 0;
+  try {
+    await apiFetch('/ai-credits/monthly-credits', { method: 'PUT', body: JSON.stringify({ amount }) });
+    showToast('Crédits mensuels mis à jour', 'success');
+  } catch (e) { showToast('Erreur : ' + e.message, 'error'); }
+}
+
+async function addAiCredits() {
+  const credits = parseFloat(document.getElementById('aiAddCreditsAmount').value);
+  const note = document.getElementById('aiAddCreditsNote').value.trim();
+  if (!credits || credits <= 0) return showToast('Montant invalide', 'error');
+  try {
+    await apiFetch('/ai-credits', { method: 'POST', body: JSON.stringify({ credits, note }) });
+    showToast('Crédits ajoutés', 'success');
+    document.getElementById('content').innerHTML = await renderAiCredits();
+    attachAiCreditsEvents();
+  } catch (e) { showToast('Erreur : ' + e.message, 'error'); }
+}
+
+async function deleteAiCredit(id) {
+  if (!confirm('Supprimer ce crédit ?')) return;
+  try {
+    await apiFetch(`/ai-credits/${id}`, { method: 'DELETE' });
+    showToast('Crédit supprimé', 'success');
+    document.getElementById('content').innerHTML = await renderAiCredits();
+    attachAiCreditsEvents();
+  } catch (e) { showToast('Erreur : ' + e.message, 'error'); }
+}
+
+async function loadAiUsagePage(page) {
+  // Reload just the history tab with pagination
+  try {
+    const usageLog = await apiFetch(`/ai-credits/usage?page=${page}`);
+    const rows = (usageLog.data || []).map(u => `
+      <tr>
+        <td>${new Date(u.created_at).toLocaleString('fr-FR')}</td>
+        <td>${u.user_name}</td>
+        <td><span class="badge badge-${u.model === 'sonnet' ? 'primary' : 'secondary'}">${u.model}</span></td>
+        <td style="text-align:right">${Number(u.input_tokens).toLocaleString()}</td>
+        <td style="text-align:right">${Number(u.output_tokens).toLocaleString()}</td>
+        <td style="text-align:right;font-weight:600">${Number(u.credits_used).toFixed(6)} €</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.prompt_summary || '—'}</td>
+      </tr>
+    `).join('');
+
+    const tabHistory = document.getElementById('tab-history');
+    tabHistory.querySelector('.card').innerHTML = `
+      <table class="ai-table">
+        <thead><tr><th>Date</th><th>Utilisateur</th><th>Modèle</th><th style="text-align:right">Input</th><th style="text-align:right">Output</th><th style="text-align:right">Coût</th><th>Prompt</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${usageLog.pages > 1 ? `<div style="margin-top:12px;text-align:center">${renderAiPagination(usageLog.page, usageLog.pages)}</div>` : ''}
+    `;
+  } catch (e) { showToast('Erreur : ' + e.message, 'error'); }
 }

@@ -61,6 +61,8 @@ require_once __DIR__ . '/controllers/RenderBlockController.php';
 require_once __DIR__ . '/controllers/PluginController.php';
 require_once __DIR__ . '/controllers/GoogleReviewsController.php';
 require_once __DIR__ . '/controllers/AiController.php';
+require_once __DIR__ . '/controllers/AiCreditController.php';
+require_once __DIR__ . '/helpers/encryption.php';
 require_once __DIR__ . '/controllers/SearchController.php';
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
@@ -708,6 +710,63 @@ try {
         $user = authenticate_token();
         require_admin($user);
         FormController::delete((int) $params['id']);
+    }
+
+    // ── AI Credits ──
+    elseif ($method === 'GET' && $path === '/ai-credits') {
+        $user = authenticate_token();
+        require_admin($user);
+        AiCreditController::getOverview();
+    }
+    elseif ($method === 'GET' && $path === '/ai-credits/usage') {
+        $user = authenticate_token();
+        require_admin($user);
+        AiCreditController::getUsageLog();
+    }
+    elseif ($method === 'GET' && $path === '/ai-credits/per-user') {
+        $user = authenticate_token();
+        require_admin($user);
+        AiCreditController::getPerUserUsage();
+    }
+    elseif ($method === 'GET' && $path === '/ai-credits/entries') {
+        $user = authenticate_token();
+        require_admin($user);
+        AiCreditController::getCreditEntries();
+    }
+    elseif ($method === 'POST' && $path === '/ai-credits') {
+        $user = authenticate_token();
+        require_admin($user);
+        AiCreditController::addCredits($user);
+    }
+    elseif ($method === 'DELETE' && match_route('/ai-credits/:id', $path, $params)) {
+        $user = authenticate_token();
+        require_admin($user);
+        AiCreditController::deleteCredit((int) $params['id']);
+    }
+    elseif ($method === 'GET' && $path === '/ai-credits/api-key') {
+        $user = authenticate_token();
+        require_admin($user);
+        AiCreditController::getApiKey();
+    }
+    elseif ($method === 'PUT' && $path === '/ai-credits/api-key') {
+        $user = authenticate_token();
+        require_admin($user);
+        AiCreditController::saveApiKey();
+    }
+    elseif ($method === 'PUT' && $path === '/ai-credits/limit') {
+        $user = authenticate_token();
+        require_admin($user);
+        AiCreditController::updateLimit();
+    }
+    elseif ($method === 'PUT' && $path === '/ai-credits/monthly-credits') {
+        $user = authenticate_token();
+        require_admin($user);
+        AiCreditController::updateMonthlyCredits();
+    }
+    elseif ($method === 'POST' && $path === '/ai-credits/reset') {
+        $user = authenticate_token();
+        require_admin($user);
+        AiCreditController::resetMonthlyCredits();
     }
 
     // ── Search ──
