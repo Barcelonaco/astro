@@ -10,12 +10,12 @@ class UserController {
         $name = $body['name'] ?? '';
         $email = $body['email'] ?? '';
         $password = $body['password'] ?? '';
-        $role = $body['role'] ?? 'editor';
+        $role = $body['role'] ?? 'reader';
 
         if (empty($name) || empty($email) || empty($password)) {
             error_response('Nom, email et mot de passe sont requis', 400);
         }
-        if (!in_array($role, ['admin', 'editor'])) {
+        if (!in_array($role, ['super_admin', 'admin_site', 'editor', 'reader'])) {
             error_response('Rôle invalide', 400);
         }
 
@@ -39,7 +39,7 @@ class UserController {
         if (empty($name) || empty($email) || empty($role)) {
             error_response('Nom, email et rôle sont requis', 400);
         }
-        if (!in_array($role, ['admin', 'editor'])) {
+        if (!in_array($role, ['super_admin', 'admin_site', 'editor', 'reader'])) {
             error_response('Rôle invalide', 400);
         }
 

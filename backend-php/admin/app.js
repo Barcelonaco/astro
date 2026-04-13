@@ -1,6 +1,8 @@
 const API_BASE = window.location.origin + '/api';
 let token = localStorage.getItem('token');
 let currentUser = null;
+const ROLE_LEVELS = { reader: 0, editor: 1, admin_site: 2, super_admin: 3, admin: 3 };
+function hasMinRole(minRole) { return (ROLE_LEVELS[currentUser?.role] ?? 0) >= (ROLE_LEVELS[minRole] ?? 99); }
 
 const MENU_LOCATIONS = [
   { value: '', label: '— Aucun —' },
@@ -9,10 +11,30 @@ const MENU_LOCATIONS = [
   { value: 'footer', label: 'Menu footer' },
 ];
 
+// --- Inactivity auto-logout (30 min) ---
+const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 min
+let _inactivityTimer = null;
+
+function resetInactivityTimer() {
+  clearTimeout(_inactivityTimer);
+  _inactivityTimer = setTimeout(() => {
+    localStorage.removeItem('token');
+    window.location.href = '/admin/login.html?reason=inactivity';
+  }, INACTIVITY_TIMEOUT);
+}
+
+function startInactivityTracker() {
+  ['mousemove', 'keydown', 'pointerdown', 'scroll', 'touchstart'].forEach(evt =>
+    document.addEventListener(evt, resetInactivityTimer, { passive: true })
+  );
+  resetInactivityTimer();
+}
+
 // Check auth on load
 if (!token) {
   window.location.href = '/admin/login.html';
 } else {
+  startInactivityTracker();
   init();
 }
 
@@ -75,11 +97,13 @@ async function init() {
   try {
     document.getElementById('userInfo').textContent = currentUser.name;
 
-    // Afficher les menus admin-only pour les admins uniquement
-    if (currentUser.role === 'admin') {
-      const navUsers = document.getElementById('navUsers');
-      if (navUsers) navUsers.style.display = '';
-      document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+    // Show nav items based on role hierarchy
+    const userLevel = ROLE_LEVELS[currentUser.role] ?? 0;
+    const roleMinMap = { 'role-editor': 1, 'role-admin_site': 2, 'role-super_admin': 3 };
+    for (const [cls, minLevel] of Object.entries(roleMinMap)) {
+      if (userLevel >= minLevel) {
+        document.querySelectorAll('.' + cls).forEach(el => el.style.display = '');
+      }
     }
 
     // Appliquer le thème choisi au back-office
@@ -90,6 +114,9 @@ async function init() {
 
     // Charger les plugins et injecter modules + CPT
     await loadPlugins();
+
+    // Admin top bar
+    initAdminTopBar();
 
     // Setup navigation
     setupNavigation();
@@ -141,11 +168,56 @@ function setupSidebarToggle() {
   });
 }
 
+function initAdminTopBar() {
+  const bar = document.getElementById('adminTopBar');
+  if (!bar) return;
+
+  // Frontend URL
+  const frontendUrl = siteSettingsCache?.frontend_url || 'http://localhost:4321';
+  const viewSiteLink = document.getElementById('topBarViewSite');
+  if (viewSiteLink) viewSiteLink.href = frontendUrl;
+
+  // User name
+  const userEl = document.getElementById('topBarUser');
+  if (userEl && currentUser) {
+    userEl.textContent = `Bonjour, ${currentUser.name || currentUser.email}`;
+  }
+
+  // "Créer" dropdown items
+  const menu = document.getElementById('topBarCreateMenu');
+  if (menu) {
+    const items = [
+      { label: 'Page', action: "openPageBuilder(null)" },
+      { label: 'Bloc réutilisable', action: "openReusableBlocBuilder(null)" },
+    ];
+    // Add CPTs from loaded plugins
+    const activePlugins = loadedPlugins.filter(p => p._active !== false);
+    for (const plugin of activePlugins) {
+      if (plugin.postTypes) {
+        for (const pt of plugin.postTypes) {
+          items.push({ label: pt.label || pt.slug, action: `loadSection('cpt-add:${pt.slug}')` });
+        }
+      }
+    }
+    menu.innerHTML = items.map(i => `<a href="#" onclick="${i.action}; return false;">${i.label}</a>`).join('');
+  }
+
+  bar.style.display = '';
+  document.body.classList.add('has-admin-top-bar');
+}
+
 function setupNavigation() {
   document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', (e) => {
+    item.addEventListener('click', async (e) => {
       e.preventDefault();
       const section = item.dataset.section;
+
+      // Guard unsaved changes in builder
+      if (_builderDirty) {
+        const ok = await confirmModal('Vous avez des modifications non enregistrées. Quitter sans sauvegarder ?', 'Modifications non enregistrées');
+        if (!ok) return;
+        clearBuilderDirty();
+      }
 
       // Mémoriser la dernière vue (section simple)
       localStorage.setItem('adminLastView', section);
@@ -170,9 +242,26 @@ async function loadSection(section) {
     navSection = 'cpt:' + section.split(':')[1];
   } else if (section.startsWith('builder:')) {
     navSection = 'pages';
+  } else if (/^form-(edit|entries|entry-detail):/.test(section)) {
+    navSection = 'forms';
   }
   const activeNav = document.querySelector(`.nav-item[data-section="${navSection}"]`);
   if (activeNav) activeNav.classList.add('active');
+
+  // Section-level role guards
+  const sectionMinRoles = {
+    pages: 'editor', 'reusable-blocs': 'editor', media: 'editor',
+    menus: 'admin_site', forms: 'admin_site', 'site-settings': 'admin_site', theme: 'admin_site',
+    users: 'super_admin', plugins: 'super_admin', 'ai-credits': 'super_admin',
+  };
+  const aliasMap = { builder: 'pages', 'rb-builder': 'reusable-blocs', 'form-edit': 'forms', 'form-entries': 'forms', 'form-entry-detail': 'forms' };
+  let sectionBase = section.split(':')[0];
+  if (aliasMap[sectionBase]) sectionBase = aliasMap[sectionBase];
+  else if (sectionBase.startsWith('cpt-')) sectionBase = 'pages'; // CPT = editor level
+  else if (sectionBase.startsWith('plugin-options')) sectionBase = 'site-settings'; // plugin options = admin_site level
+  if (sectionMinRoles[sectionBase] && !hasMinRole(sectionMinRoles[sectionBase])) {
+    navigateTo('dashboard'); return;
+  }
 
   switch(section) {
     case 'dashboard':
@@ -209,12 +298,17 @@ async function loadSection(section) {
       content.innerHTML = await renderFormsList();
       break;
     case 'ai-credits':
-      if (currentUser.role !== 'admin') { navigateTo('posts'); return; }
       content.innerHTML = await renderAiCredits();
       attachAiCreditsEvents();
       break;
     default:
-      if (section.startsWith('cpt-add:')) {
+      if (section.startsWith('builder:')) {
+        const pageId = section.split(':')[1];
+        await openPageBuilder(pageId === 'new' ? null : Number(pageId));
+      } else if (section.startsWith('rb-builder:')) {
+        const blocId = section.split(':')[1];
+        await openReusableBlocBuilder(blocId === 'new' ? null : Number(blocId));
+      } else if (section.startsWith('cpt-add:')) {
         const slug = section.split(':')[1];
         const ptDef = findPostTypeDef(slug);
         if (ptDef) {
@@ -543,9 +637,9 @@ async function loadPlugins() {
       if (nav && !nav.querySelector(`[data-section="plugin-options:${plugin.name}"]`)) {
         const a = document.createElement('a');
         a.href = '#';
-        a.className = 'nav-item admin-only';
+        a.className = 'nav-item role-admin_site';
         a.dataset.section = `plugin-options:${plugin.name}`;
-        if (currentUser.role !== 'admin') a.style.display = 'none';
+        if (!hasMinRole('admin_site')) a.style.display = 'none';
         const pluginIconMap = {
           'google-reviews': 'fa-brands fa-google',
         };
@@ -1346,13 +1440,14 @@ function createCPTQuill(container) {
     theme: 'snow',
     modules: {
       toolbar: [
-        [{ header: [1, 2, 3, false] }],
+        [{ header: [1, 2, 3, 4, 5, 6, false] }],
         ['bold', 'italic', 'underline'],
         [{ list: 'ordered' }, { list: 'bullet' }],
         [{ align: [] }],
         ['link'],
         ['clean']
-      ]
+      ],
+      clipboard: { matchers: _quillCleanPasteMatchers() }
     }
   });
   // Set initial content
@@ -2131,13 +2226,14 @@ function createCPTOptionsQuill(container, hiddenInput) {
     theme: 'snow',
     modules: {
       toolbar: [
-        [{ header: [1, 2, 3, false] }],
+        [{ header: [1, 2, 3, 4, 5, 6, false] }],
         ['bold', 'italic', 'underline'],
         [{ list: 'ordered' }, { list: 'bullet' }],
         [{ align: [] }],
         ['link'],
         ['clean']
-      ]
+      ],
+      clipboard: { matchers: _quillCleanPasteMatchers() }
     }
   });
   if (hiddenInput.value) _cptOptionsQuill.root.innerHTML = hiddenInput.value;
@@ -2199,6 +2295,39 @@ async function saveCPTOptions(event, postTypeSlug) {
 let pageBuilderState = { editingPageId: null, blocks: [], meta: { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null }, colorOverrides: { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' }, seoMeta: { enabled: true, meta_title: '', meta_description: '', schema_org: '' }, cptMode: null, cptExcerpt: '', cptFeaturedImage: null, cptCategories: [], cptItemCategories: [], cptCustomFields: {} };
 let selectedBlockId = null;
 let reusableBlocBuilderMode = false;
+
+// --- Unsaved changes guard ---
+let _builderDirty = false;
+
+function markBuilderDirty() {
+  if (!_builderDirty) {
+    _builderDirty = true;
+    window.addEventListener('beforeunload', _beforeUnloadGuard);
+  }
+}
+
+function clearBuilderDirty() {
+  _builderDirty = false;
+  window.removeEventListener('beforeunload', _beforeUnloadGuard);
+}
+
+function _beforeUnloadGuard(e) {
+  if (_builderDirty) { e.preventDefault(); }
+}
+
+function isInBuilder() {
+  const lastView = localStorage.getItem('adminLastView') || '';
+  return lastView.startsWith('builder:') || lastView.startsWith('rb-builder:') || lastView.startsWith('cpt-edit:') || lastView.startsWith('cpt-add:');
+}
+
+async function guardedLoadSection(section) {
+  if (_builderDirty) {
+    const ok = await confirmModal('Vous avez des modifications non enregistrées. Quitter sans sauvegarder ?', 'Modifications non enregistrées');
+    if (!ok) return;
+    clearBuilderDirty();
+  }
+  loadSection(section);
+}
 let _inlineEditingBlockId = null;
 let _inlineEditingFieldName = null;
 let _inlineEditingDataRef = null;  // direct ref to the data object (block.data or sub-module data)
@@ -2312,6 +2441,7 @@ function blockId() {
 // Reuses the page builder for CPTs that have content support and no custom fields
 
 async function openCPTBuilder(ptDef, itemId) {
+  clearBuilderDirty();
   pageBuilderState.editingPageId = itemId;
   pageBuilderState.blocks = [];
   pageBuilderState.meta = { title: '', slug: '', status: 'draft', show_in_menu: false, menu_order: 0, parent_id: null };
@@ -2480,6 +2610,7 @@ async function saveCPTBuilder() {
         localStorage.setItem('adminLastView', `cpt-edit:${ptDef.slug}:${res.id}`);
       }
     }
+    clearBuilderDirty();
   } catch (error) {
     showToast(error.message || 'Erreur lors de la sauvegarde', 'error');
   }
@@ -2497,6 +2628,7 @@ function parsePageContent(content) {
 }
 
 async function openPageBuilder(pageId) {
+  clearBuilderDirty();
   pageBuilderState.editingPageId = pageId;
   pageBuilderState.blocks = [];
   pageBuilderState.meta = { title: '', slug: '', status: 'draft', show_in_menu: true, menu_order: 0, parent_id: null };
@@ -2723,7 +2855,7 @@ async function renderPageBuilder() {
   return `
     <div class="page-builder">
       <header class="builder-header">
-        <button type="button" class="btn btn-danger" onclick="loadSection('${backSection}')">← Retour</button>
+        <button type="button" class="btn btn-danger" onclick="guardedLoadSection('${backSection}')">← Retour</button>
         <div class="builder-meta">
           <div class="builder-field-group">
             <label class="builder-field-label">Titre</label>
@@ -3001,7 +3133,7 @@ async function renderPageBuilder() {
           <div class="builder-canvas-inner" id="builderCanvasInner" style="${buildColorOverrideStyle()}">
             <div class="builder-canvas-placeholder" id="builderPlaceholder">Glissez des modules ici ou cliquez sur un module à gauche pour l'ajouter.</div>
             <div class="builder-blocks" id="builderBlocks">
-              ${pageBuilderState.blocks.map(block => renderBlockCard(block)).join('')}
+              ${renderBlocksWithInsertButtons(pageBuilderState.blocks)}
             </div>
           </div>
         </main>`}
@@ -3879,8 +4011,17 @@ function renderBlockPreviewHtml(block) {
     queueModuleTemplateLoad(layout);
     return `<div class="preview-loading">Chargement du rendu…</div>`;
   }
-  const ctx = buildTemplateContext(block);
-  let html = renderBladeTemplate(cached.template, ctx);
+  if (cached._error) {
+    return `<div class="preview-loading" style="color:#c00;">Erreur : impossible de charger le template « ${escapeHtml(layout)} »</div>`;
+  }
+  let ctx, html;
+  try {
+    ctx = buildTemplateContext(block);
+    html = renderBladeTemplate(cached.template, ctx);
+  } catch (e) {
+    console.error(`[PreviewRender] Error rendering block type="${block.type}" layout="${layout}":`, e);
+    return `<div class="preview-loading" style="color:#c00;">Erreur de rendu (${escapeHtml(layout)}). Voir la console.</div>`;
+  }
   // S'assurer que les classes calculées (bloc_color, padding_top, etc.)
   // sont bien appliquées au wrapper .module, même si l'expression Blade
   // originale n'est pas parfaitement interprétée par notre moteur.
@@ -3945,7 +4086,13 @@ function queueModuleTemplateLoad(layout) {
       if (res?.adminCssUrl) ensureModuleAdminStyles(layout, res.adminCssUrl);
       updateAllPreviewsForLayout(layout);
     })
-    .catch(() => {})
+    .catch((err) => {
+      console.error(`[ModuleTemplate] Failed to load layout "${layout}":`, err);
+      // Store a minimal entry so the preview can show an error instead of
+      // spinning on "Chargement du rendu…" forever.
+      moduleTemplateCache[layout] = { template: '', cssUrl: null, adminCssUrl: null, _error: true };
+      updateAllPreviewsForLayout(layout);
+    })
     .finally(() => {
       delete moduleTemplatePromises[layout];
     });
@@ -4946,6 +5093,7 @@ function handleBuilderDrop(e) {
       const block = { id: blockId(), type: payload.blockType, data: { ...def.defaultData } };
       const insertAt = getDropInsertIndex(e.clientY);
       pageBuilderState.blocks.splice(insertAt, 0, block);
+      markBuilderDirty();
       rebuildBuilderBlocksDOM();
       reattachBlockCardListeners();
       selectBlock(block.id);
@@ -4957,6 +5105,7 @@ function handleBuilderDrop(e) {
       const [block] = pageBuilderState.blocks.splice(idx, 1);
       const insertAt = getDropInsertIndex(e.clientY);
       pageBuilderState.blocks.splice(insertAt, 0, block);
+      markBuilderDirty();
       rebuildBuilderBlocksDOM();
       reattachBlockCardListeners();
     }
@@ -5255,9 +5404,15 @@ function applyPreviewScaling() {
 
 function syncBuilderMetaFromDOM() {
   const get = (sel, attr) => { const e = document.querySelector(sel); return e ? (attr ? e[attr] : e.value) : null; };
+  const oldTitle = pageBuilderState.meta.title;
+  const oldSlug = pageBuilderState.meta.slug;
+  const oldStatus = pageBuilderState.meta.status;
   pageBuilderState.meta.title = get('.builder-title') || get('input[data-field="title"]') || '';
   pageBuilderState.meta.slug = get('.builder-slug') || get('input[data-field="slug"]') || '';
   pageBuilderState.meta.status = get('.builder-status') || get('select[data-field="status"]') || 'draft';
+  if (pageBuilderState.meta.title !== oldTitle || pageBuilderState.meta.slug !== oldSlug || pageBuilderState.meta.status !== oldStatus) {
+    markBuilderDirty();
+  }
 
   // show_in_menu derived from menu toggles
   const anyMenuChecked = document.querySelectorAll('.menu-toggle-cb:checked').length > 0;
@@ -6359,10 +6514,18 @@ function initBuilderParallax() {
   updateBuilderParallax();
 }
 
+function renderInsertButton(index) {
+  return `<div class="builder-insert-between" data-insert-index="${index}"><button type="button" class="builder-insert-btn" title="Insérer un bloc ici"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button></div>`;
+}
+
+function renderBlocksWithInsertButtons(blocks) {
+  return blocks.map((block, i) => renderBlockCard(block) + renderInsertButton(i)).join('');
+}
+
 function rebuildBuilderBlocksDOM() {
   const blocksEl = document.getElementById('builderBlocks');
   if (!blocksEl) return;
-  blocksEl.innerHTML = pageBuilderState.blocks.map(block => renderBlockCard(block)).join('');
+  blocksEl.innerHTML = renderBlocksWithInsertButtons(pageBuilderState.blocks);
   pageBuilderState.blocks.forEach(block => {
     const card = blocksEl.querySelector(`[data-block-id="${block.id}"]`);
     if (!card) return;
@@ -6428,6 +6591,7 @@ function reattachBlockCardListeners() {
           const newBlock = { id: blockId(), type: payload.blockType, data: { ...def.defaultData } };
           const targetIdx = pageBuilderState.blocks.findIndex(b => b.id === targetId);
           pageBuilderState.blocks.splice(position === 'before' ? targetIdx : targetIdx + 1, 0, newBlock);
+          markBuilderDirty();
           rebuildBuilderBlocksDOM();
           selectBlock(newBlock.id);
         } else if (payload.type === 'move' && payload.blockId && payload.blockId !== targetId) {
@@ -6437,6 +6601,7 @@ function reattachBlockCardListeners() {
           const [moved] = pageBuilderState.blocks.splice(fromIdx, 1);
           const newToIdx = pageBuilderState.blocks.findIndex(b => b.id === targetId);
           pageBuilderState.blocks.splice(position === 'before' ? newToIdx : newToIdx + 1, 0, moved);
+          markBuilderDirty();
           rebuildBuilderBlocksDOM();
         }
       } catch (err) {}
@@ -6517,6 +6682,59 @@ function reattachBlockCardListeners() {
       selectBlock(blockId);
     });
   });
+  // Attach insert-between button listeners
+  document.querySelectorAll('.builder-insert-between').forEach(wrapper => {
+    const btn = wrapper.querySelector('.builder-insert-btn');
+    if (btn) {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const insertIndex = parseInt(wrapper.dataset.insertIndex, 10);
+        window._pendingInsertIndex = insertIndex;
+        deselectBlock();
+      });
+    }
+    wrapper.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'copy';
+      wrapper.style.opacity = '1';
+      wrapper.style.height = '24px';
+    });
+    wrapper.addEventListener('dragleave', () => {
+      wrapper.style.opacity = '';
+      wrapper.style.height = '';
+    });
+    wrapper.addEventListener('drop', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      wrapper.style.opacity = '';
+      wrapper.style.height = '';
+      clearDropIndicators();
+      document.getElementById('builderCanvas')?.classList.remove('builder-drag-over');
+      const raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
+      try {
+        const payload = raw ? JSON.parse(raw) : null;
+        if (!payload) return;
+        const insertIndex = parseInt(wrapper.dataset.insertIndex, 10);
+        if (payload.type === 'new' && payload.blockType && BLOCK_TYPES[payload.blockType]) {
+          const def = BLOCK_TYPES[payload.blockType];
+          const newBlock = { id: blockId(), type: payload.blockType, data: { ...def.defaultData } };
+          pageBuilderState.blocks.splice(insertIndex + 1, 0, newBlock);
+          markBuilderDirty();
+          rebuildBuilderBlocksDOM();
+          selectBlock(newBlock.id);
+        } else if (payload.type === 'move' && payload.blockId) {
+          const fromIdx = pageBuilderState.blocks.findIndex(b => b.id === payload.blockId);
+          if (fromIdx < 0) return;
+          const [moved] = pageBuilderState.blocks.splice(fromIdx, 1);
+          const adjustedIdx = insertIndex >= fromIdx ? insertIndex : insertIndex + 1;
+          pageBuilderState.blocks.splice(adjustedIdx, 0, moved);
+          markBuilderDirty();
+          rebuildBuilderBlocksDOM();
+        }
+      } catch (err) {}
+    });
+  });
   updateSelectedBlockCard();
 }
 
@@ -6535,11 +6753,27 @@ function filterBuilderModules(query) {
   });
 }
 
-function addBlockByClick(blockType) {
+function addBlockByClick(blockType, insertAfterIndex) {
   if (!BLOCK_TYPES[blockType]) return;
   const def = BLOCK_TYPES[blockType];
   const block = { id: blockId(), type: blockType, data: { ...def.defaultData } };
-  pageBuilderState.blocks.push(block);
+  const pendingIdx = window._pendingInsertIndex;
+  if (typeof insertAfterIndex === 'number' && insertAfterIndex >= 0) {
+    pageBuilderState.blocks.splice(insertAfterIndex + 1, 0, block);
+  } else if (typeof pendingIdx === 'number' && pendingIdx >= 0) {
+    pageBuilderState.blocks.splice(pendingIdx + 1, 0, block);
+  } else if (selectedBlockId) {
+    const idx = pageBuilderState.blocks.findIndex(b => b.id === selectedBlockId);
+    if (idx >= 0) {
+      pageBuilderState.blocks.splice(idx + 1, 0, block);
+    } else {
+      pageBuilderState.blocks.push(block);
+    }
+  } else {
+    pageBuilderState.blocks.push(block);
+  }
+  window._pendingInsertIndex = undefined;
+  markBuilderDirty();
   rebuildBuilderBlocksDOM();
   reattachBlockCardListeners();
   editBlock(block.id);
@@ -6576,6 +6810,7 @@ function duplicateBlock(id) {
   const original = pageBuilderState.blocks[idx];
   const copy = { type: original.type, id: blockId(), data: JSON.parse(JSON.stringify(original.data || {})) };
   pageBuilderState.blocks.splice(idx + 1, 0, copy);
+  markBuilderDirty();
   rebuildBuilderBlocksDOM();
   selectBlock(copy.id);
   const newCard = document.querySelector(`.builder-block-card[data-block-id="${copy.id}"]`);
@@ -6584,6 +6819,7 @@ function duplicateBlock(id) {
 
 function removeBlock(id) {
   pageBuilderState.blocks = pageBuilderState.blocks.filter(b => b.id !== id);
+  markBuilderDirty();
   rebuildBuilderBlocksDOM();
   if (selectedBlockId === id) {
     deselectBlock();
@@ -6594,6 +6830,7 @@ async function removeAllBlocks() {
   if (!pageBuilderState.blocks.length) return;
   if (!await confirmModal('Supprimer tous les blocs ?')) return;
   pageBuilderState.blocks = [];
+  markBuilderDirty();
   rebuildBuilderBlocksDOM();
   deselectBlock();
 }
@@ -7986,6 +8223,36 @@ function renderBlockSettings() {
 
 const _quillInstances = new Map();
 
+function _quillCleanPasteMatchers() {
+  if (typeof Quill === 'undefined') return [];
+  const Delta = Quill.import('delta');
+  return [
+    // Strip all inline styles/classes — keep only text + block structure
+    [Node.ELEMENT_NODE, function(node, delta) {
+      const tag = node.tagName;
+      // Keep heading levels
+      if (/^H[1-6]$/.test(tag)) {
+        const level = parseInt(tag[1]);
+        return new Delta().insert(node.textContent, { header: level }).insert('\n');
+      }
+      // Strip all inline formatting attributes (color, font, size, background, etc.)
+      const ops = delta.ops.map(op => {
+        if (op.attributes) {
+          const clean = {};
+          // Only keep these Quill formats
+          if (op.attributes.link) clean.link = op.attributes.link;
+          if (op.attributes.header) clean.header = op.attributes.header;
+          if (op.attributes.list) clean.list = op.attributes.list;
+          if (op.attributes.blockquote) clean.blockquote = op.attributes.blockquote;
+          return { ...op, attributes: Object.keys(clean).length ? clean : undefined };
+        }
+        return op;
+      });
+      return new Delta(ops);
+    }]
+  ];
+}
+
 function initWysiwygEditors(container) {
   if (typeof Quill === 'undefined') return;
   container.querySelectorAll('.wysiwyg-editor').forEach(el => {
@@ -7995,14 +8262,17 @@ function initWysiwygEditors(container) {
       theme: 'snow',
       modules: {
         toolbar: [
-          [{ header: [1, 2, 3, false] }],
-          ['bold', 'italic', 'underline', 'strike'],
-          [{ list: 'ordered' }, { list: 'bullet' }],
+          [{ header: [1, 2, 3, 4, 5, 6, false] }],
+          ['bold', 'italic', 'strike'],
+          [{ list: 'bullet' }, { list: 'ordered' }],
           ['blockquote'],
           [{ align: [] }],
           ['link'],
+          [{ color: [] }],
+          [{ indent: '-1' }, { indent: '+1' }],
           ['clean']
-        ]
+        ],
+        clipboard: { matchers: _quillCleanPasteMatchers() }
       },
       placeholder: 'Saisissez votre texte...'
     });
@@ -8046,6 +8316,7 @@ function liveUpdateFromSettingsForm(form) {
   if (!selectedBlockId) return;
   const block = pageBuilderState.blocks.find(b => b.id === selectedBlockId);
   if (!block) return;
+  markBuilderDirty();
   if (LEGACY_BLOCK_TYPES[block.type]) return;
   const def = BLOCK_TYPES[block.type] || {};
   const moduleName = def.moduleName || block.type;
@@ -8196,7 +8467,10 @@ function updateBlockCardPreview(blockId) {
   }
 
   let rich;
-  try { rich = replaceEmptyImages(renderBlockPreviewHtml(block)); } catch (e) { console.warn('Preview render error:', e); }
+  try { rich = replaceEmptyImages(renderBlockPreviewHtml(block)); } catch (e) {
+    console.warn('Preview render error:', e);
+    rich = `<div class="preview-loading" style="color:#c00;">Erreur de rendu (${escapeHtml(block.type)}). Voir la console.</div>`;
+  }
   let richEl = card.querySelector('.builder-block-render');
   if (rich) {
     if (!richEl) {
@@ -8370,19 +8644,22 @@ function _createInlineToolbar() {
   bar.className = 'inline-toolbar';
   bar.innerHTML = `
     <select class="inline-toolbar-select" data-action="formatBlock" title="Style">
-      <option value="p">Normal</option>
+      <option value="p">Paragraphe</option>
       <option value="h1">Titre 1</option>
       <option value="h2">Titre 2</option>
       <option value="h3">Titre 3</option>
+      <option value="h4">Titre 4</option>
+      <option value="h5">Titre 5</option>
+      <option value="h6">Mention</option>
     </select>
     <span class="inline-toolbar-sep"></span>
     <button type="button" data-cmd="bold" title="Gras (Ctrl+B)"><b>B</b></button>
     <button type="button" data-cmd="italic" title="Italique (Ctrl+I)"><i>I</i></button>
-    <button type="button" data-cmd="underline" title="Souligné (Ctrl+U)"><u>U</u></button>
     <button type="button" data-cmd="strikeThrough" title="Barré"><s>S</s></button>
     <span class="inline-toolbar-sep"></span>
-    <button type="button" data-cmd="insertOrderedList" title="Liste numérotée"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><text x="1" y="7" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">1</text><text x="1" y="13" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">2</text><text x="1" y="19" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">3</text></svg></button>
     <button type="button" data-cmd="insertUnorderedList" title="Liste à puces"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="9" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="9" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="2" fill="currentColor"/><circle cx="4" cy="12" r="2" fill="currentColor"/><circle cx="4" cy="18" r="2" fill="currentColor"/></svg></button>
+    <button type="button" data-cmd="insertOrderedList" title="Liste numérotée"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><text x="1" y="7" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">1</text><text x="1" y="13" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">2</text><text x="1" y="19" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">3</text></svg></button>
+    <span class="inline-toolbar-sep"></span>
     <button type="button" data-cmd="formatBlock" data-value="blockquote" title="Citation"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg></button>
     <span class="inline-toolbar-sep"></span>
     <button type="button" data-cmd="justifyLeft" title="Aligner à gauche"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg></button>
@@ -8390,7 +8667,11 @@ function _createInlineToolbar() {
     <button type="button" data-cmd="justifyRight" title="Aligner à droite"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg></button>
     <span class="inline-toolbar-sep"></span>
     <button type="button" data-cmd="createLink" title="Lien"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
-    <button type="button" data-cmd="removeFormat" title="Supprimer le formatage"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M10 4v3"/><path d="M8 21l4-14"/><path d="M3 21h6"/><line x1="18" y1="5" x2="22" y2="9" stroke="currentColor" stroke-width="2"/><line x1="22" y1="5" x2="18" y2="9" stroke="currentColor" stroke-width="2"/></svg></button>
+    <span class="inline-toolbar-sep"></span>
+    <button type="button" data-cmd="indent" data-value="outdent" title="Diminuer le retrait"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="4" x2="21" y2="4"/><line x1="11" y1="9" x2="21" y2="9"/><line x1="11" y1="14" x2="21" y2="14"/><line x1="3" y1="19" x2="21" y2="19"/><polyline points="7 14 3 11.5 7 9"/></svg></button>
+    <button type="button" data-cmd="indent" data-value="indent" title="Augmenter le retrait"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="4" x2="21" y2="4"/><line x1="11" y1="9" x2="21" y2="9"/><line x1="11" y1="14" x2="21" y2="14"/><line x1="3" y1="19" x2="21" y2="19"/><polyline points="3 9 7 11.5 3 14"/></svg></button>
+    <span class="inline-toolbar-sep"></span>
+    <button type="button" data-cmd="removeFormat" title="Supprimer le formatage"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M10 4v3"/><path d="M8 21l4-14"/><path d="M3 21h6"/><line x1="18" y1="5" x2="22" y2="9"/><line x1="22" y1="5" x2="18" y2="9"/></svg></button>
   `;
   bar.style.display = 'none';
   document.body.appendChild(bar);
@@ -8408,6 +8689,8 @@ function _createInlineToolbar() {
         if (url) document.execCommand('createLink', false, url);
       } else if (cmd === 'formatBlock') {
         document.execCommand('formatBlock', false, btn.dataset.value);
+      } else if (cmd === 'indent') {
+        document.execCommand(btn.dataset.value === 'outdent' ? 'outdent' : 'indent', false, null);
       } else {
         document.execCommand(cmd, false, null);
       }
@@ -8470,7 +8753,7 @@ function _updateToolbarState() {
   const select = _inlineToolbar.querySelector('.inline-toolbar-select');
   if (select) {
     const blockTag = document.queryCommandValue('formatBlock').toLowerCase().replace(/[<>]/g, '');
-    select.value = ['h1', 'h2', 'h3'].includes(blockTag) ? blockTag : 'p';
+    select.value = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(blockTag) ? blockTag : 'p';
   }
 }
 
@@ -8520,6 +8803,7 @@ function enableInlineEditing(blockId, targetTxtEditor, dataRef, fieldName) {
   targetTxtEditor.addEventListener('input', _handleInlineInput);
   targetTxtEditor.addEventListener('blur', _handleInlineBlur);
   targetTxtEditor.addEventListener('keydown', _handleInlineKeydown);
+  targetTxtEditor.addEventListener('paste', _handleInlinePaste);
   document.addEventListener('selectionchange', _updateToolbarState);
 }
 
@@ -8532,6 +8816,7 @@ function disableInlineEditing() {
     _inlineEditingElement.removeEventListener('input', _handleInlineInput);
     _inlineEditingElement.removeEventListener('blur', _handleInlineBlur);
     _inlineEditingElement.removeEventListener('keydown', _handleInlineKeydown);
+    _inlineEditingElement.removeEventListener('paste', _handleInlinePaste);
   }
 
   const card = document.querySelector(`.builder-block-card[data-block-id="${_inlineEditingBlockId}"]`);
@@ -8558,6 +8843,7 @@ function disableInlineEditing() {
 }
 
 function _handleInlineInput(e) {
+  markBuilderDirty();
   _syncInlineContentToBlockData(e.target);
   // Don't sync to Quill on every keystroke — it triggers text-change → liveUpdate
   // which overwrites block.data.text with stale Quill content.
@@ -8583,6 +8869,82 @@ function _handleInlineKeydown(e) {
     e.preventDefault();
     disableInlineEditing();
   }
+}
+
+function _handleInlinePaste(e) {
+  e.preventDefault();
+  const html = e.clipboardData.getData('text/html');
+  const text = e.clipboardData.getData('text/plain');
+  let clean = '';
+  if (html) {
+    // Parse pasted HTML, keep only structure (headings, paragraphs, lists, line breaks)
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    clean = _cleanPastedHTML(tmp);
+  } else {
+    // Plain text: convert line breaks to paragraphs
+    clean = text.split(/\n\n+/).map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+  }
+  document.execCommand('insertHTML', false, clean);
+}
+
+function _cleanPastedHTML(el) {
+  const allowedBlocks = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'BR', 'BLOCKQUOTE'];
+  const allowedInline = ['A', 'BR'];
+  let result = '';
+  for (const node of el.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const txt = node.textContent;
+      if (txt.trim()) result += txt;
+      continue;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) continue;
+    const tag = node.tagName;
+    if (allowedBlocks.includes(tag)) {
+      const inner = _cleanPastedInline(node);
+      if (tag === 'UL' || tag === 'OL') {
+        const items = Array.from(node.querySelectorAll('li')).map(li => `<li>${_cleanPastedInline(li)}</li>`).join('');
+        result += `<${tag.toLowerCase()}>${items}</${tag.toLowerCase()}>`;
+      } else {
+        result += `<${tag.toLowerCase()}>${inner}</${tag.toLowerCase()}>`;
+      }
+    } else if (tag === 'DIV' || tag === 'SECTION' || tag === 'ARTICLE' || tag === 'SPAN' || tag === 'FONT' || tag === 'B' || tag === 'I' || tag === 'U' || tag === 'STRONG' || tag === 'EM') {
+      // Unwrap container/inline elements, recurse into children
+      const inner = _cleanPastedHTML(node);
+      if (inner.trim()) {
+        // If the result doesn't start with a block tag, wrap in <p>
+        if (!/^<(p|h[1-6]|ul|ol|blockquote)/i.test(inner.trim())) {
+          result += `<p>${inner}</p>`;
+        } else {
+          result += inner;
+        }
+      }
+    } else {
+      // Unknown tag — extract text content as paragraph
+      const txt = node.textContent.trim();
+      if (txt) result += `<p>${txt}</p>`;
+    }
+  }
+  return result;
+}
+
+function _cleanPastedInline(el) {
+  let result = '';
+  for (const node of el.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      result += node.textContent;
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.tagName === 'BR') {
+        result += '<br>';
+      } else if (node.tagName === 'A' && node.href) {
+        result += `<a href="${node.getAttribute('href')}">${_cleanPastedInline(node)}</a>`;
+      } else {
+        // Strip inline formatting (bold, italic, spans, etc.) — keep text only
+        result += _cleanPastedInline(node);
+      }
+    }
+  }
+  return result;
 }
 
 function _syncInlineContentToBlockData(txtEditorEl) {
@@ -8683,6 +9045,7 @@ async function savePageBuilder() {
     // Update "Voir la page" link with current slug
     const viewBtn = document.getElementById('viewPageBtn');
     if (viewBtn) viewBtn.href = `${siteSettingsCache?.frontend_url || 'http://localhost:4321'}/pages/${encodeURIComponent(slug)}`;
+    clearBuilderDirty();
   } catch (error) {
     hideLoading();
     showToast('Erreur: ' + error.message, 'error');
@@ -9035,6 +9398,7 @@ function refreshReusableBlocsView() {
 }
 
 async function openReusableBlocBuilder(blocId) {
+  clearBuilderDirty();
   reusableBlocBuilderMode = true;
   pageBuilderState.editingPageId = blocId;
   pageBuilderState.blocks = [];
@@ -9125,7 +9489,7 @@ async function renderReusableBlocBuilder() {
           <div class="builder-canvas-inner" id="builderCanvasInner" style="${buildColorOverrideStyle()}">
             <div class="builder-canvas-placeholder" id="builderPlaceholder">Glissez des modules ici ou cliquez sur un module à gauche pour l'ajouter.</div>
             <div class="builder-blocks" id="builderBlocks">
-              ${pageBuilderState.blocks.map(block => renderBlockCard(block)).join('')}
+              ${renderBlocksWithInsertButtons(pageBuilderState.blocks)}
             </div>
           </div>
         </main>
@@ -9134,7 +9498,12 @@ async function renderReusableBlocBuilder() {
   `;
 }
 
-function closeReusableBlocBuilder() {
+async function closeReusableBlocBuilder() {
+  if (_builderDirty) {
+    const ok = await confirmModal('Vous avez des modifications non enregistrées. Quitter sans sauvegarder ?', 'Modifications non enregistrées');
+    if (!ok) return;
+    clearBuilderDirty();
+  }
   reusableBlocBuilderMode = false;
   loadSection('reusable-blocs');
 }
@@ -9177,6 +9546,7 @@ async function saveReusableBlocBuilder() {
         localStorage.setItem('adminLastView', `rb-builder:${res.id}`);
       }
     }
+    clearBuilderDirty();
   } catch (error) {
     hideLoading();
     showToast('Erreur: ' + error.message, 'error');
@@ -12426,6 +12796,44 @@ async function renderUsers() {
         ${users.length > 0 ? renderUsersTable(users) : renderEmptyState('👥', 'Aucun utilisateur', 'Créez votre premier utilisateur')}
       </div>
 
+      <div class="card" style="margin-top:24px">
+        <h3 style="margin-bottom:16px">Permissions par rôle</h3>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+              <tr style="border-bottom:2px solid var(--border-color,#e5e7eb);text-align:left">
+                <th style="padding:8px 12px">Fonctionnalité</th>
+                <th style="padding:8px 12px;text-align:center"><span class="badge badge-primary">Super admin</span></th>
+                <th style="padding:8px 12px;text-align:center"><span class="badge badge-info">Admin site</span></th>
+                <th style="padding:8px 12px;text-align:center"><span class="badge badge-warning">Éditeur</span></th>
+                <th style="padding:8px 12px;text-align:center"><span class="badge badge-muted">Lecteur</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${[
+                ['Tableau de bord', true, true, true, true],
+                ['Pages / Articles / CPT', true, true, true, false],
+                ['Médiathèque', true, true, true, false],
+                ['Blocs réutilisables', true, true, true, false],
+                ['Menus', true, true, false, false],
+                ['Paramètres du site', true, true, false, false],
+                ['Formulaires', true, true, false, false],
+                ['Thème', true, true, false, false],
+                ['Rebuild', true, true, false, false],
+                ['Utilisateurs', true, false, false, false],
+                ['Plugins', true, false, false, false],
+                ['Crédits IA', true, false, false, false],
+              ].map(([label, ...perms]) =>
+                '<tr style="border-bottom:1px solid var(--border-color,#e5e7eb)">'
+                + '<td style="padding:8px 12px;font-weight:500">' + label + '</td>'
+                + perms.map(ok => '<td style="padding:8px 12px;text-align:center">' + (ok ? '<span style="color:var(--success,#22c55e)">✓</span>' : '<span style="color:var(--danger,#ef4444);opacity:.4">✗</span>') + '</td>').join('')
+                + '</tr>'
+              ).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div id="userModal" style="display: none;"></div>
     `;
   } catch (error) {
@@ -12436,9 +12844,12 @@ async function renderUsers() {
 }
 
 function renderUsersTable(users) {
-  const roleLabel = r => r === 'admin' ? 'Administrateur' : 'Éditeur';
-  const roleBadge = r => r === 'admin' ? 'badge-primary' : 'badge-warning';
-  const avatarClass = r => r === 'admin' ? 'user-avatar--admin' : 'user-avatar--editor';
+  const _roleLabels = { super_admin: 'Super admin', admin_site: 'Admin site', editor: 'Éditeur', reader: 'Lecteur', admin: 'Super admin' };
+  const _roleBadges = { super_admin: 'badge-primary', admin_site: 'badge-info', editor: 'badge-warning', reader: 'badge-muted', admin: 'badge-primary' };
+  const _roleAvatars = { super_admin: 'user-avatar--admin', admin_site: 'user-avatar--admin', editor: 'user-avatar--editor', reader: 'user-avatar--editor' };
+  const roleLabel = r => _roleLabels[r] || r;
+  const roleBadge = r => _roleBadges[r] || 'badge-secondary';
+  const avatarClass = r => _roleAvatars[r] || 'user-avatar--editor';
   const getInitials = name => name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
 
   return `
@@ -12503,8 +12914,10 @@ async function showUserForm(userId = null) {
           <div class="form-group">
             <label class="form-label">Role *</label>
             <select class="form-input" id="userRole">
-              <option value="editor" ${!user || user.role === 'editor' ? 'selected' : ''}>Editeur</option>
-              <option value="admin" ${user?.role === 'admin' ? 'selected' : ''}>Administrateur</option>
+              <option value="reader" ${user?.role === 'reader' ? 'selected' : ''}>Lecteur</option>
+              <option value="editor" ${!user || user.role === 'editor' ? 'selected' : ''}>Éditeur</option>
+              <option value="admin_site" ${user?.role === 'admin_site' ? 'selected' : ''}>Admin site</option>
+              <option value="super_admin" ${user?.role === 'super_admin' ? 'selected' : ''}>Super administrateur</option>
             </select>
           </div>
           <div class="form-group">
@@ -12723,20 +13136,24 @@ async function openMenuEditor(menuId) {
 
 function renderMenuEditor(menu) {
   const cptSectionsHtml = _menuCptSections.map(section => {
-    if (!section.items || section.items.length === 0) return '';
     return `
       <div class="menu-add-section">
         <h4>${section.icon ? section.icon + ' ' : ''}${escapeHtml(section.label)}</h4>
-        <input type="text" class="form-input form-input-sm menu-search-input" placeholder="Rechercher…" oninput="filterMenuCptList(this, '${escapeHtml(section.slug)}')">
-        <div class="menu-pages-list" id="menuCptList_${escapeHtml(section.slug)}">
-          ${section.items.map(item => `
-            <label class="menu-page-checkbox" data-search="${escapeHtml(item.title.toLowerCase())}">
-              <input type="checkbox" value="${item.id}" data-title="${escapeHtml(item.title)}" data-slug="${escapeHtml(item.slug)}" data-cpt="${escapeHtml(section.slug)}">
-              ${escapeHtml(item.title)}
-            </label>
-          `).join('')}
+        <div style="margin-bottom:6px">
+          <button class="btn btn-sm btn-outline" onclick="addCptArchiveLink('${escapeHtml(section.slug)}', '${escapeHtml(section.label)}')">+ Archive « ${escapeHtml(section.label)} »</button>
         </div>
-        <button class="btn btn-sm" onclick="addSelectedCptItems('${escapeHtml(section.slug)}')" style="margin-top:8px">Ajouter au menu</button>
+        ${section.items && section.items.length > 0 ? `
+          <input type="text" class="form-input form-input-sm menu-search-input" placeholder="Rechercher…" oninput="filterMenuCptList(this, '${escapeHtml(section.slug)}')">
+          <div class="menu-pages-list" id="menuCptList_${escapeHtml(section.slug)}">
+            ${section.items.map(item => `
+              <label class="menu-page-checkbox" data-search="${escapeHtml(item.title.toLowerCase())}">
+                <input type="checkbox" value="${item.id}" data-title="${escapeHtml(item.title)}" data-slug="${escapeHtml(item.slug)}" data-cpt="${escapeHtml(section.slug)}">
+                ${escapeHtml(item.title)}
+              </label>
+            `).join('')}
+          </div>
+          <button class="btn btn-sm" onclick="addSelectedCptItems('${escapeHtml(section.slug)}')" style="margin-top:8px">Ajouter au menu</button>
+        ` : ''}
       </div>
     `;
   }).join('');
@@ -12992,6 +13409,23 @@ function filterMenuCptList(input, cptSlug) {
   });
 }
 
+function addCptArchiveLink(cptSlug, label) {
+  const maxOrder = _menuItems.length > 0 ? Math.max(..._menuItems.map(i => i.menu_order || 0)) : -1;
+  const tempId = 'temp_' + (_menuTempIdCounter++);
+  _menuItems.push({
+    id: null,
+    temp_id: tempId,
+    title: label,
+    url: `/${cptSlug}`,
+    type: 'custom',
+    page_id: null,
+    parent_id: null,
+    menu_order: maxOrder + 1,
+    open_in_new_tab: false,
+  });
+  refreshMenuItemsList();
+}
+
 function addSelectedCptItems(cptSlug) {
   const container = document.getElementById('menuCptList_' + cptSlug);
   if (!container) return;
@@ -13201,21 +13635,21 @@ function attachMenuEditorEvents() {
 // ========== FORMS SYSTEM ==========
 
 const FORM_FIELD_TYPES = [
-  { type: 'text', label: 'Texte', icon: 'Aa' },
-  { type: 'email', label: 'Email', icon: '@' },
-  { type: 'phone', label: 'Téléphone', icon: '#' },
-  { type: 'number', label: 'Nombre', icon: '123' },
-  { type: 'textarea', label: 'Zone de texte', icon: '¶' },
-  { type: 'select', label: 'Liste déroulante', icon: '▼' },
-  { type: 'radio', label: 'Boutons radio', icon: '◉' },
-  { type: 'checkbox', label: 'Cases à cocher', icon: '☑' },
-  { type: 'date', label: 'Date', icon: '📅' },
-  { type: 'time', label: 'Heure', icon: '🕐' },
-  { type: 'url', label: 'URL', icon: '🔗' },
-  { type: 'file', label: 'Fichier', icon: '📎' },
-  { type: 'hidden', label: 'Champ caché', icon: '👁' },
-  { type: 'html', label: 'Contenu HTML', icon: '</>' },
-  { type: 'name', label: 'Nom complet', icon: '👤' },
+  { type: 'text', label: 'Texte', icon: '<i class="fa-solid fa-font"></i>' },
+  { type: 'email', label: 'Email', icon: '<i class="fa-solid fa-at"></i>' },
+  { type: 'phone', label: 'Téléphone', icon: '<i class="fa-solid fa-phone"></i>' },
+  { type: 'number', label: 'Nombre', icon: '<i class="fa-solid fa-hashtag"></i>' },
+  { type: 'textarea', label: 'Zone de texte', icon: '<i class="fa-solid fa-align-left"></i>' },
+  { type: 'select', label: 'Liste déroulante', icon: '<i class="fa-solid fa-chevron-down"></i>' },
+  { type: 'radio', label: 'Boutons radio', icon: '<i class="fa-regular fa-circle-dot"></i>' },
+  { type: 'checkbox', label: 'Cases à cocher', icon: '<i class="fa-regular fa-square-check"></i>' },
+  { type: 'date', label: 'Date', icon: '<i class="fa-regular fa-calendar"></i>' },
+  { type: 'time', label: 'Heure', icon: '<i class="fa-regular fa-clock"></i>' },
+  { type: 'url', label: 'URL', icon: '<i class="fa-solid fa-link"></i>' },
+  { type: 'file', label: 'Fichier', icon: '<i class="fa-solid fa-paperclip"></i>' },
+  { type: 'hidden', label: 'Champ caché', icon: '<i class="fa-regular fa-eye-slash"></i>' },
+  { type: 'html', label: 'Contenu HTML', icon: '<i class="fa-solid fa-code"></i>' },
+  { type: 'name', label: 'Nom complet', icon: '<i class="fa-regular fa-user"></i>' },
 ];
 
 let _formsCache = [];
@@ -13354,13 +13788,13 @@ async function renderFormBuilder(formId) {
 
   return `
     <div class="page-header">
-      <div style="display:flex;align-items:center;gap:12px">
-        <button class="btn btn-outline btn-sm" onclick="loadSection('forms')">← Retour</button>
+      <div style="display:flex;align-items:center;gap:16px">
+        <button class="btn btn-outline btn-sm" onclick="loadSection('forms')"><i class="fa-solid fa-arrow-left" style="font-size:11px"></i> Retour</button>
         <h1>${isEdit ? 'Modifier le formulaire' : 'Nouveau formulaire'}</h1>
       </div>
-      <div style="display:flex;gap:8px">
-        ${isEdit ? `<button class="btn btn-outline" onclick="loadSection('form-entries:${_formBuilderData.id}')">${_svgInbox} Entrées</button>` : ''}
-        <button class="btn btn-primary" onclick="saveFormBuilder()">Enregistrer</button>
+      <div style="display:flex;align-items:center;gap:10px">
+        ${isEdit ? `<button class="btn btn-outline btn-sm" onclick="loadSection('form-entries:${_formBuilderData.id}')"><i class="fa-solid fa-inbox" style="font-size:13px"></i> Entrées</button>` : ''}
+        <button class="btn btn-primary btn-sm" onclick="saveFormBuilder()">Enregistrer</button>
       </div>
     </div>
 
@@ -13384,13 +13818,16 @@ async function renderFormBuilder(formId) {
     <!-- Fields Tab -->
     <div id="formTabFields" style="display:flex;gap:16px;margin-top:16px">
       <!-- Field Types Sidebar -->
-      <div class="card" style="width:200px;flex-shrink:0;padding:12px">
-        <p style="font-weight:600;margin-bottom:8px;font-size:13px">Ajouter un champ</p>
+      <div class="card form-field-types-panel" style="width:200px;flex-shrink:0;padding:16px">
+        <p style="font-weight:600;margin-bottom:12px;font-size:13px;color:var(--gray-700)">Ajouter un champ</p>
+        <div style="display:flex;flex-direction:column;gap:2px">
         ${FORM_FIELD_TYPES.map(ft => `
-          <button class="btn btn-outline btn-sm" onclick="addFormField('${ft.type}')" style="width:100%;text-align:left;margin-bottom:4px;font-size:12px">
-            <span style="display:inline-block;width:24px;text-align:center">${ft.icon}</span> ${ft.label}
+          <button class="form-field-type-btn" onclick="addFormField('${ft.type}')">
+            <span class="form-field-type-icon">${ft.icon}</span>
+            <span class="form-field-type-label">${ft.label}</span>
           </button>
         `).join('')}
+        </div>
       </div>
 
       <!-- Fields Canvas -->

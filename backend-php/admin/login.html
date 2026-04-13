@@ -110,6 +110,20 @@
       display: block;
     }
 
+    .warning {
+      background: #fff8e1;
+      color: #b8860b;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .warning.show {
+      display: block;
+    }
+
     .info {
       margin-top: 24px;
       padding: 16px;
@@ -131,6 +145,7 @@
     <h1>🚀 Connexion</h1>
     <p class="subtitle">Accédez à votre tableau de bord</p>
 
+    <div id="inactivityMessage" class="warning"></div>
     <div id="errorMessage" class="error"></div>
 
     <form onsubmit="handleLogin(event)">
@@ -158,6 +173,13 @@
     // Check if already logged in
     if (localStorage.getItem('token')) {
       window.location.href = '/admin/';
+    }
+
+    // Show inactivity message if redirected for that reason
+    if (new URLSearchParams(window.location.search).get('reason') === 'inactivity') {
+      const msg = document.getElementById('inactivityMessage');
+      msg.textContent = 'Vous avez été déconnecté après 30 minutes d\'inactivité.';
+      msg.classList.add('show');
     }
 
     async function handleLogin(e) {

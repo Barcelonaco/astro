@@ -8,6 +8,7 @@ import type { ImageMetadata } from 'astro';
 import FallbackImage from '../assets/blog-placeholder-1.jpg';
 import ThemeInjector from './ThemeInjector.astro';
 import CookieConsent from './CookieConsent.astro';
+import AdminBar from './AdminBar.astro';
 
 interface Props {
 	title: string;
@@ -83,6 +84,7 @@ const faviconUrl = faviconSetting ? (faviconSetting.startsWith('http') ? favicon
 <meta property="twitter:image" content={new URL(image.src, Astro.url)} />
 
 <ThemeInjector styleSettings={styleSettings} />
+<AdminBar siteSettings={s} />
 
 {/* Cookie Consent — when enabled, tracking scripts are loaded after consent */}
 <CookieConsent

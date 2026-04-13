@@ -89,7 +89,7 @@ if (ref.content) {
     <BaseHead title={`${ref.title} | ${siteName}`} description={siteDescription} styleSettings={styleSettings} siteSettings={siteSettings} />
     {blocks && <ModuleStyles blocks={blocks} />}
   </head>
-  <body class={bodyClasses || undefined}>
+  <body class={bodyClasses || undefined} data-cpt-slug="references" data-cpt-item-id={ref.id}>
     <Header siteName={siteName} navigation={navigationData} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
     <main class="main-page page-single-refs">
       <article>

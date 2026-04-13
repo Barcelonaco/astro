@@ -96,7 +96,7 @@ const bodyClasses = [
 		{schemaOrg && <script type="application/ld+json" set:html={schemaOrg} />}
 		<ModuleStyles blocks={blocks} />
 	</head>
-	<body class={bodyClasses || undefined}>
+	<body class={bodyClasses || undefined} data-page-id={page?.id}>
 		<Header siteName={siteName} navigation={navigationData} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
 		<main class={`${isBlockPage ? 'main-page' : ''} ${hasColorOverrides ? 'has-color-overrides' : ''}`.trim()} style={colorOverrideStyle || undefined}>
 			{hasPage ? (

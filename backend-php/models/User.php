@@ -25,7 +25,7 @@ class UserModel {
         $db = Database::getInstance();
         $name = $data['name'];
         $email = $data['email'];
-        $role = $data['role'] ?? 'editor';
+        $role = $data['role'] ?? 'reader';
         $hashedPassword = password_hash($data['password'], PASSWORD_BCRYPT);
 
         $stmt = $db->prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)');

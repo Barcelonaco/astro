@@ -61,7 +61,7 @@ if (!table_exists($db, 'users')) {
             name VARCHAR(255) NOT NULL,
             email VARCHAR(255) NOT NULL UNIQUE,
             password VARCHAR(255) NOT NULL,
-            role ENUM('admin', 'editor') NOT NULL DEFAULT 'editor',
+            role ENUM('super_admin', 'admin_site', 'editor', 'reader') NOT NULL DEFAULT 'reader',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
@@ -73,13 +73,23 @@ if (!table_exists($db, 'users')) {
         ['Quentin',  'quentin@barcelona-co.fr',   'Linoleum-Impurity-Launder0-Scariness'],
         ['Olivier',  'olivier@barcelona-co.fr',    'Overvalue-Cactus-Hunter0'],
     ];
-    $stmt = $db->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'admin')");
+    $stmt = $db->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'super_admin')");
     foreach ($defaultUsers as [$name, $email, $pwd]) {
         $stmt->execute([$name, $email, password_hash($pwd, PASSWORD_DEFAULT)]);
         echo "  + Created admin ({$email})\n";
     }
     $changes++;
 } else {
+    // Migrate role ENUM to 4-role system (3-step: expand → update → shrink)
+    $colInfo = $db->query("SHOW COLUMNS FROM users LIKE 'role'")->fetch();
+    if ($colInfo && strpos($colInfo['Type'], 'super_admin') === false) {
+        $db->exec("ALTER TABLE users MODIFY COLUMN role ENUM('admin','editor','super_admin','admin_site','reader') NOT NULL DEFAULT 'reader'");
+        $db->exec("UPDATE users SET role = 'super_admin' WHERE role = 'admin'");
+        $db->exec("ALTER TABLE users MODIFY COLUMN role ENUM('super_admin','admin_site','editor','reader') NOT NULL DEFAULT 'reader'");
+        echo "  + Migrated role column to 4-role system\n";
+        $changes++;
+    }
+
     // Ensure default admin users exist
     $defaultUsers = [
         ['Chulee',   'chulee@barcelona-co.fr',   'GS3iQMjJROQj'],
@@ -87,12 +97,12 @@ if (!table_exists($db, 'users')) {
         ['Olivier',  'olivier@barcelona-co.fr',    'Overvalue-Cactus-Hunter0'],
     ];
     $check = $db->prepare("SELECT id FROM users WHERE email = ?");
-    $insert = $db->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'admin')");
+    $insert = $db->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'super_admin')");
     foreach ($defaultUsers as [$name, $email, $pwd]) {
         $check->execute([$email]);
         if (!$check->fetch()) {
             $insert->execute([$name, $email, password_hash($pwd, PASSWORD_DEFAULT)]);
-            echo "  + Created admin ({$email})\n";
+            echo "  + Created super_admin ({$email})\n";
             $changes++;
         }
     }
@@ -229,6 +239,30 @@ if (!table_exists($db, 'pages')) {
     if (ensure_column($db, 'pages', 'seo_meta', 'JSON DEFAULT NULL', 'color_overrides')) $changes++;
     if (ensure_column($db, 'pages', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP', 'created_at')) $changes++;
     if ($changes === 0) echo "  OK\n";
+}
+
+// ─── Fix dangerous CASCADE on author_id → users ────────────────────────────
+// Deleting a user must NOT delete their pages/posts. Change to SET NULL.
+
+foreach (['pages', 'posts'] as $tbl) {
+    $fks = $db->query("
+        SELECT CONSTRAINT_NAME, DELETE_RULE
+        FROM information_schema.REFERENTIAL_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE()
+          AND TABLE_NAME = '{$tbl}'
+          AND REFERENCED_TABLE_NAME = 'users'
+    ")->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($fks as $fk) {
+        if ($fk['DELETE_RULE'] === 'CASCADE') {
+            // author_id must allow NULL for SET NULL to work
+            $db->exec("ALTER TABLE `{$tbl}` MODIFY COLUMN author_id INT DEFAULT NULL");
+            $db->exec("ALTER TABLE `{$tbl}` DROP FOREIGN KEY `{$fk['CONSTRAINT_NAME']}`");
+            $db->exec("ALTER TABLE `{$tbl}` ADD CONSTRAINT `{$fk['CONSTRAINT_NAME']}` FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL");
+            echo "  + Fixed {$tbl}.author_id: CASCADE → SET NULL\n";
+            $changes++;
+        }
+    }
 }
 
 // ─── Table: settings ────────────────────────────────────────────────────────

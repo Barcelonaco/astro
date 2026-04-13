@@ -357,14 +357,17 @@ try {
     }
     elseif ($method === 'POST' && $path === '/posts') {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         PostController::create($user);
     }
     elseif ($method === 'PUT' && match_route('/posts/:id', $path, $params)) {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         PostController::update((int) $params['id'], $user);
     }
     elseif ($method === 'DELETE' && match_route('/posts/:id', $path, $params)) {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         PostController::delete((int) $params['id']);
     }
 
@@ -377,14 +380,17 @@ try {
     }
     elseif ($method === 'POST' && $path === '/categories') {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         CategoryController::create();
     }
     elseif ($method === 'PUT' && match_route('/categories/:id', $path, $params)) {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         CategoryController::update((int) $params['id']);
     }
     elseif ($method === 'DELETE' && match_route('/categories/:id', $path, $params)) {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         CategoryController::delete((int) $params['id']);
     }
 
@@ -409,33 +415,36 @@ try {
     }
     elseif ($method === 'POST' && $path === '/pages') {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         PageController::create($user);
     }
     elseif ($method === 'PUT' && match_route('/pages/:id', $path, $params)) {
         // Check for /pages/:pageId/menus
         if (preg_match('#^/pages/(\d+)/menus$#', $path, $pm)) {
             $user = authenticate_token();
-            require_admin($user);
+            require_min_role($user, 'admin_site');
             MenuController::syncPageMenus((int) $pm[1]);
             return;
         }
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         PageController::update((int) $params['id'], $user);
     }
     elseif ($method === 'DELETE' && match_route('/pages/:id', $path, $params)) {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         PageController::delete((int) $params['id']);
     }
 
     // ── Page ↔ Menu assignments ──
     elseif ($method === 'GET' && match_route('/pages/:pageId/menus', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         MenuController::getPageMenus((int) $params['pageId']);
     }
     elseif ($method === 'PUT' && match_route('/pages/:pageId/menus', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         MenuController::syncPageMenus((int) $params['pageId']);
     }
 
@@ -448,14 +457,17 @@ try {
     }
     elseif ($method === 'POST' && $path === '/reusable-blocs') {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         ReusableBlocController::create($user);
     }
     elseif ($method === 'PUT' && match_route('/reusable-blocs/:id', $path, $params)) {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         ReusableBlocController::update((int) $params['id']);
     }
     elseif ($method === 'DELETE' && match_route('/reusable-blocs/:id', $path, $params)) {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         ReusableBlocController::delete((int) $params['id']);
     }
 
@@ -478,14 +490,14 @@ try {
     }
     elseif ($method === 'PUT' && $path === '/settings') {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         SettingsController::updateSettings();
     }
 
     // ── Rebuild ──
     elseif ($method === 'POST' && $path === '/rebuild') {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         $body = get_json_body();
         trigger_frontend_rebuild($body['reason'] ?? 'manual');
         json_response(['message' => 'Rebuild triggered', 'status' => get_rebuild_status()]);
@@ -517,15 +529,15 @@ try {
         UserController::delete((int) $params['id'], $user);
     }
 
-    // ── Module fields & templates (admin) ──
+    // ── Module fields & templates ──
     elseif ($method === 'GET' && $path === '/module-fields') {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'editor');
         ModuleFieldsController::getModuleFields();
     }
     elseif ($method === 'GET' && $path === '/module-template') {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'editor');
         ModuleTemplatesController::getModuleTemplate();
     }
 
@@ -539,7 +551,7 @@ try {
     }
     elseif ($method === 'PUT' && preg_match('#^/plugins/([a-zA-Z0-9_-]+)/toggle$#', $path, $m)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'super_admin');
         PluginController::togglePlugin($m[1]);
     }
 
@@ -558,50 +570,50 @@ try {
         RenderBlockController::renderBlock();
     }
 
-    // ── Media (admin) ──
+    // ── Media (editor+) ──
     elseif ($method === 'GET' && $path === '/media/folders') {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'editor');
         MediaController::getFolders();
     }
     elseif ($method === 'POST' && $path === '/media/folders') {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'editor');
         MediaController::createFolder();
     }
     elseif ($method === 'PUT' && match_route('/media/folders/:id', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'editor');
         MediaController::updateFolder((int) $params['id']);
     }
     elseif ($method === 'DELETE' && match_route('/media/folders/:id', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'editor');
         MediaController::deleteFolder((int) $params['id']);
     }
     elseif ($method === 'GET' && $path === '/media') {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'editor');
         MediaController::getItems();
     }
     elseif ($method === 'POST' && $path === '/media/upload') {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'editor');
         MediaController::upload();
     }
     elseif ($method === 'PUT' && match_route('/media/:id', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'editor');
         MediaController::updateItem((int) $params['id']);
     }
     elseif ($method === 'POST' && match_route('/media/:id/crop', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'editor');
         MediaController::cropItem((int) $params['id']);
     }
     elseif ($method === 'DELETE' && match_route('/media/:id', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'editor');
         MediaController::deleteItem((int) $params['id']);
     }
 
@@ -618,37 +630,37 @@ try {
     }
     elseif ($method === 'GET' && $path === '/menus/pages') {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         MenuController::getAvailablePages();
     }
     elseif ($method === 'GET' && $path === '/menus/cpt-items') {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         MenuController::getAvailableCptItems();
     }
     elseif ($method === 'GET' && match_route('/menus/:id', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         MenuController::getById((int) $params['id']);
     }
     elseif ($method === 'POST' && $path === '/menus') {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         MenuController::create();
     }
     elseif ($method === 'PUT' && match_route('/menus/:id/items', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         MenuController::saveItems((int) $params['id']);
     }
     elseif ($method === 'PUT' && match_route('/menus/:id', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         MenuController::update((int) $params['id']);
     }
     elseif ($method === 'DELETE' && match_route('/menus/:id', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         MenuController::delete((int) $params['id']);
     }
 
@@ -660,55 +672,55 @@ try {
         FormController::submitForm((int) $params['id']);
     }
 
-    // ── Forms (admin) ──
+    // ── Forms (admin_site+) ──
     elseif ($method === 'GET' && $path === '/forms') {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         FormController::getAll();
     }
     elseif ($method === 'GET' && match_route('/forms/:id/entries/export', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         FormController::exportEntries((int) $params['id']);
     }
     elseif ($method === 'GET' && match_route('/forms/:id/entries', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         FormController::getEntries((int) $params['id']);
     }
     elseif ($method === 'GET' && match_route('/forms/entries/:entryId', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         FormController::getEntryById((int) $params['entryId']);
     }
     elseif ($method === 'PUT' && match_route('/forms/entries/:entryId/status', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         FormController::updateEntryStatus((int) $params['entryId']);
     }
     elseif ($method === 'DELETE' && match_route('/forms/entries/:entryId', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         FormController::deleteEntry((int) $params['entryId']);
     }
     elseif ($method === 'GET' && match_route('/forms/:id', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         FormController::getById((int) $params['id']);
     }
     elseif ($method === 'POST' && $path === '/forms') {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         FormController::create();
     }
     elseif ($method === 'PUT' && match_route('/forms/:id', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         FormController::update((int) $params['id']);
     }
     elseif ($method === 'DELETE' && match_route('/forms/:id', $path, $params)) {
         $user = authenticate_token();
-        require_admin($user);
+        require_min_role($user, 'admin_site');
         FormController::delete((int) $params['id']);
     }
 
@@ -783,14 +795,17 @@ try {
     }
     elseif ($method === 'POST' && match_route('/cpt/:postType/categories', $path, $params)) {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         CustomPostTypeController::createCategory($params['postType']);
     }
     elseif ($method === 'PUT' && match_route('/cpt/:postType/categories/:id', $path, $params)) {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         CustomPostTypeController::updateCategory($params['postType'], (int) $params['id']);
     }
     elseif ($method === 'DELETE' && match_route('/cpt/:postType/categories/:id', $path, $params)) {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         CustomPostTypeController::deleteCategory($params['postType'], (int) $params['id']);
     }
     elseif ($method === 'GET' && match_route('/cpt/:postType/by-id/:id', $path, $params)) {
@@ -804,14 +819,17 @@ try {
     }
     elseif ($method === 'POST' && match_route('/cpt/:postType', $path, $params)) {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         CustomPostTypeController::createItem($params['postType'], $user);
     }
     elseif ($method === 'PUT' && match_route('/cpt/:postType/:id', $path, $params)) {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         CustomPostTypeController::updateItem($params['postType'], (int) $params['id']);
     }
     elseif ($method === 'DELETE' && match_route('/cpt/:postType/:id', $path, $params)) {
         $user = authenticate_token();
+        require_min_role($user, 'editor');
         CustomPostTypeController::deleteItem($params['postType'], (int) $params['id']);
     }
 

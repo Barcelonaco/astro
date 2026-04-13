@@ -12,6 +12,25 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 </head>
 <body>
+  <!-- Admin Top Bar -->
+  <div id="adminTopBar" class="admin-top-bar" style="display:none">
+    <div class="admin-top-bar-left">
+      <a href="#" class="admin-top-bar-link" id="topBarViewSite" target="_blank" title="Voir le site">
+        <i class="fa-solid fa-external-link-alt"></i> <span>Voir le site</span>
+      </a>
+      <div class="admin-top-bar-dropdown">
+        <a href="#" class="admin-top-bar-link" id="topBarCreate">
+          <i class="fa-solid fa-plus"></i> <span>Créer</span>
+        </a>
+        <div class="admin-top-bar-dropdown-menu" id="topBarCreateMenu"></div>
+      </div>
+    </div>
+    <div class="admin-top-bar-right">
+      <span class="admin-top-bar-user" id="topBarUser"></span>
+      <a href="#" class="admin-top-bar-link" onclick="logout(); return false;" title="Déconnexion"><i class="fa-solid fa-right-from-bracket"></i></a>
+    </div>
+  </div>
+
   <div class="admin-container">
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
@@ -22,16 +41,16 @@
       </div>
       <nav class="nav">
         <a href="#" class="nav-item active" data-section="dashboard"><i class="fa-solid fa-table-columns"></i><span>Tableau de bord</span></a>
-        <a href="#" class="nav-item" data-section="pages"><i class="fa-regular fa-file-lines"></i><span>Pages</span></a>
-        <a href="#" class="nav-item" data-section="reusable-blocs"><i class="fa-regular fa-clone"></i><span>Blocs réutilisables</span></a>
-        <a href="#" class="nav-item" data-section="menus"><i class="fa-solid fa-bars"></i><span>Menus</span></a>
-        <a href="#" class="nav-item admin-only" data-section="forms" style="display:none"><i class="fa-regular fa-rectangle-list"></i><span>Formulaires</span></a>
-        <a href="#" class="nav-item" data-section="media"><i class="fa-regular fa-images"></i><span>Médiathèque</span></a>
-        <a href="#" class="nav-item" data-section="site-settings"><i class="fa-solid fa-gear"></i><span>Paramètres du site</span></a>
-        <a href="#" class="nav-item admin-only" data-section="theme" style="display:none"><i class="fa-solid fa-palette"></i><span>Thème</span></a>
-        <a href="#" class="nav-item admin-only" data-section="plugins" style="display:none"><i class="fa-solid fa-plug"></i><span>Plugins</span></a>
-        <a href="#" class="nav-item admin-only" data-section="ai-credits" style="display:none"><i class="fa-solid fa-microchip"></i><span>Crédits IA</span></a>
-        <a href="#" class="nav-item" data-section="users" id="navUsers" style="display:none"><i class="fa-solid fa-users"></i><span>Utilisateurs</span></a>
+        <a href="#" class="nav-item role-editor" data-section="pages" style="display:none"><i class="fa-regular fa-file-lines"></i><span>Pages</span></a>
+        <a href="#" class="nav-item role-editor" data-section="reusable-blocs" style="display:none"><i class="fa-regular fa-clone"></i><span>Blocs réutilisables</span></a>
+        <a href="#" class="nav-item role-admin_site" data-section="menus" style="display:none"><i class="fa-solid fa-bars"></i><span>Menus</span></a>
+        <a href="#" class="nav-item role-admin_site" data-section="forms" style="display:none"><i class="fa-regular fa-rectangle-list"></i><span>Formulaires</span></a>
+        <a href="#" class="nav-item role-editor" data-section="media" style="display:none"><i class="fa-regular fa-images"></i><span>Médiathèque</span></a>
+        <a href="#" class="nav-item role-admin_site" data-section="site-settings" style="display:none"><i class="fa-solid fa-gear"></i><span>Paramètres du site</span></a>
+        <a href="#" class="nav-item role-admin_site" data-section="theme" style="display:none"><i class="fa-solid fa-palette"></i><span>Thème</span></a>
+        <a href="#" class="nav-item role-super_admin" data-section="plugins" style="display:none"><i class="fa-solid fa-plug"></i><span>Plugins</span></a>
+        <a href="#" class="nav-item role-super_admin" data-section="ai-credits" style="display:none"><i class="fa-solid fa-microchip"></i><span>Crédits IA</span></a>
+        <a href="#" class="nav-item role-super_admin" data-section="users" id="navUsers" style="display:none"><i class="fa-solid fa-users"></i><span>Utilisateurs</span></a>
       </nav>
       <div class="sidebar-footer">
         <button onclick="logout()" class="btn btn-logout">Déconnexion</button>

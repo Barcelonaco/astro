@@ -24,6 +24,7 @@ class AuthController {
         $token = JWT::encode(
             [
                 'id' => $user['id'],
+                'name' => $user['name'],
                 'email' => $user['email'],
                 'role' => $user['role'],
                 'exp' => time() + (7 * 24 * 60 * 60), // 7 days

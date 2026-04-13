@@ -34,6 +34,86 @@ a{
   text-decoration: none!important;
 }
 
+/* Admin Top Bar */
+.admin-top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  background: #1d2327;
+  color: #c3c4c7;
+  font-size: 13px;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  line-height: 32px;
+}
+.admin-top-bar a { color: #c3c4c7; text-decoration: none !important; }
+.admin-top-bar a:hover { color: #00b9eb; }
+.admin-top-bar-left,
+.admin-top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.admin-top-bar-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  height: 32px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.admin-top-bar-link i { font-size: 12px; }
+.admin-top-bar-user {
+  padding: 0 10px;
+  color: #c3c4c7;
+  white-space: nowrap;
+}
+.admin-top-bar-dropdown {
+  position: relative;
+}
+.admin-top-bar-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 32px;
+  left: 0;
+  background: #2c3338;
+  min-width: 160px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 10001;
+  border-radius: 0 0 4px 4px;
+}
+.admin-top-bar-dropdown:hover .admin-top-bar-dropdown-menu,
+.admin-top-bar-dropdown-menu:hover {
+  display: block;
+}
+.admin-top-bar-dropdown-menu a {
+  display: block;
+  padding: 6px 14px;
+  color: #c3c4c7;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.admin-top-bar-dropdown-menu a:hover {
+  background: #3c4349;
+  color: #00b9eb;
+}
+
+body.has-admin-top-bar .admin-container {
+  height: calc(100vh - 32px);
+  margin-top: 32px;
+}
+
+@media (max-width: 600px) {
+  .admin-top-bar-link span { display: none; }
+  .admin-top-bar-user { display: none; }
+}
+
 .admin-container {
   display: flex;
   height: 100vh;
@@ -207,11 +287,10 @@ body.sidebar-collapsed .sidebar-toggle svg {
 .nav-item.active {
   background: var(--gray-50);
   color: var(--primary);
-  font-weight: 600;
 }
 
 .nav-item-parent {
-  font-weight: 600;
+  font-weight: normal;
 }
 
 .nav-sub-items {
@@ -556,6 +635,55 @@ tr:hover {
   font-family: inherit;
 }
 
+/* ── Form Builder — Field Type Buttons ────────────────────────────────────── */
+.form-field-type-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gray-700);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  text-align: left;
+}
+
+.form-field-type-btn:hover {
+  background: var(--gray-100);
+  color: var(--gray-900);
+}
+
+.form-field-type-btn:active {
+  background: var(--gray-200);
+}
+
+.form-field-type-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--gray-100);
+  color: var(--gray-500);
+  font-size: 13px;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.form-field-type-btn:hover .form-field-type-icon {
+  background: var(--primary);
+  color: #fff;
+}
+
+.form-field-type-label {
+  font-weight: 500;
+}
+
 /* ── WYSIWYG Editor (Quill) ──────────────────────────────────────────────── */
 .wysiwyg-wrapper {
   border: 1px solid var(--gray-300);
@@ -592,6 +720,22 @@ tr:hover {
   color: var(--gray-700);
   line-height: 1.6;
 }
+/* Quill header picker labels */
+.ql-snow .ql-picker.ql-header .ql-picker-label::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item::before { content: 'Paragraphe'; }
+.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="1"]::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="1"]::before { content: 'Titre 1'; }
+.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="2"]::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="2"]::before { content: 'Titre 2'; }
+.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="3"]::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="3"]::before { content: 'Titre 3'; }
+.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="4"]::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="4"]::before { content: 'Titre 4'; }
+.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="5"]::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="5"]::before { content: 'Titre 5'; }
+.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="6"]::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="6"]::before { content: 'Mention'; }
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="6"]::before { font-style: italic; font-size: 0.85em; }
 .wysiwyg-wrapper .ql-editor.ql-blank::before {
   color: var(--gray-400);
   font-style: normal;
@@ -1202,6 +1346,10 @@ tr:hover {
 
 .builder-block-card--visual .builder-block-actions {
   margin-left: auto;
+}
+
+.builder-block-card--visual.is-selected .builder-block-actions [onclick^="editBlock"] {
+  display: none;
 }
 
 .builder-block-card--visual .builder-block-info .icon,
@@ -4617,4 +4765,64 @@ body.sidebar-collapsed .builder-settings {
   font-weight: 600;
   cursor: default;
   letter-spacing: 0.02em;
+}
+
+/* Insert block between buttons */
+.builder-insert-between {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 8px;
+  position: relative;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.15s, height 0.15s;
+}
+/* Show insert zones during drag as drop targets */
+.builder-drag-over .builder-insert-between {
+  opacity: 0.5;
+  height: 16px;
+}
+.builder-insert-between:hover {
+  opacity: 1;
+  height: 24px;
+}
+.builder-insert-between::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 1px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.builder-insert-between:hover::before {
+  opacity: 0.4;
+}
+.builder-insert-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--primary);
+  background: white;
+  color: var(--primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  position: relative;
+  z-index: 1;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+.builder-insert-btn:hover {
+  background: var(--primary);
+  color: white;
+  transform: scale(1.15);
+}
+.builder-insert-btn svg {
+  pointer-events: none;
 }

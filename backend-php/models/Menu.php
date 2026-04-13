@@ -38,6 +38,11 @@ class MenuModel {
         $stmt->execute([$menuId]);
         $rows = $stmt->fetchAll();
 
+        // Filter out page-type items whose page no longer exists
+        $rows = array_filter($rows, function ($row) {
+            return $row['type'] !== 'page' || !empty($row['page_title']);
+        });
+
         $items = array_map(function ($row) {
             return [
                 'id' => $row['id'],
