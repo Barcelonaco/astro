@@ -30,46 +30,46 @@ export interface ImagePreset {
  */
 export const IMAGE_PRESETS: Record<string, ImagePreset> = {
   hero: {
-    width: 1920,
-    quality: 88,
+    width: 1440,
+    quality: 78,
     format: 'webp',
-    srcsetWidths: [600, 960, 1440, 1920],
-    srcsetQuality: 85,
+    srcsetWidths: [480, 960, 1440],
+    srcsetQuality: 75,
   },
   banner: {
     width: 1440,
-    quality: 85,
+    quality: 76,
     format: 'webp',
-    srcsetWidths: [600, 900, 1440],
-    srcsetQuality: 82,
+    srcsetWidths: [480, 900, 1440],
+    srcsetQuality: 73,
   },
   feature: {
-    width: 1050,
-    quality: 82,
+    width: 960,
+    quality: 76,
     format: 'webp',
-    srcsetWidths: [500, 750, 1050],
-    srcsetQuality: 80,
+    srcsetWidths: [480, 720, 960],
+    srcsetQuality: 73,
   },
   card: {
-    width: 700,
-    quality: 80,
+    width: 600,
+    quality: 74,
     format: 'webp',
-    srcsetWidths: [350, 500, 700],
-    srcsetQuality: 78,
+    srcsetWidths: [300, 450, 600],
+    srcsetQuality: 72,
   },
   thumbnail: {
-    width: 500,
-    quality: 78,
+    width: 450,
+    quality: 73,
     format: 'webp',
-    srcsetWidths: [250, 350, 500],
-    srcsetQuality: 75,
+    srcsetWidths: [225, 350, 450],
+    srcsetQuality: 70,
   },
   icon: {
     width: 220,
-    quality: 80,
+    quality: 75,
     format: 'webp',
     srcsetWidths: [110, 220],
-    srcsetQuality: 78,
+    srcsetQuality: 73,
   },
 };
 
@@ -171,7 +171,7 @@ export function resolveImageUrl(
 ): string {
   const p = preset ? getPreset(preset) : null;
   const defaultW = p ? p.width : 900;
-  const defaultQ = p ? p.quality : 82;
+  const defaultQ = p ? p.quality : 75;
   if (!img) return _defaultImageUrl ? optimizedImageUrl(_defaultImageUrl, defaultW, defaultQ) : '';
   let rawUrl = '';
   if (typeof img === 'string') {
@@ -189,7 +189,7 @@ export function resolveImageUrl(
   // Use preset dimensions or fallback to size-based heuristic
   const SMALL_SIZES = ['thumbnail', 'icon', 'module-logo'];
   const optWidth = p ? p.width : (preferredSize && SMALL_SIZES.includes(preferredSize) ? 220 : 900);
-  const optQuality = p ? p.quality : 82;
+  const optQuality = p ? p.quality : 75;
   return optimizedImageUrl(rawUrl, optWidth, optQuality);
 }
 

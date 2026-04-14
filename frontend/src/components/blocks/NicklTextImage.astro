@@ -42,11 +42,11 @@ const ratioImgMap: Record<string, string> = {
 };
 const ratioImg = ratioImgMap[mediaRatio] || 'banner';
 
-// Preset adapté au ratio — full-height/portrait prennent toute la hauteur écran,
-// ils ont besoin de la résolution hero (1920px) pour ne pas pixeliser sur retina.
+// Preset adapté au ratio — full-height/portrait occupent plus de surface écran,
+// ils ont besoin d'une résolution plus élevée que landscape/square.
 const ratioPresetMap: Record<string, string> = {
-  'full-height': 'hero',
-  portrait: 'banner',
+  'full-height': 'banner',
+  portrait: 'feature',
   square: 'feature',
   landscape: 'feature',
 };

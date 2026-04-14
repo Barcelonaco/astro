@@ -53,8 +53,6 @@ const faviconUrl = faviconSetting ? (faviconSetting.startsWith('http') ? favicon
 <!-- Global Metadata -->
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<!-- Preconnect to external origins for faster resource loading -->
-<link rel="preconnect" href="https://lh3.googleusercontent.com" crossorigin />
 {/* LCP image preload — MUST appear before any CSS to start download immediately */}
 {lcpImage?.mobile && <link rel="preload" as="image" href={lcpImage.mobile} media="(max-width: 600px)" fetchpriority="high" />}
 {lcpImage?.desktop && <link rel="preload" as="image" href={lcpImage.desktop} media="(min-width: 601px)" fetchpriority="high" />}
