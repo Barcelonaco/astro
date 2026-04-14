@@ -65,7 +65,8 @@ const imageAlt = resolveImageAlt(data.image);
 const imageTitle = resolveImageTitle(data.image);
 // Responsive srcset — serve right size for viewport width
 const rawImgUrl = typeof data.image === 'string' ? data.image : (data.image as any)?.url || '';
-const imgSrcset = responsiveSrcset(rawImgUrl, [400, 600, 800], 75);
+// srcset: 400w for mobile 1x, 600w for mobile 2x retina — max display width ~400px
+const imgSrcset = responsiveSrcset(rawImgUrl, [400, 600], 75);
 const imageDims = resolveImageDimensions(data.image);
 
 // Vidéo
