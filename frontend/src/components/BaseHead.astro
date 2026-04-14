@@ -66,8 +66,8 @@ const faviconUrl = faviconSetting ? (faviconSetting.startsWith('http') ? favicon
 {/* Critical CSS — inlined at build time to eliminate render-blocking request */}
 {criticalCss && <style set:html={criticalCss} />}
 {!criticalCss && <link rel="stylesheet" href="/nickl-assets/css/app-critical.css" />}
-{/* Deferred CSS — loaded after page is interactive to avoid unused-CSS penalty */}
-<script set:html={`window.addEventListener('load',function(){(window.requestIdleCallback||function(c){setTimeout(c,50)})(function(){var l=document.createElement('link');l.rel='stylesheet';l.href='/nickl-assets/css/app-deferred.css';document.head.appendChild(l)})})`} />
+{/* Deferred CSS — non-blocking, fetched in parallel but doesn't block render */}
+<link rel="stylesheet" href="/nickl-assets/css/app-deferred.css" media="print" onload="this.media='all'" />
 <noscript><link rel="stylesheet" href="/nickl-assets/css/app-deferred.css" /></noscript>
 <link rel="sitemap" href="/sitemap-index.xml" />
 <link
