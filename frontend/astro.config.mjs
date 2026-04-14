@@ -11,8 +11,7 @@ export default defineConfig({
 	integrations: [mdx(), sitemap()],
 	scopedStyleStrategy: 'where',
 	build: {
-		// Inline all Astro CSS to avoid additional render-blocking external requests.
-		// app.css (Nickl) is the only external CSS — loaded as blocking to prevent CLS.
-		inlineStylesheets: 'always',
+		// 'auto' inlines small styles, externalizes large ones — avoids HTML bloat
+		inlineStylesheets: 'auto',
 	},
 });

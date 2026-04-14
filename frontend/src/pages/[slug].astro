@@ -47,7 +47,7 @@ function extractLcpImages(blocks: any[] | null): { desktop: string; mobile: stri
     const imgUrl = typeof first.data.image === 'string' ? first.data.image : first.data.image?.url || '';
     if (imgUrl) {
       return {
-        desktop: optimizedImageUrl(imgUrl, 900, 75),
+        desktop: optimizedImageUrl(imgUrl, 800, 75),
         mobile: optimizedImageUrl(imgUrl, 400, 70),
       };
     }

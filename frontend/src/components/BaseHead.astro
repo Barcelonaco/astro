@@ -57,8 +57,9 @@ const faviconUrl = faviconSetting ? (faviconSetting.startsWith('http') ? favicon
 .popin-gallery-wrapper{position:fixed;top:0;left:0;width:100%;height:100%;visibility:hidden;opacity:0;z-index:9999;transition:all .6s ease}
 .popin-gallery-wrapper.active{visibility:visible;opacity:1}
 </style>
-{/* Critical CSS — inlined at build time, zero render-blocking external requests */}
-{criticalCss && <style set:html={criticalCss} />}
+{/* Critical CSS — small external file (13KB gz), preloaded for fast discovery */}
+<link rel="preload" href="/nickl-assets/css/app-critical.css" as="style" />
+<link rel="stylesheet" href="/nickl-assets/css/app-critical.css" />
 {/* Deferred CSS — non-blocking (footer, pages, modules, woocommerce) */}
 <link rel="stylesheet" href="/nickl-assets/css/app-deferred.css" media="print" onload="this.media='all'" />
 <noscript><link rel="stylesheet" href="/nickl-assets/css/app-deferred.css" /></noscript>
