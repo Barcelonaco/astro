@@ -72,7 +72,7 @@ if (fontGeneral) fontsToLoad.add(fontGeneral);
 const googleFontsUrl = fontsToLoad.size > 0
   ? 'https://fonts.googleapis.com/css2?' +
     Array.from(fontsToLoad).map(f => `family=${f.replace(/ /g, '+')}:wght@400;500;600;700`).join('&') +
-    '&display=optional'
+    '&display=swap'
   : '';
 
 // Fetch @font-face CSS and self-host the woff2 files
