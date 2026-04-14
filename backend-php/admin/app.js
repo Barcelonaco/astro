@@ -173,7 +173,7 @@ function initAdminTopBar() {
   if (!bar) return;
 
   // Frontend URL
-  const frontendUrl = siteSettingsCache?.frontend_url || 'http://localhost:4321';
+  const frontendUrl = siteSettingsCache?.frontend_url || window.location.origin;
   const viewSiteLink = document.getElementById('topBarViewSite');
   if (viewSiteLink) viewSiteLink.href = frontendUrl;
 
@@ -2700,8 +2700,8 @@ async function renderPageBuilder() {
   const backSection = isCPT ? `cpt:${cptDef.slug}` : 'pages';
   const saveFunc = isCPT ? 'saveCPTBuilder()' : 'savePageBuilder()';
   const viewUrl = isCPT
-    ? `${siteSettingsCache?.frontend_url || 'http://localhost:4321'}/${cptDef.slug}/${encodeURIComponent(m.slug)}`
-    : `${siteSettingsCache?.frontend_url || 'http://localhost:4321'}/pages/${encodeURIComponent(m.slug)}`;
+    ? `${siteSettingsCache?.frontend_url || window.location.origin}/${cptDef.slug}/${encodeURIComponent(m.slug)}`
+    : `${siteSettingsCache?.frontend_url || window.location.origin}/pages/${encodeURIComponent(m.slug)}`;
   const titlePlaceholder = isCPT ? `Titre de l'${cptDef.label.toLowerCase()}` : 'Titre de la page';
 
   // CPT sidebar: featured image, excerpt, categories, custom fields
@@ -9044,7 +9044,7 @@ async function savePageBuilder() {
 
     // Update "Voir la page" link with current slug
     const viewBtn = document.getElementById('viewPageBtn');
-    if (viewBtn) viewBtn.href = `${siteSettingsCache?.frontend_url || 'http://localhost:4321'}/pages/${encodeURIComponent(slug)}`;
+    if (viewBtn) viewBtn.href = `${siteSettingsCache?.frontend_url || window.location.origin}/pages/${encodeURIComponent(slug)}`;
     clearBuilderDirty();
   } catch (error) {
     hideLoading();
@@ -12766,6 +12766,31 @@ function showToast(message, type = 'success') {
   container.appendChild(toast);
 
   setTimeout(() => toast.remove(), 4000);
+}
+
+async function clearAllCaches() {
+  // Module templates & field schema
+  Object.keys(moduleTemplateCache).forEach(k => delete moduleTemplateCache[k]);
+  moduleFieldSchema = null;
+  _layoutToModuleName = null;
+  siteSettingsCache = null;
+  moduleStylesLoaded.clear();
+  moduleAdminStylesLoaded.clear();
+  // Remove dynamically loaded module CSS <link> elements
+  document.querySelectorAll('link[data-module-layout], link[data-module-admin-layout]').forEach(el => el.remove());
+  // Reload schema + settings then refresh current view
+  await Promise.all([loadModuleFieldSchema(), loadSiteSettings()]);
+  const btn = document.getElementById('topBarClearCache');
+  if (btn) {
+    const icon = btn.querySelector('i');
+    if (icon) { icon.className = 'fa-solid fa-check'; setTimeout(() => { icon.className = 'fa-solid fa-broom'; }, 1200); }
+  }
+  // Re-render current view
+  if (pageBuilderState.editingPageId) {
+    openPageBuilder(pageBuilderState.editingPageId);
+  } else {
+    showSection(document.querySelector('.nav-link.active')?.dataset?.section || 'dashboard');
+  }
 }
 
 async function logout() {
