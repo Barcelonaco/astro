@@ -85,7 +85,7 @@ const indexPopin = Math.floor(Math.random() * 1000);
                       {photos.map((photo) => (
                         <div class="swiper-slide">
                           <a href={`/references/${ref.slug}`} class="illus-wrapper">
-                            <img src={optimizedImageUrl(photo, 600, 75)} srcset={responsiveSrcset(photo, [300, 450, 600], 75) || undefined} sizes="(max-width: 600px) 100vw, 33vw" alt={ref.title} class="illus" width="400" height="300" loading="lazy" />
+                            <img src={optimizedImageUrl(photo, 600, 75)} srcset={responsiveSrcset(photo, [300, 500, 600], 75) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 1024px) 50vw, 33vw" alt={ref.title} class="illus" width="400" height="300" loading="lazy" />
                             <div class="overlay">
                               <span class="icon" aria-hidden="true">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>
@@ -102,7 +102,7 @@ const indexPopin = Math.floor(Math.random() * 1000);
                   </div>
                 ) : (
                   <a href={`/references/${ref.slug}`} class="illus-wrapper" style="position:relative;overflow:hidden;">
-                    {mainImage && <img src={optimizedImageUrl(mainImage, 600, 75)} srcset={responsiveSrcset(mainImage, [300, 450, 600], 75) || undefined} sizes="(max-width: 600px) 100vw, 33vw" alt={ref.title} class="illus" width="400" height="300" loading="lazy" />}
+                    {mainImage && <img src={optimizedImageUrl(mainImage, 600, 75)} srcset={responsiveSrcset(mainImage, [300, 500, 600], 75) || undefined} sizes="(max-width: 600px) 100vw, (max-width: 1024px) 50vw, 33vw" alt={ref.title} class="illus" width="400" height="300" loading="lazy" />}
                     <div class="overlay">
                       <span class="icon" aria-hidden="true">
                         <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>

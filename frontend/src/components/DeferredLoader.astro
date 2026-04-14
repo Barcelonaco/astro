@@ -47,8 +47,8 @@ document.addEventListener('DOMContentLoaded',function(){
 window.addEventListener('load',function(){
   var needsSwiper=document.querySelector('.js_images-slider')||document.querySelector('.js_logos-slider')||document.querySelector('.js_references-slider')||document.querySelector('.js_ref-single-slider')||document.querySelector('.js_google-reviews-slider');
   if(!needsSwiper)return;
-  var lc=document.createElement('link');lc.rel='stylesheet';lc.href='https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css';document.head.appendChild(lc);
-  var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js';
+  var lc=document.createElement('link');lc.rel='stylesheet';lc.href='/vendor/swiper/swiper-bundle.min.css';document.head.appendChild(lc);
+  var s=document.createElement('script');s.src='/vendor/swiper/swiper-bundle.min.js';
   s.onload=function(){
     (window.requestIdleCallback||function(c){setTimeout(c,0)})(function(){
       document.querySelectorAll('.js_images-slider').forEach(function(e,i){

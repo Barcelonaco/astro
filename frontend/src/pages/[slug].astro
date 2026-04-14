@@ -36,7 +36,7 @@ function extractLcpImages(blocks: any[] | null): { desktop: string; mobile: stri
     const mobileUrl = slide.image_mobile?.url || slide.image.url;
     return {
       desktop: optimizedImageUrl(slide.image.url, 1440, 80),
-      mobile: optimizedImageUrl(mobileUrl, 600, 70),
+      mobile: optimizedImageUrl(mobileUrl, 400, 70),
     };
   }
   if (first.type === 'banner' && first.data?.image?.url) {

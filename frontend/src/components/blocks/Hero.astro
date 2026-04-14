@@ -46,10 +46,10 @@ function normalizeCta(cta: any): { url: string; title: string; target: string } 
                     />
                     <source
                       media="(max-width: 600px)"
-                      srcset={optimizedImageUrl(slide.image_mobile?.url || slide.image?.url || getDefaultImageUrl(), 600, 70)}
+                      srcset={optimizedImageUrl(slide.image_mobile?.url || slide.image?.url || getDefaultImageUrl(), 400, 70)}
                     />
                     <img
-                      src={optimizedImageUrl(slide.image_mobile?.url || slide.image?.url || getDefaultImageUrl(), 600, 70)}
+                      src={optimizedImageUrl(slide.image_mobile?.url || slide.image?.url || getDefaultImageUrl(), 400, 70)}
                       alt={slide.image?.alt ?? ''}
                       class="illus"
                       width="1920"
