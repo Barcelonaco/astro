@@ -20,7 +20,8 @@ class SettingsController {
 
     public static function getAllSettings(): void {
         $settings = self::getSettingsMap();
-        $settings['frontend_url'] = $_ENV['FRONTEND_URL'] ?? 'http://localhost:4321';
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $settings['frontend_url'] = $_ENV['FRONTEND_URL'] ?? ($protocol . '://' . $_SERVER['HTTP_HOST']);
         json_response($settings);
     }
 
