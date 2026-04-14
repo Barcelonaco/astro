@@ -16,7 +16,11 @@ import { MEDIA_ORIGIN } from '../lib/api';
 // Read critical CSS at build time and inline it — zero render-blocking requests
 const criticalCssPath = path.join(process.cwd(), 'public', 'nickl-assets', 'css', 'app-critical.css');
 let criticalCss = '';
-try { criticalCss = fs.readFileSync(criticalCssPath, 'utf-8'); } catch {}
+try {
+  criticalCss = fs.readFileSync(criticalCssPath, 'utf-8');
+  // Fix unresolved Bud ~@images alias — in inline context, use absolute path
+  criticalCss = criticalCss.replaceAll('~@images/', '/nickl-assets/images/').replaceAll('../images/', '/nickl-assets/images/');
+} catch {}
 
 interface Props {
 	title: string;
