@@ -46,31 +46,13 @@ const faviconUrl = faviconSetting ? (faviconSetting.startsWith('http') ? favicon
 {lcpImage?.mobile && <link rel="preload" as="image" href={lcpImage.mobile} media="(max-width: 600px)" fetchpriority="high" />}
 {lcpImage?.desktop && <link rel="preload" as="image" href={lcpImage.desktop} media="(min-width: 601px)" fetchpriority="high" />}
 <style>
-/* Critical CSS — prevents FOUC while app.css loads async */
-*,*:before,*:after{box-sizing:border-box;-webkit-font-smoothing:antialiased}
-body{margin:0}
-img{border-style:none;max-width:100%;height:auto}
-.container{width:100%;max-width:calc(5vw*2 + 1430px);margin-right:auto;margin-left:auto;padding-right:5vw;padding-left:5vw}
-.container-large{width:100%;max-width:120rem;margin-right:auto;margin-left:auto;padding-right:5vw;padding-left:5vw}
-.module{position:relative;padding-top:calc(75px + 3.90625vw);padding-bottom:calc(75px + 3.90625vw)}
-.has-padding-top-none{padding-top:0!important}
-.has-padding-top-small{padding-top:calc(35px + 1.953125vw)!important}
-.has-padding-bottom-none{padding-bottom:0!important}
-.has-padding-bottom-small{padding-bottom:calc(35px + 1.953125vw)!important}
-.has-background-primary{background-color:var(--color-primary,#3ee98d)}
-.has-background-secondary{background-color:var(--color-secondary,#02bd9c);color:var(--color-background,#fff)}
-.has-background-tertiary{background-color:var(--color-tertiary,#d6d6d6)}
-.has-background-image{overflow:hidden}
-.has-background-image>.background-image{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0}
-.is-fullscreen>.container,.is-fullscreen>.container-large{max-width:100%;padding-left:0;padding-right:0}
-.slider-navigation{position:absolute;z-index:5;top:50%;display:none;padding:.625rem;border:0;transform:translateY(-50%);background:none;cursor:pointer}
 /* Popin overlay — needs to be ready before JS */
 .popin-gallery-wrapper{position:fixed;top:0;left:0;width:100%;height:100%;visibility:hidden;opacity:0;z-index:9999;transition:all .6s ease}
 .popin-gallery-wrapper.active{visibility:visible;opacity:1}
 </style>
-{/* app.css — loaded async to unblock rendering (~3.6 MB). Critical styles inlined above. */}
-<link rel="stylesheet" href="/nickl-assets/css/app.css" media="print" onload="this.media='all'" />
-<noscript><link rel="stylesheet" href="/nickl-assets/css/app.css" /></noscript>
+{/* Preload hint starts download early, blocking link applies styles */}
+<link rel="preload" href="/nickl-assets/css/app.css" as="style" />
+<link rel="stylesheet" href="/nickl-assets/css/app.css" />
 <link rel="sitemap" href="/sitemap-index.xml" />
 <link
 	rel="alternate"
