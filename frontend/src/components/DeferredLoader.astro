@@ -43,13 +43,13 @@ document.addEventListener('DOMContentLoaded',function(){
   });
 });
 
-// ── Other sliders — load Swiper after page load, no artificial delay ──
-window.addEventListener('load',function(){
-  var needsSwiper=document.querySelector('.js_images-slider')||document.querySelector('.js_logos-slider')||document.querySelector('.js_references-slider')||document.querySelector('.js_ref-single-slider')||document.querySelector('.js_google-reviews-slider');
-  if(!needsSwiper)return;
-  var lc=document.createElement('link');lc.rel='stylesheet';lc.href='/vendor/swiper/swiper-bundle.min.css';document.head.appendChild(lc);
-  var s=document.createElement('script');s.src='/vendor/swiper/swiper-bundle.min.js';
-  s.onload=function(){
+// ── Other sliders — load Swiper only when a slider is near viewport ──
+(function(){
+  var sliderSelectors='.js_images-slider,.js_logos-slider,.js_references-slider,.js_ref-single-slider,.js_google-reviews-slider';
+  var sliders=document.querySelectorAll(sliderSelectors);
+  if(!sliders.length)return;
+  var loaded=false;
+  function initSliders(){
     (window.requestIdleCallback||function(c){setTimeout(c,0)})(function(){
       document.querySelectorAll('.js_images-slider').forEach(function(e,i){
         if(e.closest('.popin-wrapper'))return;
@@ -77,7 +77,21 @@ window.addEventListener('load',function(){
         new window.Swiper(e,{loop:c>2,speed:750,slidesPerView:1,autoplay:{delay:4e3,disableOnInteraction:!0},navigation:{nextEl:w?w.querySelector('.next'):null,prevEl:w?w.querySelector('.prev'):null}});
       });
     });
-  };
-  document.head.appendChild(s);
-});
+  }
+  function loadSwiper(){
+    if(loaded)return;loaded=true;
+    var lc=document.createElement('link');lc.rel='stylesheet';lc.href='/vendor/swiper/swiper-bundle.min.css';document.head.appendChild(lc);
+    var s=document.createElement('script');s.src='/vendor/swiper/swiper-bundle.min.js';
+    s.onload=initSliders;
+    document.head.appendChild(s);
+  }
+  if('IntersectionObserver' in window){
+    var obs=new IntersectionObserver(function(entries){
+      for(var i=0;i<entries.length;i++){if(entries[i].isIntersecting){loadSwiper();obs.disconnect();return;}}
+    },{rootMargin:'300px'});
+    sliders.forEach(function(el){obs.observe(el)});
+  }else{
+    window.addEventListener('load',loadSwiper);
+  }
+})();
 </script>

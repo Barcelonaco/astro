@@ -17,8 +17,8 @@ const widgetId = (data.trustindex_widget_id as string) || '';
 
 <NicklModuleWrapper data={data} moduleName="review" containerLarge>
   {widgetId ? (
-    <div class="trustindex-widget-wrapper">
-      <script is:inline src={`https://cdn.trustindex.io/loader.js?${widgetId}`} defer></script>
+    <div class="trustindex-widget-wrapper" data-ti-widget-id={widgetId}>
+      <div class="ti-placeholder" style="min-height:200px;"></div>
     </div>
   ) : (
     <p class="placeholder-message" style="text-align:center;opacity:0.6;">
@@ -26,3 +26,29 @@ const widgetId = (data.trustindex_widget_id as string) || '';
     </p>
   )}
 </NicklModuleWrapper>
+
+{widgetId && (
+  <script is:inline>
+  (function(){
+    var loaded=false;
+    var el=document.querySelector('[data-ti-widget-id]');
+    if(!el)return;
+    var id=el.getAttribute('data-ti-widget-id');
+    function load(){
+      if(loaded)return;loaded=true;
+      var s=document.createElement('script');
+      s.src='https://cdn.trustindex.io/loader.js?'+id;
+      s.defer=true;
+      el.appendChild(s);
+    }
+    if('IntersectionObserver' in window){
+      new IntersectionObserver(function(entries,obs){
+        if(entries[0].isIntersecting){load();obs.disconnect();}
+      },{rootMargin:'200px'}).observe(el);
+    }else{
+      window.addEventListener('load',load);
+    }
+  })();
+  </script>
+)}
+
