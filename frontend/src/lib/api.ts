@@ -1,5 +1,13 @@
 const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api'
 
+/**
+ * Origin used for media/upload URLs in built HTML.
+ * BUILD_MEDIA_ORIGIN overrides so that a local build-time API (127.0.0.1)
+ * doesn't leak into production pages.
+ */
+export const MEDIA_ORIGIN: string = import.meta.env.BUILD_MEDIA_ORIGIN
+  || API_URL.replace(/\/api\/?$/, '')
+
 export interface Post {
   id: number
   title: string

@@ -92,7 +92,7 @@ jobs:
 
             cd "$REMOTE_ROOT/frontend"
             npm i
-            BUILD_API_URL=http://127.0.0.1:8891/api npm run build
+            BUILD_API_URL=http://127.0.0.1:8891/api BUILD_MEDIA_ORIGIN=https://astro.bcnco.site npm run build
 
             kill $PHP_PID 2>/dev/null || true
 

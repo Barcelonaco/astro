@@ -5,6 +5,7 @@
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { resolveImageUrl, resolveImageAlt } from '../../lib/module-helpers';
+import { MEDIA_ORIGIN } from '../../lib/api';
 
 interface Props {
   data: Record<string, any>;
@@ -12,8 +13,7 @@ interface Props {
 
 const { data } = Astro.props;
 
-const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
-const apiOrigin = new URL(API_URL).origin;
+const apiOrigin = MEDIA_ORIGIN;
 
 const quoteText = (data.quote as string) || '';
 const photo = data.photo as any;

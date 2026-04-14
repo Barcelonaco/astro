@@ -1,12 +1,13 @@
 ---
+import { MEDIA_ORIGIN } from '../../lib/api';
+
 interface Props {
   data: Record<string, any>;
 }
 
 const { data } = Astro.props as Props;
 
-const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
-const apiOrigin = new URL(API_URL).origin;
+const apiOrigin = MEDIA_ORIGIN;
 
 const id = (data.id_bloc as string) ?? '';
 const blocColor = (data.bloc_color as string) ?? '';

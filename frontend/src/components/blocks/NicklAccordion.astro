@@ -1,5 +1,6 @@
 ---
 import { buildModuleClasses, cleanHtml, resolveBackgroundImage } from '../../lib/module-classes';
+import { MEDIA_ORIGIN } from '../../lib/api';
 
 interface NicklAccordionProps {
   data: Record<string, any>;
@@ -7,8 +8,7 @@ interface NicklAccordionProps {
 
 const { data } = Astro.props as NicklAccordionProps;
 
-const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
-const apiOrigin = new URL(API_URL).origin;
+const apiOrigin = MEDIA_ORIGIN;
 
 const id = (data.id as string) ?? (data.id_bloc as string) ?? '';
 const classes = buildModuleClasses(data);

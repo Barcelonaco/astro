@@ -7,9 +7,9 @@
 
 // LIBS
 // ----------------------------------------
-@import '../../node_modules/swiper/swiper-bundle.min.css';
-@import '../../node_modules/mapbox-gl/dist/mapbox-gl.css';
-@import '../../node_modules/vanilla-cookieconsent/dist/cookieconsent.css';
+// Swiper: loaded on-demand via DeferredLoader (/vendor/swiper/swiper-bundle.min.css)
+// Mapbox GL: loaded via CDN in NicklMap/NicklContact blocks
+// CookieConsent: loaded via JS import in CookieConsent.astro
 
 
 // COMPONENT

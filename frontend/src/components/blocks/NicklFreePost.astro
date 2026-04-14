@@ -1,6 +1,7 @@
 ---
 import { cleanHtml } from '../../lib/module-classes';
 import { optimizedImageUrl, responsiveSrcset, getDefaultImageUrl } from '../../lib/module-helpers';
+import { MEDIA_ORIGIN } from '../../lib/api';
 
 interface NicklFreePostProps {
   data: Record<string, any>;
@@ -8,8 +9,7 @@ interface NicklFreePostProps {
 
 const { data } = Astro.props as NicklFreePostProps;
 
-const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
-const apiOrigin = new URL(API_URL).origin;
+const apiOrigin = MEDIA_ORIGIN;
 
 const id = (data.id_bloc as string) ?? '';
 const blocColor = (data.bloc_color as string) ?? '';

@@ -2,6 +2,7 @@
 import BlockRenderer from './BlockRenderer.astro';
 import ModuleStyles from './ModuleStyles.astro';
 import '../styles/footer.css';
+import { MEDIA_ORIGIN } from '../lib/api';
 
 interface Props {
   siteSettings?: Record<string, string>;
@@ -10,8 +11,7 @@ interface Props {
 
 const { siteSettings: s = {}, styleSettings: st = {} } = Astro.props;
 
-const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
-const apiOrigin = API_URL.replace(/\/api\/?$/, '');
+const apiOrigin = MEDIA_ORIGIN;
 
 function resolveUrl(url: string) {
   if (!url) return '';

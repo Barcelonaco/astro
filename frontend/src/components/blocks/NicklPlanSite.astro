@@ -5,7 +5,7 @@
  * Reproduit le comportement du shortcode [plan_du_site] WordPress.
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
-import { getAllPages, getAllPosts } from '../../lib/api';
+import { getAllPages, getAllPosts, MEDIA_ORIGIN } from '../../lib/api';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -16,7 +16,7 @@ interface Props {
 const { data } = Astro.props;
 
 const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'https://astro.lan/api';
-const apiOrigin = new URL(API_URL).origin;
+const apiOrigin = MEDIA_ORIGIN;
 
 // --- Fetch pages ---
 let pages: any[] = [];
