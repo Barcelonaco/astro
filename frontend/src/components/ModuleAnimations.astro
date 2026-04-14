@@ -151,44 +151,51 @@
   var OVERLAP = 200;
 
   // ── Setup : état initial (hidden) ──
+  // Batch all geometry reads BEFORE any writes to avoid forced reflow
   var modulesToObserve = [];
+  var viewportHeight = window.innerHeight;
+  var moduleEntries = []; // { mod, moduleClass, inViewport }
 
   Object.keys(ANIM).forEach(function(moduleClass) {
     var modules = document.querySelectorAll('.module.' + moduleClass);
     if (modules.length === 0) return;
-
     modules.forEach(function(mod) {
-      // Skip modules already in the viewport — animating them causes CLS
       var rect = mod.getBoundingClientRect();
-      if (rect.top < window.innerHeight && rect.bottom > 0) return;
+      moduleEntries.push({ mod: mod, moduleClass: moduleClass, inViewport: rect.top < viewportHeight && rect.bottom > 0 });
+    });
+  });
 
-      var steps = ANIM[moduleClass];
-      var cumulDelay = 0;
+  // Now apply writes (style changes) without interleaved reads
+  moduleEntries.forEach(function(entry) {
+    // Skip modules already in the viewport — animating them causes CLS
+    if (entry.inViewport) return;
 
-      steps.forEach(function(step) {
-        var els = mod.querySelectorAll(step.sel);
-        if (els.length === 0) return;
+    var steps = ANIM[entry.moduleClass];
+    var cumulDelay = 0;
 
-        els.forEach(function(el, i) {
-          // Position initiale
-          var tx = step.x ? step.x + 'px' : '0';
-          var ty = step.y ? step.y + 'px' : '0';
-          el.style.opacity = '0';
-          el.style.transform = 'translate(' + tx + ', ' + ty + ')';
-          el.style.willChange = 'opacity, transform';
+    steps.forEach(function(step) {
+      var els = entry.mod.querySelectorAll(step.sel);
+      if (els.length === 0) return;
 
-          // Calcul du délai pour chaque élément
-          var d = cumulDelay + (step.delay || 0) + (step.stagger ? i * 100 : 0);
-          el.setAttribute('data-anim-delay', String(d));
-        });
+      els.forEach(function(el, i) {
+        // Position initiale
+        var tx = step.x ? step.x + 'px' : '0';
+        var ty = step.y ? step.y + 'px' : '0';
+        el.style.opacity = '0';
+        el.style.transform = 'translate(' + tx + ', ' + ty + ')';
+        el.style.willChange = 'opacity, transform';
 
-        // Avance le délai cumulé (avec overlap comme GSAP timeline)
-        var lastStagger = step.stagger ? (els.length - 1) * 100 : 0;
-        cumulDelay += Math.max(0, 700 + lastStagger + (step.delay || 0) - OVERLAP);
+        // Calcul du délai pour chaque élément
+        var d = cumulDelay + (step.delay || 0) + (step.stagger ? i * 100 : 0);
+        el.setAttribute('data-anim-delay', String(d));
       });
 
-      modulesToObserve.push(mod);
+      // Avance le délai cumulé (avec overlap comme GSAP timeline)
+      var lastStagger = step.stagger ? (els.length - 1) * 100 : 0;
+      cumulDelay += Math.max(0, 700 + lastStagger + (step.delay || 0) - OVERLAP);
     });
+
+    modulesToObserve.push(entry.mod);
   });
 
   if (modulesToObserve.length === 0) return;

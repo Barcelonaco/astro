@@ -64,8 +64,10 @@ export function resolveImageUrl(
     rawUrl = rawUrl.startsWith('http') ? rawUrl : apiOrigin + rawUrl;
   }
   // Auto-optimize local uploads to WebP
-  // Use 900px for standard container images; banner/hero sizes use explicit widths
-  return optimizedImageUrl(rawUrl, 900, 80);
+  // Use size-appropriate widths: small for icons/thumbnails, 900px for standard containers
+  const SMALL_SIZES = ['thumbnail', 'icon', 'module-logo'];
+  const optWidth = preferredSize && SMALL_SIZES.includes(preferredSize) ? 200 : 900;
+  return optimizedImageUrl(rawUrl, optWidth, 80);
 }
 
 /**

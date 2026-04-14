@@ -11,7 +11,7 @@ export default defineConfig({
 	integrations: [mdx(), sitemap()],
 	scopedStyleStrategy: 'where',
 	build: {
-		// 'auto' inlines small styles, externalizes large ones — avoids HTML bloat
-		inlineStylesheets: 'auto',
+		// Inline all stylesheets to eliminate render-blocking CSS requests
+		inlineStylesheets: 'always',
 	},
 });
