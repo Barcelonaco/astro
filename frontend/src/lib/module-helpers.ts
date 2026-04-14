@@ -3,6 +3,123 @@
  * Remplace les helpers PHP GlobalHelper::getVideoID, etc.
  */
 
+// ---------------------------------------------------------------------------
+// Image presets — qualité et tailles adaptées par contexte de module
+// ---------------------------------------------------------------------------
+
+export interface ImagePreset {
+  /** Largeur de l'image principale (px) */
+  width: number;
+  /** Qualité de compression (0-100) */
+  quality: number;
+  /** Format de sortie */
+  format: 'webp' | 'avif';
+  /** Largeurs pour le srcset responsive */
+  srcsetWidths: number[];
+  /** Qualité pour le srcset (peut être légèrement inférieure) */
+  srcsetQuality: number;
+}
+
+/**
+ * Presets d'images par contexte de module.
+ * - hero/banner : qualité maximale, grandes tailles (pleine largeur, impact visuel)
+ * - feature : haute qualité pour les images principales de modules (text-image, gallery 1col, video poster)
+ * - card : qualité intermédiaire pour les vignettes (news slider, references, clickable tiles)
+ * - thumbnail : qualité réduite pour les petits formats (gallery grid, team, contact)
+ * - icon : minimum pour les logos, icônes, ornements
+ */
+export const IMAGE_PRESETS: Record<string, ImagePreset> = {
+  hero: {
+    width: 1920,
+    quality: 88,
+    format: 'webp',
+    srcsetWidths: [600, 960, 1440, 1920],
+    srcsetQuality: 85,
+  },
+  banner: {
+    width: 1440,
+    quality: 85,
+    format: 'webp',
+    srcsetWidths: [600, 900, 1440],
+    srcsetQuality: 82,
+  },
+  feature: {
+    width: 1050,
+    quality: 82,
+    format: 'webp',
+    srcsetWidths: [500, 750, 1050],
+    srcsetQuality: 80,
+  },
+  card: {
+    width: 700,
+    quality: 80,
+    format: 'webp',
+    srcsetWidths: [350, 500, 700],
+    srcsetQuality: 78,
+  },
+  thumbnail: {
+    width: 500,
+    quality: 78,
+    format: 'webp',
+    srcsetWidths: [250, 350, 500],
+    srcsetQuality: 75,
+  },
+  icon: {
+    width: 220,
+    quality: 80,
+    format: 'webp',
+    srcsetWidths: [110, 220],
+    srcsetQuality: 78,
+  },
+};
+
+/**
+ * Mapping module-type → preset name.
+ * Permet à chaque bloc d'obtenir automatiquement le bon preset.
+ */
+export const MODULE_PRESET_MAP: Record<string, string> = {
+  // Hero & Banners — pleine largeur, qualité maximale
+  'hero': 'hero',
+  'banner': 'banner',
+  'images-slider': 'banner',
+  'images-videos-parallax': 'banner',
+  'slider-text-video': 'banner',
+  // Feature — images principales de module
+  'text-image': 'feature',
+  'illus-video': 'feature',
+  'video': 'feature',
+  'quote': 'feature',
+  'contact': 'feature',
+  'ornament': 'feature',
+  // Card — vignettes moyennes
+  'news-slider': 'card',
+  'events-slider': 'card',
+  'bloc-references': 'card',
+  'clickable-tiles': 'card',
+  'free-post': 'card',
+  'product': 'card',
+  // Thumbnail — petits formats, grilles
+  'gallery': 'thumbnail',
+  'team': 'thumbnail',
+  'key-figures': 'thumbnail',
+  // Icon — logos, petits éléments
+  'logos-slider': 'icon',
+  'icons': 'icon',
+};
+
+/** Retourne le preset d'image pour un type de module donné */
+export function getImagePreset(moduleType: string): ImagePreset {
+  const presetName = MODULE_PRESET_MAP[moduleType] || 'card';
+  return IMAGE_PRESETS[presetName] || IMAGE_PRESETS.card;
+}
+
+/** Retourne un preset par nom direct */
+export function getPreset(name: string): ImagePreset {
+  return IMAGE_PRESETS[name] || IMAGE_PRESETS.card;
+}
+
+// ---------------------------------------------------------------------------
+
 /** URL de l'image de remplacement du site (settings.replacement_image) */
 let _defaultImageUrl = '';
 
@@ -43,13 +160,19 @@ export function extractDailymotionId(url: string): string {
 /**
  * Résout l'URL d'une image ACF.
  * Accepte un objet {url, sizes: {banner, ...}} ou une string.
+ * @param preset - Nom du preset ('hero', 'banner', 'feature', 'card', 'thumbnail', 'icon')
+ *                 pour adapter automatiquement largeur et qualité au contexte du module.
  */
 export function resolveImageUrl(
   img: unknown,
   apiOrigin: string,
-  preferredSize?: string
+  preferredSize?: string,
+  preset?: string
 ): string {
-  if (!img) return _defaultImageUrl ? optimizedImageUrl(_defaultImageUrl, 900, 80) : '';
+  const p = preset ? getPreset(preset) : null;
+  const defaultW = p ? p.width : 900;
+  const defaultQ = p ? p.quality : 82;
+  if (!img) return _defaultImageUrl ? optimizedImageUrl(_defaultImageUrl, defaultW, defaultQ) : '';
   let rawUrl = '';
   if (typeof img === 'string') {
     rawUrl = img.startsWith('http') ? img : apiOrigin + img;
@@ -60,14 +183,14 @@ export function resolveImageUrl(
     } else {
       rawUrl = obj.url || obj.sizes?.banner || '';
     }
-    if (!rawUrl) return _defaultImageUrl ? optimizedImageUrl(_defaultImageUrl, 900, 80) : '';
+    if (!rawUrl) return _defaultImageUrl ? optimizedImageUrl(_defaultImageUrl, defaultW, defaultQ) : '';
     rawUrl = rawUrl.startsWith('http') ? rawUrl : apiOrigin + rawUrl;
   }
-  // Auto-optimize local uploads to WebP
-  // Use size-appropriate widths: small for icons/thumbnails, 900px for standard containers
+  // Use preset dimensions or fallback to size-based heuristic
   const SMALL_SIZES = ['thumbnail', 'icon', 'module-logo'];
-  const optWidth = preferredSize && SMALL_SIZES.includes(preferredSize) ? 200 : 900;
-  return optimizedImageUrl(rawUrl, optWidth, 80);
+  const optWidth = p ? p.width : (preferredSize && SMALL_SIZES.includes(preferredSize) ? 220 : 900);
+  const optQuality = p ? p.quality : 82;
+  return optimizedImageUrl(rawUrl, optWidth, optQuality);
 }
 
 /**
@@ -108,6 +231,18 @@ export function responsiveSrcset(
   return widths
     .map(w => `/uploads/media/_optimized/${filename}?w=${w}&q=${quality}&f=${format} ${w}w`)
     .join(', ');
+}
+
+/**
+ * Generates a srcset string from an image preset.
+ * Convenience wrapper around responsiveSrcset using preset values.
+ */
+export function presetSrcset(
+  url: string,
+  preset: string
+): string {
+  const p = getPreset(preset);
+  return responsiveSrcset(url, p.srcsetWidths, p.srcsetQuality, p.format);
 }
 
 /** Récupère l'alt text d'une image ACF */

@@ -2,6 +2,7 @@ import { defineMiddleware } from 'astro:middleware';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
+import sharp from 'sharp';
 
 const BACKEND_URL = (import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL)?.replace('/api', '') || 'http://localhost:3000';
 
@@ -69,33 +70,66 @@ export const onRequest = defineMiddleware(async (context, next) => {
     if (resp) return resp;
   }
 
-  // Serve /uploads/media/_optimized/ — try disk cache first, proxy to backend for Sharp processing if not cached
+  // Serve /uploads/media/_optimized/ — try disk cache first, process with Sharp if not cached
   if (pathname.startsWith('/uploads/media/_optimized/')) {
     const filename = pathname.replace('/uploads/media/_optimized/', '');
     const params = new URLSearchParams(search);
-    const w = params.get('w') || '1200';
-    const q = params.get('q') || '80';
-    const f = params.get('f') || 'webp';
+    const w = Math.min(parseInt(params.get('w') || '1200', 10) || 1200, 2400);
+    const q = Math.min(parseInt(params.get('q') || '80', 10) || 80, 100);
+    const f = (params.get('f') === 'avif' ? 'avif' : 'webp') as 'webp' | 'avif';
     const baseName = path.parse(filename).name;
     const cacheKey = `${baseName}_${w}_${q}.${f}`;
-    const cachePath = path.join(uploadsDir, 'media/_optimized', cacheKey);
+    const cacheDir = path.join(uploadsDir, 'media/_optimized');
+    const cachePath = path.join(cacheDir, cacheKey);
 
-    // Serve from disk cache if available (avoids Sharp processing + HTTP proxy)
+    // Serve from disk cache if available
     const resp = serveFile(cachePath);
     if (resp) return resp;
 
-    // Not cached — proxy to backend for Sharp processing
-    try {
-      const backendUrl = `${BACKEND_URL}${pathname}${search}`;
-      const backendResp = await fetch(backendUrl);
-      if (backendResp.ok) {
-        const headers = new Headers();
-        const ct = backendResp.headers.get('content-type');
-        if (ct) headers.set('content-type', ct);
-        headers.set('cache-control', 'public, max-age=31536000, immutable');
-        return new Response(backendResp.body, { status: 200, headers });
+    // Not cached — process with Sharp (much better quality than GD)
+    const originalPath = path.join(uploadsDir, 'media', filename);
+    if (fs.existsSync(originalPath)) {
+      try {
+        const ext = path.extname(filename).toLowerCase();
+        // SVGs: serve as-is
+        if (ext === '.svg') {
+          return serveFile(originalPath) || new Response(null, { status: 404 });
+        }
+        // Videos: serve as-is
+        if (['.mp4', '.webm', '.mov', '.avi'].includes(ext)) {
+          return serveFile(originalPath) || new Response(null, { status: 404 });
+        }
+
+        let pipeline = sharp(originalPath).resize(w, undefined, {
+          withoutEnlargement: true,
+          fit: 'inside',
+        });
+
+        if (f === 'avif') {
+          pipeline = pipeline.avif({ quality: q, effort: 4 });
+        } else {
+          pipeline = pipeline.webp({ quality: q, effort: 4, smartSubsample: true });
+        }
+
+        const buffer = await pipeline.toBuffer();
+
+        // Write cache
+        if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+        fs.writeFileSync(cachePath, buffer);
+
+        return new Response(buffer, {
+          status: 200,
+          headers: {
+            'content-type': `image/${f}`,
+            'cache-control': 'public, max-age=31536000, immutable',
+          },
+        });
+      } catch {
+        // Fallback: serve original
+        const fallback = serveFile(originalPath);
+        if (fallback) return fallback;
       }
-    } catch {}
+    }
   }
 
   // Serve other /uploads/ directly from filesystem

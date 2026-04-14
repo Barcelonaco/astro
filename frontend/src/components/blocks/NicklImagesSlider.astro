@@ -6,7 +6,7 @@
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { resolveLink } from '../../lib/module-classes';
-import { resolveImageUrl, resolveImageAlt, optimizedImageUrl, responsiveSrcset, getDefaultImageUrl } from '../../lib/module-helpers';
+import { resolveImageUrl, resolveImageAlt, optimizedImageUrl, responsiveSrcset, getDefaultImageUrl, getPreset } from '../../lib/module-helpers';
 import { MEDIA_ORIGIN } from '../../lib/api';
 
 interface Props {
@@ -16,13 +16,14 @@ interface Props {
 const { data } = Astro.props;
 
 const apiOrigin = MEDIA_ORIGIN;
+const p = getPreset('banner');
 
 // Le Composer transforme data.sliders en $images avec des clés normalisées
 const rawSliders = (data.sliders as any[]) || [];
 const images = rawSliders.map((slide) => ({
   image_url: (() => {
     const img = slide.image;
-    if (!img) return getDefaultImageUrl() ? optimizedImageUrl(getDefaultImageUrl(), 1600, 80) : '';
+    if (!img) return getDefaultImageUrl() ? optimizedImageUrl(getDefaultImageUrl(), p.width, p.quality) : '';
     let rawUrl = '';
     if (typeof img === 'string') {
       rawUrl = img.startsWith('http') ? img : apiOrigin + img;
@@ -30,10 +31,10 @@ const images = rawSliders.map((slide) => ({
       rawUrl = img.sizes?.banner || img.url || '';
       if (rawUrl && !rawUrl.startsWith('http')) rawUrl = apiOrigin + rawUrl;
     }
-    if (!rawUrl) return getDefaultImageUrl() ? optimizedImageUrl(getDefaultImageUrl(), 1600, 80) : '';
-    return optimizedImageUrl(rawUrl, 1600, 80);
+    if (!rawUrl) return getDefaultImageUrl() ? optimizedImageUrl(getDefaultImageUrl(), p.width, p.quality) : '';
+    return optimizedImageUrl(rawUrl, p.width, p.quality);
   })(),
-  image_srcset: responsiveSrcset(typeof slide.image === 'string' ? slide.image : (slide.image as any)?.url || '', [600, 900, 1440], 75),
+  image_srcset: responsiveSrcset(typeof slide.image === 'string' ? slide.image : (slide.image as any)?.url || '', p.srcsetWidths, p.srcsetQuality),
   image_alt: resolveImageAlt(slide.image),
   has_desc: !!(slide.legend || slide.text || slide.link?.url),
   legend: (slide.legend as string) || '',

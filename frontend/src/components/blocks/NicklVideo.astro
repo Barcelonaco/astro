@@ -12,6 +12,7 @@ import {
   extractYouTubeId,
   extractVimeoId,
   extractDailymotionId,
+  getPreset,
 } from '../../lib/module-helpers';
 import { MEDIA_ORIGIN } from '../../lib/api';
 
@@ -22,6 +23,8 @@ interface Props {
 const { data } = Astro.props;
 
 const apiOrigin = MEDIA_ORIGIN;
+
+const p = getPreset('feature');
 
 // Media choice : true/1 = image, false/0 = vidéo
 const mediaChoice = isTruthy(data.media_choice);
@@ -154,7 +157,7 @@ const extraClasses = imgParallax ? 'img-parallax' : '';
     imageUrl && (
       <div class="container-large">
         <div class={`illus-wrapper ${mediaRatio}`}>
-          <img src={imageUrl} srcset={responsiveSrcset(typeof data.image === "string" ? data.image : (data.image as any)?.url || "", [400, 600, 900], 75) || undefined} sizes="100vw" alt={imageAlt} class="illus" width="800" height="450" loading="lazy" />
+          <img src={imageUrl} srcset={responsiveSrcset(typeof data.image === "string" ? data.image : (data.image as any)?.url || "", p.srcsetWidths, p.srcsetQuality) || undefined} sizes="100vw" alt={imageAlt} class="illus" width="800" height="450" loading="lazy" />
         </div>
       </div>
     )

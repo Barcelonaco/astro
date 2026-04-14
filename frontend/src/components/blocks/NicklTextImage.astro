@@ -16,6 +16,7 @@ import {
   extractYouTubeId,
   extractVimeoId,
   extractDailymotionId,
+  getPreset,
 } from '../../lib/module-helpers';
 import { MEDIA_ORIGIN } from '../../lib/api';
 
@@ -26,6 +27,7 @@ interface Props {
 const { data } = Astro.props;
 
 const apiOrigin = MEDIA_ORIGIN;
+const p = getPreset('feature');
 
 // Placement média
 const imgToLeft = isTruthy(data.img_to_left);
@@ -60,13 +62,13 @@ const rawImage = data.image;
 const imgObj = typeof rawImage === 'object' && rawImage ? rawImage as Record<string, any> : null;
 const imgRawUrl = imgObj?.sizes?.[ratioImg] || imgObj?.url || (typeof rawImage === 'string' ? rawImage : '');
 const resolvedImgUrl = imgRawUrl && !imgRawUrl.startsWith('http') ? apiOrigin + imgRawUrl : imgRawUrl;
-const imageUrl = resolvedImgUrl ? optimizedImageUrl(resolvedImgUrl, 600, 75) : resolveImageUrl(rawImage, apiOrigin, ratioImg);
+const imageUrl = resolvedImgUrl ? optimizedImageUrl(resolvedImgUrl, p.width, p.quality) : resolveImageUrl(rawImage, apiOrigin, ratioImg);
 const imageAlt = resolveImageAlt(data.image);
 const imageTitle = resolveImageTitle(data.image);
 // Responsive srcset — serve right size for viewport width
 const rawImgUrl = typeof data.image === 'string' ? data.image : (data.image as any)?.url || '';
 // srcset: 400w for mobile 1x, 600w for mobile 2x retina — max display width ~400px
-const imgSrcset = responsiveSrcset(rawImgUrl, [400, 600], 75);
+const imgSrcset = responsiveSrcset(rawImgUrl, p.srcsetWidths, p.srcsetQuality);
 const imageDims = resolveImageDimensions(data.image);
 
 // Vidéo

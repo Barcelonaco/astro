@@ -1,6 +1,6 @@
 ---
 import { buildModuleClasses } from '../../lib/module-classes';
-import { optimizedImageUrl, responsiveSrcset, getDefaultImageUrl } from '../../lib/module-helpers';
+import { optimizedImageUrl, responsiveSrcset, getDefaultImageUrl, getPreset } from '../../lib/module-helpers';
 import { MEDIA_ORIGIN } from '../../lib/api';
 
 interface Props {
@@ -36,6 +36,7 @@ const titleBloc = inColumns ? '' : ((data.title_bloc as string) ?? (data.title a
 const titleStyle = (data.title_style as number | string) ?? 2;
 const titleAlign = (data.title_align as string) ?? 'center';
 
+const p = getPreset('card');
 const listItems = (data.list_interlocking as any[]) ?? [];
 const interlockingTiles = data.interlocking_tiles === true || data.interlocking_tiles === 1 || data.interlocking_tiles === '1';
 const orientation = data.orientation === true || data.orientation === 1 || data.orientation === '1';
@@ -64,12 +65,12 @@ function resolveFileUrl(file: any): string {
   const finalUrl = url || getDefaultImageUrl();
   if (!finalUrl) return '';
   const fullUrl = finalUrl.startsWith('http') ? finalUrl : apiOrigin + finalUrl;
-  return optimizedImageUrl(fullUrl, 500, 75);
+  return optimizedImageUrl(fullUrl, p.width, p.quality);
 }
 
 function resolveFileSrcset(file: any): string {
   const url = typeof file === 'string' ? file : (file?.url || '');
-  return responsiveSrcset(url, [300, 400, 500, 700], 75);
+  return responsiveSrcset(url, p.srcsetWidths, p.srcsetQuality);
 }
 
 function isVideo(file: any): boolean {

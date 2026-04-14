@@ -5,7 +5,7 @@
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { isTruthy } from '../../lib/module-classes';
-import { optimizedImageUrl, responsiveSrcset, getDefaultImageUrl } from '../../lib/module-helpers';
+import { optimizedImageUrl, responsiveSrcset, getDefaultImageUrl, getPreset } from '../../lib/module-helpers';
 import { getActualites, type ActualiteItem } from '../../lib/api';
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
 
 const { data } = Astro.props;
 
+const p = getPreset('card');
 const displayPosts = (data.display_posts as string) || '1';
 const isManual = isTruthy(data.is_manual);
 const displayArchiveLink = isTruthy(data.display_archive_link);
@@ -70,8 +71,8 @@ function getDate(item: ActualiteItem): string {
                   <div class="illus-wrapper">
                     {image ? (
                       <img
-                        src={optimizedImageUrl(image, 600, 75)}
-                        srcset={responsiveSrcset(image, [300, 450, 600], 75) || undefined}
+                        src={optimizedImageUrl(image, p.width, p.quality)}
+                        srcset={responsiveSrcset(image, p.srcsetWidths, p.srcsetQuality) || undefined}
                         sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw"
                         alt={post.title || ''}
                         class="illus"

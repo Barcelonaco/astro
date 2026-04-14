@@ -5,7 +5,7 @@
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { isTruthy } from '../../lib/module-classes';
-import { resolveImageUrl, resolveImageAlt, responsiveSrcset } from '../../lib/module-helpers';
+import { resolveImageUrl, resolveImageAlt, responsiveSrcset, getPreset } from '../../lib/module-helpers';
 import { socialIcons, socialLabels, socialOrder } from '../../lib/social-icons';
 import { MEDIA_ORIGIN } from '../../lib/api';
 
@@ -19,10 +19,11 @@ const apiOrigin = MEDIA_ORIGIN;
 
 const addresses = (data.addresses as any[]) || [];
 const isMap = isTruthy(data.is_map);
-const photoUrl = resolveImageUrl(data.photo, apiOrigin, 'text-image-default');
+const pFeature = getPreset('feature');
+const photoUrl = resolveImageUrl(data.photo, apiOrigin, 'text-image-default', 'feature');
 const photoAlt = resolveImageAlt(data.photo);
 const rawPhotoUrl = typeof data.photo === 'string' ? data.photo : (data.photo as any)?.url || '';
-const photoSrcset = responsiveSrcset(rawPhotoUrl, [200, 300, 400], 75);
+const photoSrcset = responsiveSrcset(rawPhotoUrl, pFeature.srcsetWidths, pFeature.srcsetQuality);
 
 // Calcul du centre pour la carte
 const markers: [number, number][] = [];
@@ -59,7 +60,7 @@ const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
             const addressStreet = `${streetNumber} ${streetName}`.trim();
             const addressStreetShort = `${streetNumber} ${addr.street_name_short || ''}`.trim();
             const placeId = addr.place_id || '';
-            const logoUrl = resolveImageUrl(contact.logo, apiOrigin, 'logo');
+            const logoUrl = resolveImageUrl(contact.logo, apiOrigin, 'logo', 'icon');
 
             const socials = socialOrder.filter((key) => contact[key]);
 

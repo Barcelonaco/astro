@@ -5,7 +5,7 @@
  * Hauteurs : small, medium, large, none.
  */
 import { buildModuleClasses, resolveBackgroundImage } from '../../lib/module-classes';
-import { resolveImageUrl, resolveImageAlt, resolveImageTitle, resolveImageDimensions, optimizedImageUrl, responsiveSrcset } from '../../lib/module-helpers';
+import { resolveImageUrl, resolveImageAlt, resolveImageTitle, resolveImageDimensions, optimizedImageUrl, responsiveSrcset, getPreset } from '../../lib/module-helpers';
 import { MEDIA_ORIGIN } from '../../lib/api';
 
 interface Props {
@@ -21,6 +21,7 @@ const id = (data.id_bloc as string) || 'section_0';
 const isVisible = (data.is_visible ?? 'yes') !== 'no';
 const classes = buildModuleClasses(data);
 const backgroundImage = resolveBackgroundImage(data, apiOrigin);
+const p = getPreset('banner');
 
 /* --- Champs specifiques banner --- */
 const heightBanner = (data.banner_height as string) || 'small';
@@ -33,7 +34,7 @@ const imgUrl = resolveImageUrl(imgBanner, apiOrigin);
 const imgAlt = resolveImageAlt(imgBanner);
 const imgTitle = resolveImageTitle(imgBanner);
 const rawBannerUrl = typeof imgBanner === 'string' ? imgBanner : (imgBanner as any)?.url || '';
-const bannerSrcset = responsiveSrcset(rawBannerUrl, [600, 900, 1440], 80);
+const bannerSrcset = responsiveSrcset(rawBannerUrl, p.srcsetWidths, p.srcsetQuality);
 const imgDims = resolveImageDimensions(imgBanner);
 
 const hideTitleClass = titleInHeader === 'hideTitle' ? ' hide_banner_title' : '';
@@ -57,7 +58,7 @@ const titleSizeClass = titleSize ? ` h1-${titleSize}` : '';
     {/* Image banner principale */}
     {heightBanner !== 'none' && imgUrl && (
       <div class="background">
-        <img src={optimizedImageUrl(imgUrl, 1440, 80)} srcset={bannerSrcset || undefined} sizes="100vw" width={imgDims.width || 1440} height={imgDims.height || 600} fetchpriority="high" loading="eager" decoding="sync" alt={imgAlt} title={imgTitle || undefined} class="illus" />
+        <img src={optimizedImageUrl(imgUrl, p.width, p.quality)} srcset={bannerSrcset || undefined} sizes="100vw" width={imgDims.width || 1440} height={imgDims.height || 600} fetchpriority="high" loading="eager" decoding="sync" alt={imgAlt} title={imgTitle || undefined} class="illus" />
       </div>
     )}
 
