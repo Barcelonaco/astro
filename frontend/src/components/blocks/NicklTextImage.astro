@@ -27,7 +27,6 @@ interface Props {
 const { data } = Astro.props;
 
 const apiOrigin = MEDIA_ORIGIN;
-const p = getPreset('feature');
 
 // Placement média
 const imgToLeft = isTruthy(data.img_to_left);
@@ -42,6 +41,16 @@ const ratioImgMap: Record<string, string> = {
   'full-height': 'full-height',
 };
 const ratioImg = ratioImgMap[mediaRatio] || 'banner';
+
+// Preset adapté au ratio — full-height/portrait prennent toute la hauteur écran,
+// ils ont besoin de la résolution hero (1920px) pour ne pas pixeliser sur retina.
+const ratioPresetMap: Record<string, string> = {
+  'full-height': 'hero',
+  portrait: 'banner',
+  square: 'feature',
+  landscape: 'feature',
+};
+const p = getPreset(ratioPresetMap[mediaRatio] || 'feature');
 
 // Texte
 const text = cleanHtml(data.text as string);
@@ -187,7 +196,7 @@ const extraClasses = extraParts.join(' ');
         /* Image */
         imageUrl && (
           <div class={`illus-wrapper ${mediaRatio}`}>
-            <img src={imageUrl} srcset={imgSrcset || undefined} sizes={imgSrcset ? '(max-width: 600px) calc(100vw - 40px), (max-width: 960px) 45vw, 400px' : undefined} alt={imageAlt} title={imageTitle || undefined} class="illus" width={imageDims.width || 800} height={imageDims.height || 600} loading={data._eager ? 'eager' : 'lazy'} decoding="async" fetchpriority={data._eager ? 'high' : undefined} />
+            <img src={imageUrl} srcset={imgSrcset || undefined} sizes={imgSrcset ? `(max-width: 600px) calc(100vw - 40px), (max-width: 960px) 50vw, ${mediaRatio === 'full-height' || mediaRatio === 'portrait' ? '50vw' : '500px'}` : undefined} alt={imageAlt} title={imageTitle || undefined} class="illus" width={imageDims.width || 800} height={imageDims.height || 600} loading={data._eager ? 'eager' : 'lazy'} decoding="async" fetchpriority={data._eager ? 'high' : undefined} />
           </div>
         )
       )}
