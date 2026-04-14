@@ -1,8 +1,8 @@
 // CRITICAL CSS — Above-the-fold, blocks rendering
 // ----------------------------------------
 
-// BASE
-@import 'base/reset';
+// BASE (slim reset for first paint — full reset in deferred)
+@import 'base/reset-critical';
 @import 'base/variables';
 @import 'base/mixin';
 

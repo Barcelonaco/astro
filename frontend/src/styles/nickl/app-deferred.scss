@@ -1,6 +1,8 @@
 // DEFERRED CSS — Below-the-fold, loaded async
 // ----------------------------------------
 
+// Full reset (completes the slim critical reset)
+@import 'base/reset';
 // Dependencies (variables, mixins, and @extend targets needed by pages below)
 @import 'base/variables';
 @import 'base/mixin';
