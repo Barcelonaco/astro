@@ -43,6 +43,15 @@ function extractLcpImages(blocks: any[] | null): { desktop: string; mobile: stri
     const url = optimizedImageUrl(first.data.image.url, 1440, 80);
     return { desktop: url, mobile: url };
   }
+  if (first.data?.image) {
+    const imgUrl = typeof first.data.image === 'string' ? first.data.image : first.data.image?.url || '';
+    if (imgUrl) {
+      return {
+        desktop: optimizedImageUrl(imgUrl, 900, 75),
+        mobile: optimizedImageUrl(imgUrl, 400, 70),
+      };
+    }
+  }
   return { desktop: '', mobile: '' };
 }
 
