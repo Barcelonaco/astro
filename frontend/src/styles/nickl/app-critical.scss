@@ -1,0 +1,21 @@
+// CRITICAL CSS — Above-the-fold, blocks rendering
+// ----------------------------------------
+
+// BASE
+@import 'base/reset';
+@import 'base/variables';
+@import 'base/mixin';
+
+// PARTIALS (above-fold)
+@import 'partials/accessibility';
+@import 'partials/document';
+@import 'partials/cookies';
+@import 'partials/header';
+
+// COMPONENTS (critical)
+@import 'components/buttons';
+@import 'components/editor';
+@import 'components/social-networks';
+
+// MODULES (shared base)
+@import 'modules/modules';

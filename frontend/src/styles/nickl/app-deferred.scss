@@ -1,0 +1,57 @@
+// DEFERRED CSS — Below-the-fold, loaded async
+// ----------------------------------------
+
+// Dependencies (variables, mixins, and @extend targets needed by pages below)
+@import 'base/variables';
+@import 'base/mixin';
+@import 'components/buttons';
+@import 'components/editor';
+@import 'components/form';
+@import 'partials/document';
+@import 'modules/modules';
+
+// PARTIALS (below-fold)
+@import 'partials/footer';
+@import 'partials/search-form';
+@import 'partials/sidebar';
+
+// COMPONENTS (secondary)
+@import 'components/breadcrumb';
+@import 'components/floating-btn';
+@import 'components/gtranslate';
+@import 'components/module-protected';
+@import 'components/no-cookies';
+@import 'components/pagination';
+@import 'components/popins';
+@import 'components/sliders';
+@import 'components/tabs';
+
+// MODULES (specific)
+@import 'modules/gallery';
+@import 'modules/references';
+@import 'modules/alert';
+@import 'modules/share';
+
+// PAGES
+@import 'pages/archive-news';
+@import 'pages/archive-references';
+@import 'pages/archive-evenements';
+@import 'pages/error-404';
+@import 'pages/search';
+@import 'pages/single-post';
+@import 'pages/single-news';
+@import 'pages/single-evenements';
+@import 'pages/single-references';
+@import 'pages/waiting';
+@import 'pages/woocommerce';
+@import 'pages/woocommerce-account';
+@import 'pages/woocommerce-account-addresses';
+@import 'pages/woocommerce-account-edit-account';
+@import 'pages/woocommerce-account-orders';
+@import 'pages/woocommerce-archive-product';
+@import 'pages/woocommerce-cart';
+@import 'pages/woocommerce-checkout';
+@import 'pages/woocommerce-single-product';
+
+// ADMIN
+@import 'admin/global';

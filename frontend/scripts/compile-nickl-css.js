@@ -66,9 +66,11 @@ const moduleEntries = {
   'video':                    'modules/_video.scss',
 };
 
-// All entries: app.scss + individual modules
+// All entries: critical + deferred app CSS + individual modules
 const allEntries = {
   'app': 'app.scss',
+  'app-critical': 'app-critical.scss',
+  'app-deferred': 'app-deferred.scss',
   ...moduleEntries,
 };
 
