@@ -46,7 +46,8 @@ export interface Page {
   slug: string
   content: string
   color_overrides?: string
-  status: 'draft' | 'published'
+  status: 'draft' | 'published' | 'private'
+  published_date?: string
   show_in_menu: boolean
   menu_order: number
   parent_id?: number
@@ -62,6 +63,7 @@ export interface NavigationItem {
   slug: string
   menu_order: number
   parent_id?: number
+  status?: 'published' | 'private'
   children?: NavigationItem[]
 }
 

@@ -221,7 +221,8 @@ if (!table_exists($db, 'pages')) {
             color_overrides JSON DEFAULT NULL,
             seo_meta JSON DEFAULT NULL,
             author_id INT NOT NULL,
-            status ENUM('draft', 'published') NOT NULL DEFAULT 'draft',
+            status ENUM('draft', 'published', 'private') NOT NULL DEFAULT 'draft',
+            published_date DATETIME DEFAULT NULL,
             show_in_menu TINYINT(1) NOT NULL DEFAULT 1,
             menu_order INT NOT NULL DEFAULT 0,
             parent_id INT DEFAULT NULL,
@@ -238,6 +239,20 @@ if (!table_exists($db, 'pages')) {
     if (ensure_column($db, 'pages', 'color_overrides', 'JSON DEFAULT NULL', 'content')) $changes++;
     if (ensure_column($db, 'pages', 'seo_meta', 'JSON DEFAULT NULL', 'color_overrides')) $changes++;
     if (ensure_column($db, 'pages', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP', 'created_at')) $changes++;
+    if (ensure_column($db, 'pages', 'published_date', 'DATETIME DEFAULT NULL', 'status')) $changes++;
+
+    // Expand status ENUM to include 'private'
+    $colInfo = $db->query("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pages' AND COLUMN_NAME = 'status'")->fetchColumn();
+    if ($colInfo && strpos($colInfo, "'private'") === false) {
+        $db->exec("ALTER TABLE pages MODIFY COLUMN status ENUM('draft','published','private') NOT NULL DEFAULT 'draft'");
+        echo "  + Expanded status ENUM to include 'private'\n";
+        $changes++;
+    }
+
+    // Backfill published_date for existing published pages that have NULL
+    $backfilled = $db->exec("UPDATE pages SET published_date = created_at WHERE status = 'published' AND published_date IS NULL");
+    if ($backfilled > 0) { echo "  + Backfilled published_date for {$backfilled} pages\n"; $changes++; }
+
     if ($changes === 0) echo "  OK\n";
 }
 
@@ -632,7 +647,9 @@ if (!table_exists($db, 'ai_credits')) {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
-    echo "  + Created table\n";
+    // Default: 2€ initial credits
+    $db->exec("INSERT INTO ai_credits (credits, source, note) VALUES (2.0000, 'manual', 'Crédit initial à la création du site')");
+    echo "  + Created table with 2€ initial credits\n";
     $changes++;
 } else {
     echo "  OK\n";

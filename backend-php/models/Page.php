@@ -36,13 +36,14 @@ class PageModel {
     public static function create(array $data): int {
         $db = Database::getInstance();
         $stmt = $db->prepare("
-            INSERT INTO pages (title, slug, content, color_overrides, seo_meta, author_id, status, show_in_menu, menu_order, parent_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO pages (title, slug, content, color_overrides, seo_meta, author_id, status, published_date, show_in_menu, menu_order, parent_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $data['title'], $data['slug'], $data['content'] ?? null,
             $data['color_overrides'] ?? null, $data['seo_meta'] ?? null,
             $data['author_id'], $data['status'] ?? 'draft',
+            $data['published_date'] ?? null,
             isset($data['show_in_menu']) ? (int) $data['show_in_menu'] : 1,
             $data['menu_order'] ?? 0,
             $data['parent_id'] ?? null
@@ -54,13 +55,14 @@ class PageModel {
         $db = Database::getInstance();
         $stmt = $db->prepare("
             UPDATE pages
-            SET title = ?, slug = ?, content = ?, color_overrides = ?, seo_meta = ?, status = ?, show_in_menu = ?, menu_order = ?, parent_id = ?
+            SET title = ?, slug = ?, content = ?, color_overrides = ?, seo_meta = ?, status = ?, published_date = ?, show_in_menu = ?, menu_order = ?, parent_id = ?
             WHERE id = ?
         ");
         $stmt->execute([
             $data['title'], $data['slug'], $data['content'] ?? null,
             $data['color_overrides'] ?? null, $data['seo_meta'] ?? null,
             $data['status'] ?? 'draft',
+            $data['published_date'] ?? null,
             isset($data['show_in_menu']) ? (int) $data['show_in_menu'] : 1,
             $data['menu_order'] ?? 0,
             $data['parent_id'] ?? null,
@@ -77,9 +79,11 @@ class PageModel {
     public static function findNavigation(): array {
         $db = Database::getInstance();
         $rows = $db->query("
-            SELECT id, title, slug, menu_order, parent_id
+            SELECT id, title, slug, menu_order, parent_id, status,
+                   published_date
             FROM pages
-            WHERE status = 'published' AND show_in_menu = 1
+            WHERE status IN ('published', 'private') AND show_in_menu = 1
+              AND (published_date IS NULL OR published_date <= NOW())
             ORDER BY menu_order ASC, title ASC
         ")->fetchAll();
 

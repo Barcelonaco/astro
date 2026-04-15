@@ -10,6 +10,7 @@ class PageController {
             'color_overrides' => $page['color_overrides'] ?? null,
             'seo_meta' => $page['seo_meta'] ?? null,
             'status' => $page['status'],
+            'published_date' => $page['published_date'] ?? null,
             'show_in_menu' => $page['show_in_menu'],
             'menu_order' => $page['menu_order'],
             'parent_id' => $page['parent_id'],
@@ -46,6 +47,13 @@ class PageController {
 
         $content = isset($body['content']) ? (string) $body['content'] : '';
 
+        $status = $body['status'] ?? 'draft';
+        $publishedDate = $body['published_date'] ?? null;
+        // Auto-set published_date to now when publishing without explicit date
+        if (in_array($status, ['published', 'private']) && !$publishedDate) {
+            $publishedDate = date('Y-m-d H:i:s');
+        }
+
         $pageId = PageModel::create([
             'title' => $body['title'],
             'slug' => $body['slug'],
@@ -53,7 +61,8 @@ class PageController {
             'color_overrides' => $body['color_overrides'] ?? null,
             'seo_meta' => $body['seo_meta'] ?? null,
             'author_id' => $authUser['id'],
-            'status' => $body['status'] ?? 'draft',
+            'status' => $status,
+            'published_date' => $publishedDate,
             'show_in_menu' => $body['show_in_menu'] ?? true,
             'menu_order' => $body['menu_order'] ?? 0,
             'parent_id' => $body['parent_id'] ?? null,
@@ -71,13 +80,21 @@ class PageController {
 
         $content = isset($body['content']) ? (string) $body['content'] : '';
 
+        $status = $body['status'] ?? 'draft';
+        $publishedDate = $body['published_date'] ?? null;
+        // Auto-set published_date to now when publishing without explicit date
+        if (in_array($status, ['published', 'private']) && !$publishedDate) {
+            $publishedDate = date('Y-m-d H:i:s');
+        }
+
         PageModel::update($id, [
             'title' => $body['title'],
             'slug' => $body['slug'],
             'content' => $content,
             'color_overrides' => $body['color_overrides'] ?? null,
             'seo_meta' => $body['seo_meta'] ?? null,
-            'status' => $body['status'] ?? 'draft',
+            'status' => $status,
+            'published_date' => $publishedDate,
             'show_in_menu' => $body['show_in_menu'] ?? true,
             'menu_order' => $body['menu_order'] ?? 0,
             'parent_id' => $body['parent_id'] ?? null,

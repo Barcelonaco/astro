@@ -49,14 +49,16 @@ function itemTarget(item: any): string | undefined {
     {items.map((item) => (
       <li class:list={[
         hasChildren(item) ? 'menu-item-has-children' : '',
-      ]}>
+        item.status === 'private' ? 'nav-private' : '',
+      ]} data-private={item.status === 'private' ? 'true' : undefined}>
         <a href={itemUrl(item)} target={itemTarget(item)}>{item.title}</a>
         {hasChildren(item) && depth >= 2 && (
           <ul class="sub-menu">
             {item.children!.map((child: any) => (
               <li class:list={[
                 hasChildren(child) ? 'menu-item-has-children' : '',
-              ]}>
+                child.status === 'private' ? 'nav-private' : '',
+              ]} data-private={child.status === 'private' ? 'true' : undefined}>
                 <a href={itemUrl(child)} target={itemTarget(child)}>{child.title}</a>
                 {hasChildren(child) && depth >= 3 && (
                   <ul class="sub-menu">
@@ -75,3 +77,13 @@ function itemTarget(item: any): string | undefined {
     ))}
   </ul>
 </div>
+
+<style>
+  .nav-private { display: none; }
+  :global(body.user-authenticated) .nav-private { display: list-item; }
+</style>
+
+<script>
+  const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+  if (token) document.body.classList.add('user-authenticated');
+</script>

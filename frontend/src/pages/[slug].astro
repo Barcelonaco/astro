@@ -14,9 +14,16 @@ export async function getStaticPaths() {
   // Slugs réservés — correspondent aux dossiers/fichiers dans src/pages/
   const RESERVED_SLUGS = ['about', 'actualites', 'blog', 'category', 'evenements', 'pages', 'references', 'rss.xml', 'search'];
   const pages = await getAllPages();
+  const now = new Date();
   return pages
-    .filter((p: any) => p.status === 'published' && !RESERVED_SLUGS.includes(p.slug))
-    .map((p: any) => ({ params: { slug: p.slug } }));
+    .filter((p: any) => {
+      if (RESERVED_SLUGS.includes(p.slug)) return false;
+      if (p.status !== 'published' && p.status !== 'private') return false;
+      // Exclude scheduled pages (published_date in future)
+      if (p.published_date && new Date(p.published_date) > now) return false;
+      return true;
+    })
+    .map((p: any) => ({ params: { slug: p.slug }, props: { isPrivate: p.status === 'private' } }));
 }
 
 function parseBlocks(content: string): unknown[] | null {
@@ -68,6 +75,7 @@ function extractLcpImages(blocks: any[] | null): { desktop: string; mobile: stri
 }
 
 const { slug } = Astro.params;
+const { isPrivate } = Astro.props as { isPrivate?: boolean };
 // Fetch page + bootstrap data in parallel (2 HTTP calls instead of 4+)
 const [page, { siteInfo, styleSettings, siteSettings, navigation: navigationData, secondaryNavigation }] = await Promise.all([
   getPageBySlug(slug as string),
@@ -133,7 +141,7 @@ const bodyClasses = [
 		{schemaOrg && <script type="application/ld+json" set:html={schemaOrg} />}
 		<ModuleStyles blocks={blocks} />
 	</head>
-	<body class={bodyClasses || undefined} data-page-id={page.id}>
+	<body class={bodyClasses || undefined} data-page-id={page.id} data-private={isPrivate ? 'true' : undefined}>
 		<Header siteName={siteName} navigation={navigationData} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
 		<main class={`${isBlockPage ? 'main-page' : ''} ${hasColorOverrides ? 'has-color-overrides' : ''}`.trim()} style={colorOverrideStyle || undefined}>
 			<article>
@@ -156,6 +164,16 @@ const bodyClasses = [
 		<Footer siteSettings={siteSettings} />
 		<SiteOverlays siteSettings={siteSettings} />
 		<DeferredLoader />
+		{isPrivate && (
+			<script>
+				if (document.body.dataset.private === 'true') {
+					const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+					if (!token) {
+						document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui"><div style="text-align:center;padding:2rem"><h1 style="font-size:1.5rem;margin-bottom:1rem">Page privée</h1><p style="color:#666">Connectez-vous pour accéder à cette page.</p></div></div>';
+					}
+				}
+			</script>
+		)}
 	</body>
 </html>
 

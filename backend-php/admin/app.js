@@ -2870,7 +2870,19 @@ async function renderPageBuilder() {
             <select class="form-select builder-status" data-field="status" onchange="onBuilderStatusChange(this.value)">
               <option value="draft" ${m.status === 'draft' ? 'selected' : ''}>Brouillon</option>
               <option value="published" ${m.status === 'published' ? 'selected' : ''}>Publié</option>
+              <option value="private" ${m.status === 'private' ? 'selected' : ''}>Privé</option>
             </select>
+          </div>
+          <div class="builder-field-group builder-publish-date-group" style="display:${m.status === 'draft' ? 'none' : ''}">
+            <label class="builder-field-label">Date de publication</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select class="form-select builder-publish-mode" style="width:auto;min-width:120px" onchange="onPublishModeChange(this.value)">
+                <option value="now" ${!m.published_date || m.published_date === 'now' ? 'selected' : ''}>Maintenant</option>
+                <option value="schedule" ${m.published_date && new Date(m.published_date) > new Date() ? 'selected' : ''}>Planifier</option>
+                <option value="backdate" ${m.published_date && new Date(m.published_date) <= new Date() && m.published_date !== 'now' ? 'selected' : ''}>Antérieur</option>
+              </select>
+              <input type="datetime-local" class="form-input builder-publish-date" data-field="published_date" value="${m.published_date && m.published_date !== 'now' ? m.published_date.slice(0,16) : ''}" style="display:${m.published_date && m.published_date !== 'now' && new Date(m.published_date).getTime() !== new Date(m.created_at).getTime() ? '' : 'none'};width:auto">
+            </div>
           </div>
         </div>
         <div class="builder-actions">
@@ -5413,6 +5425,20 @@ function syncBuilderMetaFromDOM() {
   pageBuilderState.meta.title = get('.builder-title') || get('input[data-field="title"]') || '';
   pageBuilderState.meta.slug = get('.builder-slug') || get('input[data-field="slug"]') || '';
   pageBuilderState.meta.status = get('.builder-status') || get('select[data-field="status"]') || 'draft';
+
+  // Resolve published_date from mode + date input
+  const mode = get('.builder-publish-mode') || 'now';
+  const dateVal = get('.builder-publish-date') || '';
+  if (pageBuilderState.meta.status === 'draft') {
+    pageBuilderState.meta.published_date = null;
+  } else if (mode === 'now') {
+    pageBuilderState.meta.published_date = null; // backend auto-sets to now
+  } else if (dateVal) {
+    pageBuilderState.meta.published_date = dateVal.includes('T') ? dateVal.replace('T', ' ') + ':00' : dateVal;
+  } else {
+    pageBuilderState.meta.published_date = null;
+  }
+
   if (pageBuilderState.meta.title !== oldTitle || pageBuilderState.meta.slug !== oldSlug || pageBuilderState.meta.status !== oldStatus) {
     markBuilderDirty();
   }
@@ -6309,6 +6335,317 @@ async function resolveAiFormIds() {
   }
 }
 
+// ========== BULK AI PAGE GENERATION ==========
+
+function openBulkAiModal() {
+  openUiModal({
+    title: '✨ Générer des pages par IA',
+    bodyHtml: `
+      <div class="ai-modal-content">
+        <div class="ai-modal-field">
+          <label class="form-label">Décrivez les pages ou collez du HTML / wireframe à convertir</label>
+          <textarea class="form-input ai-prompt-input" id="bulkAiPromptInput" rows="8" placeholder="Exemples d'utilisation :&#10;&#10;• Collez du HTML/wireframe : l'IA convertira chaque page en blocs Nickl&#10;• Décrivez vos pages : Crée 2 pages pour un artisan plombier — une page d'accueil avec hero et services, une page contact&#10;&#10;L'IA génère EXACTEMENT le nombre de pages décrites."></textarea>
+        </div>
+        <div class="ai-modal-field" style="margin-top:12px">
+          <label class="form-label">URL à analyser (optionnel)</label>
+          <p class="form-hint" style="margin:0 0 8px;color:#64748b;font-size:13px">L'IA récupère le HTML de la page et le convertit en blocs Nickl. Plusieurs URLs séparées par des retours à la ligne.</p>
+          <textarea class="form-input" id="bulkAiUrlsInput" rows="2" placeholder="https://exemple.com/page-a-convertir"></textarea>
+        </div>
+        <div class="ai-modal-field" style="margin-top:12px">
+          <label class="form-label">Fichiers de référence (optionnel)</label>
+          <p class="form-hint" style="margin:0 0 8px;color:#64748b;font-size:13px">Images (screenshots, maquettes) ou PDF (wireframes, cahiers des charges) pour guider l'IA.</p>
+          <div class="bulk-ai-images-zone" id="bulkAiImagesZone">
+            <input type="file" id="bulkAiImagesInput" multiple accept="image/*,application/pdf" style="display:none" onchange="handleBulkAiImages(this.files)">
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('bulkAiImagesInput').click()">📎 Ajouter des fichiers</button>
+            <div id="bulkAiImagesPreviews" class="bulk-ai-images-previews"></div>
+          </div>
+        </div>
+        <div class="ai-modal-row" style="margin-top:12px">
+          <div class="ai-modal-checkboxes">
+            <label class="ai-checkbox-label"><input type="checkbox" id="bulkAiGenSeo" checked> Générer le SEO</label>
+            <label class="ai-checkbox-label"><input type="checkbox" id="bulkAiWebSearch" checked> 🔍 Recherche web</label>
+          </div>
+          <div class="ai-modal-model">
+            <label class="form-label">Modèle</label>
+            <select class="form-select" id="bulkAiModelSelect">
+              <option value="haiku">Haiku (rapide)</option>
+              <option value="sonnet" selected>Sonnet (précis)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    `,
+    actions: [
+      { label: 'Annuler', variant: 'btn-outline', onClick: () => closeUiModal() },
+      { label: '✨ Générer les pages', variant: 'btn-ai', onClick: () => executeBulkAiGeneration() }
+    ]
+  });
+  setTimeout(() => document.getElementById('bulkAiPromptInput')?.focus(), 50);
+}
+
+// Store base64 files (images + PDFs) for the bulk AI request
+let _bulkAiImages = [];
+
+function handleBulkAiImages(files) {
+  const container = document.getElementById('bulkAiImagesPreviews');
+  if (!container) return;
+
+  for (const file of files) {
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    if (!isImage && !isPdf) continue;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target.result.split(',')[1];
+      _bulkAiImages.push({ data: base64, media_type: file.type, name: file.name, kind: isPdf ? 'document' : 'image' });
+
+      const idx = _bulkAiImages.length - 1;
+      const preview = document.createElement('div');
+      preview.className = 'bulk-ai-image-preview';
+      preview.innerHTML = isPdf
+        ? `<div class="bulk-ai-pdf-icon">PDF</div>
+           <button type="button" class="bulk-ai-image-remove" onclick="removeBulkAiImage(${idx}, this.parentElement)">&times;</button>
+           <span class="bulk-ai-image-name">${escapeHtml(file.name)}</span>`
+        : `<img src="${e.target.result}" alt="${escapeHtml(file.name)}">
+           <button type="button" class="bulk-ai-image-remove" onclick="removeBulkAiImage(${idx}, this.parentElement)">&times;</button>
+           <span class="bulk-ai-image-name">${escapeHtml(file.name)}</span>`;
+      container.appendChild(preview);
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function removeBulkAiImage(index, element) {
+  _bulkAiImages[index] = null;
+  if (element) element.remove();
+}
+
+async function executeBulkAiGeneration() {
+  const prompt = document.getElementById('bulkAiPromptInput')?.value?.trim();
+  if (!prompt) {
+    showToast('Veuillez décrire les pages à générer', 'error');
+    return;
+  }
+
+  const model = document.getElementById('bulkAiModelSelect')?.value || 'sonnet';
+  const webSearch = document.getElementById('bulkAiWebSearch')?.checked ?? true;
+  const genSeo = document.getElementById('bulkAiGenSeo')?.checked ?? true;
+  const images = _bulkAiImages.filter(Boolean);
+  const urlsRaw = document.getElementById('bulkAiUrlsInput')?.value?.trim() || '';
+  const urls = urlsRaw.split(/[\n,]+/).map(u => u.trim()).filter(u => u.startsWith('http'));
+
+  closeUiModal();
+
+  // Show loading overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'aiLoadingOverlay';
+  overlay.innerHTML = `
+    <div class="ai-loading-card bulk-ai-loading">
+      <div class="ai-loading-spinner"></div>
+      <h3>Génération des pages en cours...</h3>
+      <p id="bulkAiStatus">${urls.length > 0 ? 'Récupération des URLs...' : 'Connexion à l\'IA...'}</p>
+      <div id="bulkAiProgress" class="bulk-ai-progress"></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  try {
+    const body = JSON.stringify({
+      prompt: genSeo ? prompt + '\n\nGénère aussi le SEO (meta title + description) et le Schema.org pour chaque page.' : prompt,
+      model,
+      web_search: webSearch,
+      images: images.length > 0 ? images : undefined,
+      urls: urls.length > 0 ? urls : undefined,
+    });
+
+    const result = await new Promise((resolve, reject) => {
+      fetch(`${API_BASE}/ai/generate-pages`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body
+      }).then(response => {
+        if (!response.ok && !response.headers.get('content-type')?.includes('text/event-stream')) {
+          return response.json().then(err => { throw new Error(err.error || 'Request failed'); });
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let charCount = 0;
+        let currentEvent = '';
+        let resolved = false;
+
+        function handleLine(line) {
+          if (resolved) return;
+          if (line.startsWith('event: ')) { currentEvent = line.slice(7).trim(); return; }
+          if (!line.startsWith('data: ')) return;
+          const data = line.slice(6);
+
+          const statusEl = document.getElementById('bulkAiStatus');
+          const progressEl = document.getElementById('bulkAiProgress');
+
+          if (currentEvent === 'status') {
+            if (statusEl) statusEl.textContent = data;
+          } else if (currentEvent === 'chunk') {
+            charCount += data.length;
+            if (statusEl) statusEl.textContent = `${charCount} caractères générés...`;
+          } else if (currentEvent === 'form_created') {
+            try {
+              const form = JSON.parse(data);
+              if (progressEl) {
+                progressEl.innerHTML += `
+                  <div class="bulk-ai-page-done">
+                    📋 Formulaire créé : <strong>${escapeHtml(form.title)}</strong> — ${form.fields_count} champs
+                  </div>`;
+              }
+              if (statusEl) statusEl.textContent = 'Formulaire créé, génération des pages...';
+            } catch (e) {}
+          } else if (currentEvent === 'page_saved') {
+            try {
+              const page = JSON.parse(data);
+              if (progressEl) {
+                progressEl.innerHTML += `
+                  <div class="bulk-ai-page-done">
+                    ✅ <strong>${escapeHtml(page.title)}</strong> — ${page.blocks_count} blocs <span class="text-muted">(${page.index}/${page.total})</span>
+                  </div>`;
+              }
+              if (statusEl) statusEl.textContent = `Page ${page.index}/${page.total} sauvegardée...`;
+            } catch (e) {}
+          } else if (currentEvent === 'done') {
+            resolved = true;
+            try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('JSON invalide')); }
+          } else if (currentEvent === 'error') {
+            resolved = true;
+            try { reject(new Error(JSON.parse(data).error || 'Erreur IA')); } catch (e) { reject(new Error(data)); }
+          }
+        }
+
+        function processChunks() {
+          reader.read().then(({ done, value }) => {
+            if (value) buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = done ? '' : lines.pop();
+            for (const line of lines) handleLine(line);
+            if (done && buffer) handleLine(buffer);
+            if (resolved) return;
+            if (done) { reject(new Error('Stream terminé sans résultat')); return; }
+            processChunks();
+          }).catch(reject);
+        }
+        processChunks();
+      }).catch(reject);
+    });
+
+    const pages = result.pages || [];
+    const forms = result.forms || [];
+    _bulkAiImages = [];
+
+    if (result.usage) {
+      console.log(`IA bulk tokens — input: ${result.usage.input_tokens}, output: ${result.usage.output_tokens}`);
+    }
+
+    const summary = [
+      `${pages.length} page${pages.length > 1 ? 's' : ''}`,
+      forms.length > 0 ? `${forms.length} formulaire${forms.length > 1 ? 's' : ''}` : ''
+    ].filter(Boolean).join(' + ');
+    showToast(`${summary} créé${pages.length + forms.length > 1 ? 's' : ''} avec succès`, 'success');
+
+    // Refresh pages list
+    const content = document.getElementById('content');
+    if (content) content.innerHTML = await renderPages();
+
+    // Show results modal with action buttons
+    if (pages.length > 0) {
+      const formsHtml = forms.length > 0 ? `
+        <div style="margin-bottom:14px">
+          <h4 style="font-size:14px;margin:0 0 8px 0;color:#64748b">📋 Formulaires créés</h4>
+          ${forms.map(f => `
+            <div class="bulk-ai-result-row" style="padding:8px 0">
+              <div class="bulk-ai-result-info">
+                <strong>${escapeHtml(f.title)}</strong>
+                <span class="text-muted" style="font-size:12px">${f.fields_count} champs</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 14px 0">
+      ` : '';
+
+      const pagesList = pages.map(p => `
+        <div class="bulk-ai-result-row">
+          <div class="bulk-ai-result-info">
+            <strong>${escapeHtml(p.title)}</strong>
+            <span class="text-muted" style="font-size:12px">/${escapeHtml(p.slug)} · ${p.blocks_count} blocs</span>
+          </div>
+          <div class="bulk-ai-result-actions">
+            <button type="button" class="btn btn-sm btn-primary" onclick="closeUiModal(); openPageBuilder(${p.id})">Modifier</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="bulkAiPublishAndPreview(${p.id}, '${escapeHtml(p.slug)}')">Publier & voir</button>
+          </div>
+        </div>
+      `).join('');
+
+      openUiModal({
+        title: `✅ ${pages.length} page${pages.length > 1 ? 's' : ''} créée${pages.length > 1 ? 's' : ''}`,
+        bodyHtml: `
+          <div class="bulk-ai-results">
+            <p style="color:#64748b;font-size:13px;margin:0 0 14px 0">Pages créées en brouillon. Vous pouvez les modifier dans le builder ou les publier pour les prévisualiser sur le site.</p>
+            ${formsHtml}
+            ${pagesList}
+          </div>
+        `,
+        actions: [
+          { label: 'Fermer', variant: 'btn-outline', onClick: () => closeUiModal() }
+        ]
+      });
+    }
+
+  } catch (error) {
+    console.error('Bulk AI error:', error);
+    showToast(`Erreur IA : ${error.message}`, 'error');
+  } finally {
+    const loadingOverlay = document.getElementById('aiLoadingOverlay');
+    if (loadingOverlay) loadingOverlay.remove();
+  }
+}
+
+async function bulkAiPublishAndPreview(pageId, slug) {
+  try {
+    // Fetch full page data
+    const page = await apiFetch(`/pages/${slug}`);
+    if (!page) { showToast('Page introuvable', 'error'); return; }
+
+    // Publish it
+    await apiFetch(`/pages/${pageId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: page.title,
+        slug: page.slug,
+        content: page.content,
+        color_overrides: page.color_overrides,
+        seo_meta: page.seo_meta,
+        status: 'published',
+        show_in_menu: page.show_in_menu ?? false,
+        menu_order: page.menu_order ?? 0,
+        parent_id: page.parent_id || null,
+      })
+    });
+
+    // Open frontend in new tab
+    const frontendUrl = siteSettingsCache?.frontend_url || window.location.origin;
+    window.open(`${frontendUrl}/${slug}`, '_blank');
+
+    showToast('Page publiée', 'success');
+    // Refresh pages list
+    const content = document.getElementById('content');
+    if (content) content.innerHTML = await renderPages();
+  } catch (error) {
+    console.error('Publish error:', error);
+    showToast(`Erreur : ${error.message}`, 'error');
+  }
+}
+
 async function geocodeAiBlockAddresses() {
   let changed = false;
   for (const block of pageBuilderState.blocks) {
@@ -6603,6 +6940,29 @@ function onBuilderStatusChange(status) {
   // If switching to draft, close the menu settings panel
   if (status === 'draft') {
     toggleMenuSettingsPanel(false);
+  }
+  // Show/hide publish date group
+  const dateGroup = document.querySelector('.builder-publish-date-group');
+  if (dateGroup) {
+    dateGroup.style.display = status === 'draft' ? 'none' : '';
+  }
+}
+
+function onPublishModeChange(mode) {
+  const dateInput = document.querySelector('.builder-publish-date');
+  if (!dateInput) return;
+  if (mode === 'now') {
+    dateInput.style.display = 'none';
+    dateInput.value = '';
+  } else {
+    dateInput.style.display = '';
+    if (!dateInput.value) {
+      const now = new Date();
+      if (mode === 'schedule') {
+        now.setDate(now.getDate() + 1);
+      }
+      dateInput.value = now.toISOString().slice(0, 16);
+    }
   }
 }
 
@@ -9122,7 +9482,7 @@ async function savePageBuilder() {
   if (form && selectedBlockId) {
     liveUpdateFromSettingsForm(form);
   }
-  const { title, slug, status, parent_id } = pageBuilderState.meta;
+  const { title, slug, status, published_date, parent_id } = pageBuilderState.meta;
   if (!title || !slug) { showToast('Titre et slug requis', 'error'); return; }
 
   // Derive show_in_menu from menu toggles
@@ -9135,10 +9495,10 @@ async function savePageBuilder() {
   showLoading();
   try {
     if (pageBuilderState.editingPageId) {
-      await apiFetch(`/pages/${pageBuilderState.editingPageId}`, { method: 'PUT', body: JSON.stringify({ title, slug, content, color_overrides, seo_meta, status, show_in_menu, menu_order: 0, parent_id: parent_id || null }) });
+      await apiFetch(`/pages/${pageBuilderState.editingPageId}`, { method: 'PUT', body: JSON.stringify({ title, slug, content, color_overrides, seo_meta, status, published_date, show_in_menu, menu_order: 0, parent_id: parent_id || null }) });
       showToast('Page mise à jour', 'success');
     } else {
-      const res = await apiFetch('/pages', { method: 'POST', body: JSON.stringify({ title, slug, content, color_overrides, seo_meta, status, show_in_menu, menu_order: 0, parent_id: parent_id || null }) });
+      const res = await apiFetch('/pages', { method: 'POST', body: JSON.stringify({ title, slug, content, color_overrides, seo_meta, status, published_date, show_in_menu, menu_order: 0, parent_id: parent_id || null }) });
       showToast('Page créée', 'success');
       if (res && res.id) {
         pageBuilderState.editingPageId = res.id;
@@ -9190,6 +9550,7 @@ let _pagesSortField = 'title'; // 'title' | 'updated_at'
 let _pagesSortDir = 'asc';     // 'asc' | 'desc'
 let _pagesMenusList = []; // [{id, name, location}] all menus with a location
 let _pagesMenuItems = {}; // menuId → [{id, title, page_id, parent_id, menu_order}]
+let _pagesSelected = new Set(); // selected page IDs for bulk actions
 
 let _pagesMenuInfo = {}; // { pageId: { menus: [{id,name,location}], primaryParent: {title,page_id}|null } }
 
@@ -9208,6 +9569,7 @@ async function renderPages() {
     _pagesCurrentPage = 1;
     _pagesActiveMenu = null;
     _pagesMenuItems = {};
+    _pagesSelected = new Set();
     hideLoading();
     return renderPagesView();
   } catch (error) {
@@ -9355,10 +9717,14 @@ function renderPagesView() {
   return `
     <div class="page-header">
       <h1>Pages</h1>
-      <button class="btn btn-primary" onclick="openPageBuilder(null)">
-        <span class="icon">➕</span>
-        Nouvelle page
-      </button>
+      <div class="page-header-actions">
+        <button class="btn btn-ai" onclick="openBulkAiModal()">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Générer par IA
+        </button>
+        <button class="btn btn-primary" onclick="openPageBuilder(null)">
+          <i class="fa-solid fa-plus"></i> Nouvelle page
+        </button>
+      </div>
     </div>
     <div class="card">
       ${menuButtons}
@@ -9370,6 +9736,7 @@ function renderPagesView() {
         </div>
         <span class="pages-count">${sorted.length} page${sorted.length > 1 ? 's' : ''}${_pagesSearch ? ` trouvée${sorted.length > 1 ? 's' : ''}` : ''}</span>
       </div>
+      ${_pagesSelected.size > 0 ? renderPagesBulkBar() : ''}
       ${paginated.length > 0 ? renderPagesTable(paginated) : renderEmptyState('🔍', 'Aucune page trouvée', 'Essayez un autre terme de recherche')}
       ${totalPages > 1 ? renderPagesPagination(totalPages) : ''}
     </div>
@@ -9404,6 +9771,115 @@ function refreshPagesView() {
   if (input && _pagesSearch) {
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
+  }
+}
+
+// ========== PAGES BULK ACTIONS ==========
+
+function togglePageSelect(id, checked) {
+  if (checked) _pagesSelected.add(id);
+  else _pagesSelected.delete(id);
+  refreshPagesView();
+}
+
+function toggleAllPagesOnPage(checked, ids) {
+  ids.forEach(id => checked ? _pagesSelected.add(id) : _pagesSelected.delete(id));
+  refreshPagesView();
+}
+
+function clearPagesSelection() {
+  _pagesSelected.clear();
+  refreshPagesView();
+}
+
+function renderPagesBulkBar() {
+  const count = _pagesSelected.size;
+  return `
+    <div class="pages-bulk-bar">
+      <span class="pages-bulk-bar__count">${count} page${count > 1 ? 's' : ''} sélectionnée${count > 1 ? 's' : ''}</span>
+      <div class="pages-bulk-bar__actions">
+        <button type="button" class="btn btn-sm btn-outline" onclick="bulkPagesStatus('published')">Publier</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="bulkPagesStatus('private')">Privé</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="bulkPagesStatus('draft')">Brouillon</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="bulkPagesDuplicate()">Dupliquer</button>
+        <button type="button" class="btn btn-sm btn-danger" onclick="bulkPagesDelete()">Supprimer</button>
+      </div>
+      <button type="button" class="pages-bulk-bar__close" onclick="clearPagesSelection()" title="Annuler la sélection">✕</button>
+    </div>
+  `;
+}
+
+async function bulkPagesStatus(status) {
+  const ids = [..._pagesSelected];
+  const label = status === 'published' ? 'publiée' : status === 'private' ? 'mise en privé' : 'mise en brouillon';
+  showLoading();
+  try {
+    await Promise.all(ids.map(id => apiFetch(`/pages/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    })));
+    showToast(`${ids.length} page${ids.length > 1 ? 's' : ''} ${label}${ids.length > 1 ? 's' : ''}`, 'success');
+    _pagesSelected.clear();
+    loadSection('pages');
+  } catch (error) {
+    hideLoading();
+    showToast('Erreur: ' + error.message, 'error');
+  }
+}
+
+async function bulkPagesDuplicate() {
+  const ids = [..._pagesSelected];
+  showLoading();
+  try {
+    const pages = _pagesCache;
+    const existingSlugs = new Set(pages.map(p => p.slug));
+    for (const id of ids) {
+      const source = pages.find(p => p.id === id);
+      if (!source) continue;
+      const baseSlug = source.slug + '-copie';
+      let slug = baseSlug;
+      let counter = 1;
+      while (existingSlugs.has(slug)) {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+      existingSlugs.add(slug);
+      await apiFetch('/pages', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: source.title + ' (copie)',
+          slug,
+          content: source.content,
+          status: 'draft',
+          show_in_menu: false,
+          menu_order: 0,
+          parent_id: source.parent_id || null,
+        }),
+      });
+    }
+    showToast(`${ids.length} page${ids.length > 1 ? 's' : ''} dupliquée${ids.length > 1 ? 's' : ''}`, 'success');
+    _pagesSelected.clear();
+    loadSection('pages');
+  } catch (error) {
+    hideLoading();
+    showToast('Erreur: ' + error.message, 'error');
+  }
+}
+
+async function bulkPagesDelete() {
+  const ids = [..._pagesSelected];
+  const ok = await confirmModal(`Voulez-vous vraiment supprimer ${ids.length} page${ids.length > 1 ? 's' : ''} ?`);
+  if (!ok) return;
+
+  showLoading();
+  try {
+    await Promise.all(ids.map(id => apiFetch(`/pages/${id}`, { method: 'DELETE' })));
+    showToast(`${ids.length} page${ids.length > 1 ? 's' : ''} supprimée${ids.length > 1 ? 's' : ''}`, 'success');
+    _pagesSelected.clear();
+    loadSection('pages');
+  } catch (error) {
+    hideLoading();
+    showToast('Erreur: ' + error.message, 'error');
   }
 }
 
@@ -11273,9 +11749,12 @@ function togglePagesSort(field) {
 function renderPagesTable(pages) {
   const arrow = (field) => _pagesSortField === field ? (_pagesSortDir === 'asc' ? ' ▲' : ' ▼') : '';
   const activeStyle = (field) => _pagesSortField === field ? 'font-weight:700;' : '';
+  const allIds = pages.map(p => p.id);
+  const allChecked = allIds.length > 0 && allIds.every(id => _pagesSelected.has(id));
   return `
     <div class="pages-list">
       <div class="pages-list-header">
+        <label class="page-item__checkbox"><input type="checkbox" ${allChecked ? 'checked' : ''} onchange="toggleAllPagesOnPage(this.checked, [${allIds.join(',')}])"></label>
         <span class="page-item__info sortable-header" style="cursor:pointer;${activeStyle('title')}" onclick="togglePagesSort('title')">Page${arrow('title')}</span>
         <span class="page-item__meta sortable-header" style="cursor:pointer;${activeStyle('updated_at')}" onclick="togglePagesSort('updated_at')">Modifié${arrow('updated_at')}</span>
         <span class="page-item__badges">Statut</span>
@@ -11283,7 +11762,9 @@ function renderPagesTable(pages) {
       </div>
       ${pages.map(page => {
         const safeTitle = page.title.replace(/'/g, "\\'");
-        return '<div class="page-item">'
+        const checked = _pagesSelected.has(page.id);
+        return '<div class="page-item' + (checked ? ' page-item--selected' : '') + '">'
+          + '<label class="page-item__checkbox"><input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="togglePageSelect(' + page.id + ', this.checked)"></label>'
           + '<div class="page-item__info">'
           +   '<div class="page-item__title">' + escapeHtml(page.title) + '</div>'
           +   '<div class="page-item__slug">/' + escapeHtml(page.slug) + '</div>'
@@ -11294,9 +11775,10 @@ function renderPagesTable(pages) {
           + '</div>'
           + '<div class="page-item__badges">'
           +   renderPageMenuBadges(page.id)
-          +   '<span class="badge ' + (page.status === 'published' ? 'badge-success' : 'badge-warning') + '">'
-          +     (page.status === 'published' ? 'Publié' : 'Brouillon')
+          +   '<span class="badge ' + (page.status === 'published' ? 'badge-success' : page.status === 'private' ? 'badge-info' : 'badge-warning') + '">'
+          +     (page.status === 'published' ? 'Publié' : page.status === 'private' ? 'Privé' : 'Brouillon')
           +   '</span>'
+          +   (page.published_date && new Date(page.published_date) > new Date() ? '<span class="badge badge-outline" title="Planifié le ' + new Date(page.published_date).toLocaleDateString('fr-FR') + '">⏱</span>' : '')
           + '</div>'
           + '<div class="page-item__actions">'
           +   '<button class="btn-icon-action" onclick="editPage(' + page.id + ')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
@@ -11355,9 +11837,10 @@ async function showPageForm(pageId = null) {
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Statut *</label>
-              <select class="form-select" name="status" required>
+              <select class="form-select" name="status" required onchange="document.getElementById('pagePublishDateGroup').style.display = this.value === 'draft' ? 'none' : ''">
                 <option value="draft" ${page?.status === 'draft' ? 'selected' : ''}>Brouillon</option>
                 <option value="published" ${page?.status === 'published' ? 'selected' : ''}>Publié</option>
+                <option value="private" ${page?.status === 'private' ? 'selected' : ''}>Privé</option>
               </select>
             </div>
 
@@ -11367,6 +11850,21 @@ async function showPageForm(pageId = null) {
                 <option value="true" ${page?.show_in_menu !== false ? 'selected' : ''}>Oui</option>
                 <option value="false" ${page?.show_in_menu === false ? 'selected' : ''}>Non</option>
               </select>
+            </div>
+          </div>
+
+          <div class="form-row" id="pagePublishDateGroup" style="display:${!page || page.status === 'draft' ? 'none' : ''}">
+            <div class="form-group">
+              <label class="form-label">Mode de publication</label>
+              <select class="form-select" name="publish_mode" onchange="document.getElementById('pagePublishDate').style.display = this.value === 'now' ? 'none' : ''">
+                <option value="now" ${!page?.published_date || !page ? 'selected' : ''}>Maintenant</option>
+                <option value="schedule" ${page?.published_date && new Date(page.published_date) > new Date() ? 'selected' : ''}>Planifier</option>
+                <option value="backdate" ${page?.published_date && new Date(page.published_date) <= new Date() && page?.published_date ? 'selected' : ''}>Antérieur</option>
+              </select>
+            </div>
+            <div class="form-group" id="pagePublishDate" style="display:${page?.published_date ? '' : 'none'}">
+              <label class="form-label">Date de publication</label>
+              <input type="datetime-local" class="form-input" name="published_date" value="${page?.published_date ? page.published_date.slice(0,16) : ''}">
             </div>
           </div>
 
@@ -11407,11 +11905,19 @@ async function savePage(event, pageId) {
   event.preventDefault();
   const formData = new FormData(event.target);
 
+  const publishMode = formData.get('publish_mode') || 'now';
+  let publishedDate = null;
+  if (formData.get('status') !== 'draft' && publishMode !== 'now') {
+    const dateVal = formData.get('published_date');
+    if (dateVal) publishedDate = dateVal.replace('T', ' ') + ':00';
+  }
+
   const data = {
     title: formData.get('title'),
     slug: formData.get('slug'),
     content: formData.get('content'),
     status: formData.get('status'),
+    published_date: publishedDate,
     show_in_menu: formData.get('show_in_menu') === 'true',
     menu_order: parseInt(formData.get('menu_order')) || 0,
     parent_id: formData.get('parent_id') ? parseInt(formData.get('parent_id')) : null
@@ -12937,11 +13443,12 @@ async function clearAllCaches() {
     const icon = btn.querySelector('i');
     if (icon) { icon.className = 'fa-solid fa-check'; setTimeout(() => { icon.className = 'fa-solid fa-broom'; }, 1200); }
   }
-  // Re-render current view
+  // Re-render current view (stay on same page)
+  const currentSection = localStorage.getItem('adminLastView') || 'dashboard';
   if (pageBuilderState.editingPageId) {
     openPageBuilder(pageBuilderState.editingPageId);
   } else {
-    showSection(document.querySelector('.nav-link.active')?.dataset?.section || 'dashboard');
+    loadSection(currentSection);
   }
 }
 
@@ -14725,7 +15232,7 @@ async function renderAiCredits() {
         <td style="text-align:right">${Number(u.input_tokens).toLocaleString()}</td>
         <td style="text-align:right">${Number(u.output_tokens).toLocaleString()}</td>
         <td style="text-align:right;font-weight:600">${Number(u.credits_used).toFixed(6)} €</td>
-        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(u.prompt_summary || '').replace(/"/g, '&quot;')}">${u.prompt_summary || '—'}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(u.prompt_summary || '')}">${escapeHtml(u.prompt_summary || '—')}</td>
       </tr>
     `).join('');
 
@@ -14875,70 +15382,6 @@ async function renderAiCredits() {
         </div>
       </div>
 
-      <style>
-        /* AI Credits — Config card */
-        .ai-config-card { padding:0 !important; overflow:hidden; }
-        .ai-config-section { padding:24px 28px; }
-        .ai-config-header { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
-        .ai-config-header svg { color:var(--primary); flex-shrink:0; }
-        .ai-config-header h3 { font-size:15px; font-weight:600; color:var(--gray-800); margin:0; }
-        .ai-config-divider { height:1px; background:var(--gray-200, #e5e7eb); margin:0; }
-        .ai-config-grid { display:grid; grid-template-columns:1fr 1fr; }
-        .ai-config-grid > .ai-config-section:first-child { border-right:1px solid var(--gray-200, #e5e7eb); }
-
-        /* Input rows */
-        .ai-input-row { display:flex; gap:10px; align-items:flex-end; }
-        .ai-input-group { position:relative; }
-        .ai-input-group .form-label { font-size:13px; font-weight:600; color:var(--gray-600); margin-bottom:6px; display:block; }
-        .ai-input-euro { position:relative; }
-        .ai-input-euro .form-input { padding-left:26px; }
-        .ai-input-euro::after { content:'€'; position:absolute; bottom:11px; left:12px; color:var(--gray-400); font-size:14px; font-weight:500; pointer-events:none; }
-        .ai-hint { font-size:12px; color:var(--gray-400); margin-top:8px; }
-
-        /* Key status */
-        .ai-key-status { display:flex; align-items:center; gap:6px; font-size:13px; margin-top:10px; padding:8px 12px; border-radius:8px; }
-        .ai-key-status--ok { background:rgba(40,167,69,.08); color:#28a745; }
-        .ai-key-status--ok span { flex:1; word-break:break-all; font-family:monospace; font-size:12px; }
-        .ai-key-status--warn { background:rgba(255,152,0,.08); color:#ff9800; }
-        .ai-reveal-btn { background:none; border:1px solid currentColor; color:inherit; padding:2px 10px; border-radius:5px; font-size:11px; cursor:pointer; font-weight:600; white-space:nowrap; transition:all .2s; opacity:.7; }
-        .ai-reveal-btn:hover { opacity:1; background:rgba(40,167,69,.1); }
-
-        /* Icon button */
-        .ai-btn-icon { padding:10px 12px; background:var(--gray-100); border:1px solid var(--gray-300); border-radius:8px; cursor:pointer; display:flex; align-items:center; }
-        .ai-btn-icon:hover { background:var(--gray-200); }
-        .ai-btn-icon svg { color:var(--gray-600); }
-
-        /* Add credits row */
-        .ai-add-credits-row { align-items:flex-end; }
-        .ai-add-btn { display:flex; align-items:center; gap:6px; white-space:nowrap; height:41px; }
-
-        /* Tabs */
-        .ai-tab { background:var(--gray-100); color:var(--gray-600); border:none; padding:9px 18px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:500; transition:all .2s; }
-        .ai-tab:hover { background:var(--gray-200); color:var(--gray-800); }
-        .ai-tab.active { background:var(--primary); color:#fff; box-shadow:0 2px 8px rgba(0,0,0,.15); }
-
-        /* Table */
-        .ai-table { width:100%; border-collapse:collapse; font-size:13px; }
-        .ai-table th { text-align:left; padding:12px 14px; border-bottom:2px solid var(--gray-200); font-weight:600; color:var(--gray-500); font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
-        .ai-table td { padding:11px 14px; border-bottom:1px solid var(--gray-100); color:var(--gray-700); }
-        .ai-table tbody tr { transition:background .15s; }
-        .ai-table tbody tr:hover { background:var(--gray-50); }
-
-        /* Badges */
-        .badge-success { background:#d4edda; color:#155724; font-weight:500; }
-        .badge-secondary { background:var(--gray-100); color:var(--gray-600); font-weight:500; }
-        .btn-sm { padding:5px 12px; font-size:12px; border-radius:6px; }
-        .btn-danger { background:var(--danger, #dc3545); color:#fff; border:none; border-radius:6px; cursor:pointer; transition:opacity .2s; }
-        .btn-danger:hover { opacity:.85; }
-
-        /* Responsive */
-        @media (max-width:768px) {
-          .ai-config-grid { grid-template-columns:1fr; }
-          .ai-config-grid > .ai-config-section:first-child { border-right:none; border-bottom:1px solid var(--gray-200); }
-          .ai-add-credits-row { flex-wrap:wrap; }
-          .ai-add-credits-row > div:first-child { flex:1 1 100% !important; }
-        }
-      </style>
     `;
   } catch (error) {
     hideLoading();
@@ -15056,7 +15499,7 @@ async function loadAiUsagePage(page) {
         <td style="text-align:right">${Number(u.input_tokens).toLocaleString()}</td>
         <td style="text-align:right">${Number(u.output_tokens).toLocaleString()}</td>
         <td style="text-align:right;font-weight:600">${Number(u.credits_used).toFixed(6)} €</td>
-        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.prompt_summary || '—'}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(u.prompt_summary || '')}">${escapeHtml(u.prompt_summary || '—')}</td>
       </tr>
     `).join('');
 

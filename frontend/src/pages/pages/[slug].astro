@@ -3,8 +3,9 @@ import { getAllPages } from '../../lib/api';
 
 export async function getStaticPaths() {
   const pages = await getAllPages();
+  const now = new Date();
   return pages
-    .filter((p: any) => p.status === 'published')
+    .filter((p: any) => (p.status === 'published' || p.status === 'private') && !(p.published_date && new Date(p.published_date) > now))
     .map((p: any) => ({ params: { slug: p.slug } }));
 }
 
