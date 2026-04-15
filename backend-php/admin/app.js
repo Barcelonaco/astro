@@ -11557,15 +11557,12 @@ async function renderSiteSettings() {
             </div>
             <div class="form-group">
               <label class="form-label">Slogan du site</label>
-              <textarea class="form-textarea" name="site_description" rows="2" placeholder="Slogan ou description courte (utilisée pour le SEO, les métadonnées, etc.)">${escapeHtml(siteDescription)}</textarea>
+              <input type="text" class="form-input" name="site_description" placeholder="Slogan ou description courte (utilisée pour le SEO, les métadonnées, etc.)" value="${escapeHtml(siteDescription)}">
             </div>
           </div>
 
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Articles par page (blog)</label>
-              <input type="number" min="1" class="form-input" name="posts_per_page" value="${escapeHtml(postsPerPage)}">
-            </div>
+            
             <div class="form-group">
               <label class="form-label">Page d'accueil</label>
               <select class="form-select" name="front_page">
