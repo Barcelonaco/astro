@@ -11,8 +11,8 @@ const MENU_LOCATIONS = [
   { value: 'footer', label: 'Menu footer' },
 ];
 
-// --- Inactivity auto-logout (30 min) ---
-const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 min
+// --- Inactivity auto-logout (1h) ---
+const INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 1h
 let _inactivityTimer = null;
 
 function resetInactivityTimer() {

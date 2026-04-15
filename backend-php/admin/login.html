@@ -178,7 +178,7 @@
     // Show inactivity message if redirected for that reason
     if (new URLSearchParams(window.location.search).get('reason') === 'inactivity') {
       const msg = document.getElementById('inactivityMessage');
-      msg.textContent = 'Vous avez été déconnecté après 30 minutes d\'inactivité.';
+      msg.textContent = 'Vous avez été déconnecté après 1 heure d\'inactivité.';
       msg.classList.add('show');
     }
 
