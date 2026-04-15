@@ -31,45 +31,45 @@ export interface ImagePreset {
 export const IMAGE_PRESETS: Record<string, ImagePreset> = {
   hero: {
     width: 1440,
-    quality: 72,
+    quality: 78,
     format: 'webp',
     srcsetWidths: [480, 960, 1440],
-    srcsetQuality: 68,
+    srcsetQuality: 75,
   },
   banner: {
     width: 1440,
-    quality: 70,
+    quality: 76,
     format: 'webp',
     srcsetWidths: [480, 900, 1440],
-    srcsetQuality: 66,
+    srcsetQuality: 73,
   },
   feature: {
     width: 960,
-    quality: 70,
+    quality: 76,
     format: 'webp',
     srcsetWidths: [480, 720, 960],
-    srcsetQuality: 66,
+    srcsetQuality: 73,
   },
   card: {
     width: 600,
-    quality: 68,
+    quality: 74,
     format: 'webp',
     srcsetWidths: [300, 450, 600],
-    srcsetQuality: 65,
+    srcsetQuality: 72,
   },
   thumbnail: {
     width: 450,
-    quality: 68,
+    quality: 73,
     format: 'webp',
     srcsetWidths: [225, 350, 450],
-    srcsetQuality: 65,
+    srcsetQuality: 70,
   },
   icon: {
     width: 220,
-    quality: 70,
+    quality: 75,
     format: 'webp',
     srcsetWidths: [110, 220],
-    srcsetQuality: 68,
+    srcsetQuality: 73,
   },
 };
 
@@ -171,7 +171,7 @@ export function resolveImageUrl(
 ): string {
   const p = preset ? getPreset(preset) : null;
   const defaultW = p ? p.width : 900;
-  const defaultQ = p ? p.quality : 68;
+  const defaultQ = p ? p.quality : 75;
   if (!img) return _defaultImageUrl ? optimizedImageUrl(_defaultImageUrl, defaultW, defaultQ) : '';
   let rawUrl = '';
   if (typeof img === 'string') {
@@ -189,7 +189,7 @@ export function resolveImageUrl(
   // Use preset dimensions or fallback to size-based heuristic
   const SMALL_SIZES = ['thumbnail', 'icon', 'module-logo'];
   const optWidth = p ? p.width : (preferredSize && SMALL_SIZES.includes(preferredSize) ? 220 : 900);
-  const optQuality = p ? p.quality : 68;
+  const optQuality = p ? p.quality : 75;
   return optimizedImageUrl(rawUrl, optWidth, optQuality);
 }
 
@@ -200,7 +200,7 @@ export function resolveImageUrl(
 export function optimizedImageUrl(
   url: string,
   width: number = 1200,
-  quality: number = 72,
+  quality: number = 80,
   format: 'webp' | 'avif' = 'webp'
 ): string {
   if (!url) return '';
@@ -220,7 +220,7 @@ export function optimizedImageUrl(
 export function responsiveSrcset(
   url: string,
   widths: number[] = [400, 600, 900],
-  quality: number = 68,
+  quality: number = 75,
   format: 'webp' | 'avif' = 'webp'
 ): string {
   if (!url) return '';

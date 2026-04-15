@@ -1,14 +1,14 @@
 // DEFERRED CSS — Below-the-fold, loaded async
 // ----------------------------------------
-// Contains only component styles not available elsewhere.
-// Page-specific styles → scoped in each Astro page file.
-// Admin bar → scoped in AdminBar.astro.
-// Modules → inlined per-page by ModuleStyles.
-// Reset/buttons/editor/document → in app-critical.
+// Slim version: duplicates with app-critical, Astro component imports,
+// ModuleStyles inlining, and unused WooCommerce pages have been removed.
 
 // Dependencies (variables + mixins only — zero CSS output, needed by imports below)
 @import 'base/variables';
 @import 'base/mixin';
+
+// Full reset (completes the slim critical reset)
+@import 'base/reset';
 
 // COMPONENTS (not in app-critical, not inlined by Astro components)
 @import 'components/form';
@@ -22,8 +22,22 @@
 @import 'components/sliders';
 @import 'components/tabs';
 
-// PARTIALS
+// PARTIALS (footer → Footer.astro, search-form → Header.astro — already inlined)
 @import 'partials/sidebar';
 
-// MODULES
+// MODULES (gallery/references/share → inlined per-page by ModuleStyles)
 @import 'modules/alert';
+
+// PAGES (only pages that exist in Astro frontend — WooCommerce removed)
+@import 'pages/archive-news';
+@import 'pages/archive-references';
+@import 'pages/archive-evenements';
+@import 'pages/error-404';
+@import 'pages/search';
+@import 'pages/single-post';
+@import 'pages/single-news';
+@import 'pages/single-evenements';
+@import 'pages/single-references';
+
+// ADMIN
+@import 'admin/global';

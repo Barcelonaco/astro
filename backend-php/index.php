@@ -931,10 +931,10 @@ function serve_optimized_image(string $filename): void {
     if ($newW < $srcW && function_exists('imageconvolution')) {
         $sharpen = [
             [-1, -1, -1],
-            [-1, 16, -1],
+            [-1, 20, -1],
             [-1, -1, -1],
         ];
-        imageconvolution($dst, $sharpen, 8, 0);
+        imageconvolution($dst, $sharpen, 12, 0);
     }
 
     // Ensure cache dir exists

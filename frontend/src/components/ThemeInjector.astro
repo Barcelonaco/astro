@@ -120,26 +120,26 @@ if (googleFontsUrl) {
         css = css.replaceAll(remote, local);
       }
 
-      // Strip non-latin @font-face blocks (cyrillic, greek, vietnamese)
-      // French site only needs latin + latin-ext (for accented chars: é, è, ê, etc.)
-      css = css.replace(/\/\*\s*(cyrillic|greek|vietnamese)[\s\S]*?@font-face\s*\{[^}]*\}\s*/gi, '');
-
-      // Inline critical font files (weight 400 + 600, latin + latin-ext) as base64
+      // Inline critical font files (weight 400 + 600, latin) as base64 data URIs
       // Weight 400 = body text, weight 600 = headings — both above the fold
-      const inlineBlocks = css.split(/(?=@font-face)/);
-      const inlinedKeys = new Set<string>();
-      googleFontsCss = inlineBlocks.map(block => {
+      // This eliminates woff2 network requests from the critical path entirely
+      const blocks = css.split(/(?=@font-face)/);
+      const inlinedKeys = new Set<string>(); // track family+weight combos
+      googleFontsCss = blocks.map(block => {
         if (!block.includes('font-weight')) return block;
+        // Only inline weight 400 and 600, latin subset (not latin-ext, cyrillic, etc.)
         const is400 = /font-weight:\s*400/.test(block);
         const is600 = /font-weight:\s*600/.test(block);
         if (!is400 && !is600) return block;
+        if (/unicode-range:\s*U\+0100/i.test(block)) return block; // latin-ext
+        if (/cyrillic|greek|vietnamese/i.test(block)) return block;
         const urlM = block.match(/url\(([^)]+\.woff2)\)/);
         const famM = block.match(/font-family:\s*'([^']+)'/);
         if (!urlM || !famM) return block;
-        const isLatinExt = /unicode-range:\s*U\+0100/i.test(block);
-        const key = `${famM[1]}-${is400 ? '400' : '600'}-${isLatinExt ? 'ext' : 'lat'}`;
+        const key = `${famM[1]}-${is400 ? '400' : '600'}`;
         if (inlinedKeys.has(key)) return block;
-        const localPath = urlM[1];
+        // Read local file and convert to base64 data URI
+        const localPath = urlM[1]; // e.g. /fonts/google/xxx.woff2
         const filePath = path.join(process.cwd(), 'public', localPath);
         if (fs.existsSync(filePath)) {
           const fontBuffer = fs.readFileSync(filePath);
