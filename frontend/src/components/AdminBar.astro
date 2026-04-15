@@ -9,14 +9,14 @@ interface Props {
 }
 
 const { siteSettings: s = {} } = Astro.props;
-const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
-const adminUrl = API_URL.replace(/\/api\/?$/, '') + '/admin';
 ---
 
-<script define:vars={{ adminUrl }}>
+<script>
 document.addEventListener('DOMContentLoaded', function() {
   const token = localStorage.getItem('token');
   if (!token) return;
+
+  const adminUrl = window.location.origin + '/admin';
 
   // Decode JWT payload to get user info
   let user = null;
