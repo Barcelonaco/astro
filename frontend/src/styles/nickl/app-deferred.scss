@@ -1,23 +1,17 @@
 // DEFERRED CSS — Below-the-fold, loaded async
 // ----------------------------------------
+// Slim version: duplicates with app-critical, Astro component imports,
+// ModuleStyles inlining, and unused WooCommerce pages have been removed.
+
+// Dependencies (variables + mixins only — zero CSS output, needed by imports below)
+@import 'base/variables';
+@import 'base/mixin';
 
 // Full reset (completes the slim critical reset)
 @import 'base/reset';
-// Dependencies (variables, mixins, and @extend targets needed by pages below)
-@import 'base/variables';
-@import 'base/mixin';
-@import 'components/buttons';
-@import 'components/editor';
+
+// COMPONENTS (not in app-critical, not inlined by Astro components)
 @import 'components/form';
-@import 'partials/document';
-@import 'modules/modules';
-
-// PARTIALS (below-fold)
-@import 'partials/footer';
-@import 'partials/search-form';
-@import 'partials/sidebar';
-
-// COMPONENTS (secondary)
 @import 'components/breadcrumb';
 @import 'components/floating-btn';
 @import 'components/gtranslate';
@@ -28,13 +22,13 @@
 @import 'components/sliders';
 @import 'components/tabs';
 
-// MODULES (specific)
-@import 'modules/gallery';
-@import 'modules/references';
-@import 'modules/alert';
-@import 'modules/share';
+// PARTIALS (footer → Footer.astro, search-form → Header.astro — already inlined)
+@import 'partials/sidebar';
 
-// PAGES
+// MODULES (gallery/references/share → inlined per-page by ModuleStyles)
+@import 'modules/alert';
+
+// PAGES (only pages that exist in Astro frontend — WooCommerce removed)
 @import 'pages/archive-news';
 @import 'pages/archive-references';
 @import 'pages/archive-evenements';
@@ -44,16 +38,6 @@
 @import 'pages/single-news';
 @import 'pages/single-evenements';
 @import 'pages/single-references';
-@import 'pages/waiting';
-@import 'pages/woocommerce';
-@import 'pages/woocommerce-account';
-@import 'pages/woocommerce-account-addresses';
-@import 'pages/woocommerce-account-edit-account';
-@import 'pages/woocommerce-account-orders';
-@import 'pages/woocommerce-archive-product';
-@import 'pages/woocommerce-cart';
-@import 'pages/woocommerce-checkout';
-@import 'pages/woocommerce-single-product';
 
 // ADMIN
 @import 'admin/global';
