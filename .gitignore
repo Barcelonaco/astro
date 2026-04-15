@@ -91,3 +91,6 @@ MULTISITE.md
 #  ignorées ; elles restent ici uniquement à titre d’information)
 # package-lock.json
 # frontend/package-lock.json
+
+
+/backend-php/uploads/

@@ -9646,8 +9646,15 @@ async function renderMediaLibrary() {
           <input type="file" multiple accept="image/*,video/*,application/pdf,.pdf" onchange="handleMediaUpload(event)" />
           Importer
         </label>
-        <button class="btn btn-outline" onclick="createMediaFolder()">+ Dossier</button>
+        ${!currentFolder ? `<button class="btn btn-outline" onclick="createMediaFolder()">+ Dossier</button>` : ''}
         ${currentFolder ? `<button class="btn btn-danger" onclick="deleteMediaFolder(${currentFolder})">Supprimer le dossier</button>` : ''}
+        <button
+          class="btn btn-outline media-select-all-btn"
+          onclick="selectAllMedia()"
+          ${mediaState.items.length === 0 ? 'disabled' : ''}
+        >
+          ${mediaState.selectedIds.length > 0 && mediaState.selectedIds.length === mediaState.items.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+        </button>
         <button
           class="btn btn-danger"
           onclick="deleteSelectedMedia()"
@@ -10895,6 +10902,20 @@ function clearMediaSelection(blockId, fieldName) {
   }
 }
 
+function selectAllMedia() {
+  const allIds = mediaState.items.map(item => String(item.id));
+  const allSelected = allIds.length > 0 && allIds.every(id => mediaState.selectedIds.includes(id));
+  if (allSelected) {
+    mediaState.selectedIds = [];
+  } else {
+    mediaState.selectedIds = [...allIds];
+  }
+  document.querySelectorAll('.media-card .media-select input[type="checkbox"]').forEach(cb => {
+    cb.checked = !allSelected;
+  });
+  updateMediaSelectionUI();
+}
+
 function toggleMediaSelection(id, isChecked) {
   if (!Array.isArray(mediaState.selectedIds)) {
     mediaState.selectedIds = [];
@@ -10931,10 +10952,17 @@ async function deleteSelectedMedia() {
 
 function updateMediaSelectionUI() {
   const btn = document.querySelector('.page-header .actions button.btn.btn-danger:last-of-type');
-  if (!btn) return;
-  const count = Array.isArray(mediaState.selectedIds) ? mediaState.selectedIds.length : 0;
-  btn.disabled = count === 0;
-  btn.textContent = `Supprimer la sélection (${count})`;
+  if (btn) {
+    const count = Array.isArray(mediaState.selectedIds) ? mediaState.selectedIds.length : 0;
+    btn.disabled = count === 0;
+    btn.textContent = `Supprimer la sélection (${count})`;
+  }
+  const selectAllBtn = document.querySelector('.media-select-all-btn');
+  if (selectAllBtn) {
+    const allIds = mediaState.items.map(item => String(item.id));
+    const allSelected = allIds.length > 0 && allIds.every(id => mediaState.selectedIds.includes(id));
+    selectAllBtn.textContent = allSelected ? 'Tout désélectionner' : 'Tout sélectionner';
+  }
 }
 
 function normalizeMediaValue(value) {
@@ -13896,18 +13924,22 @@ function renderFormFieldsList() {
     return '<p style="text-align:center;color:var(--gray-400);margin-top:40px">Ajoutez des champs depuis le panneau de gauche</p>';
   }
 
-  return `<div class="form-fields-list">
+  return `<div class="form-fields-list" style="display:flex;flex-wrap:wrap;gap:6px">
     ${_formBuilderFields.map((f, idx) => {
       const isSelected = idx === _formBuilderSelectedIdx;
       const ft = FORM_FIELD_TYPES.find(t => t.type === f.type) || { icon: '?', label: f.type };
+      const w = f.settings?.width || '100';
+      const widthStyle = w === '50' ? 'calc(50% - 3px)' : w === '33' ? 'calc(33.333% - 4px)' : '100%';
+      const widthLabel = w === '50' ? '½' : w === '33' ? '⅓' : '';
       return `
-        <div class="form-field-item ${isSelected ? 'is-selected' : ''}" data-idx="${idx}" onclick="selectFormField(${idx})" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid ${isSelected ? 'var(--primary)' : 'var(--gray-200)'};border-radius:8px;margin-bottom:6px;cursor:pointer;background:${isSelected ? 'var(--gray-50)' : 'white'}">
+        <div class="form-field-item ${isSelected ? 'is-selected' : ''}" data-idx="${idx}" onclick="selectFormField(${idx})" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid ${isSelected ? 'var(--primary)' : 'var(--gray-200)'};border-radius:8px;cursor:pointer;background:${isSelected ? 'var(--gray-50)' : 'white'};width:${widthStyle};box-sizing:border-box">
           <span style="cursor:grab;color:var(--gray-400)" class="form-field-drag" data-idx="${idx}">☰</span>
           <span style="width:28px;text-align:center;font-size:14px">${ft.icon}</span>
-          <div style="flex:1">
+          <div style="flex:1;min-width:0">
             <strong style="font-size:13px">${escapeHtml(f.label)}</strong>
             <span style="font-size:11px;color:var(--gray-400);margin-left:6px">${ft.label}${f.required ? ' *' : ''}</span>
           </div>
+          ${widthLabel ? `<span style="font-size:11px;color:var(--gray-400);background:var(--gray-100);padding:1px 6px;border-radius:4px">${widthLabel}</span>` : ''}
           <div style="display:flex;gap:4px">
             <button class="btn-icon-action btn-icon-action--danger" onclick="event.stopPropagation(); removeFormField(${idx})" title="Supprimer" style="font-size:12px">✕</button>
           </div>
@@ -14147,6 +14179,7 @@ function updateFormFieldSetting(idx, key, value) {
   if (_formBuilderFields[idx]) {
     if (!_formBuilderFields[idx].settings) _formBuilderFields[idx].settings = {};
     _formBuilderFields[idx].settings[key] = value;
+    if (key === 'width') refreshFormFieldsCanvas();
   }
 }
 
