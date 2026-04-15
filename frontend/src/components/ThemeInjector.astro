@@ -34,6 +34,41 @@ const FONT_GENERALS: Record<string, string> = {
   'open-sans': 'Open Sans', roboto: 'Roboto', rubik: 'Rubik',
 };
 
+/**
+ * Font metric overrides for CLS-free font swap.
+ * Each entry defines size-adjust, ascent-override, descent-override and line-gap-override
+ * to make the system fallback font match the custom font's metrics as closely as possible.
+ * Source: https://screenspan.net/fallback and manual tuning.
+ */
+const FONT_METRICS: Record<string, { sizeAdjust: string; ascent: string; descent: string; lineGap: string }> = {
+  'Poppins':              { sizeAdjust: '112.0%', ascent: '96%',  descent: '34%',  lineGap: '0%' },
+  'Plus Jakarta Sans':    { sizeAdjust: '109.0%', ascent: '97%',  descent: '28%',  lineGap: '0%' },
+  'Montserrat':           { sizeAdjust: '112.4%', ascent: '97%',  descent: '25%',  lineGap: '0%' },
+  'Inter':                { sizeAdjust: '107.0%', ascent: '96%',  descent: '24%',  lineGap: '0%' },
+  'Open Sans':            { sizeAdjust: '105.5%', ascent: '101%', descent: '27%',  lineGap: '0%' },
+  'Roboto':               { sizeAdjust: '100.3%', ascent: '93%',  descent: '24%',  lineGap: '0%' },
+  'Lora':                 { sizeAdjust: '112.0%', ascent: '98%',  descent: '30%',  lineGap: '0%' },
+  'Oswald':               { sizeAdjust: '91.2%',  ascent: '112%', descent: '28%',  lineGap: '0%' },
+  'Raleway':              { sizeAdjust: '105.0%', ascent: '100%', descent: '27%',  lineGap: '0%' },
+  'Rubik':                { sizeAdjust: '108.0%', ascent: '95%',  descent: '26%',  lineGap: '0%' },
+  'Jost':                 { sizeAdjust: '103.0%', ascent: '99%',  descent: '26%',  lineGap: '0%' },
+  'Kanit':                { sizeAdjust: '113.0%', ascent: '93%',  descent: '30%',  lineGap: '0%' },
+  'Ubuntu':               { sizeAdjust: '103.5%', ascent: '97%',  descent: '24%',  lineGap: '3%' },
+  'Barlow':               { sizeAdjust: '104.0%', ascent: '97%',  descent: '25%',  lineGap: '0%' },
+  'Onest':                { sizeAdjust: '107.0%', ascent: '96%',  descent: '25%',  lineGap: '0%' },
+  'Exo':                  { sizeAdjust: '107.0%', ascent: '97%',  descent: '26%',  lineGap: '0%' },
+  'Playfair Display':     { sizeAdjust: '110.0%', ascent: '99%',  descent: '28%',  lineGap: '0%' },
+  'DM Serif Display':     { sizeAdjust: '110.8%', ascent: '95%',  descent: '27%',  lineGap: '0%' },
+  'Crimson Pro':          { sizeAdjust: '114.0%', ascent: '96%',  descent: '28%',  lineGap: '0%' },
+  'Encode Sans Expanded': { sizeAdjust: '116.0%', ascent: '96%',  descent: '25%',  lineGap: '0%' },
+  'Bitter':               { sizeAdjust: '113.0%', ascent: '96%',  descent: '27%',  lineGap: '0%' },
+  'Cormorant Garamond':   { sizeAdjust: '119.0%', ascent: '95%',  descent: '33%',  lineGap: '0%' },
+  'Prompt':               { sizeAdjust: '111.0%', ascent: '97%',  descent: '34%',  lineGap: '0%' },
+  'Lilita One':           { sizeAdjust: '111.0%', ascent: '95%',  descent: '22%',  lineGap: '0%' },
+  'Zilla Slab':           { sizeAdjust: '103.0%', ascent: '97%',  descent: '26%',  lineGap: '0%' },
+  'Anek Odia':            { sizeAdjust: '113.0%', ascent: '97%',  descent: '30%',  lineGap: '0%' },
+};
+
 // Use pre-fetched settings or fetch as fallback
 const settings = Astro.props.styleSettings || await getStyleSettings();
 
@@ -157,11 +192,25 @@ cssVars.push(`--color-secondary-bis:${colorSecondaryBis}`);
 cssVars.push(`--color-tertiary:${colorTertiary}`);
 cssVars.push(`--color-background:${colorBackground}`);
 cssVars.push(`--color-form:${colorForm}`);
-cssVars.push(`--font-title:'${fontTitle}',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif`);
-cssVars.push(`--font-general:'${fontGeneral}',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif`);
+// Build fallback font-face declarations with metric overrides to minimize CLS on swap
+const fallbackFaces: string[] = [];
+const titleFallbackName = `${fontTitle} Fallback`;
+const generalFallbackName = `${fontGeneral} Fallback`;
+const titleMetrics = FONT_METRICS[fontTitle];
+const generalMetrics = FONT_METRICS[fontGeneral];
+if (titleMetrics) {
+  fallbackFaces.push(`@font-face{font-family:'${titleFallbackName}';src:local('Arial');size-adjust:${titleMetrics.sizeAdjust};ascent-override:${titleMetrics.ascent};descent-override:${titleMetrics.descent};line-gap-override:${titleMetrics.lineGap}}`);
+}
+if (generalMetrics && fontGeneral !== fontTitle) {
+  fallbackFaces.push(`@font-face{font-family:'${generalFallbackName}';src:local('Arial');size-adjust:${generalMetrics.sizeAdjust};ascent-override:${generalMetrics.ascent};descent-override:${generalMetrics.descent};line-gap-override:${generalMetrics.lineGap}}`);
+}
+cssVars.push(`--font-title:'${fontTitle}','${titleFallbackName}',system-ui,sans-serif`);
+cssVars.push(`--font-general:'${fontGeneral}','${generalFallbackName}',system-ui,sans-serif`);
 if (!isNaN(logoHeight)) cssVars.push(`--logo-height:${logoHeight}px`);
 ---
 
+{/* Font fallback faces with metric overrides — eliminates CLS from font swap */}
+{fallbackFaces.length > 0 && <style set:html={fallbackFaces.join('')} />}
 {/* Inline CSS variables — no client-side fetch needed */}
 <style set:html={`:root{${cssVars.join(';')}}`} />
 
