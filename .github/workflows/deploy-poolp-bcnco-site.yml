@@ -26,7 +26,7 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.POOLP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.POOLP_SSH_PRIVATE_KEY }}" > ~/.ssh/poolp_deploy
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.POOLP_SSH_HOST }} >> ~/.ssh/known_hosts
 
@@ -36,7 +36,7 @@ jobs:
             --exclude='.env' \
             --exclude='dist' \
             --exclude='uploads/' \
-            ./backend-php/ ${{ secrets.POOLP_SSH_USER }}@${{ secrets.POOLP_SSH_HOST }}:~/poolp.bcnco.site/httpdocs/backend-php/
+            ./backend-php/ ${{ secrets.POOLP_SSH_USER }}@${{ secrets.POOLP_SSH_HOST }}:~/httpdocs/backend-php/
 
       - name: Deploy frontend
         run: |
@@ -44,17 +44,17 @@ jobs:
             --exclude='.env' \
             --exclude='dist/' \
             --exclude='node_modules/' \
-            ./frontend/ ${{ secrets.POOLP_SSH_USER }}@${{ secrets.POOLP_SSH_HOST }}:~/poolp.bcnco.site/httpdocs/frontend/
+            ./frontend/ ${{ secrets.POOLP_SSH_USER }}@${{ secrets.POOLP_SSH_HOST }}:~/httpdocs/frontend/
 
       - name: Deploy root package.json
         run: |
           rsync -avz \
-            ./package.json ${{ secrets.POOLP_SSH_USER }}@${{ secrets.POOLP_SSH_HOST }}:~/poolp.bcnco.site/httpdocs/
+            ./package.json ${{ secrets.POOLP_SSH_USER }}@${{ secrets.POOLP_SSH_HOST }}:~/httpdocs/
 
       - name: Deploy plugins
         run: |
           rsync -avz --delete \
-            ./plugins/ ${{ secrets.POOLP_SSH_USER }}@${{ secrets.POOLP_SSH_HOST }}:~/poolp.bcnco.site/httpdocs/plugins/
+            ./plugins/ ${{ secrets.POOLP_SSH_USER }}@${{ secrets.POOLP_SSH_HOST }}:~/httpdocs/plugins/
 
       - name: Post-deploy
         uses: appleboy/ssh-action@v1
@@ -66,7 +66,7 @@ jobs:
             set -e
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-            REMOTE_ROOT=~/poolp.bcnco.site/httpdocs
+            REMOTE_ROOT=~/httpdocs
 
             # Use PHP 8.x from Plesk (default php is 7.4)
             PHP=$(ls /opt/plesk/php/8.*/bin/php 2>/dev/null | sort -V | tail -1 || echo php)
