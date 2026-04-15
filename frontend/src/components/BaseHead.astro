@@ -28,7 +28,7 @@ interface Props {
 	image?: ImageMetadata;
 	styleSettings?: Record<string, string>;
 	siteSettings?: Record<string, string>;
-	lcpImage?: { desktop: string; mobile: string };
+	lcpImage?: { desktop: string; mobile: string; srcset?: string; sizes?: string };
 }
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
@@ -54,8 +54,14 @@ const faviconUrl = faviconSetting ? (faviconSetting.startsWith('http') ? favicon
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 {/* LCP image preload — MUST appear before any CSS to start download immediately */}
-{lcpImage?.mobile && <link rel="preload" as="image" href={lcpImage.mobile} media="(max-width: 600px)" fetchpriority="high" />}
-{lcpImage?.desktop && <link rel="preload" as="image" href={lcpImage.desktop} media="(min-width: 601px)" fetchpriority="high" />}
+{lcpImage?.srcset ? (
+  <link rel="preload" as="image" imagesrcset={lcpImage.srcset} imagesizes={lcpImage.sizes} fetchpriority="high" />
+) : (
+  <>
+    {lcpImage?.mobile && <link rel="preload" as="image" href={lcpImage.mobile} media="(max-width: 600px)" fetchpriority="high" />}
+    {lcpImage?.desktop && <link rel="preload" as="image" href={lcpImage.desktop} media="(min-width: 601px)" fetchpriority="high" />}
+  </>
+)}
 <style>
 /* Popin overlay — needs to be ready before JS */
 .popin-gallery-wrapper{position:fixed;top:0;left:0;width:100%;height:100%;visibility:hidden;opacity:0;z-index:9999;transition:all .6s ease}

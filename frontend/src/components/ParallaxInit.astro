@@ -23,35 +23,41 @@
   function update() {
     var wh = window.innerHeight;
 
+    // Batch all geometry reads first to avoid forced reflow
+    var bgUpdates = [];
     bgModules.forEach(function(mod) {
       var rect = mod.getBoundingClientRect();
       if (rect.bottom < 0 || rect.top > wh) return;
       var bg = mod.querySelector('.background');
       if (!bg) return;
       var progress = (wh - rect.top) / (wh + rect.height);
-      bg.style.transform = 'translateY(' + (progress * 25) + '%)';
+      bgUpdates.push({ el: bg, val: 'translateY(' + (progress * 25) + '%)' });
     });
 
+    var imgUpdates = [];
     imgParallaxWrappers.forEach(function(wrapper) {
       var rect = wrapper.getBoundingClientRect();
       if (rect.bottom < 0 || rect.top > wh) return;
       var illus = wrapper.querySelector('.illus');
       if (!illus) return;
       var progress = (wh - rect.top) / (wh + rect.height);
-      var y = 200 * (1 - progress);
-      illus.style.transform = 'translateY(' + y + 'px)';
+      imgUpdates.push({ el: illus, val: 'translateY(' + (200 * (1 - progress)) + 'px)' });
     });
 
-    // Ornament illus parallax: reproduit GSAP scrub y: 0 → 14vh
+    var ornUpdates = [];
     ornamentWrappers.forEach(function(wrapper) {
       var rect = wrapper.getBoundingClientRect();
       if (rect.bottom < -200 || rect.top > wh + 200) return;
       var illus = wrapper.querySelector('.illus');
       if (!illus) return;
       var progress = (wh - rect.top) / (wh + rect.height);
-      var y = 14 * progress;
-      illus.style.transform = 'translateY(' + y + 'vh)';
+      ornUpdates.push({ el: illus, val: 'translateY(' + (14 * progress) + 'vh)' });
     });
+
+    // Apply all writes after reads
+    for (var i = 0; i < bgUpdates.length; i++) bgUpdates[i].el.style.transform = bgUpdates[i].val;
+    for (var i = 0; i < imgUpdates.length; i++) imgUpdates[i].el.style.transform = imgUpdates[i].val;
+    for (var i = 0; i < ornUpdates.length; i++) ornUpdates[i].el.style.transform = ornUpdates[i].val;
 
     ticking = false;
   }

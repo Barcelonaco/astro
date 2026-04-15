@@ -125,6 +125,7 @@ if (googleFontsUrl) {
       // This embeds ~26KB of woff2 directly in the HTML — zero network request, zero CLS
       const blocks = css.split(/(?=@font-face)/);
       const inlinedFamilies = new Set<string>();
+      const preloadedWeights = new Set<string>();
       googleFontsCss = blocks.map(block => {
         if (!block.includes('font-weight')) return block;
         // Only inline weight 400, latin subset (not latin-ext, cyrillic, etc.)
@@ -145,6 +146,22 @@ if (googleFontsUrl) {
         }
         return block;
       }).join('');
+
+      // Preload weight 600/700 latin fonts (used in headings above the fold)
+      // These aren't inlined but are needed early for visual stability
+      const preloadedUrls = new Set<string>();
+      for (const block of blocks) {
+        if (!block.includes('font-weight')) continue;
+        const wM = block.match(/font-weight:\s*600/);
+        if (!wM) continue;
+        if (/unicode-range:\s*U\+0100/i.test(block)) continue;
+        if (/cyrillic|greek|vietnamese/i.test(block)) continue;
+        const urlM = block.match(/url\(([^)]+\.woff2)\)/);
+        if (!urlM || urlM[1].includes('data:')) continue;
+        if (preloadedUrls.has(urlM[1])) continue;
+        preloadedUrls.add(urlM[1]);
+        fontPreloads.push(urlM[1]);
+      }
     }
   } catch {}
 }
@@ -174,6 +191,11 @@ if (!isNaN(logoHeight)) cssVars.push(`--logo-height:${logoHeight}px`);
 
 {/* Inline CSS variables — no client-side fetch needed */}
 <style set:html={`:root{${cssVars.join(';')}}`} />
+
+{/* Preload critical font files (weight 600/700 used in headings) */}
+{fontPreloads.map(href => (
+  <link rel="preload" as="font" type="font/woff2" href={href} crossorigin />
+))}
 
 {/* Google Fonts — inlined at build time to avoid external blocking request */}
 {googleFontsCss ? (

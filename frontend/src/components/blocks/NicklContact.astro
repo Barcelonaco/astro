@@ -60,7 +60,9 @@ const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
             const addressStreet = `${streetNumber} ${streetName}`.trim();
             const addressStreetShort = `${streetNumber} ${addr.street_name_short || ''}`.trim();
             const placeId = addr.place_id || '';
-            const logoUrl = resolveImageUrl(contact.logo, apiOrigin, 'logo', 'icon');
+            const rawLogo = contact.logo;
+            const hasLogo = rawLogo && (typeof rawLogo === 'string' ? rawLogo.trim() !== '' : rawLogo.url);
+            const logoUrl = hasLogo ? resolveImageUrl(rawLogo, apiOrigin, 'logo', 'icon') : '';
 
             const socials = socialOrder.filter((key) => contact[key]);
 
@@ -139,7 +141,9 @@ const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
     <div class="col col-2">
       {!isMap ? (
         photoUrl && (
-          <img src={photoUrl} srcset={photoSrcset || undefined} sizes="(max-width: 960px) 100vw, 400px" alt={photoAlt} class="illus" width="400" height="400" loading="lazy" />
+          <div class="photo-wrapper">
+            <img src={photoUrl} srcset={photoSrcset || undefined} sizes="(max-width: 960px) 100vw, 600px" alt={photoAlt} class="illus" loading="lazy" />
+          </div>
         )
       ) : (
         <>
@@ -281,5 +285,18 @@ const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
   }
   .module-contact .social-networks .item-social {
     list-style: none;
+  }
+  /* Photo wrapper — same sizing as map-wrapper */
+  .module-contact .photo-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+  .module-contact .photo-wrapper .illus {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 </style>

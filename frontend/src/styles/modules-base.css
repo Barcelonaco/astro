@@ -360,6 +360,15 @@
 .module .title-module {
   margin-bottom: 3.375rem;
 }
+.module .title-module.title-section-2 {
+  color: var(--color-primary, #333);
+}
+.module .title-module.title-section-3 {
+  color: var(--color-secondary, #666);
+}
+.module .title-module.title-section-4 {
+  color: var(--color-tertiary, #999);
+}
 .module .title-module.align-left {
   text-align: left;
 }

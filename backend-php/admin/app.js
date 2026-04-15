@@ -2930,6 +2930,7 @@ async function renderPageBuilder() {
                 </div>
                 <div id="seoFields" style="${pageBuilderState.seoMeta.enabled ? '' : 'display:none'}">
                   <button type="button" class="btn btn-primary seo-analyze-btn" onclick="analyzeSeoPage()">Analyser la page</button>
+                  <div class="seo-image-audit" style="display:none"></div>
                   <div class="seo-field">
                     <label class="form-label">Balise Title <span class="seo-counter" id="seoTitleCount">(${pageBuilderState.seoMeta.meta_title.length}/60)</span></label>
                     <input type="text" class="form-input" id="seo_meta_title" value="${(pageBuilderState.seoMeta.meta_title || '').replace(/"/g, '&quot;')}" oninput="onSeoFieldChange()" maxlength="60" placeholder="Titre SEO de la page (max 60 car.)" />
@@ -2983,6 +2984,7 @@ async function renderPageBuilder() {
                 </div>
                 <div id="seoFields" style="${pageBuilderState.seoMeta.enabled ? '' : 'display:none'}">
                   <button type="button" class="btn btn-primary seo-analyze-btn" onclick="analyzeSeoPage()">Analyser la page</button>
+                  <div class="seo-image-audit" style="display:none"></div>
                   <div class="seo-field">
                     <label class="form-label">Meta Title <span class="seo-counter" id="seoTitleCount">(${pageBuilderState.seoMeta.meta_title.length}/60)</span></label>
                     <input type="text" class="form-input" id="seo_meta_title" value="${(pageBuilderState.seoMeta.meta_title || '').replace(/"/g, '&quot;')}" oninput="onSeoFieldChange()" maxlength="60" placeholder="Titre SEO de la page (max 60 car.)" />
@@ -3041,6 +3043,7 @@ async function renderPageBuilder() {
             <div class="cpt-builder-tab-content" data-tab="page-seo" style="display:none;padding-top:16px;">
               <div class="builder-seo-body">
                 <button type="button" class="btn btn-primary seo-analyze-btn" onclick="analyzeSeoPage()">Analyser la page</button>
+                <div class="seo-image-audit" style="display:none"></div>
                 <div class="seo-field">
                   <label class="form-label">Balise Title <span class="seo-counter" id="seoTitleCount">(${pageBuilderState.seoMeta.meta_title.length}/60)</span></label>
                   <input type="text" class="form-input" id="seo_meta_title" value="${(pageBuilderState.seoMeta.meta_title || '').replace(/"/g, '&quot;')}" oninput="onSeoFieldChange()" maxlength="60" placeholder="Titre SEO de la page (max 60 car.)" />
@@ -5759,7 +5762,131 @@ function analyzeSeoPage() {
   if (titleInput) titleInput.value = metaTitle;
   if (descInput) descInput.value = metaDesc;
   onSeoFieldChange();
+  auditSeoImages();
   showToast('Analyse SEO terminée — vérifiez et ajustez les textes', 'success');
+}
+
+function auditSeoImages() {
+  const blocks = pageBuilderState.blocks || [];
+  const allImages = [];
+
+  function collectImage(imgObj, blockLabel) {
+    if (!imgObj) return;
+    if (typeof imgObj === 'string') {
+      if (imgObj.match(/\.(jpg|jpeg|png|gif|webp|svg|avif|bmp)/i)) {
+        allImages.push({ url: imgObj, alt: '', title: '', block: blockLabel });
+      }
+      return;
+    }
+    if (imgObj.url || imgObj.src) {
+      allImages.push({
+        url: imgObj.url || imgObj.src || '',
+        alt: imgObj.alt || imgObj.alt_text || '',
+        title: imgObj.title || imgObj.name || '',
+        block: blockLabel
+      });
+    }
+  }
+
+  function collectFromObj(obj, blockLabel) {
+    if (!obj || typeof obj !== 'object') return;
+    // Direct image fields
+    const imgFields = ['image', 'photo', 'logo', 'icon', 'icon_image', 'bg_image', 'background', 'background_image', 'featured_image', 'preview', 'media', 'cover', 'thumbnail', 'picture'];
+    for (const f of imgFields) {
+      if (obj[f]) collectImage(obj[f], blockLabel);
+    }
+    // Array image fields
+    const arrFields = ['images', 'gallery', 'photos', 'logos', 'slides', 'sliders', 'hero_sliders'];
+    for (const f of arrFields) {
+      if (Array.isArray(obj[f])) {
+        for (const item of obj[f]) {
+          if (item && typeof item === 'object') {
+            // item itself could be image or contain image sub-fields
+            if (item.url || item.src) {
+              collectImage(item, blockLabel);
+            } else {
+              collectFromObj(item, blockLabel);
+            }
+          }
+        }
+      }
+    }
+    // Repeater items
+    if (Array.isArray(obj.items)) {
+      for (const item of obj.items) collectFromObj(item, blockLabel);
+    }
+    if (Array.isArray(obj.columns)) {
+      for (const col of obj.columns) collectFromObj(col, blockLabel);
+    }
+    if (Array.isArray(obj.members)) {
+      for (const m of obj.members) collectFromObj(m, blockLabel);
+    }
+    if (Array.isArray(obj.references)) {
+      for (const r of obj.references) collectFromObj(r, blockLabel);
+    }
+    if (Array.isArray(obj.tiles)) {
+      for (const t of obj.tiles) collectFromObj(t, blockLabel);
+    }
+    if (Array.isArray(obj.files)) {
+      for (const f of obj.files) collectFromObj(f, blockLabel);
+    }
+  }
+
+  for (const block of blocks) {
+    const def = BLOCK_TYPES[block.type] || {};
+    const label = def.label || block.type || '?';
+    collectFromObj(block.data || {}, label);
+  }
+
+  // Dedup by URL — keep first occurrence
+  const seen = new Set();
+  const uniqueImages = [];
+  for (const img of allImages) {
+    const key = (img.url || '').replace(/^https?:\/\/[^/]+/, '').split('?')[0];
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    uniqueImages.push(img);
+  }
+
+  const missingAlt = uniqueImages.filter(i => !i.alt || !i.alt.trim());
+  const missingTitle = uniqueImages.filter(i => !i.title || !i.title.trim());
+  const total = uniqueImages.length;
+
+  // Render audit panel
+  const panels = document.querySelectorAll('.seo-image-audit');
+  panels.forEach(panel => {
+    if (total === 0) {
+      panel.innerHTML = `<div class="seo-audit-summary seo-audit-empty">Aucune image détectée dans les blocs</div>`;
+      panel.style.display = '';
+      return;
+    }
+
+    let html = `<div class="seo-audit-summary" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:${missingAlt.length > 0 ? '10' : '0'}px;">
+      <div class="seo-audit-stat"><strong>${total}</strong> image${total > 1 ? 's' : ''}</div>
+      <div class="seo-audit-stat ${missingAlt.length > 0 ? 'seo-audit-warn' : 'seo-audit-ok'}"><strong>${missingAlt.length}</strong> sans alt</div>
+      <div class="seo-audit-stat ${missingTitle.length > 0 ? 'seo-audit-warn' : 'seo-audit-ok'}"><strong>${missingTitle.length}</strong> sans titre</div>
+    </div>`;
+
+    if (missingAlt.length > 0) {
+      html += `<details class="seo-audit-details"><summary>Images sans texte alternatif (${missingAlt.length})</summary><ul>`;
+      for (const img of missingAlt) {
+        const fname = (img.url || '').split('/').pop() || '?';
+        html += `<li><span class="seo-audit-block">${escapeHtml(img.block)}</span> — <span class="seo-audit-file">${escapeHtml(fname)}</span></li>`;
+      }
+      html += `</ul></details>`;
+    }
+    if (missingTitle.length > 0) {
+      html += `<details class="seo-audit-details"><summary>Images sans titre (${missingTitle.length})</summary><ul>`;
+      for (const img of missingTitle) {
+        const fname = (img.url || '').split('/').pop() || '?';
+        html += `<li><span class="seo-audit-block">${escapeHtml(img.block)}</span> — <span class="seo-audit-file">${escapeHtml(fname)}</span></li>`;
+      }
+      html += `</ul></details>`;
+    }
+
+    panel.innerHTML = html;
+    panel.style.display = '';
+  });
 }
 
 function stripHtml(html) {

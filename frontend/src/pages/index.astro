@@ -8,7 +8,7 @@ import DeferredLoader from '../components/DeferredLoader.astro';
 import SiteOverlays from '../components/SiteOverlays.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
 import { formatContent, getFrontendBootstrap } from '../lib/api';
-import { optimizedImageUrl, setDefaultImageUrl } from '../lib/module-helpers';
+import { optimizedImageUrl, responsiveSrcset, IMAGE_PRESETS, setDefaultImageUrl } from '../lib/module-helpers';
 
 function parseBlocks(content: string): unknown[] | null {
   if (!content || !content.trim()) return null;
@@ -19,28 +19,40 @@ function parseBlocks(content: string): unknown[] | null {
   return null;
 }
 
-function extractLcpImages(blocks: any[] | null): { desktop: string; mobile: string } {
+function extractLcpImages(blocks: any[] | null): { desktop: string; mobile: string; srcset?: string; sizes?: string } {
   if (!blocks || blocks.length === 0) return { desktop: '', mobile: '' };
   const first = blocks[0];
+  // Hero — uses <picture> with separate desktop/mobile sources
   if (first.type === 'hero' && first.data?.hero_sliders?.[0]?.image?.url) {
     const slide = first.data.hero_sliders[0];
+    const p = IMAGE_PRESETS.hero;
     const mobileUrl = slide.image_mobile?.url || slide.image.url;
     return {
-      desktop: optimizedImageUrl(slide.image.url, 1440, 80),
-      mobile: optimizedImageUrl(mobileUrl, 400, 70),
+      desktop: optimizedImageUrl(slide.image.url, p.width, p.quality),
+      mobile: optimizedImageUrl(mobileUrl, 600, p.srcsetQuality),
     };
   }
+  // Banner — single URL for both
   if (first.type === 'banner' && first.data?.image?.url) {
-    const url = optimizedImageUrl(first.data.image.url, 1440, 80);
+    const p = IMAGE_PRESETS.banner;
+    const url = optimizedImageUrl(first.data.image.url, p.width, p.quality);
     return { desktop: url, mobile: url };
   }
-  // text-image, illus-video, or any block with an image field
+  // text-image, illus-video, etc. — uses <img srcset sizes>
+  // Preload must use imagesrcset/imagesizes to match browser's srcset selection
   if (first.data?.image) {
     const imgUrl = typeof first.data.image === 'string' ? first.data.image : first.data.image?.url || '';
     if (imgUrl) {
+      const p = IMAGE_PRESETS.feature;
+      const srcset = responsiveSrcset(imgUrl, p.srcsetWidths, p.srcsetQuality);
+      if (srcset) {
+        const mediaRatio = (first.data.media_ratio as string) || 'landscape';
+        const lastSize = mediaRatio === 'full-height' || mediaRatio === 'portrait' ? '50vw' : '500px';
+        return { desktop: '', mobile: '', srcset, sizes: `(max-width: 600px) calc(100vw - 40px), (max-width: 960px) 50vw, ${lastSize}` };
+      }
       return {
-        desktop: optimizedImageUrl(imgUrl, 800, 75),
-        mobile: optimizedImageUrl(imgUrl, 400, 70),
+        desktop: optimizedImageUrl(imgUrl, p.width, p.quality),
+        mobile: optimizedImageUrl(imgUrl, p.srcsetWidths[0], p.srcsetQuality),
       };
     }
   }
