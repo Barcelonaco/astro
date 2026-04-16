@@ -165,8 +165,17 @@ for (const type of pluginBlockTypes) {
 const pluginInlinedCss = pluginCssChunks.filter(Boolean).join('\n');
 ---
 
-{/* All Nickl module CSS inlined — zero external render-blocking requests for module specifics */}
-{inlinedCss && <style set:html={inlinedCss} />}
+{/* Nickl module CSS — external cacheable files, non-blocking */}
+{cssFileNames.map(name => (
+  <link rel="stylesheet" href={`/nickl-assets/css/${name}.css`} media="print" onload="this.media='all'" />
+))}
+{cssFileNames.length > 0 && (
+  <noscript>
+    {cssFileNames.map(name => (
+      <link rel="stylesheet" href={`/nickl-assets/css/${name}.css`} />
+    ))}
+  </noscript>
+)}
 
-{/* Plugin CSS — inlined at build time from plugins/ directory */}
+{/* Plugin CSS — inlined (small, not available as external files) */}
 {pluginInlinedCss && <style set:html={pluginInlinedCss} />}

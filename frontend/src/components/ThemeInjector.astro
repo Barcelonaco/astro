@@ -78,6 +78,7 @@ const googleFontsUrl = fontsToLoad.size > 0
 
 // Fetch @font-face CSS and self-host the woff2 files
 let googleFontsCss = '';
+const fontPreloads = new Map<string, string>(); // family → woff2 URL (weight 400 latin)
 if (googleFontsUrl) {
   try {
     const res = await fetch(googleFontsUrl, {
@@ -120,35 +121,24 @@ if (googleFontsUrl) {
         css = css.replaceAll(remote, local);
       }
 
-      // Inline critical font files (weight 400, 500, 600, 700 latin) as base64 data URIs
-      // All weights used above the fold — eliminates FOUT and CLS from font swap
-      // This eliminates woff2 network requests from the critical path entirely
-      const blocks = css.split(/(?=@font-face)/);
-      const inlinedKeys = new Set<string>(); // track family+weight combos
-      googleFontsCss = blocks.map(block => {
-        if (!block.includes('font-weight')) return block;
-        // Inline weight 400, 500, 600, 700 — latin subset only (not latin-ext, cyrillic, etc.)
-        const isCriticalWeight = /font-weight:\s*(400|500|600|700)/.test(block);
-        if (!isCriticalWeight) return block;
-        if (/unicode-range:\s*U\+0100/i.test(block)) return block; // latin-ext
-        if (/cyrillic|greek|vietnamese/i.test(block)) return block;
+      // Write font CSS to external file (cacheable, not bloating HTML)
+      const fontCssPath = path.join(process.cwd(), 'public', 'fonts', 'google', 'fonts.css');
+      fs.writeFileSync(fontCssPath, css);
+      googleFontsCss = ''; // don't inline — use external file
+
+      // Collect preload hints for critical fonts (weight 400 latin of each family)
+      const fontBlocks = css.split(/(?=@font-face)/);
+      for (const block of fontBlocks) {
+        if (!block.includes('font-weight')) continue;
+        if (!/font-weight:\s*400/.test(block)) continue;
+        if (/unicode-range:\s*U\+0100/i.test(block)) continue; // skip latin-ext
+        if (/cyrillic|greek|vietnamese/i.test(block)) continue;
         const urlM = block.match(/url\(([^)]+\.woff2)\)/);
         const famM = block.match(/font-family:\s*'([^']+)'/);
-        if (!urlM || !famM) return block;
-        const weightM = block.match(/font-weight:\s*(400|500|600|700)/);
-        const key = `${famM[1]}-${weightM ? weightM[1] : 'unknown'}`;
-        if (inlinedKeys.has(key)) return block;
-        // Read local file and convert to base64 data URI
-        const localPath = urlM[1]; // e.g. /fonts/google/xxx.woff2
-        const filePath = path.join(process.cwd(), 'public', localPath);
-        if (fs.existsSync(filePath)) {
-          const fontBuffer = fs.readFileSync(filePath);
-          const b64 = fontBuffer.toString('base64');
-          inlinedKeys.add(key);
-          return block.replace(urlM[0], `url(data:font/woff2;base64,${b64})`);
+        if (urlM && famM && !fontPreloads.has(famM[1])) {
+          fontPreloads.set(famM[1], urlM[1]);
         }
-        return block;
-      }).join('');
+      }
     }
   } catch {}
 }
@@ -179,8 +169,13 @@ if (!isNaN(logoHeight)) cssVars.push(`--logo-height:${logoHeight}px`);
 {/* Inline CSS variables — no client-side fetch needed */}
 <style set:html={`:root{${cssVars.join(';')}}`} />
 
-{/* Google Fonts — weight 400+600 inlined as base64, rest loaded from local files */}
-{googleFontsCss ? (
+{/* Google Fonts — preload critical weight 400 woff2, load CSS from local file */}
+{fontPreloads.size > 0 && Array.from(fontPreloads.values()).map(url => (
+  <link rel="preload" as="font" type="font/woff2" href={url} crossorigin="anonymous" />
+))}
+{fontPreloads.size > 0 ? (
+  <link rel="stylesheet" href="/fonts/google/fonts.css" media="print" onload="this.media='all'" />
+) : googleFontsCss ? (
   <style set:html={googleFontsCss} />
 ) : googleFontsUrl ? (
   <link rel="stylesheet" href={googleFontsUrl} media="print" onload="this.media='all'" />

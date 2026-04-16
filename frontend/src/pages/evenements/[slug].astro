@@ -133,7 +133,7 @@ const calEnd = `${cf.end_date || cf.start_date || ''} ${cf.end_time || ''}`.trim
   <head>
     <BaseHead title={`${item.title} | ${siteName}`} description={cf.desc || siteDescription} styleSettings={styleSettings} siteSettings={siteSettings} />
     {blocks && <ModuleStyles blocks={blocks} />}
-    {hasMap && <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />}
+    {hasMap && <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" media="print" onload="this.media='all'" />}
   </head>
   <body class={bodyClasses || undefined} data-cpt-slug="evenements" data-cpt-item-id={item.id}>
     <Header siteName={siteName} navigation={navigationData} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />

@@ -55,7 +55,7 @@ const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
 </NicklModuleWrapper>
 
 {address && lat && lng && (
-  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" />
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" media="print" onload="this.media='all'" />
   <script is:inline define:vars={{ MAPBOX_TOKEN, MAPBOX_STYLE }}>
     (function() {
       // Load Mapbox GL JS dynamically
