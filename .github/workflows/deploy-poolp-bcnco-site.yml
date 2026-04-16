@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: deploy-bcnco-server
+  group: deploy-poolp
   cancel-in-progress: false
 
 jobs:
