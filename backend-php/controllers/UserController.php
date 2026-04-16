@@ -9,6 +9,7 @@ class UserController {
         $body = get_json_body();
         $name = $body['name'] ?? '';
         $email = $body['email'] ?? '';
+        $username = $body['username'] ?? '';
         $password = $body['password'] ?? '';
         $role = $body['role'] ?? 'reader';
 
@@ -20,7 +21,7 @@ class UserController {
         }
 
         try {
-            $userId = UserModel::create(['name' => $name, 'email' => $email, 'password' => $password, 'role' => $role]);
+            $userId = UserModel::create(['name' => $name, 'email' => $email, 'username' => $username, 'password' => $password, 'role' => $role]);
             json_response(['id' => $userId, 'message' => 'Utilisateur créé avec succès'], 201);
         } catch (PDOException $e) {
             if ($e->getCode() == 23000) {
@@ -34,6 +35,7 @@ class UserController {
         $body = get_json_body();
         $name = $body['name'] ?? '';
         $email = $body['email'] ?? '';
+        $username = $body['username'] ?? '';
         $role = $body['role'] ?? '';
 
         if (empty($name) || empty($email) || empty($role)) {
@@ -47,6 +49,7 @@ class UserController {
             UserModel::update($id, [
                 'name' => $name,
                 'email' => $email,
+                'username' => $username,
                 'role' => $role,
                 'password' => $body['password'] ?? null
             ]);

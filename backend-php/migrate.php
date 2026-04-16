@@ -108,6 +108,19 @@ if (!table_exists($db, 'users')) {
     }
     if ($changes === 0) echo "  OK\n";
 }
+$changes += ensure_column($db, 'users', 'username', "VARCHAR(100) DEFAULT NULL", 'name') ? 1 : 0;
+// Add UNIQUE index on username if column was just added or index doesn't exist
+$idxCheck = $db->query("SHOW INDEX FROM users WHERE Key_name = 'idx_username'")->fetch();
+if (!$idxCheck) {
+    try {
+        $db->exec("ALTER TABLE users ADD UNIQUE INDEX idx_username (username)");
+        echo "  + Added unique index on username\n";
+        $changes++;
+    } catch (PDOException $e) {
+        // Ignore if duplicate values prevent unique index (shouldn't happen with NULLs)
+    }
+}
+
 $changes += ensure_column($db, 'users', 'reset_token', "VARCHAR(64) DEFAULT NULL") ? 1 : 0;
 $changes += ensure_column($db, 'users', 'reset_token_expires', "DATETIME DEFAULT NULL", 'reset_token') ? 1 : 0;
 

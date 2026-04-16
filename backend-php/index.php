@@ -347,6 +347,10 @@ try {
         $user = authenticate_token();
         AuthController::me($user);
     }
+    elseif ($method === 'PUT' && $path === '/auth/profile') {
+        $user = authenticate_token();
+        AuthController::updateProfile($user);
+    }
 
     // ── Posts ──
     elseif ($method === 'GET' && $path === '/posts') {

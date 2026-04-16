@@ -291,6 +291,9 @@ async function loadSection(section) {
     case 'users':
       content.innerHTML = await renderUsers();
       break;
+    case 'profile':
+      content.innerHTML = await renderProfile();
+      break;
     case 'plugins':
       content.innerHTML = await renderPluginsManager();
       break;
@@ -13459,6 +13462,131 @@ async function logout() {
   window.location.href = '/admin/login.html';
 }
 
+// ========== PROFILE ==========
+
+async function renderProfile() {
+  showLoading();
+  try {
+    const user = await apiFetch('/auth/me');
+    currentUser = user; // refresh
+    hideLoading();
+
+    const _roleLabels = { super_admin: 'Super admin', admin_site: 'Admin site', editor: 'Éditeur', reader: 'Lecteur', admin: 'Super admin' };
+    const _roleBadges = { super_admin: 'badge-primary', admin_site: 'badge-info', editor: 'badge-warning', reader: 'badge-muted', admin: 'badge-primary' };
+
+    return `
+      <div class="page-header">
+        <h1>Mon profil</h1>
+        <span class="badge ${_roleBadges[user.role] || 'badge-secondary'}" style="font-size:13px">${_roleLabels[user.role] || user.role}</span>
+      </div>
+
+      <div class="card" style="max-width:600px">
+        <form onsubmit="saveProfile(event)">
+          <div class="form-group">
+            <label class="form-label">Nom complet *</label>
+            <input type="text" class="form-input" id="profileName" value="${escapeHtml(user.name || '')}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nom d'utilisateur</label>
+            <input type="text" class="form-input" id="profileUsername" value="${escapeHtml(user.username || '')}" placeholder="ex : mon-pseudo">
+            <small style="color:var(--text-secondary,#666);font-size:12px;margin-top:4px;display:block">Permet de se connecter avec un identifiant au lieu de l'email</small>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email *</label>
+            <input type="email" class="form-input" id="profileEmail" value="${escapeHtml(user.email || '')}" required>
+          </div>
+
+          <hr style="margin:24px 0;border:none;border-top:1px solid var(--border-color,#e5e7eb)">
+          <h3 style="margin-bottom:16px">Changer le mot de passe</h3>
+
+          <div class="form-group">
+            <label class="form-label">Mot de passe actuel</label>
+            <input type="password" class="form-input" id="profileCurrentPassword" placeholder="Requis pour changer le mot de passe" autocomplete="current-password">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nouveau mot de passe</label>
+            <input type="password" class="form-input" id="profileNewPassword" placeholder="Min. 6 caractères" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirmer le nouveau mot de passe</label>
+            <input type="password" class="form-input" id="profileConfirmPassword" placeholder="Répéter le nouveau mot de passe" autocomplete="new-password">
+          </div>
+
+          <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:24px;">
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+          </div>
+        </form>
+      </div>
+    `;
+  } catch (error) {
+    hideLoading();
+    showToast('Erreur lors du chargement du profil', 'error');
+    return '<div class="card"><p>Erreur de chargement</p></div>';
+  }
+}
+
+async function saveProfile(e) {
+  e.preventDefault();
+
+  const name = document.getElementById('profileName').value.trim();
+  const username = document.getElementById('profileUsername').value.trim();
+  const email = document.getElementById('profileEmail').value.trim();
+  const currentPassword = document.getElementById('profileCurrentPassword').value;
+  const newPassword = document.getElementById('profileNewPassword').value;
+  const confirmPassword = document.getElementById('profileConfirmPassword').value;
+
+  if (!name || !email) {
+    showToast('Nom et email sont requis', 'error');
+    return;
+  }
+
+  const data = { name, username, email };
+
+  if (newPassword) {
+    if (!currentPassword) {
+      showToast('Le mot de passe actuel est requis pour changer le mot de passe', 'error');
+      return;
+    }
+    if (newPassword.length < 6) {
+      showToast('Le nouveau mot de passe doit contenir au moins 6 caractères', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('Les mots de passe ne correspondent pas', 'error');
+      return;
+    }
+    data.current_password = currentPassword;
+    data.new_password = newPassword;
+  }
+
+  showLoading();
+  try {
+    const result = await apiFetch('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+
+    // Update token + currentUser
+    if (result.token) {
+      localStorage.setItem('token', result.token);
+      token = result.token;
+    }
+    if (result.user) {
+      currentUser = result.user;
+      document.getElementById('userInfo').textContent = currentUser.name;
+      const topBarUser = document.getElementById('topBarUser');
+      if (topBarUser) topBarUser.textContent = `Bonjour, ${currentUser.name}`;
+    }
+
+    showToast('Profil mis à jour', 'success');
+    // Re-render to clear password fields
+    document.getElementById('content').innerHTML = await renderProfile();
+  } catch (error) {
+    showToast('Erreur : ' + error.message, 'error');
+  }
+  hideLoading();
+}
+
 // ========== USERS ==========
 
 async function renderUsers() {
@@ -13552,7 +13680,7 @@ function renderUsersTable(users) {
           + '<div class="user-avatar ' + avatarClass(user.role) + '">' + getInitials(user.name) + '</div>'
           + '<div class="page-item__info" style="cursor:pointer" onclick="showUserForm(' + user.id + ')">'
           +   '<div class="page-item__title">' + escapeHtml(user.name) + (user.id === currentUser.id ? ' <span class="badge badge-info" style="font-size:10px">Vous</span>' : '') + '</div>'
-          +   '<div class="page-item__slug">' + escapeHtml(user.email) + '</div>'
+          +   '<div class="page-item__slug">' + escapeHtml(user.email) + (user.username ? ' · @' + escapeHtml(user.username) : '') + '</div>'
           + '</div>'
           + '<div class="page-item__meta"><span class="page-item__date">' + dateStr + '</span></div>'
           + '<div class="page-item__badges"><span class="badge ' + roleBadge(user.role) + '">' + roleLabel(user.role) + '</span></div>'
@@ -13592,6 +13720,10 @@ async function showUserForm(userId = null) {
             <input type="text" class="form-input" id="userName" value="${user?.name || ''}" required placeholder="Nom complet">
           </div>
           <div class="form-group">
+            <label class="form-label">Nom d'utilisateur</label>
+            <input type="text" class="form-input" id="userUsername" value="${user?.username || ''}" placeholder="ex : mon-pseudo">
+          </div>
+          <div class="form-group">
             <label class="form-label">Email *</label>
             <input type="email" class="form-input" id="userEmail" value="${user?.email || ''}" required placeholder="email@exemple.com">
           </div>
@@ -13621,11 +13753,12 @@ async function showUserForm(userId = null) {
 async function saveUser(e, userId) {
   e.preventDefault();
   const name = document.getElementById('userName').value.trim();
+  const username = document.getElementById('userUsername').value.trim();
   const email = document.getElementById('userEmail').value.trim();
   const role = document.getElementById('userRole').value;
   const password = document.getElementById('userPassword').value;
 
-  const data = { name, email, role };
+  const data = { name, username, email, role };
   if (password) data.password = password;
 
   showLoading();
@@ -15320,7 +15453,6 @@ async function renderAiCredits() {
                 <input type="text" id="aiAddCreditsNote" class="form-input" placeholder="Raison de l'ajout..." />
               </div>
               <button class="btn btn-primary ai-add-btn" onclick="addAiCredits()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Ajouter
               </button>
             </div>

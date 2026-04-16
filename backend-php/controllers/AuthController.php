@@ -5,16 +5,16 @@ use Firebase\JWT\JWT;
 class AuthController {
     public static function login(): void {
         $body = get_json_body();
-        $email = $body['email'] ?? '';
+        $login = $body['login'] ?? $body['email'] ?? '';
         $password = $body['password'] ?? '';
 
-        if (empty($email) || empty($password)) {
-            error_response('Email and password are required', 400);
+        if (empty($login) || empty($password)) {
+            error_response('Identifiant et mot de passe requis', 400);
         }
 
-        $user = UserModel::findByEmail($email);
+        $user = UserModel::findByLogin($login);
         if (!$user) {
-            error_response('Invalid email or password', 401);
+            error_response('Identifiant ou mot de passe incorrect', 401);
         }
 
         if (!UserModel::verifyPassword($password, $user['password'])) {
@@ -25,9 +25,10 @@ class AuthController {
             [
                 'id' => $user['id'],
                 'name' => $user['name'],
+                'username' => $user['username'] ?? null,
                 'email' => $user['email'],
                 'role' => $user['role'],
-                'exp' => time() + (7 * 24 * 60 * 60), // 7 days
+                'exp' => time() + 7 * 24 * 60 * 60, // 7 days
             ],
             $_ENV['JWT_SECRET'],
             'HS256'
@@ -38,6 +39,7 @@ class AuthController {
             'user' => [
                 'id' => $user['id'],
                 'name' => $user['name'],
+                'username' => $user['username'] ?? null,
                 'email' => $user['email'],
                 'role' => $user['role'],
             ]
@@ -50,6 +52,90 @@ class AuthController {
             error_response('User not found', 404);
         }
         json_response($user);
+    }
+
+    public static function updateProfile(array $authUser): void {
+        $body = get_json_body();
+        $name = $body['name'] ?? '';
+        $email = $body['email'] ?? '';
+        $username = $body['username'] ?? '';
+
+        if (empty($name) || empty($email)) {
+            error_response('Nom et email sont requis', 400);
+        }
+
+        // Check email uniqueness (exclude self)
+        $existing = UserModel::findByEmail($email);
+        if ($existing && $existing['id'] !== $authUser['id']) {
+            error_response('Cet email est déjà utilisé', 400);
+        }
+
+        // Check username uniqueness (exclude self)
+        if (!empty($username)) {
+            $existingUsername = UserModel::findByUsername($username);
+            if ($existingUsername && $existingUsername['id'] !== $authUser['id']) {
+                error_response('Ce nom d\'utilisateur est déjà pris', 400);
+            }
+        }
+
+        // Get current user to preserve role
+        $currentUser = UserModel::findById($authUser['id']);
+        if (!$currentUser) {
+            error_response('Utilisateur introuvable', 404);
+        }
+
+        $data = [
+            'name' => $name,
+            'email' => $email,
+            'username' => $username,
+            'role' => $currentUser['role'], // role cannot be changed via profile
+        ];
+
+        // Password change (optional, requires current password)
+        if (!empty($body['new_password'])) {
+            if (empty($body['current_password'])) {
+                error_response('Le mot de passe actuel est requis pour changer le mot de passe', 400);
+            }
+            // Verify current password
+            $fullUser = UserModel::findByEmail($currentUser['email']);
+            if (!$fullUser || !UserModel::verifyPassword($body['current_password'], $fullUser['password'])) {
+                error_response('Mot de passe actuel incorrect', 400);
+            }
+            if (strlen($body['new_password']) < 6) {
+                error_response('Le nouveau mot de passe doit contenir au moins 6 caractères', 400);
+            }
+            $data['password'] = $body['new_password'];
+        }
+
+        try {
+            UserModel::update($authUser['id'], $data);
+
+            // Return updated user + new token
+            $updated = UserModel::findById($authUser['id']);
+            $token = JWT::encode(
+                [
+                    'id' => $updated['id'],
+                    'name' => $updated['name'],
+                    'username' => $updated['username'] ?? null,
+                    'email' => $updated['email'],
+                    'role' => $updated['role'],
+                    'exp' => time() + 7 * 24 * 60 * 60,
+                ],
+                $_ENV['JWT_SECRET'],
+                'HS256'
+            );
+
+            json_response([
+                'message' => 'Profil mis à jour avec succès',
+                'token' => $token,
+                'user' => $updated,
+            ]);
+        } catch (PDOException $e) {
+            if ($e->getCode() == 23000) {
+                error_response('Email ou nom d\'utilisateur déjà utilisé', 400);
+            }
+            throw $e;
+        }
     }
 
     public static function forgotPassword(): void {
