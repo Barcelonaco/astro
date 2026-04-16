@@ -120,23 +120,23 @@ if (googleFontsUrl) {
         css = css.replaceAll(remote, local);
       }
 
-      // Inline critical font files (weight 400 + 600, latin) as base64 data URIs
-      // Weight 400 = body text, weight 600 = headings — both above the fold
+      // Inline critical font files (weight 400, 500, 600, 700 latin) as base64 data URIs
+      // All weights used above the fold — eliminates FOUT and CLS from font swap
       // This eliminates woff2 network requests from the critical path entirely
       const blocks = css.split(/(?=@font-face)/);
       const inlinedKeys = new Set<string>(); // track family+weight combos
       googleFontsCss = blocks.map(block => {
         if (!block.includes('font-weight')) return block;
-        // Only inline weight 400 and 600, latin subset (not latin-ext, cyrillic, etc.)
-        const is400 = /font-weight:\s*400/.test(block);
-        const is600 = /font-weight:\s*600/.test(block);
-        if (!is400 && !is600) return block;
+        // Inline weight 400, 500, 600, 700 — latin subset only (not latin-ext, cyrillic, etc.)
+        const isCriticalWeight = /font-weight:\s*(400|500|600|700)/.test(block);
+        if (!isCriticalWeight) return block;
         if (/unicode-range:\s*U\+0100/i.test(block)) return block; // latin-ext
         if (/cyrillic|greek|vietnamese/i.test(block)) return block;
         const urlM = block.match(/url\(([^)]+\.woff2)\)/);
         const famM = block.match(/font-family:\s*'([^']+)'/);
         if (!urlM || !famM) return block;
-        const key = `${famM[1]}-${is400 ? '400' : '600'}`;
+        const weightM = block.match(/font-weight:\s*(400|500|600|700)/);
+        const key = `${famM[1]}-${weightM ? weightM[1] : 'unknown'}`;
         if (inlinedKeys.has(key)) return block;
         // Read local file and convert to base64 data URI
         const localPath = urlM[1]; // e.g. /fonts/google/xxx.woff2

@@ -15321,10 +15321,11 @@ async function togglePlugin(dir, active) {
 async function renderAiCredits() {
   showLoading();
   try {
-    const [overview, apiKeyInfo, perUser, entries, usageLog] = await Promise.all([
+    const [overview, apiKeyInfo, perUser, perModel, entries, usageLog] = await Promise.all([
       apiFetch('/ai-credits'),
       apiFetch('/ai-credits/api-key'),
       apiFetch('/ai-credits/per-user'),
+      apiFetch('/ai-credits/per-model'),
       apiFetch('/ai-credits/entries'),
       apiFetch('/ai-credits/usage'),
     ]);
@@ -15343,6 +15344,20 @@ async function renderAiCredits() {
         <td style="text-align:right;font-weight:600">${Number(u.total_credits_used).toFixed(4)} €</td>
       </tr>
     `).join('');
+
+    const perModelRows = perModel.map(m => {
+      const totalTokens = Number(m.total_input_tokens) + Number(m.total_output_tokens);
+      return `
+      <tr>
+        <td><span class="badge badge-${m.model === 'sonnet' ? 'primary' : 'secondary'}">${m.model}</span></td>
+        <td style="text-align:center">${m.request_count}</td>
+        <td style="text-align:right">${Number(m.total_input_tokens).toLocaleString()}</td>
+        <td style="text-align:right">${Number(m.total_output_tokens).toLocaleString()}</td>
+        <td style="text-align:right">${totalTokens.toLocaleString()}</td>
+        <td style="text-align:right;font-weight:600">${Number(m.total_credits_used).toFixed(4)} €</td>
+      </tr>
+    `;
+    }).join('');
 
     const entryRows = entries.map(e => `
       <tr>
@@ -15389,6 +15404,7 @@ async function renderAiCredits() {
       <!-- Tabs -->
       <div class="ai-credits-tabs" style="display:flex;gap:8px;margin-bottom:20px">
         <button class="btn btn-primary ai-tab active" data-tab="config">Configuration</button>
+        <button class="btn ai-tab" data-tab="models">Consommation par modèle</button>
         <button class="btn ai-tab" data-tab="users">Consommation par utilisateur</button>
         <button class="btn ai-tab" data-tab="history">Historique</button>
         <button class="btn ai-tab" data-tab="entries">Crédits ajoutés</button>
@@ -15457,6 +15473,25 @@ async function renderAiCredits() {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Tab: Per-model usage -->
+      <div class="ai-tab-content" id="tab-models" style="display:none">
+        <div class="card" style="padding:20px">
+          ${perModel.length === 0 ? '<p style="color:var(--gray-500)">Aucune utilisation ce mois-ci</p>' : `
+          <table class="ai-table">
+            <thead>
+              <tr>
+                <th>Modèle</th><th style="text-align:center">Requêtes</th>
+                <th style="text-align:right">Tokens entrée</th><th style="text-align:right">Tokens sortie</th>
+                <th style="text-align:right">Total tokens</th>
+                <th style="text-align:right">Coût</th>
+              </tr>
+            </thead>
+            <tbody>${perModelRows}</tbody>
+          </table>
+          `}
         </div>
       </div>
 

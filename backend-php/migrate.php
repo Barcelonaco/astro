@@ -690,6 +690,29 @@ if (!table_exists($db, 'ai_credit_usage')) {
     echo "  OK\n";
 }
 
+// Recalculate haiku pricing (was $0.25/$1.25 per MTok, correct is $1.00/$5.00)
+echo "AI pricing fix (Haiku 4.5):\n";
+$stmt = $db->prepare("
+    SELECT COUNT(*) FROM ai_credit_usage
+    WHERE model = 'haiku'
+    AND credits_used > 0
+    AND ABS(credits_used - ((input_tokens / 1000000.0) * 0.25 + (output_tokens / 1000000.0) * 1.25)) < 0.000001
+");
+$stmt->execute();
+$oldPricingCount = (int) $stmt->fetchColumn();
+
+if ($oldPricingCount > 0) {
+    $db->exec("
+        UPDATE ai_credit_usage
+        SET credits_used = (input_tokens / 1000000.0) * 1.00 + (output_tokens / 1000000.0) * 5.00
+        WHERE model = 'haiku'
+    ");
+    echo "  + Recalculated {$oldPricingCount} haiku entries with correct Haiku 4.5 pricing\n";
+    $changes++;
+} else {
+    echo "  OK (already correct)\n";
+}
+
 // ─── Summary ────────────────────────────────────────────────────────────────
 
 echo "\n=== Done! ";

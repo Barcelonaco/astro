@@ -747,6 +747,11 @@ try {
         require_admin($user);
         AiCreditController::getPerUserUsage();
     }
+    elseif ($method === 'GET' && $path === '/ai-credits/per-model') {
+        $user = authenticate_token();
+        require_admin($user);
+        AiCreditController::getPerModelUsage();
+    }
     elseif ($method === 'GET' && $path === '/ai-credits/entries') {
         $user = authenticate_token();
         require_admin($user);

@@ -6,7 +6,7 @@ class AiCreditController {
 
     // ── Pricing per million tokens (USD) ──
     private static array $pricing = [
-        'haiku'  => ['input' => 0.25, 'output' => 1.25],
+        'haiku'  => ['input' => 1.00, 'output' => 5.00],
         'sonnet' => ['input' => 3.00, 'output' => 15.00],
     ];
 
@@ -106,6 +106,27 @@ class AiCreditController {
             'page' => $page,
             'pages' => ceil($total / $limit),
         ]);
+    }
+
+    // ── Per-model usage this month ──
+    public static function getPerModelUsage(): void {
+        $db = Database::getInstance();
+        $monthStart = date('Y-m') . '-01 00:00:00';
+
+        $stmt = $db->prepare("
+            SELECT model,
+                   COUNT(id) as request_count,
+                   COALESCE(SUM(input_tokens), 0) as total_input_tokens,
+                   COALESCE(SUM(output_tokens), 0) as total_output_tokens,
+                   COALESCE(SUM(credits_used), 0) as total_credits_used
+            FROM ai_credit_usage
+            WHERE created_at >= ?
+            GROUP BY model
+            ORDER BY total_credits_used DESC
+        ");
+        $stmt->execute([$monthStart]);
+
+        json_response($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
     // ── Credit entries this month ──

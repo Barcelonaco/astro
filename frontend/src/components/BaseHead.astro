@@ -53,6 +53,8 @@ const faviconUrl = faviconSetting ? (faviconSetting.startsWith('http') ? favicon
 <!-- Global Metadata -->
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+{/* Preconnect to media origin — saves ~300ms DNS+TCP+TLS on first image request */}
+{apiOrigin && <link rel="preconnect" href={apiOrigin} />}
 {/* LCP image preload — MUST appear before any CSS to start download immediately */}
 {lcpImage?.srcset ? (
   <link rel="preload" as="image" imagesrcset={lcpImage.srcset} imagesizes={lcpImage.sizes} fetchpriority="high" />

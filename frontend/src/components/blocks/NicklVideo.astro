@@ -75,7 +75,7 @@ const extraClasses = imgParallax ? 'img-parallax' : '';
         <div class={`video-wrapper ${mediaRatio}`}>
           {/* Preview */}
           {preview && previewType === 'image' && (
-            <img src={previewSizeUrl} alt={previewAlt} class="illus-video" />
+            <img src={previewSizeUrl} alt={previewAlt} class="illus-video" width="1280" height="720" />
           )}
           {preview && previewType === 'video' && (
             <video class="background-video" autoplay loop muted playsinline>
@@ -87,6 +87,8 @@ const extraClasses = imgParallax ? 'img-parallax' : '';
               src={`https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`}
               alt=""
               class="illus-video"
+              width="1280"
+              height="720"
             />
           )}
 
