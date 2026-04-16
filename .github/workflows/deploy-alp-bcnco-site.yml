@@ -4,6 +4,10 @@ on:
     push:
         branches: [main]
 
+concurrency:
+    group: deploy-bcnco-server
+    cancel-in-progress: false
+
 jobs:
     deploy:
         runs-on: ubuntu-latest
@@ -92,7 +96,18 @@ jobs:
 
                       cd "$REMOTE_ROOT/frontend"
                       npm i
-                      BUILD_API_URL=http://127.0.0.1:8892/api npm run build
+
+                      # Backup dist before build (astro build wipes dist/ first)
+                      if [ -d dist ]; then cp -r dist dist_backup; fi
+
+                      if BUILD_API_URL=http://127.0.0.1:8892/api npm run build; then
+                        rm -rf dist_backup
+                      else
+                        echo "⚠️ Build failed, restoring previous dist"
+                        if [ -d dist_backup ]; then rm -rf dist; mv dist_backup dist; fi
+                        kill $PHP_PID 2>/dev/null || true
+                        exit 1
+                      fi
 
                       kill $PHP_PID 2>/dev/null || true
 
