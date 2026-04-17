@@ -33,6 +33,7 @@ require_once __DIR__ . '/helpers/slug.php';
 require_once __DIR__ . '/helpers/rebuild.php';
 require_once __DIR__ . '/helpers/media-enricher.php';
 require_once __DIR__ . '/middleware/auth.php';
+require_once __DIR__ . '/helpers/rate-limit.php';
 
 // Models
 require_once __DIR__ . '/models/User.php';
@@ -78,6 +79,14 @@ header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Access-Control-Allow-Credentials: true');
 
+// ─── Security headers ────────────────────────────────────────────────────────
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('X-XSS-Protection: 1; mode=block');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+
 // Handle preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -87,22 +96,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // ─── Static file routes (handled before JSON content-type) ───────────────────
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// DEBUG: temporary (remove after testing)
-if (strpos($uri, 'debug') !== false || strpos($_SERVER['REQUEST_URI'], 'debug') !== false) {
-    header('Content-Type: application/json');
-    echo json_encode([
-        'REQUEST_URI' => $_SERVER['REQUEST_URI'],
-        'SCRIPT_NAME' => $_SERVER['SCRIPT_NAME'] ?? null,
-        'DOCUMENT_ROOT' => $_SERVER['DOCUMENT_ROOT'] ?? null,
-        'parsed_uri' => $uri,
-        '__DIR__' => __DIR__,
-        'admin_exists' => is_dir(__DIR__ . '/admin'),
-        'login_exists' => file_exists(__DIR__ . '/admin/login.html'),
-        'dist_exists' => is_dir(__DIR__ . '/dist'),
-        'htaccess_exists' => file_exists(__DIR__ . '/.htaccess'),
-    ]);
-    exit;
-}
 
 // Serve admin interface files
 if (preg_match('#^/admin(?:/(.*))?$#', $uri, $m)) {
@@ -333,14 +326,17 @@ function match_route(string $pattern, string $path, array &$params = []): bool {
 $params = [];
 
 try {
-    // ── Auth ──
+    // ── Auth (rate limited) ──
     if ($method === 'POST' && $path === '/auth/login') {
+        check_rate_limit('login', 5, 300); // 5 attempts per 5 min
         AuthController::login();
     }
     elseif ($method === 'POST' && $path === '/auth/forgot-password') {
+        check_rate_limit('forgot-password', 3, 600); // 3 attempts per 10 min
         AuthController::forgotPassword();
     }
     elseif ($method === 'POST' && $path === '/auth/reset-password') {
+        check_rate_limit('reset-password', 5, 300);
         AuthController::resetPassword();
     }
     elseif ($method === 'GET' && $path === '/auth/me') {

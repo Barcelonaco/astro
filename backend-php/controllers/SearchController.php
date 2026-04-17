@@ -12,6 +12,10 @@ class SearchController {
             json_response(['results' => [], 'total' => 0, 'query' => $q]);
             return;
         }
+        // Cap search query length to prevent DoS via massive LIKE queries
+        if (mb_strlen($q) > 200) {
+            $q = mb_substr($q, 0, 200);
+        }
 
         $limit  = min(max((int) ($_GET['limit'] ?? 20), 1), 100);
         $offset = max((int) ($_GET['offset'] ?? 0), 0);
@@ -61,9 +65,13 @@ class SearchController {
                     $slug = $pt['slug'] ?? '';
                     if (!$slug) continue;
 
+                    // Validate slug format
+                    if (!preg_match('/^[a-z0-9-]+$/', $slug)) continue;
                     $table = "cpt_{$slug}";
-                    // Check table exists
-                    $check = $db->query("SHOW TABLES LIKE '{$table}'")->fetch();
+                    // Check table exists (parameterized)
+                    $checkStmt = $db->prepare("SHOW TABLES LIKE ?");
+                    $checkStmt->execute([$table]);
+                    $check = $checkStmt->fetch();
                     if (!$check) continue;
 
                     $baseUrl = "/{$slug}/";

@@ -27,11 +27,39 @@ class MediaController {
         return $parsed !== false ? $parsed : null;
     }
 
+    /** Allowed file extensions whitelist */
+    private const ALLOWED_EXTENSIONS = [
+        'image' => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg', 'ico'],
+        'video' => ['mp4', 'webm'],
+        'document' => ['pdf'],
+    ];
+
+    /** Dangerous extensions that must NEVER be uploaded */
+    private const BLOCKED_EXTENSIONS = [
+        'php', 'phtml', 'phar', 'php3', 'php4', 'php5', 'php7', 'phps',
+        'inc', 'sh', 'bash', 'cgi', 'pl', 'py', 'rb', 'exe', 'bat', 'cmd',
+        'com', 'vbs', 'js', 'jsp', 'asp', 'aspx', 'htaccess', 'htpasswd',
+    ];
+
     private static function detectType(string $mime): ?string {
         if (str_starts_with($mime, 'image/')) return 'image';
         if (str_starts_with($mime, 'video/')) return 'video';
         if ($mime === 'application/pdf') return 'document';
         return null;
+    }
+
+    private static function isAllowedExtension(string $ext): bool {
+        if (in_array($ext, self::BLOCKED_EXTENSIONS, true)) return false;
+        foreach (self::ALLOWED_EXTENSIONS as $exts) {
+            if (in_array($ext, $exts, true)) return true;
+        }
+        return false;
+    }
+
+    private static function verifyRealMime(string $filePath): ?string {
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $realMime = $finfo->file($filePath);
+        return self::detectType($realMime) ? $realMime : null;
     }
 
     public static function getFolders(): void {
@@ -140,15 +168,28 @@ class MediaController {
 
             if ($error !== UPLOAD_ERR_OK) continue;
 
+            // Validate extension against whitelist
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+            if (!self::isAllowedExtension($ext)) continue;
+
+            // Validate MIME from client header
             $type = self::detectType($mime);
             if (!$type) continue;
 
-            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-            $safeExt = (strlen($ext) <= 10) ? '.' . $ext : '';
+            $safeExt = '.' . $ext;
             $filename = time() . '_' . substr(bin2hex(random_bytes(4)), 0, 8) . $safeExt;
             $destPath = $uploadDir . '/' . $filename;
 
             if (!move_uploaded_file($tmpName, $destPath)) continue;
+
+            // Verify real MIME type from file content (not client header)
+            $realMime = self::verifyRealMime($destPath);
+            if (!$realMime) {
+                @unlink($destPath);
+                continue;
+            }
+            $mime = $realMime;
+            $type = self::detectType($mime);
 
             // Dimensions
             $width = null;

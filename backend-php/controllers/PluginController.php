@@ -69,6 +69,11 @@ class PluginController {
      * Body: { "active": true|false }
      */
     public static function togglePlugin(string $pluginDir): void {
+        // Validate plugin directory name (prevent path traversal)
+        if (!preg_match('/^[a-z0-9_-]+$/i', $pluginDir)) {
+            error_response('Invalid plugin name', 400);
+        }
+
         // Verify the plugin directory exists
         $pluginsDir = __DIR__ . '/../../plugins';
         $manifestPath = $pluginsDir . '/' . $pluginDir . '/plugin.json';

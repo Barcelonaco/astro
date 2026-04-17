@@ -28,7 +28,7 @@ class AuthController {
                 'username' => $user['username'] ?? null,
                 'email' => $user['email'],
                 'role' => $user['role'],
-                'exp' => time() + 7 * 24 * 60 * 60, // 7 days
+                'exp' => time() + 24 * 60 * 60, // 24 hours
             ],
             $_ENV['JWT_SECRET'],
             'HS256'
@@ -101,8 +101,8 @@ class AuthController {
             if (!$fullUser || !UserModel::verifyPassword($body['current_password'], $fullUser['password'])) {
                 error_response('Mot de passe actuel incorrect', 400);
             }
-            if (strlen($body['new_password']) < 6) {
-                error_response('Le nouveau mot de passe doit contenir au moins 6 caractères', 400);
+            if (strlen($body['new_password']) < 8) {
+                error_response('Le nouveau mot de passe doit contenir au moins 8 caractères', 400);
             }
             $data['password'] = $body['new_password'];
         }
@@ -205,8 +205,8 @@ class AuthController {
             error_response('Token et mot de passe sont requis', 400);
         }
 
-        if (strlen($password) < 6) {
-            error_response('Le mot de passe doit contenir au moins 6 caractères', 400);
+        if (strlen($password) < 8) {
+            error_response('Le mot de passe doit contenir au moins 8 caractères', 400);
         }
 
         $user = UserModel::findByResetToken($token);

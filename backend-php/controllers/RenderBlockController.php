@@ -22,6 +22,9 @@ class RenderBlockController {
     }
 
     private static function findTemplate(string $layout): ?string {
+        // Sanitize layout name: only allow alphanumeric, hyphens and underscores
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $layout)) return null;
+
         $backendRoot = realpath(__DIR__ . '/..');
         $repoRoot = realpath(__DIR__ . '/../..');
 
@@ -84,7 +87,7 @@ class RenderBlockController {
                 . "&key=" . urlencode($apiKey)
                 . "&language=fr";
             $ch = curl_init($url);
-            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => true]);
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2]);
             $response = curl_exec($ch);
             curl_close($ch);
             $json = json_decode($response, true);
