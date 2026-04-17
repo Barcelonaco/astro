@@ -40,7 +40,38 @@ class AiCreditController {
             'available' => round($available, 4),
             'monthly_credits' => $monthlyCredits,
             'month' => $month,
+            'enabled' => self::isEnabled(),
         ]);
+    }
+
+    // ── Available credits (lightweight, for UI gating) ──
+    public static function getAvailable(): void {
+        json_response([
+            'available' => round(self::getAvailableCredits(), 4),
+            'enabled' => self::isEnabled(),
+        ]);
+    }
+
+    // ── Is AI generation enabled? ──
+    public static function isEnabled(): bool {
+        $db = Database::getInstance();
+        $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'ai_enabled'");
+        $stmt->execute();
+        $val = $stmt->fetchColumn();
+        // Default to enabled if setting not present
+        return $val === false || $val === null || (string) $val === '1';
+    }
+
+    // ── Toggle AI on/off (super_admin) ──
+    public static function setEnabled(): void {
+        $body = get_json_body();
+        $enabled = !empty($body['enabled']) ? '1' : '0';
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('ai_enabled', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+        $stmt->execute([$enabled]);
+
+        json_response(['enabled' => $enabled === '1', 'message' => $enabled === '1' ? 'IA activée' : 'IA désactivée']);
     }
 
     // ── Per-user usage this month ──
@@ -338,6 +369,8 @@ class AiCreditController {
     }
 
     // ── Internal: get decrypted API key ──
+    // Returns empty string if no key is configured in the back-office.
+    // No fallback to .env — AI generation must be explicitly configured.
     public static function getDecryptedApiKey(): string {
         $db = Database::getInstance();
         $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'ai_api_key_encrypted'");
@@ -345,15 +378,13 @@ class AiCreditController {
         $encrypted = $stmt->fetchColumn();
 
         if (!$encrypted) {
-            // Fallback to env
-            return $_ENV['ANTHROPIC_API_KEY'] ?? '';
+            return '';
         }
 
         try {
             return decrypt_value($encrypted);
         } catch (\Exception $e) {
-            // Fallback to env if decryption fails
-            return $_ENV['ANTHROPIC_API_KEY'] ?? '';
+            return '';
         }
     }
 

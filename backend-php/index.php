@@ -728,6 +728,10 @@ try {
     }
 
     // ── AI Credits ──
+    elseif ($method === 'GET' && $path === '/ai-credits/available') {
+        authenticate_token();
+        AiCreditController::getAvailable();
+    }
     elseif ($method === 'GET' && $path === '/ai-credits') {
         $user = authenticate_token();
         require_admin($user);
@@ -787,6 +791,11 @@ try {
         $user = authenticate_token();
         require_admin($user);
         AiCreditController::resetMonthlyCredits();
+    }
+    elseif ($method === 'PUT' && $path === '/ai-credits/enabled') {
+        $user = authenticate_token();
+        require_admin($user);
+        AiCreditController::setEnabled();
     }
 
     // ── Search ──

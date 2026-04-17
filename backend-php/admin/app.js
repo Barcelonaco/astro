@@ -1,7 +1,30 @@
 const API_BASE = window.location.origin + '/api';
 let token = localStorage.getItem('token');
 let currentUser = null;
+let aiCreditsAvailable = null; // null = unknown, number = credits in USD/EUR
+let aiEnabled = true; // false when an admin has temporarily disabled AI
 const ROLE_LEVELS = { reader: 0, editor: 1, admin_site: 2, super_admin: 3, admin: 3 };
+
+async function refreshAiCreditsAvailable() {
+  try {
+    const data = await apiFetch('/ai-credits/available');
+    aiCreditsAvailable = typeof data?.available === 'number' ? data.available : null;
+    aiEnabled = data?.enabled !== false;
+  } catch (e) {
+    aiCreditsAvailable = null;
+    aiEnabled = true;
+  }
+}
+
+function aiButtonAttrs() {
+  if (!aiEnabled) {
+    return { disabled: true, title: 'Génération IA temporairement désactivée par un administrateur' };
+  }
+  if (aiCreditsAvailable !== null && aiCreditsAvailable <= 0) {
+    return { disabled: true, title: 'Crédits IA épuisés — rechargez les crédits pour générer' };
+  }
+  return { disabled: false, title: 'Générer avec l\'IA' };
+}
 function hasMinRole(minRole) { return (ROLE_LEVELS[currentUser?.role] ?? 0) >= (ROLE_LEVELS[minRole] ?? 99); }
 
 const MENU_LOCATIONS = [
@@ -114,6 +137,9 @@ async function init() {
 
     // Charger les plugins et injecter modules + CPT
     await loadPlugins();
+
+    // Crédits IA disponibles (pour griser les boutons si à 0)
+    refreshAiCreditsAvailable();
 
     // Admin top bar
     initAdminTopBar();
@@ -2915,7 +2941,7 @@ async function renderPageBuilder() {
           </div>
         </div>
         <div class="builder-actions">
-          <button type="button" class="btn btn-ai" onclick="openAiModal()" title="Générer avec l'IA">✨ IA</button>
+          ${(() => { const a = aiButtonAttrs(); return `<button type="button" class="btn btn-ai" onclick="openAiModal()" title="${a.title}"${a.disabled ? ' disabled' : ''}>✨ IA</button>`; })()}
           <button type="button" class="btn btn-primary" onclick="${saveFunc}">Enregistrer</button>
           <a href="${viewUrl}" target="_blank" class="btn btn-outline" id="viewPageBtn">Voir ${isCPT ? (cptDef.isFemale ? 'la ' : "l'") + cptDef.label.toLowerCase() : 'la page'}</a>
         </div>
@@ -6188,6 +6214,14 @@ async function generateSchemaOrg() {
 // ========== AI PAGE GENERATION ==========
 
 function openAiModal() {
+  if (!aiEnabled) {
+    showToast('Génération IA temporairement désactivée par un administrateur', 'error');
+    return;
+  }
+  if (aiCreditsAvailable !== null && aiCreditsAvailable <= 0) {
+    showToast('Crédits IA épuisés — rechargez les crédits pour générer', 'error');
+    return;
+  }
   const existingBlocks = pageBuilderState.blocks.length;
   const warningHtml = existingBlocks > 0
     ? `<div class="ai-modal-warning">Cette page contient déjà ${existingBlocks} bloc(s). La génération IA remplacera tout le contenu existant.</div>`
@@ -6333,6 +6367,7 @@ async function executeAiGeneration() {
   } finally {
     const loadingOverlay = document.getElementById('aiLoadingOverlay');
     if (loadingOverlay) loadingOverlay.remove();
+    refreshAiCreditsAvailable();
   }
 }
 
@@ -6367,6 +6402,14 @@ async function resolveAiFormIds() {
 // ========== BULK AI PAGE GENERATION ==========
 
 function openBulkAiModal() {
+  if (!aiEnabled) {
+    showToast('Génération IA temporairement désactivée par un administrateur', 'error');
+    return;
+  }
+  if (aiCreditsAvailable !== null && aiCreditsAvailable <= 0) {
+    showToast('Crédits IA épuisés — rechargez les crédits pour générer', 'error');
+    return;
+  }
   openUiModal({
     title: '✨ Générer des pages par IA',
     bodyHtml: `
@@ -6635,6 +6678,7 @@ async function executeBulkAiGeneration() {
   } finally {
     const loadingOverlay = document.getElementById('aiLoadingOverlay');
     if (loadingOverlay) loadingOverlay.remove();
+    refreshAiCreditsAvailable();
   }
 }
 
@@ -9747,9 +9791,9 @@ function renderPagesView() {
     <div class="page-header">
       <h1>Pages</h1>
       <div class="page-header-actions">
-        <button class="btn btn-ai" onclick="openBulkAiModal()">
+        ${(() => { const a = aiButtonAttrs(); return `<button class="btn btn-ai" onclick="openBulkAiModal()" title="${a.title}"${a.disabled ? ' disabled' : ''}>
           <i class="fa-solid fa-wand-magic-sparkles"></i> Générer par IA
-        </button>
+        </button>`; })()}
         <button class="btn btn-primary" onclick="openPageBuilder(null)">
           <i class="fa-solid fa-plus"></i> Nouvelle page
         </button>
@@ -15441,6 +15485,22 @@ async function renderAiCredits() {
         <div class="card ai-config-card">
           <div class="ai-config-section">
             <div class="ai-config-header">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              <h3>Génération IA</h3>
+            </div>
+            <div class="ai-input-row" style="align-items:center;gap:14px">
+              <label class="toggle-switch" style="display:inline-flex;align-items:center;gap:10px;cursor:pointer">
+                <input type="checkbox" id="aiEnabledToggle" ${overview.enabled !== false ? 'checked' : ''} onchange="toggleAiEnabled(this.checked)" />
+                <span id="aiEnabledLabel" style="font-weight:600">${overview.enabled !== false ? 'IA activée' : 'IA désactivée'}</span>
+              </label>
+              <span class="ai-hint" style="margin:0;color:var(--gray-500)">Désactive temporairement la génération IA pour tous les utilisateurs.</span>
+            </div>
+          </div>
+
+          <div class="ai-config-divider"></div>
+
+          <div class="ai-config-section">
+            <div class="ai-config-header">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
               <h3>Clé API Anthropic</h3>
             </div>
@@ -15629,6 +15689,20 @@ async function revealAiApiKey() {
       _aiKeyRevealed = true;
     }
   } catch (e) { showToast('Erreur : ' + e.message, 'error'); btn.textContent = 'Révéler'; }
+}
+
+async function toggleAiEnabled(enabled) {
+  const label = document.getElementById('aiEnabledLabel');
+  try {
+    await apiFetch('/ai-credits/enabled', { method: 'PUT', body: JSON.stringify({ enabled }) });
+    aiEnabled = !!enabled;
+    if (label) label.textContent = enabled ? 'IA activée' : 'IA désactivée';
+    showToast(enabled ? 'Génération IA activée' : 'Génération IA désactivée', 'success');
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error');
+    const toggle = document.getElementById('aiEnabledToggle');
+    if (toggle) toggle.checked = !enabled;
+  }
 }
 
 async function saveAiApiKey() {

@@ -104,6 +104,12 @@ PROMPT;
             exit;
         }
 
+        if (!AiCreditController::isEnabled()) {
+            self::startSSE();
+            self::sendSSE('error', json_encode(['error' => 'Génération IA temporairement désactivée par un administrateur']));
+            exit;
+        }
+
         $apiKey = AiCreditController::getDecryptedApiKey();
         if (empty($apiKey)) {
             self::startSSE();
@@ -443,6 +449,12 @@ PROMPT;
         if (empty($prompt)) {
             self::startSSE();
             self::sendSSE('error', json_encode(['error' => 'Le prompt est requis']));
+            exit;
+        }
+
+        if (!AiCreditController::isEnabled()) {
+            self::startSSE();
+            self::sendSSE('error', json_encode(['error' => 'Génération IA temporairement désactivée par un administrateur']));
             exit;
         }
 
