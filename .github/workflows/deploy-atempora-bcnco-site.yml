@@ -103,7 +103,7 @@ jobs:
             if BUILD_API_URL=http://127.0.0.1:8892/api npm run build; then
               rm -rf dist_backup
             else
-              echo "⚠️ Build failed, restoring previous dist"
+              echo "Build failed, restoring previous dist"
               if [ -d dist_backup ]; then rm -rf dist; mv dist_backup dist; fi
               kill $PHP_PID 2>/dev/null || true
               exit 1
