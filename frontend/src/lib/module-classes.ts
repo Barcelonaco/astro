@@ -108,9 +108,13 @@ export function resolveBlocTitle(data: Record<string, any>): {
 } | null {
   const title = (data.title_bloc as string) || (data.title as string) || '';
   if (!title) return null;
+  const rawStyle = data.title_style;
+  const style = rawStyle != null && rawStyle !== ''
+    ? String(rawStyle).replace(/^h/i, '')
+    : '4';
   return {
     title,
-    style: data.title_style ?? 'h4',
+    style,
     align: (data.title_align as string) || 'center',
   };
 }
