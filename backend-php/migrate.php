@@ -490,17 +490,33 @@ if (!table_exists($db, 'forms')) {
         CREATE TABLE forms (
             id INT AUTO_INCREMENT PRIMARY KEY,
             title VARCHAR(255) NOT NULL,
-            slug VARCHAR(255) NOT NULL,
+            slug VARCHAR(255) NOT NULL UNIQUE,
             description TEXT,
             settings JSON DEFAULT NULL,
-            status ENUM('draft', 'published') NOT NULL DEFAULT 'draft',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
     echo "  + Created table\n";
     $changes++;
 } else {
-    echo "  OK\n";
+    // Repair status ENUM if it still has the legacy ('draft','published') values
+    $colInfo = $db->query("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'forms' AND COLUMN_NAME = 'status'")->fetchColumn();
+    if ($colInfo && strpos($colInfo, "'active'") === false) {
+        // 1. Expand ENUM so we can map legacy → new without truncation
+        $db->exec("ALTER TABLE forms MODIFY COLUMN status ENUM('draft','published','active','inactive') NOT NULL DEFAULT 'active'");
+        // 2. Remap legacy values
+        $db->exec("UPDATE forms SET status = 'active' WHERE status IN ('draft','published')");
+        // 3. Collapse to final ENUM
+        $db->exec("ALTER TABLE forms MODIFY COLUMN status ENUM('active','inactive') NOT NULL DEFAULT 'active'");
+        echo "  + Migrated status ENUM to ('active','inactive')\n";
+        $changes++;
+    } else {
+        echo "  OK\n";
+    }
+    // Ensure updated_at column exists (older installs lack it)
+    if (ensure_column($db, 'forms', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP', 'created_at')) $changes++;
 }
 
 // ─── Table: form_fields ─────────────────────────────────────────────────────
