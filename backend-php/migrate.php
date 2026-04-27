@@ -15,6 +15,8 @@ $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
 $dotenv->load();
 
 require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/helpers/response.php';
+require_once __DIR__ . '/controllers/EcommerceMigrationController.php';
 
 $db = Database::getInstance();
 
@@ -595,6 +597,7 @@ if (is_dir($pluginsDir)) {
                         content LONGTEXT,
                         featured_image JSON DEFAULT NULL,
                         custom_fields JSON DEFAULT NULL,
+                        seo_meta JSON DEFAULT NULL,
                         author_id INT NOT NULL,
                         status ENUM('draft', 'published') NOT NULL DEFAULT 'draft',
                         published_date DATETIME,
@@ -606,7 +609,9 @@ if (is_dir($pluginsDir)) {
                 echo "    + Created table\n";
                 $changes++;
             } else {
-                echo "    OK\n";
+                // Colonne seo_meta peut manquer sur des CPT anciens (pre-Phase 0)
+                if (ensure_column($db, $table, 'seo_meta', 'JSON DEFAULT NULL', 'custom_fields')) $changes++;
+                else echo "    OK\n";
             }
 
             if (!empty($pt['hasCategories'])) {
@@ -712,6 +717,11 @@ if ($oldPricingCount > 0) {
 } else {
     echo "  OK (already correct)\n";
 }
+
+// ─── E-commerce tables ──────────────────────────────────────────────────────
+
+echo "\nE-commerce (Phase 0+) :\n";
+$changes += EcommerceMigrationController::migrate(function (string $msg) { echo $msg . "\n"; });
 
 // ─── Summary ────────────────────────────────────────────────────────────────
 

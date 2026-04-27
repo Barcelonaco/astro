@@ -486,6 +486,19 @@ PROMPT;
             }
         }
 
+        // Uploaded HTML files (read as text on the client, stripped here)
+        $htmlFiles = $body['html_files'] ?? [];
+        if (!empty($htmlFiles) && is_array($htmlFiles)) {
+            foreach ($htmlFiles as $file) {
+                $name = trim((string)($file['name'] ?? 'fichier.html'));
+                $content = (string)($file['content'] ?? '');
+                if ($content === '') continue;
+                $stripped = self::stripHtmlContent($content);
+                if ($stripped === '') continue;
+                $fetchedHtml .= "\n\n--- CONTENU HTML DE {$name} ---\n{$stripped}\n--- FIN HTML ---";
+            }
+        }
+
         // Build user message
         $userMessage = $prompt;
         if ($fetchedHtml) {
@@ -972,22 +985,25 @@ PROMPT;
 
         if (!$html || $httpCode !== 200) return null;
 
-        // Strip scripts, styles, SVGs to reduce token usage
+        return self::stripHtmlContent($html);
+    }
+
+    /**
+     * Strip scripts/styles/svg/comments, extract body, collapse whitespace, cap size.
+     */
+    private static function stripHtmlContent(string $html): string {
         $html = preg_replace('/<script[^>]*>[\s\S]*?<\/script>/i', '', $html);
         $html = preg_replace('/<style[^>]*>[\s\S]*?<\/style>/i', '', $html);
         $html = preg_replace('/<svg[^>]*>[\s\S]*?<\/svg>/i', '', $html);
         $html = preg_replace('/<!--[\s\S]*?-->/', '', $html);
 
-        // Extract body content only
         if (preg_match('/<body[^>]*>([\s\S]*?)<\/body>/i', $html, $m)) {
             $html = $m[1];
         }
 
-        // Collapse whitespace
         $html = preg_replace('/\s+/', ' ', $html);
         $html = trim($html);
 
-        // Limit to ~80K chars to stay within token limits
         if (mb_strlen($html) > 80000) {
             $html = mb_substr($html, 0, 80000) . "\n[... tronqué — page trop longue]";
         }

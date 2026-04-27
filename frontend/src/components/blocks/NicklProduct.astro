@@ -1,19 +1,76 @@
 ---
 /**
- * Module Product — Produit WooCommerce
- * Stub — WooCommerce n'est pas disponible hors WordPress.
+ * NicklProduct — bloc "Produits à la une" réel, câblé sur le catalogue e-commerce.
+ * Accepte : products_id (array d'IDs) OU categories (slugs) OU is_featured (fallback).
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import ProductCard from '../shop/ProductCard.astro';
+import { listProducts, type ProductSummary } from '../../lib/shop-api';
 
-interface Props {
-  data: Record<string, any>;
+interface Props { data: Record<string, any>; }
+const { data } = Astro.props;
+
+let products: ProductSummary[] = [];
+const maxItems = parseInt(data.limit || '4', 10) || 4;
+
+async function fetchProducts() {
+  // Priorité 1 : IDs explicites via products_id
+  if (Array.isArray(data.products_id) && data.products_id.length > 0) {
+    const results = await Promise.all(
+      data.products_id.slice(0, maxItems).map(async (id: number) => {
+        try {
+          const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+          const res = await fetch(`${API_URL}/shop/products/by-id/${id}`);
+          if (!res.ok) return null;
+          return await res.json();
+        } catch { return null; }
+      })
+    );
+    return results.filter(Boolean);
+  }
+
+  // Priorité 2 : par catégorie
+  if (data.category) {
+    const r = await listProducts({ category: data.category, per_page: maxItems });
+    return r.data;
+  }
+
+  // Fallback : produits featured récents
+  const r = await listProducts({ per_page: maxItems });
+  return r.data.filter((p: ProductSummary) => p.is_featured).slice(0, maxItems);
 }
 
-const { data } = Astro.props;
+products = await fetchProducts();
 ---
-
 <NicklModuleWrapper data={data} moduleName="product" containerLarge>
-  <p class="placeholder-message" style="text-align:center;opacity:0.6;">
-    Les produits WooCommerce ne sont pas disponibles en mode statique.
-  </p>
+  {products.length > 0 ? (
+    <div class="module-featured-products__grid">
+      {products.map((p) => <ProductCard product={p} />)}
+    </div>
+  ) : (
+    <p class="module-featured-products__empty">Aucun produit à afficher.</p>
+  )}
+
+  {data.cta?.url && (
+    <div class="module-featured-products__cta">
+      <a href={data.cta.url} class="btn btn-primary">{data.cta.title || 'Voir tous les produits'}</a>
+    </div>
+  )}
 </NicklModuleWrapper>
+
+<style>
+  .module-featured-products__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 20px;
+  }
+  .module-featured-products__empty {
+    text-align: center;
+    opacity: .6;
+    padding: 40px 20px;
+  }
+  .module-featured-products__cta {
+    text-align: center;
+    margin-top: 2rem;
+  }
+</style>

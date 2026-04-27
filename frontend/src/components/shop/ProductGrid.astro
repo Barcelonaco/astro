@@ -1,0 +1,76 @@
+---
+import ProductCard from './ProductCard.astro';
+import type { ProductSummary } from '../../lib/shop-api';
+
+interface Props {
+  products: ProductSummary[];
+  emptyTitle?: string;
+  emptyMessage?: string;
+  emptyCtaHref?: string;
+  emptyCtaLabel?: string;
+}
+
+const {
+  products,
+  emptyTitle = 'Aucun produit à afficher',
+  emptyMessage = 'Essayez d\'ajuster vos filtres ou changez de catégorie.',
+  emptyCtaHref = '/boutique',
+  emptyCtaLabel = 'Voir toute la boutique',
+} = Astro.props;
+---
+{products.length > 0 ? (
+  <div class="shop-product-grid">
+    {products.map((p) => <ProductCard product={p} />)}
+  </div>
+) : (
+  <div class="shop-product-grid__empty">
+    <div class="shop-product-grid__empty-illustration" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/>
+        <path d="M3 6h18"/>
+        <path d="M16 10a4 4 0 0 1-8 0"/>
+      </svg>
+    </div>
+    <h2 class="shop-product-grid__empty-title">{emptyTitle}</h2>
+    <p class="shop-product-grid__empty-text">{emptyMessage}</p>
+    <a href={emptyCtaHref} class="btn btn-outline">{emptyCtaLabel}</a>
+  </div>
+)}
+
+<style>
+  .shop-product-grid {
+    display: grid;
+    /* Largeur de carte fixe + justify start : pas de distorsion quand 1-2 produits seulement */
+    grid-template-columns: repeat(auto-fill, minmax(240px, 260px));
+    justify-content: start;
+    gap: 20px;
+  }
+  .shop-product-grid__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--gray-500, #6b7280);
+    background: var(--gray-50, #f9fafb);
+    border: 1px dashed var(--gray-200, #e5e7eb);
+    border-radius: 12px;
+  }
+  .shop-product-grid__empty-illustration {
+    width: 64px; height: 64px;
+    color: var(--gray-400, #9ca3af);
+    margin-bottom: 16px;
+  }
+  .shop-product-grid__empty-illustration svg { width: 100%; height: 100%; }
+  .shop-product-grid__empty-title {
+    margin: 0 0 6px;
+    font-size: 1.15rem;
+    color: var(--gray-700, #374151);
+  }
+  .shop-product-grid__empty-text {
+    margin: 0 0 20px;
+    max-width: 420px;
+    line-height: 1.5;
+  }
+</style>

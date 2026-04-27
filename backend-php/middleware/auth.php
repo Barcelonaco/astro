@@ -22,7 +22,13 @@ function authenticate_token(): array {
     // Fall back to JWT (per-user, expires)
     try {
         $decoded = JWT::decode($token, new Key($_ENV['JWT_SECRET'], 'HS256'));
-        return (array) $decoded;
+        $claims = (array) $decoded;
+        // Refuser strictement les tokens customer qui essaieraient de passer
+        // par l'auth admin (défense en profondeur — même si le secret est partagé)
+        if (($claims['type'] ?? '') === 'customer') {
+            error_response('Invalid token for this resource', 403);
+        }
+        return $claims;
     } catch (\Exception $e) {
         error_response('Invalid token', 403);
     }

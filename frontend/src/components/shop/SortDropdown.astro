@@ -1,0 +1,52 @@
+---
+interface Props { active?: string; }
+const { active = 'newest' } = Astro.props;
+
+const SORTS = [
+  { value: 'newest', label: 'Nouveautés' },
+  { value: 'oldest', label: 'Plus anciens' },
+  { value: 'price_asc', label: 'Prix croissant' },
+  { value: 'price_desc', label: 'Prix décroissant' },
+  { value: 'name_asc', label: 'Nom A-Z' },
+  { value: 'name_desc', label: 'Nom Z-A' },
+  { value: 'popularity', label: 'Popularité' },
+];
+---
+<div class="shop-sort">
+  <label for="shopSortSelect" class="shop-sort__label">Trier par :</label>
+  <select id="shopSortSelect" class="shop-sort__select" onchange="shopSortChange(this.value)">
+    {SORTS.map((s) => (
+      <option value={s.value} selected={active === s.value}>{s.label}</option>
+    ))}
+  </select>
+</div>
+
+<script is:inline>
+  window.shopSortChange = function(value) {
+    const url = new URL(window.location.href);
+    if (value === 'newest') url.searchParams.delete('sort');
+    else url.searchParams.set('sort', value);
+    url.searchParams.delete('page'); // Reset pagination
+    window.location.href = url.toString();
+  };
+</script>
+
+<style>
+  .shop-sort {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+  }
+  .shop-sort__label {
+    color: var(--gray-600, #4b5563);
+  }
+  .shop-sort__select {
+    padding: 6px 10px;
+    border: 1px solid var(--gray-300, #d1d5db);
+    border-radius: 6px;
+    background: #fff;
+    font-size: 14px;
+    cursor: pointer;
+  }
+</style>

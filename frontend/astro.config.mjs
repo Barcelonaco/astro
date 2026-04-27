@@ -10,6 +10,11 @@ export default defineConfig({
 	output: 'static',
 	integrations: [mdx(), sitemap()],
 	scopedStyleStrategy: 'where',
+	redirects: {
+		// Le CPT produits s'appelle "products" côté backend (DB + admin).
+		// On redirige donc les URLs générées par l'admin vers le chemin FR choisi pour le front.
+		'/products/[slug]': '/produits/[slug]',
+	},
 	build: {
 		// 'auto' inlines small sheets, externalizes large ones (cacheable + smaller HTML)
 		inlineStylesheets: 'auto',

@@ -1,0 +1,58 @@
+{
+  "name": "ecommerce",
+  "label": "E-commerce",
+  "version": "1.0.0",
+  "description": "Système e-commerce complet : produits, variants, panier, checkout, commandes, factures, devis.",
+
+  "requires_ecommerce_enabled": true,
+
+  "modules": {
+    "category": {
+      "id": "ecommerce",
+      "label": "Boutique",
+      "icon": "🛒"
+    },
+    "items": [
+      { "name": "FeaturedProducts", "label": "Produits à la une" },
+      { "name": "ProductGrid", "label": "Grille de produits" }
+    ]
+  },
+
+  "postTypes": [
+    {
+      "slug": "products",
+      "label": "Produit",
+      "labelPlural": "Produits",
+      "isFemale": false,
+      "icon": "📦",
+      "supports": ["title", "slug", "featured_image", "content", "status"],
+      "fields": [
+        { "name": "sku", "label": "SKU (référence)", "type": "Text" },
+        { "name": "type", "label": "Type de produit", "type": "Select", "options": {"physical": "Physique", "digital": "Digital (téléchargement)", "service": "Service / prestation"}, "default": "physical" },
+        { "name": "base_price", "label": "Prix de base (€)", "type": "Number" },
+        { "name": "compare_at_price", "label": "Prix barré (€)", "type": "Number" },
+        { "name": "tax_code", "label": "Taux de TVA", "type": "Text", "default": "FR_STANDARD" },
+        { "name": "weight_grams", "label": "Poids (g)", "type": "Number" },
+        { "name": "dimensions_length", "label": "Longueur (cm)", "type": "Number" },
+        { "name": "dimensions_width", "label": "Largeur (cm)", "type": "Number" },
+        { "name": "dimensions_height", "label": "Hauteur (cm)", "type": "Number" },
+        { "name": "requires_shipping", "label": "Nécessite une livraison", "type": "TrueFalse", "default": true },
+        { "name": "download_file", "label": "Fichier à télécharger", "type": "File" },
+        { "name": "download_limit", "label": "Limite de téléchargements", "type": "Number" },
+        { "name": "gallery", "label": "Galerie d'images", "type": "Photos" },
+        { "name": "short_features", "label": "Caractéristiques courtes", "type": "Repeater", "subFields": [
+          { "name": "label", "label": "Libellé", "type": "Text" },
+          { "name": "value", "label": "Valeur", "type": "Text" }
+        ]},
+        { "name": "is_featured", "label": "Mis en avant", "type": "TrueFalse" },
+        { "name": "variants_enabled", "label": "Activer les variants", "type": "TrueFalse" },
+        { "name": "variant_attributes", "label": "Attributs de variants", "type": "Repeater", "subFields": [
+          { "name": "name", "label": "Nom (ex: Taille)", "type": "Text" },
+          { "name": "options", "label": "Options (une par ligne)", "type": "Textarea" }
+        ]}
+      ],
+      "hasCategories": true,
+      "categoryLabel": "Catégories produits"
+    }
+  ]
+}

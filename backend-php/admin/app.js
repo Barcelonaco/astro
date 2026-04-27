@@ -6425,9 +6425,9 @@ function openBulkAiModal() {
         </div>
         <div class="ai-modal-field" style="margin-top:12px">
           <label class="form-label">Fichiers de référence (optionnel)</label>
-          <p class="form-hint" style="margin:0 0 8px;color:#64748b;font-size:13px">Images (screenshots, maquettes) ou PDF (wireframes, cahiers des charges) pour guider l'IA.</p>
+          <p class="form-hint" style="margin:0 0 8px;color:#64748b;font-size:13px">Images (screenshots, maquettes), PDF (wireframes, cahiers des charges) ou HTML (pages à convertir) pour guider l'IA.</p>
           <div class="bulk-ai-images-zone" id="bulkAiImagesZone">
-            <input type="file" id="bulkAiImagesInput" multiple accept="image/*,application/pdf" style="display:none" onchange="handleBulkAiImages(this.files)">
+            <input type="file" id="bulkAiImagesInput" multiple accept="image/*,application/pdf,text/html,.html,.htm" style="display:none" onchange="handleBulkAiImages(this.files)">
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('bulkAiImagesInput').click()">📎 Ajouter des fichiers</button>
             <div id="bulkAiImagesPreviews" class="bulk-ai-images-previews"></div>
           </div>
@@ -6457,6 +6457,8 @@ function openBulkAiModal() {
 
 // Store base64 files (images + PDFs) for the bulk AI request
 let _bulkAiImages = [];
+// Store HTML files (read as text) sent separately to the backend
+let _bulkAiHtmlFiles = [];
 
 function handleBulkAiImages(files) {
   const container = document.getElementById('bulkAiImagesPreviews');
@@ -6465,7 +6467,27 @@ function handleBulkAiImages(files) {
   for (const file of files) {
     const isImage = file.type.startsWith('image/');
     const isPdf = file.type === 'application/pdf';
-    if (!isImage && !isPdf) continue;
+    const nameLower = (file.name || '').toLowerCase();
+    const isHtml = file.type === 'text/html' || nameLower.endsWith('.html') || nameLower.endsWith('.htm');
+    if (!isImage && !isPdf && !isHtml) continue;
+
+    if (isHtml) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        _bulkAiHtmlFiles.push({ name: file.name, content: e.target.result });
+        const idx = _bulkAiHtmlFiles.length - 1;
+        const preview = document.createElement('div');
+        preview.className = 'bulk-ai-image-preview';
+        preview.dataset.kind = 'html';
+        preview.dataset.idx = String(idx);
+        preview.innerHTML = `<div class="bulk-ai-pdf-icon">HTML</div>
+           <button type="button" class="bulk-ai-image-remove" onclick="removeBulkAiHtmlFile(${idx}, this.parentElement)">&times;</button>
+           <span class="bulk-ai-image-name">${escapeHtml(file.name)}</span>`;
+        container.appendChild(preview);
+      };
+      reader.readAsText(file);
+      continue;
+    }
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -6493,6 +6515,11 @@ function removeBulkAiImage(index, element) {
   if (element) element.remove();
 }
 
+function removeBulkAiHtmlFile(index, element) {
+  _bulkAiHtmlFiles[index] = null;
+  if (element) element.remove();
+}
+
 async function executeBulkAiGeneration() {
   const prompt = document.getElementById('bulkAiPromptInput')?.value?.trim();
   if (!prompt) {
@@ -6504,6 +6531,7 @@ async function executeBulkAiGeneration() {
   const webSearch = document.getElementById('bulkAiWebSearch')?.checked ?? true;
   const genSeo = document.getElementById('bulkAiGenSeo')?.checked ?? true;
   const images = _bulkAiImages.filter(Boolean);
+  const htmlFiles = _bulkAiHtmlFiles.filter(Boolean);
   const urlsRaw = document.getElementById('bulkAiUrlsInput')?.value?.trim() || '';
   const urls = urlsRaw.split(/[\n,]+/).map(u => u.trim()).filter(u => u.startsWith('http'));
 
@@ -6529,6 +6557,7 @@ async function executeBulkAiGeneration() {
       web_search: webSearch,
       images: images.length > 0 ? images : undefined,
       urls: urls.length > 0 ? urls : undefined,
+      html_files: htmlFiles.length > 0 ? htmlFiles : undefined,
     });
 
     const result = await new Promise((resolve, reject) => {
@@ -6612,6 +6641,7 @@ async function executeBulkAiGeneration() {
     const pages = result.pages || [];
     const forms = result.forms || [];
     _bulkAiImages = [];
+    _bulkAiHtmlFiles = [];
 
     if (result.usage) {
       console.log(`IA bulk tokens — input: ${result.usage.input_tokens}, output: ${result.usage.output_tokens}`);

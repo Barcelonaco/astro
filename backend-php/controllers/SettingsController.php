@@ -112,7 +112,10 @@ class SettingsController {
             'ga_code', 'aw_code', 'gtm_code', 'meta_pixel_code',
             'cookie_enabled', 'cookie_title', 'cookie_description',
             'cookie_privacy_url', 'cookie_accept_text', 'cookie_reject_text',
-            'is_onepage', 'is_activate_schemas', 'custom_balise', 'google_api_key'
+            'is_onepage', 'is_activate_schemas', 'custom_balise', 'google_api_key',
+            // E-commerce (public-safe uniquement, aucun secret)
+            'ecommerce_enabled', 'shop_currency', 'shop_country', 'shop_payment_methods',
+            'checkout_guest_enabled'
         ];
         $siteSettings = [];
         foreach ($frontendKeys as $k) {
@@ -192,7 +195,9 @@ class SettingsController {
         $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
 
         foreach ($updates as $key => $value) {
-            if (!in_array($key, $allowedKeys) && !preg_match('/^(cpt|plugin)_[a-z0-9_]+$/', $key)) continue;
+            $isEcomPlainKey = preg_match('/^(ecommerce_|shop_|stripe_mode|stripe_pk|stripe_webhook_id|paypal_client_id|paypal_mode|paypal_webhook_id|bank_|invoice_|quote_|checkout_|order_customer_cancel_|gdpr_)/', $key)
+                && !preg_match('/^(stripe_sk|stripe_webhook_secret|paypal_secret|paypal_webhook_secret)$/', $key); // secrets bloqués ici, uniquement via EcommerceSettingsController
+            if (!in_array($key, $allowedKeys) && !preg_match('/^(cpt|plugin)_[a-z0-9_]+$/', $key) && !$isEcomPlainKey) continue;
             $strValue = ($value === null) ? '' : (string) $value;
             $stmt->execute([$key, $strValue]);
         }

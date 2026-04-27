@@ -1,0 +1,89 @@
+---
+interface Props { productSlug: string; disabled?: boolean; }
+const { productSlug, disabled = false } = Astro.props;
+---
+<div class="shop-add-to-cart" data-product-slug={productSlug}>
+  <div class="shop-add-to-cart__row">
+    <label for="addToCartQty" class="shop-add-to-cart__label">Quantité</label>
+    <input type="number" id="addToCartQty" min="1" step="1" value="1" class="shop-add-to-cart__qty" />
+    <button type="button" id="shopAddToCartBtn" class="btn btn-primary shop-add-to-cart__btn" disabled={disabled}>
+      Ajouter au panier
+    </button>
+  </div>
+  <div id="shopAddToCartFeedback" class="shop-add-to-cart__feedback" role="status" aria-live="polite"></div>
+</div>
+
+<script is:inline>
+  (function () {
+    const btn = document.getElementById('shopAddToCartBtn');
+    if (!btn) return;
+
+    btn.addEventListener('click', async function () {
+      const variantInput = document.getElementById('selectedVariantId');
+      const qtyInput = document.getElementById('addToCartQty');
+      const fb = document.getElementById('shopAddToCartFeedback');
+      const variantId = variantInput?.value;
+      const qty = Math.max(1, parseInt(qtyInput?.value || '1', 10));
+
+      if (!variantId) {
+        if (fb) { fb.textContent = 'Veuillez sélectionner une variante.'; fb.className = 'shop-add-to-cart__feedback error'; }
+        return;
+      }
+
+      btn.disabled = true;
+      if (fb) { fb.textContent = 'Ajout en cours…'; fb.className = 'shop-add-to-cart__feedback pending'; }
+
+      try {
+        // Phase 3 : remplacer par /api/cart/items avec le token cart
+        // Pour l'instant, on stocke en localStorage comme fallback visuel.
+        const cart = JSON.parse(localStorage.getItem('shop_pending_cart') || '[]');
+        const existing = cart.find(i => i.variant_id === Number(variantId));
+        if (existing) existing.quantity += qty;
+        else cart.push({ variant_id: Number(variantId), quantity: qty });
+        localStorage.setItem('shop_pending_cart', JSON.stringify(cart));
+
+        if (fb) {
+          fb.textContent = '✓ Ajouté au panier (Phase 3 : synchronisation serveur à venir).';
+          fb.className = 'shop-add-to-cart__feedback success';
+        }
+      } catch (err) {
+        if (fb) { fb.textContent = 'Erreur lors de l\'ajout.'; fb.className = 'shop-add-to-cart__feedback error'; }
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  })();
+</script>
+
+<style>
+  .shop-add-to-cart {
+    margin-top: 1.5rem;
+  }
+  .shop-add-to-cart__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .shop-add-to-cart__label {
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .shop-add-to-cart__qty {
+    width: 70px;
+    padding: 8px 10px;
+    border: 1px solid var(--gray-300, #d1d5db);
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .shop-add-to-cart__btn {
+    padding: 10px 24px;
+  }
+  .shop-add-to-cart__feedback {
+    margin-top: 8px;
+    font-size: 14px;
+    min-height: 20px;
+  }
+  .shop-add-to-cart__feedback.error { color: var(--danger, #dc2626); }
+  .shop-add-to-cart__feedback.pending { color: var(--gray-600, #4b5563); }
+  .shop-add-to-cart__feedback.success { color: var(--success, #059669); }
+</style>
