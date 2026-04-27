@@ -657,6 +657,8 @@ PROMPT;
             exit;
         }
 
+        try {
+
         // Auto-create forms if AI generated any
         $formRefToId = [];
         $createdForms = [];
@@ -800,6 +802,22 @@ PROMPT;
             'usage' => ['input_tokens' => $inputTokens, 'output_tokens' => $outputTokens]
         ]));
         exit;
+
+        } catch (\PDOException $e) {
+            error_log('AI bulk save PDO error: ' . $e->getMessage());
+            self::sendSSE('error', json_encode([
+                'error' => 'Erreur base de données : ' . $e->getMessage(),
+                'sql_state' => $e->getCode(),
+            ]));
+            exit;
+        } catch (\Throwable $e) {
+            error_log('AI bulk save error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            self::sendSSE('error', json_encode([
+                'error' => 'Erreur serveur : ' . $e->getMessage(),
+                'file' => basename($e->getFile()) . ':' . $e->getLine(),
+            ]));
+            exit;
+        }
     }
 
     /**
