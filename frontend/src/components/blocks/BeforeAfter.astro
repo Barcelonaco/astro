@@ -123,12 +123,12 @@ const wrapperData = inColumns
     function setPosition(pct: number) {
       const v = Math.max(0, Math.min(100, pct));
       if (orientation === 'horizontal') {
-        after!.style.clipPath = `inset(0 ${100 - v}% 0 0)`;
+        after!.style.clipPath = `inset(0 0 0 ${v}%)`;
         handle!.style.left = `${v}%`;
         knob!.style.left = `${v}%`;
         knob!.style.top = '50%';
       } else {
-        after!.style.clipPath = `inset(0 0 ${100 - v}% 0)`;
+        after!.style.clipPath = `inset(${v}% 0 0 0)`;
         handle!.style.top = `${v}%`;
         knob!.style.top = `${v}%`;
         knob!.style.left = '50%';

@@ -17,7 +17,7 @@
       <div class="ba-wrapper" style="position:relative; width:100%; max-width:1100px; margin:0 auto; overflow:hidden; user-select:none; touch-action:none; cursor:grab;">
         <img src="{{ $module['image_before']['sizes']['banner'] ?? $module['image_before']['url'] }}" alt="{{ $module['image_before']['alt'] ?? '' }}" class="ba-before" style="display:block; width:100%; height:auto; pointer-events:none;">
 
-        <div class="ba-after" aria-hidden="true" style="position:absolute; inset:0; overflow:hidden; clip-path: @if ($module['orientation'] == 'vertical') inset(0 0 50% 0) @else inset(0 50% 0 0) @endif;">
+        <div class="ba-after" aria-hidden="true" style="position:absolute; inset:0; overflow:hidden; clip-path: @if ($module['orientation'] == 'vertical') inset(50% 0 0 0) @else inset(0 0 0 50%) @endif;">
           <img src="{{ $module['image_after']['sizes']['banner'] ?? $module['image_after']['url'] }}" alt="{{ $module['image_after']['alt'] ?? '' }}" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; pointer-events:none;">
         </div>
 
