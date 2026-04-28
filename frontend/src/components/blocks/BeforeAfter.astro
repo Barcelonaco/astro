@@ -46,9 +46,14 @@ const before = buildImage(data.image_before);
 const after = buildImage(data.image_after);
 
 const orientationClass = orientation === 'vertical' ? 'is-vertical' : 'is-horizontal';
+
+const inColumns = !!data.columns;
+const wrapperData = inColumns
+  ? { ...data, id_bloc: '', bg_img: null, bloc_color: '', padding_top: '', padding_bottom: '' }
+  : data;
 ---
 
-<NicklModuleWrapper data={data} moduleName="before-after" extraClasses={orientationClass}>
+<NicklModuleWrapper data={wrapperData} moduleName="before-after" extraClasses={orientationClass} hideTitle={inColumns} noContainer={inColumns}>
   {before.url && after.url && (
     <div
       class="ba-wrapper"

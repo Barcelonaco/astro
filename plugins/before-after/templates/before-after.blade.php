@@ -1,4 +1,4 @@
-<div id="{{ $id_bloc }}" class="module module-before-after @if ($module['orientation'] == 'vertical') is-vertical @else is-horizontal @endif {{ isset($columns) ? '' : $classes }}">
+<div id="{{ isset($columns) ? '' : $id_bloc }}" class="module module-before-after @if ($module['orientation'] == 'vertical') is-vertical @else is-horizontal @endif {{ isset($columns) ? '' : $classes }}">
 
   @if (!empty($backgroundImage) && !isset($columns))
     <div class="background"
@@ -6,10 +6,12 @@
     </div>
   @endif
 
+  @if (!isset($columns))
   <div class="container">
     @if (!empty($title_bloc))
       <h2 class="title-module title-section-2">{{ $title_bloc }}</h2>
     @endif
+  @endif
 
     @if (!empty($module['image_before']) && !empty($module['image_after']))
       <div class="ba-wrapper" style="position:relative; width:100%; max-width:1100px; margin:0 auto; overflow:hidden; user-select:none; touch-action:none; cursor:grab;">
@@ -30,5 +32,7 @@
     @else
       <p style="text-align:center; opacity:0.5;">Sélectionnez 2 images pour afficher l'aperçu.</p>
     @endif
+  @if (!isset($columns))
   </div>
+  @endif
 </div>
