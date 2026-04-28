@@ -559,6 +559,7 @@ const BLOCK_TYPES = { ...NICKL_MODULE_TYPES, ...LEGACY_BLOCK_TYPES };
 
 // ========== PLUGIN SYSTEM ==========
 let loadedPlugins = [];
+let INACTIVE_PLUGIN_TYPES = new Set();
 
 async function loadPlugins() {
   try {
@@ -571,6 +572,26 @@ async function loadPlugins() {
 
   // Remove previously injected plugin sidebar entries before re-rendering
   document.querySelectorAll('.nav-item[data-section^="cpt:"], .nav-sub-items[data-parent^="cpt:"], .nav-item[data-section^="plugin-options:"]').forEach(el => el.remove());
+
+  // Strip prior plugin-injected entries from MODULE_CATEGORIES and BLOCK_TYPES
+  // so deactivated plugins disappear from the page builder's "add module" list.
+  for (let i = MODULE_CATEGORIES.length - 1; i >= 0; i--) {
+    if (typeof MODULE_CATEGORIES[i]?.id === 'string' && MODULE_CATEGORIES[i].id.startsWith('plugin-')) {
+      MODULE_CATEGORIES.splice(i, 1);
+    }
+  }
+  for (const key of Object.keys(BLOCK_TYPES)) {
+    if (BLOCK_TYPES[key]?.plugin) delete BLOCK_TYPES[key];
+  }
+
+  // Track types belonging to disabled plugins so we can hide their previews
+  INACTIVE_PLUGIN_TYPES = new Set();
+  for (const p of loadedPlugins.filter(p => p._active === false)) {
+    for (const mod of p.modules?.items || []) {
+      INACTIVE_PLUGIN_TYPES.add(toKebabCase(mod.name));
+      INACTIVE_PLUGIN_TYPES.add(mod.name);
+    }
+  }
 
   const activePlugins = loadedPlugins.filter(p => p._active !== false);
 
@@ -3221,10 +3242,20 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-function renderBlockCard(block) {
+function renderBlockCard(block, visibleNum) {
+  if (INACTIVE_PLUGIN_TYPES.has(block.type)) return '';
   const def = BLOCK_TYPES[block.type] || { label: block.type, icon: '▦' };
-  const blockIndex = pageBuilderState.blocks.indexOf(block);
-  const blockNum = blockIndex >= 0 ? blockIndex + 1 : '';
+  const blockNum = typeof visibleNum === 'number'
+    ? visibleNum
+    : (() => {
+        let n = 0;
+        for (const b of pageBuilderState.blocks) {
+          if (INACTIVE_PLUGIN_TYPES.has(b.type)) continue;
+          n++;
+          if (b === block) return n;
+        }
+        return '';
+      })();
   const isHidden = block.data?.is_visible === 'no';
   const hiddenIcon = isHidden
     ? '<svg class="builder-block-hidden-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
@@ -7109,7 +7140,15 @@ function renderInsertButton(index) {
 }
 
 function renderBlocksWithInsertButtons(blocks) {
-  return blocks.map((block, i) => renderBlockCard(block) + renderInsertButton(i)).join('');
+  let visibleNum = 0;
+  const parts = [];
+  blocks.forEach((block, i) => {
+    if (INACTIVE_PLUGIN_TYPES.has(block.type)) return;
+    visibleNum++;
+    parts.push(renderBlockCard(block, visibleNum));
+    parts.push(renderInsertButton(i));
+  });
+  return parts.join('');
 }
 
 function rebuildBuilderBlocksDOM() {

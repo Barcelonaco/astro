@@ -580,6 +580,9 @@ try {
     elseif ($method === 'GET' && $path === '/plugins/active') {
         PluginController::getActivePlugins();
     }
+    elseif ($method === 'GET' && $path === '/plugins/inactive-types') {
+        PluginController::getInactiveTypes();
+    }
     elseif ($method === 'PUT' && preg_match('#^/plugins/([a-zA-Z0-9_-]+)/toggle$#', $path, $m)) {
         $user = authenticate_token();
         require_min_role($user, 'super_admin');

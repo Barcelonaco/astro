@@ -355,11 +355,12 @@ class ModuleFieldsController {
         $modules = $config['modules'] ?? [];
         $blockParamsMap = $config['blockParams'] ?? [];
 
-        // 2. Scan plugin modules (PHP parsing fallback)
+        // 2. Scan plugin modules (PHP parsing fallback) — skip inactive plugins
         $pluginsDir = $repoRoot . '/plugins';
         if (is_dir($pluginsDir)) {
             foreach (scandir($pluginsDir) as $entry) {
                 if ($entry === '.' || $entry === '..') continue;
+                if (!PluginController::isPluginActive($entry)) continue;
                 $pluginModulesDir = $pluginsDir . '/' . $entry . '/modules';
                 if (!is_dir($pluginModulesDir)) continue;
                 foreach (scandir($pluginModulesDir) as $file) {

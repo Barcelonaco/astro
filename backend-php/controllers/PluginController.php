@@ -3,9 +3,9 @@
 class PluginController {
     /**
      * Return the list of active plugin directories from settings.
-     * If the setting doesn't exist yet, ALL plugins are considered active (backward-compatible).
+     * If the setting doesn't exist yet, defaults to a known list (backward-compatible).
      */
-    private static function getActiveList(): ?array {
+    public static function getActiveList(): ?array {
         $db = Database::getInstance();
         $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'active_plugins'");
         $stmt->execute();
@@ -15,11 +15,102 @@ class PluginController {
         return is_array($decoded) ? $decoded : null;
     }
 
+    public static function isPluginActive(string $dir): bool {
+        $list = self::getActiveList();
+        if ($list === null) return true;
+        return in_array($dir, $list, true);
+    }
+
+    /**
+     * Find the plugin directory that owns a given block type (kebab-case or original name).
+     * Looks at modules.items[].name and at templates/<type>.blade.php.
+     * Returns null if no plugin owns the type (= core module).
+     */
+    public static function findPluginForBlockType(string $type): ?string {
+        $pluginsDir = __DIR__ . '/../../plugins';
+        if (!is_dir($pluginsDir)) return null;
+        foreach (scandir($pluginsDir) as $entry) {
+            if ($entry === '.' || $entry === '..') continue;
+            $pluginRoot = $pluginsDir . '/' . $entry;
+            if (!is_dir($pluginRoot)) continue;
+            $manifestPath = $pluginRoot . '/plugin.json';
+            if (file_exists($manifestPath)) {
+                $manifest = json_decode(file_get_contents($manifestPath), true);
+                if (is_array($manifest)) {
+                    $items = $manifest['modules']['items'] ?? [];
+                    foreach ($items as $m) {
+                        $name = $m['name'] ?? '';
+                        if ($name === '') continue;
+                        $kebab = strtolower(preg_replace('/(?<!^)([A-Z])/', '-$1', $name));
+                        if ($name === $type || $kebab === $type) return $entry;
+                    }
+                }
+            }
+            // Template-based detection (templates/<type>.blade.php)
+            $tplPath = $pluginRoot . '/templates/' . $type . '.blade.php';
+            if (file_exists($tplPath)) return $entry;
+        }
+        return null;
+    }
+
+    public static function isBlockTypeActive(string $type): bool {
+        $owner = self::findPluginForBlockType($type);
+        if ($owner === null) return true; // core module — always allowed
+        return self::isPluginActive($owner);
+    }
+
+    /**
+     * Return all block types that belong to inactive plugins (for frontend/admin filtering).
+     */
+    public static function getInactiveBlockTypes(): array {
+        $pluginsDir = __DIR__ . '/../../plugins';
+        if (!is_dir($pluginsDir)) return [];
+        $activeList = self::getActiveList();
+        $inactive = [];
+        foreach (scandir($pluginsDir) as $entry) {
+            if ($entry === '.' || $entry === '..') continue;
+            $pluginRoot = $pluginsDir . '/' . $entry;
+            if (!is_dir($pluginRoot)) continue;
+            $manifestPath = $pluginRoot . '/plugin.json';
+            if (!file_exists($manifestPath)) continue;
+            $isActive = $activeList === null ? true : in_array($entry, $activeList, true);
+            if ($isActive) continue;
+            $manifest = json_decode(file_get_contents($manifestPath), true);
+            if (!is_array($manifest)) continue;
+            $items = $manifest['modules']['items'] ?? [];
+            foreach ($items as $m) {
+                $name = $m['name'] ?? '';
+                if ($name === '') continue;
+                $kebab = strtolower(preg_replace('/(?<!^)([A-Z])/', '-$1', $name));
+                $inactive[] = $kebab;
+                if ($name !== $kebab) $inactive[] = $name;
+            }
+            // Template-based plugin types
+            $tplDir = $pluginRoot . '/templates';
+            if (is_dir($tplDir)) {
+                foreach (scandir($tplDir) as $f) {
+                    if (str_ends_with($f, '.blade.php')) {
+                        $inactive[] = substr($f, 0, -strlen('.blade.php'));
+                    }
+                }
+            }
+        }
+        return array_values(array_unique($inactive));
+    }
+
+    /**
+     * GET /plugins/inactive-types — public, returns block types of disabled plugins
+     * Used by frontend and admin to skip rendering modules whose plugin is off.
+     */
+    public static function getInactiveTypes(): void {
+        json_response(['types' => self::getInactiveBlockTypes()]);
+    }
+
     public static function getPluginManifests(bool $activeOnly = false): array {
         $pluginsDir = __DIR__ . '/../../plugins';
         if (!is_dir($pluginsDir)) return [];
 
-        $activeList = $activeOnly ? self::getActiveList() : null;
+        $activeList = self::getActiveList();
 
         $manifests = [];
         foreach (scandir($pluginsDir) as $entry) {
@@ -35,13 +126,7 @@ class PluginController {
             if (!$manifest) continue;
 
             $manifest['_dir'] = $entry;
-
-            // Determine active status
-            if ($activeList !== null) {
-                $manifest['_active'] = in_array($entry, $activeList, true);
-            } else {
-                $manifest['_active'] = true; // no activeList filter → show all in admin
-            }
+            $manifest['_active'] = $activeList === null ? true : in_array($entry, $activeList, true);
 
             if ($activeOnly && !$manifest['_active']) continue;
 
@@ -107,6 +192,11 @@ class PluginController {
 
         // Invalidate bootstrap cache
         @unlink(__DIR__ . '/../uploads/.bootstrap_cache.json');
+
+        // Rebuild the frontend so any pages containing modules from this plugin
+        // re-render correctly (hidden when off, restored when on) without the
+        // user needing to re-save each page.
+        trigger_frontend_rebuild('plugin ' . ($active ? 'enabled' : 'disabled') . ': ' . $pluginDir, false);
 
         json_response(['active' => (bool) $active, 'active_plugins' => $currentList]);
     }

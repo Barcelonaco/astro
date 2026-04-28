@@ -28,6 +28,7 @@ class ModuleTemplatesController {
                 foreach (scandir($pluginsDir) as $dir) {
                     if ($dir === '.' || $dir === '..') continue;
                     if (!is_dir($pluginsDir . '/' . $dir)) continue;
+                    if (!PluginController::isPluginActive($dir)) continue;
                     $candidate = $pluginsDir . '/' . $dir . '/templates/' . $layout . '.blade.php';
                     if (file_exists($candidate)) {
                         $templatePath = $candidate;

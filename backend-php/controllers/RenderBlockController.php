@@ -36,12 +36,13 @@ class RenderBlockController {
         $nicklPath = $repoRoot . '/nickl/resources/views/modules/' . $layout . '.blade.php';
         if (file_exists($nicklPath)) return file_get_contents($nicklPath);
 
-        // Try plugins
+        // Try plugins (skip inactive)
         $pluginsDir = $repoRoot . '/plugins';
         if (is_dir($pluginsDir)) {
             foreach (scandir($pluginsDir) as $dir) {
                 if ($dir === '.' || $dir === '..') continue;
                 if (!is_dir($pluginsDir . '/' . $dir)) continue;
+                if (!PluginController::isPluginActive($dir)) continue;
                 $candidate = $pluginsDir . '/' . $dir . '/templates/' . $layout . '.blade.php';
                 if (file_exists($candidate)) return file_get_contents($candidate);
             }
@@ -244,6 +245,12 @@ class RenderBlockController {
         $body = get_json_body();
         $type = $body['type'] ?? '';
         if (empty($type)) error_response('Missing type', 400);
+
+        // Block types from disabled plugins → render nothing
+        if (!PluginController::isBlockTypeActive($type)) {
+            json_response(['html' => '']);
+            return;
+        }
 
         // Special handling for bloc-references: fetch live data from DB
         if ($type === 'bloc-references') {

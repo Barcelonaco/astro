@@ -68,7 +68,22 @@ interface Block {
   data?: Record<string, unknown>;
 }
 
-const { blocks = [] } = Astro.props as { blocks: Block[] };
+const { blocks: rawBlocks = [] } = Astro.props as { blocks: Block[] };
+
+// Filter out blocks belonging to disabled plugins
+const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+let inactiveTypes: string[] = [];
+try {
+  const res = await fetch(`${API_URL}/plugins/inactive-types`);
+  if (res.ok) {
+    const data = await res.json();
+    inactiveTypes = Array.isArray(data?.types) ? data.types : [];
+  }
+} catch {
+  // ignore — render everything if endpoint unreachable
+}
+const inactiveSet = new Set(inactiveTypes);
+const blocks = rawBlocks.filter(b => !inactiveSet.has(b.type));
 ---
 
 <div class="page-blocks">
