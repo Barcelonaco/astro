@@ -25,7 +25,9 @@ const keyList = (data.key_list as any[]) || [];
     <ul class="list">
       {keyList.map((key) => {
         const link = resolveLink(key.link);
-        const iconeUrl = resolveImageUrl(key.icone, apiOrigin);
+        const rawIcone = key.icone;
+        const hasIcone = rawIcone && (typeof rawIcone === 'string' ? rawIcone.trim() !== '' : rawIcone.url);
+        const iconeUrl = hasIcone ? resolveImageUrl(rawIcone, apiOrigin) : '';
 
         const innerContent = (
           <>
