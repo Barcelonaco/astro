@@ -89,7 +89,7 @@ jobs:
 
             # Wait until PHP server is ready (max 15s)
             for i in $(seq 1 15); do
-              curl -sf http://127.0.0.1:8892/api/settings/site > /dev/null 2>&1 && break
+              curl -sf http://127.0.0.1:8894/api/settings/site > /dev/null 2>&1 && break
               echo "Waiting for PHP server... ($i)"
               sleep 1
             done
@@ -100,7 +100,7 @@ jobs:
             # Backup dist before build (astro build wipes dist/ first)
             if [ -d dist ]; then cp -r dist dist_backup; fi
 
-            if BUILD_API_URL=http://127.0.0.1:8892/api npm run build; then
+            if BUILD_API_URL=http://127.0.0.1:8894/api npm run build; then
               rm -rf dist_backup
             else
               echo "Build failed, restoring previous dist"
