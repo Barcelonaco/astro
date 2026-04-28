@@ -1521,7 +1521,8 @@ function createCPTQuill(container) {
         [{ list: 'ordered' }, { list: 'bullet' }],
         [{ align: [] }],
         ['link'],
-        ['clean']
+        ['clean'],
+        ['html']
       ],
       clipboard: { matchers: _quillCleanPasteMatchers() }
     }
@@ -1533,6 +1534,10 @@ function createCPTQuill(container) {
   // Sync on change
   q.on('text-change', () => {
     hiddenInput.value = q.root.innerHTML;
+  });
+  attachHtmlSourceToggle(q, {
+    getHtml: () => q.root.innerHTML,
+    onSync: (html) => { hiddenInput.value = html; }
   });
   _cptQuills[fieldName] = q;
   if (fieldName === 'text') _cptQuill = q;
@@ -2307,7 +2312,8 @@ function createCPTOptionsQuill(container, hiddenInput) {
         [{ list: 'ordered' }, { list: 'bullet' }],
         [{ align: [] }],
         ['link'],
-        ['clean']
+        ['clean'],
+        ['html']
       ],
       clipboard: { matchers: _quillCleanPasteMatchers() }
     }
@@ -2315,6 +2321,10 @@ function createCPTOptionsQuill(container, hiddenInput) {
   if (hiddenInput.value) _cptOptionsQuill.root.innerHTML = hiddenInput.value;
   _cptOptionsQuill.on('text-change', () => {
     hiddenInput.value = _cptOptionsQuill.root.innerHTML;
+  });
+  attachHtmlSourceToggle(_cptOptionsQuill, {
+    getHtml: () => _cptOptionsQuill.root.innerHTML,
+    onSync: (html) => { hiddenInput.value = html; }
   });
 }
 
@@ -8899,7 +8909,8 @@ function initWysiwygEditors(container) {
           ['link'],
           [{ color: [] }],
           [{ indent: '-1' }, { indent: '+1' }],
-          ['clean']
+          ['clean'],
+          ['html']
         ],
         clipboard: { matchers: _quillCleanPasteMatchers() }
       },
@@ -8913,7 +8924,50 @@ function initWysiwygEditors(container) {
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
       }
     });
+    attachHtmlSourceToggle(quill, {
+      getHtml: () => quill.getSemanticHTML(),
+      onSync: (html) => {
+        if (textarea) {
+          textarea.value = html;
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    });
     _quillInstances.set(el.id, quill);
+  });
+}
+
+function attachHtmlSourceToggle(quill, { getHtml, onSync } = {}) {
+  const toolbar = quill.getModule && quill.getModule('toolbar');
+  if (!toolbar || typeof toolbar.addHandler !== 'function') return;
+  const editorRoot = quill.root;
+  const qlContainer = editorRoot.parentNode;
+  let textarea = null;
+  toolbar.addHandler('html', function() {
+    const btn = toolbar.container && toolbar.container.querySelector('button.ql-html');
+    if (!textarea) {
+      const html = typeof getHtml === 'function' ? getHtml() : editorRoot.innerHTML;
+      textarea = document.createElement('textarea');
+      textarea.className = 'wysiwyg-html-source';
+      textarea.spellcheck = false;
+      textarea.value = html;
+      qlContainer.style.display = 'none';
+      qlContainer.parentNode.insertBefore(textarea, qlContainer.nextSibling);
+      textarea.addEventListener('input', () => {
+        if (typeof onSync === 'function') onSync(textarea.value);
+      });
+      if (btn) btn.classList.add('ql-active');
+      textarea.focus();
+    } else {
+      const html = textarea.value;
+      quill.root.innerHTML = html;
+      if (typeof onSync === 'function') onSync(html);
+      textarea.remove();
+      textarea = null;
+      qlContainer.style.display = '';
+      if (btn) btn.classList.remove('ql-active');
+      quill.focus();
+    }
   });
 }
 
@@ -9266,6 +9320,57 @@ function _findColumnsSubModuleData(block, moduleTextEl, card) {
 }
 
 let _inlineToolbar = null;
+let _inlineSourceTextarea = null;
+
+function _prettifyHtmlSource(html) {
+  return String(html || '')
+    .replace(/^\s+|\s+$/g, '')
+    .replace(/\s*(<(p|h[1-6]|ul|ol|li|blockquote|div|figure|table|tr|td|th|thead|tbody|section|article|header|footer|nav|aside)[^>]*>)\s*/gi, '\n$1')
+    .replace(/\s*(<\/(p|h[1-6]|ul|ol|li|blockquote|div|figure|table|tr|td|th|thead|tbody|section|article|header|footer|nav|aside)>)\s*/gi, '$1\n')
+    .replace(/\n{2,}/g, '\n')
+    .replace(/^\s+|\s+$/g, '');
+}
+
+function _toggleInlineHtmlSource() {
+  if (!_inlineEditingElement) return;
+  const editor = _inlineEditingElement;
+  const btn = _inlineToolbar && _inlineToolbar.querySelector('button[data-action="html"]');
+
+  if (_inlineSourceTextarea) {
+    // Switch back from HTML source → contenteditable
+    const html = _inlineSourceTextarea.value;
+    editor.innerHTML = html;
+    if (_inlineEditingDataRef && _inlineEditingFieldName) {
+      _inlineEditingDataRef[_inlineEditingFieldName] = html;
+    }
+    _inlineSourceTextarea.remove();
+    _inlineSourceTextarea = null;
+    editor.style.display = '';
+    if (btn) btn.classList.remove('active');
+    editor.focus();
+    return;
+  }
+
+  // Switch to HTML source view
+  const ta = document.createElement('textarea');
+  ta.className = 'inline-html-source';
+  ta.spellcheck = false;
+  ta.value = _prettifyHtmlSource(editor.innerHTML);
+  editor.parentNode.insertBefore(ta, editor.nextSibling);
+  editor.style.display = 'none';
+  ta.addEventListener('input', () => {
+    const v = ta.value;
+    editor.innerHTML = v;
+    if (_inlineEditingDataRef && _inlineEditingFieldName) {
+      _inlineEditingDataRef[_inlineEditingFieldName] = v;
+    }
+    markBuilderDirty();
+  });
+  ta.addEventListener('blur', _handleInlineBlur);
+  _inlineSourceTextarea = ta;
+  if (btn) btn.classList.add('active');
+  ta.focus();
+}
 
 function _createInlineToolbar() {
   if (_inlineToolbar) return _inlineToolbar;
@@ -9301,6 +9406,8 @@ function _createInlineToolbar() {
     <button type="button" data-cmd="indent" data-value="indent" title="Augmenter le retrait"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="4" x2="21" y2="4"/><line x1="11" y1="9" x2="21" y2="9"/><line x1="11" y1="14" x2="21" y2="14"/><line x1="3" y1="19" x2="21" y2="19"/><polyline points="3 9 7 11.5 3 14"/></svg></button>
     <span class="inline-toolbar-sep"></span>
     <button type="button" data-cmd="removeFormat" title="Supprimer le formatage"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M10 4v3"/><path d="M8 21l4-14"/><path d="M3 21h6"/><line x1="18" y1="5" x2="22" y2="9"/><line x1="22" y1="5" x2="18" y2="9"/></svg></button>
+    <span class="inline-toolbar-sep"></span>
+    <button type="button" data-action="html" title="Voir le HTML"><span class="inline-toolbar-html-icon">&lt;/&gt;</span></button>
   `;
   bar.style.display = 'none';
   document.body.appendChild(bar);
@@ -9310,6 +9417,12 @@ function _createInlineToolbar() {
     // Let the <select> dropdown work normally (don't preventDefault)
     if (e.target.closest('select')) return;
     e.preventDefault(); // Prevent blur on the contenteditable
+    // HTML source toggle (separate from execCommand buttons)
+    const htmlBtn = e.target.closest('button[data-action="html"]');
+    if (htmlBtn) {
+      _toggleInlineHtmlSource();
+      return;
+    }
     const btn = e.target.closest('button[data-cmd]');
     if (btn) {
       const cmd = btn.dataset.cmd;
@@ -9439,6 +9552,16 @@ function enableInlineEditing(blockId, targetTxtEditor, dataRef, fieldName) {
 function disableInlineEditing() {
   if (!_inlineEditingBlockId) return;
 
+  // If in HTML source mode, sync textarea content back into the contenteditable first
+  if (_inlineSourceTextarea && _inlineEditingElement) {
+    _inlineEditingElement.innerHTML = _inlineSourceTextarea.value;
+    _inlineEditingElement.style.display = '';
+    _inlineSourceTextarea.remove();
+    _inlineSourceTextarea = null;
+    const htmlBtn = _inlineToolbar && _inlineToolbar.querySelector('button[data-action="html"]');
+    if (htmlBtn) htmlBtn.classList.remove('active');
+  }
+
   if (_inlineEditingElement) {
     _syncInlineContentToBlockData(_inlineEditingElement);
     _inlineEditingElement.removeAttribute('contenteditable');
@@ -9488,6 +9611,8 @@ function _handleInlineBlur() {
     if (_inlineToolbar && _inlineToolbar.contains(active)) return;
     // If focus is still inside the editing element, don't disable
     if (_inlineEditingElement && (_inlineEditingElement === active || _inlineEditingElement.contains(active))) return;
+    // If focus moved to the HTML source textarea, don't disable
+    if (_inlineSourceTextarea && _inlineSourceTextarea === active) return;
     // Focus left the editing zone — disable inline editing
     disableInlineEditing();
   }, 150);
