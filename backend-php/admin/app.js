@@ -974,7 +974,7 @@ async function renderCPTEditPage(ptDef, itemId) {
             <div class="form-group" style="margin:0;">
               <select class="form-input cpt-link-page-select" data-target="cf_${fnEsc}_url">
                 <option value="">— Page du site —</option>
-                ${allPages.filter(p => p.status === 'published').map(p => `<option value="/pages/${escapeHtml(p.slug)}" ${lObj.url === '/pages/' + p.slug ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
+                ${allPages.filter(p => p.status === 'published').map(p => `<option value="/${escapeHtml(p.slug)}" ${lObj.url === '/' + p.slug ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
               </select>
             </div>
             <div class="form-group" style="margin:0;">
@@ -2756,7 +2756,7 @@ async function renderPageBuilder() {
   const saveFunc = isCPT ? 'saveCPTBuilder()' : 'savePageBuilder()';
   const viewUrl = isCPT
     ? `${siteSettingsCache?.frontend_url || window.location.origin}/${cptDef.slug}/${encodeURIComponent(m.slug)}`
-    : `${siteSettingsCache?.frontend_url || window.location.origin}/pages/${encodeURIComponent(m.slug)}`;
+    : `${siteSettingsCache?.frontend_url || window.location.origin}/${m.slug.split('/').map(encodeURIComponent).join('/')}`;
   const titlePlaceholder = isCPT ? `Titre de l'${cptDef.label.toLowerCase()}` : 'Titre de la page';
 
   // CPT sidebar: featured image, excerpt, categories, custom fields
@@ -2817,7 +2817,7 @@ async function renderPageBuilder() {
             <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">${escapeHtml(field.label)}</label>
             <select class="form-input cpt-link-page-select" data-target="cptBf_${fnEsc}_url" style="font-size:12px;margin-bottom:4px;">
               <option value="">— Page du site —</option>
-              ${allPages.filter(p => p.status === 'published').map(p => `<option value="/pages/${escapeHtml(p.slug)}" ${lObj.url === '/pages/' + p.slug ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
+              ${allPages.filter(p => p.status === 'published').map(p => `<option value="/${escapeHtml(p.slug)}" ${lObj.url === '/' + p.slug ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
             </select>
             <input type="text" class="form-input" id="cptBf_${fnEsc}_url" value="${escapeHtml(lObj.url || '')}" placeholder="URL" style="font-size:12px;margin-bottom:4px;">
             <input type="text" class="form-input" id="cptBf_${fnEsc}_title" value="${escapeHtml(lObj.title || '')}" placeholder="Titre du lien" style="font-size:12px;margin-bottom:4px;">
@@ -3127,7 +3127,7 @@ async function renderPageBuilder() {
                 </div>
                 <div id="seoPreview" class="seo-google-preview">
                   <div class="seo-preview-title">${pageBuilderState.seoMeta.meta_title || pageBuilderState.meta.title || 'Titre de la page'}</div>
-                  <div class="seo-preview-url">example.com/pages/${pageBuilderState.meta.slug || 'slug'}</div>
+                  <div class="seo-preview-url">example.com/${pageBuilderState.meta.slug || 'slug'}</div>
                   <div class="seo-preview-desc">${pageBuilderState.seoMeta.meta_description || 'Description de la page...'}</div>
                 </div>
               </div>
@@ -6013,7 +6013,7 @@ async function generateSchemaOrg() {
   const webPage = {
     '@type': 'WebPage',
     'name': title,
-    'url': `{{site_url}}/pages/${slug}`
+    'url': `{{site_url}}/${slug}`
   };
   if (description) webPage.description = description;
   schema['@graph'].push(webPage);
@@ -6200,7 +6200,7 @@ async function generateSchemaOrg() {
     '@type': 'BreadcrumbList',
     'itemListElement': [
       { '@type': 'ListItem', 'position': 1, 'name': 'Accueil', 'item': '{{site_url}}/' },
-      { '@type': 'ListItem', 'position': 2, 'name': title, 'item': `{{site_url}}/pages/${slug}` }
+      { '@type': 'ListItem', 'position': 2, 'name': title, 'item': `{{site_url}}/${slug}` }
     ]
   });
 
@@ -9634,7 +9634,7 @@ async function savePageBuilder() {
 
     // Update "Voir la page" link with current slug
     const viewBtn = document.getElementById('viewPageBtn');
-    if (viewBtn) viewBtn.href = `${siteSettingsCache?.frontend_url || window.location.origin}/pages/${encodeURIComponent(slug)}`;
+    if (viewBtn) viewBtn.href = `${siteSettingsCache?.frontend_url || window.location.origin}/${slug.split('/').map(encodeURIComponent).join('/')}`;
     clearBuilderDirty();
   } catch (error) {
     hideLoading();
@@ -14270,7 +14270,7 @@ function addSelectedPages() {
       id: null,
       temp_id: tempId,
       title: title,
-      url: `/pages/${slug}`,
+      url: `/${slug}`,
       type: 'page',
       page_id: pageId,
       parent_id: null,

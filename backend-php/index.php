@@ -419,13 +419,13 @@ try {
         $user = authenticate_token();
         MenuController::getAllPageMenuInfo();
     }
-    elseif ($method === 'GET' && match_route('/pages/:slug', $path, $params)) {
-        // Check if slug is a pageId for menu routes
-        if (is_numeric($params['slug'])) {
-            // Could be /pages/:pageId/menus
-            // Handled below in page-menu routes
-        }
-        PageController::getBySlug($params['slug']);
+    elseif ($method === 'GET' && match_route('/pages/:pageId/menus', $path, $params)) {
+        $user = authenticate_token();
+        require_min_role($user, 'admin_site');
+        MenuController::getPageMenus((int) $params['pageId']);
+    }
+    elseif ($method === 'GET' && preg_match('#^/pages/(.+)$#', $path, $m)) {
+        PageController::getBySlug($m[1]);
     }
     elseif ($method === 'POST' && $path === '/pages') {
         $user = authenticate_token();
@@ -451,11 +451,6 @@ try {
     }
 
     // ── Page ↔ Menu assignments ──
-    elseif ($method === 'GET' && match_route('/pages/:pageId/menus', $path, $params)) {
-        $user = authenticate_token();
-        require_min_role($user, 'admin_site');
-        MenuController::getPageMenus((int) $params['pageId']);
-    }
     elseif ($method === 'PUT' && match_route('/pages/:pageId/menus', $path, $params)) {
         $user = authenticate_token();
         require_min_role($user, 'admin_site');

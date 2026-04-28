@@ -48,7 +48,7 @@ class MenuModel {
                 'id' => $row['id'],
                 'menu_id' => $row['menu_id'],
                 'title' => ($row['type'] === 'page' && $row['page_title']) ? $row['page_title'] : $row['title'],
-                'url' => ($row['type'] === 'page' && $row['page_slug']) ? '/pages/' . $row['page_slug'] : $row['url'],
+                'url' => ($row['type'] === 'page' && $row['page_slug']) ? '/' . $row['page_slug'] : $row['url'],
                 'type' => $row['type'],
                 'page_id' => $row['page_id'],
                 'parent_id' => $row['parent_id'],
@@ -283,7 +283,7 @@ class MenuModel {
         $stmtInsert = $db->prepare("INSERT INTO menu_items (menu_id, title, url, type, page_id, parent_id, menu_order, open_in_new_tab) VALUES (?, ?, ?, 'page', ?, ?, ?, 0)");
 
         foreach ($assignments as $a) {
-            $url = '/pages/' . $pageSlug;
+            $url = '/' . $pageSlug;
             if (in_array($a['menuId'], $currentMenuIds)) {
                 $stmtUpdate->execute([$pageTitle, $url, $a['parent_id'] ?? null, $a['menu_order'] ?? 0, $a['menuId'], $pageId]);
             } else {

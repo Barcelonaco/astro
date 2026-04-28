@@ -33,9 +33,12 @@ function hasChildren(item: any): boolean {
 }
 
 function itemUrl(item: any): string {
-  // Menu-based items have a url field; page-based fallback uses slug
-  if (item.url) return item.url;
-  if (item.slug) return `/pages/${item.slug}`;
+  if (item.url) {
+    let u = item.url.replace(/%2F/gi, '/');
+    if (u.startsWith('/pages/')) u = u.slice(6);
+    return u;
+  }
+  if (item.slug) return `/${item.slug}`;
   return '#';
 }
 
