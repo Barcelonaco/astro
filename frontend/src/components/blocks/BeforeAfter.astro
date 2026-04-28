@@ -1,0 +1,200 @@
+---
+/**
+ * Plugin Avant / Après — comparateur d'images avec curseur drag/touch.
+ */
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import {
+  resolveImageUrl,
+  resolveImageAlt,
+  resolveImageDimensions,
+  responsiveSrcset,
+  optimizedImageUrl,
+  getPreset,
+} from '../../lib/module-helpers';
+import { MEDIA_ORIGIN } from '../../lib/api';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+const apiOrigin = MEDIA_ORIGIN;
+
+const orientation = (data.orientation as string) === 'vertical' ? 'vertical' : 'horizontal';
+const initialPosition = Math.max(0, Math.min(100, Number(data.initial_position ?? 50)));
+const showLabels = data.show_labels === true || data.show_labels === 1 || data.show_labels === '1';
+const labelBefore = (data.label_before as string) || 'Avant';
+const labelAfter = (data.label_after as string) || 'Après';
+
+const p = getPreset('feature');
+
+function buildImage(raw: any) {
+  const obj = typeof raw === 'object' && raw ? raw as Record<string, any> : null;
+  const rawUrl = obj?.sizes?.banner || obj?.url || (typeof raw === 'string' ? raw : '');
+  const resolved = rawUrl && !rawUrl.startsWith('http') ? apiOrigin + rawUrl : rawUrl;
+  const url = resolved ? optimizedImageUrl(resolved, p.width, p.quality) : resolveImageUrl(raw, apiOrigin, 'banner');
+  const baseUrl = typeof raw === 'string' ? raw : obj?.url || '';
+  return {
+    url,
+    srcset: responsiveSrcset(baseUrl, p.srcsetWidths, p.srcsetQuality),
+    alt: resolveImageAlt(raw),
+    dims: resolveImageDimensions(raw),
+  };
+}
+
+const before = buildImage(data.image_before);
+const after = buildImage(data.image_after);
+
+const orientationClass = orientation === 'vertical' ? 'is-vertical' : 'is-horizontal';
+---
+
+<NicklModuleWrapper data={data} moduleName="before-after" extraClasses={orientationClass}>
+  {before.url && after.url && (
+    <div
+      class="ba-wrapper"
+      data-orientation={orientation}
+      data-initial={initialPosition}
+    >
+      <img
+        src={before.url}
+        srcset={before.srcset || undefined}
+        sizes="(max-width: 1100px) 100vw, 1100px"
+        alt={before.alt}
+        width={before.dims.width || 1200}
+        height={before.dims.height || 800}
+        loading={data._eager ? 'eager' : 'lazy'}
+        decoding="async"
+        class="ba-before"
+      />
+
+      <div class="ba-after" aria-hidden="true">
+        <img
+          src={after.url}
+          srcset={after.srcset || undefined}
+          sizes="(max-width: 1100px) 100vw, 1100px"
+          alt={after.alt}
+          width={after.dims.width || 1200}
+          height={after.dims.height || 800}
+          loading={data._eager ? 'eager' : 'lazy'}
+          decoding="async"
+        />
+      </div>
+
+      {showLabels && (
+        <>
+          <span class="ba-label ba-label-before">{labelBefore}</span>
+          <span class="ba-label ba-label-after">{labelAfter}</span>
+        </>
+      )}
+
+      <div class="ba-handle" aria-hidden="true"></div>
+      <button
+        type="button"
+        class="ba-knob"
+        role="slider"
+        aria-label={`Comparer ${labelBefore} et ${labelAfter}`}
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow={initialPosition}
+        aria-orientation={orientation}
+      ></button>
+    </div>
+  )}
+</NicklModuleWrapper>
+
+<script>
+  function initBeforeAfter(wrapper: HTMLElement) {
+    if (wrapper.dataset.baInit === '1') return;
+    wrapper.dataset.baInit = '1';
+
+    const orientation = wrapper.dataset.orientation === 'vertical' ? 'vertical' : 'horizontal';
+    const initial = Math.max(0, Math.min(100, Number(wrapper.dataset.initial ?? 50)));
+
+    const after = wrapper.querySelector<HTMLElement>('.ba-after');
+    const handle = wrapper.querySelector<HTMLElement>('.ba-handle');
+    const knob = wrapper.querySelector<HTMLElement>('.ba-knob');
+    if (!after || !handle || !knob) return;
+
+    function setPosition(pct: number) {
+      const v = Math.max(0, Math.min(100, pct));
+      if (orientation === 'horizontal') {
+        after!.style.clipPath = `inset(0 ${100 - v}% 0 0)`;
+        handle!.style.left = `${v}%`;
+        knob!.style.left = `${v}%`;
+        knob!.style.top = '50%';
+      } else {
+        after!.style.clipPath = `inset(0 0 ${100 - v}% 0)`;
+        handle!.style.top = `${v}%`;
+        knob!.style.top = `${v}%`;
+        knob!.style.left = '50%';
+      }
+      knob!.setAttribute('aria-valuenow', String(Math.round(v)));
+    }
+
+    setPosition(initial);
+
+    function pctFromEvent(clientX: number, clientY: number): number {
+      const rect = wrapper.getBoundingClientRect();
+      if (orientation === 'horizontal') {
+        return ((clientX - rect.left) / rect.width) * 100;
+      }
+      return ((clientY - rect.top) / rect.height) * 100;
+    }
+
+    let dragging = false;
+
+    function onPointerDown(e: PointerEvent) {
+      dragging = true;
+      wrapper.classList.add('is-dragging');
+      wrapper.setPointerCapture(e.pointerId);
+      setPosition(pctFromEvent(e.clientX, e.clientY));
+      e.preventDefault();
+    }
+
+    function onPointerMove(e: PointerEvent) {
+      if (!dragging) return;
+      setPosition(pctFromEvent(e.clientX, e.clientY));
+    }
+
+    function onPointerUp(e: PointerEvent) {
+      if (!dragging) return;
+      dragging = false;
+      wrapper.classList.remove('is-dragging');
+      try { wrapper.releasePointerCapture(e.pointerId); } catch {}
+    }
+
+    wrapper.addEventListener('pointerdown', onPointerDown);
+    wrapper.addEventListener('pointermove', onPointerMove);
+    wrapper.addEventListener('pointerup', onPointerUp);
+    wrapper.addEventListener('pointercancel', onPointerUp);
+
+    knob.addEventListener('keydown', (e) => {
+      const step = e.shiftKey ? 10 : 2;
+      const current = Number(knob.getAttribute('aria-valuenow') || '50');
+      const isHoriz = orientation === 'horizontal';
+      if ((isHoriz && e.key === 'ArrowLeft') || (!isHoriz && e.key === 'ArrowUp')) {
+        setPosition(current - step);
+        e.preventDefault();
+      } else if ((isHoriz && e.key === 'ArrowRight') || (!isHoriz && e.key === 'ArrowDown')) {
+        setPosition(current + step);
+        e.preventDefault();
+      } else if (e.key === 'Home') {
+        setPosition(0);
+        e.preventDefault();
+      } else if (e.key === 'End') {
+        setPosition(100);
+        e.preventDefault();
+      }
+    });
+  }
+
+  function initAll() {
+    document.querySelectorAll<HTMLElement>('.module-before-after .ba-wrapper').forEach(initBeforeAfter);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll);
+  } else {
+    initAll();
+  }
+</script>

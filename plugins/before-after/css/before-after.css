@@ -1,0 +1,177 @@
+.module-before-after .ba-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+  background: #f5f5f5;
+}
+
+.module-before-after .ba-wrapper img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.module-before-after .ba-after {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  will-change: clip-path;
+}
+
+.module-before-after .ba-after img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.module-before-after .ba-handle {
+  position: absolute;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .15), 0 4px 12px rgba(0, 0, 0, .25);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.module-before-after .ba-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .15), 0 4px 12px rgba(0, 0, 0, .3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 3;
+  transition: none !important;
+  cursor: default;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.module-before-after .ba-handle {
+  transition: none !important;
+}
+
+.module-before-after .ba-knob::before,
+.module-before-after .ba-knob::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+/* Horizontal: vertical handle bar, knob has left/right arrows */
+.module-before-after.is-horizontal .ba-handle {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+}
+
+.module-before-after.is-horizontal .ba-knob::before {
+  border-width: 6px 8px 6px 0;
+  border-color: transparent #333 transparent transparent;
+}
+
+.module-before-after.is-horizontal .ba-knob::after {
+  border-width: 6px 0 6px 8px;
+  border-color: transparent transparent transparent #333;
+}
+
+/* Vertical: horizontal handle bar, knob has up/down arrows */
+.module-before-after.is-vertical .ba-handle {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.module-before-after.is-vertical .ba-knob {
+  flex-direction: column;
+}
+
+.module-before-after.is-vertical .ba-knob::before {
+  border-width: 0 6px 8px 6px;
+  border-color: transparent transparent #333 transparent;
+}
+
+.module-before-after.is-vertical .ba-knob::after {
+  border-width: 8px 6px 0 6px;
+  border-color: #333 transparent transparent transparent;
+}
+
+.module-before-after .ba-wrapper.is-dragging,
+.module-before-after .ba-wrapper.is-dragging * {
+  cursor: grabbing;
+}
+
+.module-before-after .ba-wrapper {
+  cursor: grab;
+}
+
+.module-before-after .ba-label {
+  position: absolute;
+  bottom: 16px;
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, .6);
+  color: #fff;
+  font-size: .85em;
+  letter-spacing: .03em;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.module-before-after .ba-label.ba-label-before {
+  left: 16px;
+}
+
+.module-before-after .ba-label.ba-label-after {
+  right: 16px;
+}
+
+.module-before-after.is-vertical .ba-label.ba-label-before {
+  top: 16px;
+  left: 16px;
+  bottom: auto;
+}
+
+.module-before-after.is-vertical .ba-label.ba-label-after {
+  bottom: 16px;
+  right: auto;
+  left: 16px;
+}
+
+@media (max-width: 600px) {
+  .module-before-after .ba-knob {
+    width: 36px;
+    height: 36px;
+  }
+
+  .module-before-after .ba-label {
+    font-size: .75em;
+    padding: 4px 10px;
+    bottom: 10px;
+  }
+
+  .module-before-after .ba-label.ba-label-before { left: 10px; }
+  .module-before-after .ba-label.ba-label-after { right: 10px; }
+}

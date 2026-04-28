@@ -56,6 +56,9 @@ import NicklBlocReferences from './blocks/NicklBlocReferences.astro';
 import NicklInstaFeed from './blocks/NicklInstaFeed.astro';
 import NicklThreadsFeed from './blocks/NicklThreadsFeed.astro';
 import NicklProduct from './blocks/NicklProduct.astro';
+
+// Plugins
+import BeforeAfter from './blocks/BeforeAfter.astro';
 import ParallaxInit from './ParallaxInit.astro';
 import ModuleAnimations from './ModuleAnimations.astro';
 
@@ -187,6 +190,10 @@ const { blocks = [] } = Astro.props as { blocks: Block[] };
         return <NicklThreadsFeed data={data} />;
       case 'featured_products':
         return <NicklProduct data={data} />;
+
+      // Plugins
+      case 'before-after':
+        return <BeforeAfter data={data} />;
 
       default:
         // Plugin blocks: rendered server-side via API

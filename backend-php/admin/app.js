@@ -42,7 +42,7 @@ function resetInactivityTimer() {
   clearTimeout(_inactivityTimer);
   _inactivityTimer = setTimeout(() => {
     localStorage.removeItem('token');
-    window.location.href = '/admin/login.html?reason=inactivity';
+    window.location.href = '/login?reason=inactivity';
   }, INACTIVITY_TIMEOUT);
 }
 
@@ -55,7 +55,7 @@ function startInactivityTracker() {
 
 // Check auth on load
 if (!token) {
-  window.location.href = '/admin/login.html';
+  window.location.href = '/login';
 } else {
   startInactivityTracker();
   init();
@@ -112,7 +112,7 @@ async function init() {
     currentUser = await response.json();
   } catch (error) {
     localStorage.removeItem('token');
-    window.location.href = '/admin/login.html';
+    window.location.href = '/login';
     return;
   }
 
@@ -13559,7 +13559,7 @@ async function logout() {
   const ok = await confirmModal('Voulez-vous vraiment vous déconnecter ?');
   if (!ok) return;
   localStorage.removeItem('token');
-  window.location.href = '/admin/login.html';
+  window.location.href = '/login';
 }
 
 // ========== PROFILE ==========

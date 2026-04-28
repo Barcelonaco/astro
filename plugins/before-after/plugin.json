@@ -1,0 +1,21 @@
+{
+  "name": "before-after",
+  "label": "Avant / Après",
+  "version": "1.0.0",
+  "description": "Comparateur d'images Avant/Après avec curseur dynamique (drag/touch).",
+  "icon": "🪞",
+
+  "modules": {
+    "category": {
+      "id": "before-after",
+      "label": "Avant / Après",
+      "icon": "🪞"
+    },
+    "items": [
+      {
+        "name": "BeforeAfter",
+        "label": "Avant / Après"
+      }
+    ]
+  }
+}

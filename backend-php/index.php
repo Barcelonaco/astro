@@ -111,6 +111,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 
+// Serve /login as admin login page
+if ($uri === '/login' || $uri === '/login/') {
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    $file = __DIR__ . '/admin/login.html';
+    $html = file_get_contents($file);
+    $html = preg_replace_callback('/href="([^"]+\.css)(?:\?[^"]*)?"/i', function($match) {
+        $f = __DIR__ . '/admin/' . basename($match[1]);
+        $v = file_exists($f) ? filemtime($f) : time();
+        return 'href="' . $match[1] . '?v=' . $v . '"';
+    }, $html);
+    $html = preg_replace_callback('/src="([^"]+\.js)(?:\?[^"]*)?"/i', function($match) {
+        $f = __DIR__ . '/admin/' . basename($match[1]);
+        $v = file_exists($f) ? filemtime($f) : time();
+        return 'src="' . $match[1] . '?v=' . $v . '"';
+    }, $html);
+    echo $html;
+    exit;
+}
+
 // Serve admin interface files
 if (preg_match('#^/admin(?:/(.*))?$#', $uri, $m)) {
     $path = $m[1] ?? '';
@@ -255,7 +277,7 @@ if (!preg_match('#^/api/(.*)$#', $uri, $apiMatch)) {
             exit;
         }
         // Fallback: redirect to admin
-        header('Location: /admin/login.html');
+        header('Location: /login');
         exit;
     }
 
