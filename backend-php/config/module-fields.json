@@ -4188,6 +4188,17 @@
                     "defaultValue": false
                 },
                 {
+                    "name": "icon_layout",
+                    "label": "Disposition",
+                    "type": "TrueFalse",
+                    "choices": null,
+                    "onLabel": "Colonnes",
+                    "offLabel": "Lignes",
+                    "conditional": null,
+                    "subFields": null,
+                    "defaultValue": false
+                },
+                {
                     "name": "logos",
                     "label": "Listes des logos",
                     "type": "Repeater",
