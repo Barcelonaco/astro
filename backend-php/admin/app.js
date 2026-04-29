@@ -370,6 +370,16 @@ async function loadSection(section) {
         const pluginName = section.split(':')[1];
         const pluginDef = loadedPlugins.find(p => p.name === pluginName);
         if (pluginDef && pluginDef.options) { content.innerHTML = await renderPluginOptionsPage(pluginDef); attachPluginOptionsEvents(); }
+      } else if (section.startsWith('plugin-page:')) {
+        const parts = section.split(':');
+        const pluginName = parts[1];
+        const pageSlug = parts[2];
+        const pluginDef = loadedPlugins.find(p => p.name === pluginName);
+        const page = pluginDef && (pluginDef.admin_pages || []).find(p => p.slug === pageSlug);
+        if (page && page.url) {
+          const safeUrl = String(page.url).replace(/"/g, '&quot;');
+          content.innerHTML = `<iframe src="${safeUrl}" style="width:100%;height:calc(100vh - 80px);border:0;" title="${escapeHtml(page.label || page.slug)}"></iframe>`;
+        }
       } else if (section.startsWith('form-edit:')) {
         const formId = parseInt(section.split(':')[1]) || null;
         content.innerHTML = await renderFormBuilder(formId);
@@ -615,6 +625,91 @@ async function loadPlugins() {
       }
     }
 
+    // ── Grouped plugin (≥ 2 nav-worthy items) : single parent folder ─────
+    // Triggers when the plugin has multiple postTypes/admin_pages — keeps the
+    // sidebar tidy. Single-CPT plugins (references, actualites, evenements)
+    // keep their legacy structure below.
+    const navWorthyCount = (plugin.postTypes?.length || 0) + (plugin.admin_pages?.length || 0);
+    const isGrouped = navWorthyCount > 1;
+
+    if (isGrouped) {
+      const nav = document.querySelector('.sidebar .nav');
+      const settingsLink = nav ? nav.querySelector('[data-section="site-settings"]') : null;
+      const groupKey = `plugin-group:${plugin.name}`;
+      if (nav && !nav.querySelector(`[data-section="${groupKey}"]`)) {
+        const a = document.createElement('a');
+        a.href = '#';
+        a.className = 'nav-item nav-item-parent';
+        a.dataset.section = groupKey;
+        const iconClass = plugin.faIcon || 'fa-solid fa-cube';
+        a.innerHTML = `<i class="${iconClass}"></i><span>${escapeHtml(plugin.label || plugin.name)}</span>`;
+
+        // Insert after Pages link (or before settings)
+        const pagesLink = nav.querySelector('[data-section="pages"]');
+        const pagesSubItems = pagesLink ? pagesLink.nextElementSibling : null;
+        const insertRef = pagesSubItems && pagesSubItems.classList.contains('nav-sub-items') ? pagesSubItems.nextSibling : (pagesLink ? pagesLink.nextSibling : settingsLink);
+        if (insertRef) nav.insertBefore(a, insertRef);
+        else nav.appendChild(a);
+
+        // Sub-items container
+        const sub = document.createElement('div');
+        sub.className = 'nav-sub-items';
+        sub.dataset.parent = groupKey;
+        sub.style.display = 'none';
+
+        // CPT links (flat — click goes to list page, where Add/Options are accessible)
+        for (const pt of plugin.postTypes || []) {
+          const sa = document.createElement('a');
+          sa.href = '#'; sa.className = 'nav-item nav-sub-item';
+          sa.dataset.section = `cpt:${pt.slug}`;
+          sa.textContent = pt.labelPlural || pt.label;
+          sub.appendChild(sa);
+        }
+
+        // Admin pages (custom HTML rendered in iframe)
+        for (const page of plugin.admin_pages || []) {
+          const pa = document.createElement('a');
+          pa.href = '#'; pa.className = 'nav-item nav-sub-item';
+          pa.dataset.section = `plugin-page:${plugin.name}:${page.slug}`;
+          pa.textContent = page.label || page.slug;
+          sub.appendChild(pa);
+        }
+
+        // Plugin-level options (vat_rate, default_pro_discount, …)
+        if (plugin.options && plugin.options.length > 0) {
+          const oa = document.createElement('a');
+          oa.href = '#'; oa.className = 'nav-item nav-sub-item';
+          oa.dataset.section = `plugin-options:${plugin.name}`;
+          oa.textContent = 'Options';
+          sub.appendChild(oa);
+        }
+
+        if (a.nextSibling) nav.insertBefore(sub, a.nextSibling);
+        else nav.appendChild(sub);
+
+        // Toggle sub-items on parent click
+        a.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          const isVisible = sub.style.display !== 'none';
+          document.querySelectorAll('.nav-sub-items').forEach(s => s.style.display = 'none');
+          sub.style.display = isVisible ? 'none' : 'block';
+        });
+
+        // Sub-item click handlers
+        sub.querySelectorAll('.nav-sub-item').forEach(subItem => {
+          subItem.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            subItem.classList.add('active');
+            a.classList.add('active');
+            loadSection(subItem.dataset.section);
+          });
+        });
+      }
+      // Skip the legacy per-CPT and per-admin_page loops below for this plugin
+      continue;
+    }
+
     // Inject sidebar items for custom post types with sub-navigation
     if (plugin.postTypes && plugin.postTypes.length > 0) {
       const nav = document.querySelector('.sidebar .nav');
@@ -703,6 +798,32 @@ async function loadPlugins() {
             loadSection(subItem.dataset.section);
           });
         });
+      }
+    }
+
+    // Inject sidebar items for plugin admin_pages[] (custom HTML pages
+    // shipped by the plugin, rendered inside an iframe).
+    if (plugin.admin_pages && plugin.admin_pages.length > 0) {
+      const nav = document.querySelector('.sidebar .nav');
+      const settingsLink = nav ? nav.querySelector('[data-section="site-settings"]') : null;
+      for (const page of plugin.admin_pages) {
+        const sectionId = `plugin-page:${plugin.name}:${page.slug}`;
+        if (!nav || nav.querySelector(`[data-section="${sectionId}"]`)) continue;
+        const a = document.createElement('a');
+        a.href = '#';
+        a.className = 'nav-item role-admin_site';
+        a.dataset.section = sectionId;
+        if (!hasMinRole('admin_site')) a.style.display = 'none';
+        const iconClass = page.faIcon || 'fa-solid fa-cube';
+        a.innerHTML = `<i class="${iconClass}"></i><span>${escapeHtml(page.label || page.slug)}</span>`;
+        a.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+          a.classList.add('active');
+          loadSection(sectionId);
+        });
+        if (settingsLink) nav.insertBefore(a, settingsLink);
+        else nav.appendChild(a);
       }
     }
 
@@ -10081,10 +10202,24 @@ async function bulkPagesStatus(status) {
   const label = status === 'published' ? 'publiée' : status === 'private' ? 'mise en privé' : 'mise en brouillon';
   showLoading();
   try {
-    await Promise.all(ids.map(id => apiFetch(`/pages/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ status }),
-    })));
+    await Promise.all(ids.map(id => {
+      const source = _pagesCache.find(p => p.id === id);
+      if (!source) return null;
+      return apiFetch(`/pages/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          title: source.title,
+          slug: source.slug,
+          content: source.content,
+          color_overrides: source.color_overrides,
+          seo_meta: source.seo_meta,
+          status,
+          show_in_menu: source.show_in_menu ?? false,
+          menu_order: source.menu_order ?? 0,
+          parent_id: source.parent_id || null,
+        }),
+      });
+    }));
     showToast(`${ids.length} page${ids.length > 1 ? 's' : ''} ${label}${ids.length > 1 ? 's' : ''}`, 'success');
     _pagesSelected.clear();
     loadSection('pages');
