@@ -2741,10 +2741,21 @@ async function loadSiteSettings() {
   try {
     siteSettingsCache = await apiFetch('/settings');
     applyCssVariablesFromSettings(siteSettingsCache);
+    applyAdminFavicon(siteSettingsCache.favicon || '');
   } catch (e) {
     siteSettingsCache = {};
   }
   return siteSettingsCache;
+}
+
+function applyAdminFavicon(favicon) {
+  if (!favicon) return;
+  const el = document.getElementById('adminFavicon');
+  if (!el) return;
+  el.href = favicon;
+  const ext = (favicon.split('?')[0].match(/\.([a-z0-9]+)$/i) || [])[1] || '';
+  const map = { svg: 'image/svg+xml', png: 'image/png', ico: 'image/x-icon', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' };
+  if (map[ext.toLowerCase()]) el.type = map[ext.toLowerCase()];
 }
 
 async function loadModuleFieldSchema() {

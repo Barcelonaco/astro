@@ -189,8 +189,16 @@ class AuthController {
                     'html' => $html,
                 ]),
             ]);
-            curl_exec($ch);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
             curl_close($ch);
+
+            if ($curlError || $httpCode < 200 || $httpCode >= 300) {
+                error_log("[forgotPassword] Resend send failed. http={$httpCode} curl={$curlError} body={$response}");
+            }
+        } else {
+            error_log('[forgotPassword] RESEND_API_KEY missing — email not sent');
         }
 
         json_response(['message' => 'Si cette adresse existe, un email de réinitialisation a été envoyé.']);

@@ -4,6 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Connexion - Blog CMS</title>
+  <link rel="icon" id="adminFavicon" href="/admin/favicon.svg">
+  <script>
+    (function(){
+      try {
+        var apiBase = (window.location.protocol + '//' + window.location.host) + '/api';
+        fetch(apiBase + '/settings/site').then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+          if (d && d.favicon) {
+            var el = document.getElementById('adminFavicon');
+            if (el) el.href = d.favicon;
+          }
+        }).catch(function(){});
+      } catch(e){}
+    })();
+  </script>
   <style>
     * {
       margin: 0;
