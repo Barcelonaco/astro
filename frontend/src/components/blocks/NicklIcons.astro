@@ -19,11 +19,12 @@ const apiOrigin = MEDIA_ORIGIN;
 const logos = (data.logos as any[]) || [];
 const greyFilter = isTruthy(data.grey_filter);
 const iconType = isTruthy(data.icon_type); // true = SVG/icon, false = JPG thumbnail
+const iconLayout = isTruthy(data.icon_layout);
 ---
 
 <NicklModuleWrapper data={data} moduleName="icons">
   {logos.length > 0 && (
-    <ul class={`list${greyFilter ? ' grey_filter' : ''}${!iconType ? ' icon_type_jpg' : ''}`}>
+    <ul class={`list${greyFilter ? ' grey_filter' : ''}${!iconType ? ' icon_type_jpg' : ''}${iconLayout ? ' layout_columns' : ''}`}>
       {logos.map((logo) => {
         const link = resolveLink(logo.link);
         // icon_type 0 = jpg (thumbnail), 1 = svg (full url)

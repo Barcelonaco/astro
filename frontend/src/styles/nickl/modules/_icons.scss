@@ -13,14 +13,15 @@
 ---------------------------------------- */
 .module-icons {
     text-align: center;
+
     .module-columns.has-background-primary:not(.cols_have_background) &,
-    &.has-background-primary:not(.cols_have_background), 
+    &.has-background-primary:not(.cols_have_background),
     .cols-background-primary &,
     .module-columns.has-background-secondary:not(.cols_have_background) &,
-    &.has-background-secondary:not(.cols_have_background), 
+    &.has-background-secondary:not(.cols_have_background),
     .cols-background-secondary &,
     .module-columns.has-background-tertiary:not(.cols_have_background) &,
-    &.has-background-tertiary:not(.cols_have_background), 
+    &.has-background-tertiary:not(.cols_have_background),
     .cols-background-tertiary & {
         .link {
             @include hover {
@@ -31,71 +32,110 @@
             }
         }
     }
+
     .module-columns.has-background-primary:not(.cols_have_background) &,
-    &.has-background-primary:not(.cols_have_background), 
+    &.has-background-primary:not(.cols_have_background),
     .cols-background-primary &,
     .module-columns.has-background-secondary:not(.cols_have_background) &,
-    &.has-background-secondary:not(.cols_have_background), 
+    &.has-background-secondary:not(.cols_have_background),
     .cols-background-secondary & {
-    .list:not(.icon_type_jpg) .illus {
+        .list:not(.icon_type_jpg) .illus {
             filter: brightness(0) invert(1);
         }
     }
+
     .list {
         @include flex(center, stretch, wrap, 6, rem(40px));
         row-gap: rem(40px);
-        &.icon_type_jpg .illus{
+
+        &.icon_type_jpg .illus {
             flex-basis: calc(100% / 6 - rem(130px));
             aspect-ratio: 1/1;
             object-fit: cover;
         }
+
         &.grey_filter {
             .illus {
                 filter: grayscale(10);
                 transition: $transition-default;
             }
+
             .item:hover {
                 .illus {
                     filter: grayscale(0);
                 }
             }
         }
+
+        &.layout_columns {
+            flex-direction: column;
+            row-gap: 1.5rem;
+
+            li,
+            .link {
+                display: flex;
+                column-gap: 1.5rem;
+
+                .title {
+                    text-align: left;
+                }
+
+                .txt {
+                    text-align: left;
+                    max-width: 100%;
+                }
+            }
+
+            li {
+                flex-basis: 100%;
+            }
+        }
     }
+
     .link {
         display: block;
+
         &:not(:active) .title {
             transition: $transition-default;
         }
+
         @include hover {
             .title {
                 color: $color3;
             }
         }
     }
+
     .illus-wrapper {
         height: rem(85px);
         @include flex(center, center);
     }
+
     .illus {
         display: block;
         max-height: rem(85px);
+
         .border-rounded & {
             border-radius: $border-radius-default;
         }
     }
+
     .desc {
         margin-top: rem(12px);
     }
+
     .title {
         font-family: $font2;
         font-size: rem(24px);
         line-height: 1;
         font-weight: 600;
         letter-spacing: $letter-spacing-default;
-        .mode-uppercase {            
+
+        .mode-uppercase {
             text-transform: uppercase;
         }
     }
+
     .txt {
         max-width: rem(191px);
         margin: rem(5px) auto 0;
@@ -114,6 +154,7 @@
         .item {
             flex-basis: calc(100% / 3 - 2.5rem);
         }
+
         .txt {
             max-width: 100%;
         }

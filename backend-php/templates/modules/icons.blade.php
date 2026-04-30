@@ -35,7 +35,7 @@
             @endif
 
             <ul
-                class="list{{ $module['grey_filter'] ? ' grey_filter' : null }}{{ $module['icon_type'] ? null : ' icon_type_jpg' }}">
+                class="list{{ $module['grey_filter'] ? ' grey_filter' : null }}{{ $module['icon_type'] ? null : ' icon_type_jpg' }}{{ $module['icon_layout'] ? ' layout_columns' : null }}">
 
                 @foreach($module['logos'] as $logo)
 
