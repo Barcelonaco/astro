@@ -47,7 +47,7 @@ class MenuModel {
             return [
                 'id' => $row['id'],
                 'menu_id' => $row['menu_id'],
-                'title' => ($row['type'] === 'page' && $row['page_title']) ? $row['page_title'] : $row['title'],
+                'title' => !empty($row['title']) ? $row['title'] : (($row['type'] === 'page' && !empty($row['page_title'])) ? $row['page_title'] : ''),
                 'url' => ($row['type'] === 'page' && $row['page_slug']) ? '/' . $row['page_slug'] : $row['url'],
                 'type' => $row['type'],
                 'page_id' => $row['page_id'],
@@ -252,7 +252,7 @@ class MenuModel {
         return array_map(function ($r) {
             return [
                 'id' => $r['id'],
-                'title' => ($r['type'] === 'page' && $r['page_title']) ? $r['page_title'] : $r['title'],
+                'title' => !empty($r['title']) ? $r['title'] : (($r['type'] === 'page' && !empty($r['page_title'])) ? $r['page_title'] : ''),
                 'page_id' => $r['page_id'],
                 'parent_id' => $r['parent_id'],
                 'menu_order' => $r['menu_order'],

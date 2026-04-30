@@ -32,6 +32,7 @@ require_once __DIR__ . '/helpers/request.php';
 require_once __DIR__ . '/helpers/slug.php';
 require_once __DIR__ . '/helpers/rebuild.php';
 require_once __DIR__ . '/helpers/media-enricher.php';
+require_once __DIR__ . '/helpers/plugin-hooks.php';
 require_once __DIR__ . '/middleware/auth.php';
 require_once __DIR__ . '/helpers/rate-limit.php';
 
@@ -79,6 +80,24 @@ require_once __DIR__ . '/controllers/EcommerceMigrationController.php';
 require_once __DIR__ . '/controllers/CustomerAuthController.php';
 require_once __DIR__ . '/controllers/ProductController.php';
 require_once __DIR__ . '/controllers/ProductCategoryController.php';
+
+// ─── Plugin autoload (monorepo plugins/ + EXTERNAL_PLUGINS_DIR) ──────────────
+// Each plugin can ship a backend/autoload.php that registers its controllers,
+// routes and migrations. Loaded only if the plugin is active.
+// Wrapped in try/catch so a bad plugin can't crash the entire boot.
+try {
+    foreach (PluginController::getPluginRoots() as $__pluginRoot) {
+        if (!is_dir($__pluginRoot)) continue;
+        foreach (glob($__pluginRoot . '/*/backend/autoload.php') as $__autoload) {
+            $__pluginDir = basename(dirname(dirname($__autoload)));
+            if (!PluginController::isPluginActive($__pluginDir)) continue;
+            require_once $__autoload;
+        }
+    }
+    unset($__pluginRoot, $__autoload, $__pluginDir);
+} catch (\Throwable $__e) {
+    error_log('Plugin autoload failed: ' . $__e->getMessage());
+}
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 $allowedOrigins = [
@@ -244,15 +263,55 @@ if (preg_match('#^/nickl-assets/(.+)$#', $uri, $m)) {
     exit;
 }
 
-// Serve plugin-assets from the plugins directory
+// Serve plugin-assets from any registered plugin root (monorepo plugins/ + EXTERNAL_PLUGINS_DIR)
 if (preg_match('#^/plugin-assets/(.+)$#', $uri, $m)) {
-    $file = __DIR__ . '/../plugins/' . $m[1];
-    if (file_exists($file)) {
-        $mime = mime_content_type($file);
-        header("Content-Type: $mime");
-        header('Cache-Control: public, max-age=2592000');
-        readfile($file);
+    $rel = $m[1];
+    // Path traversal guard
+    if (strpos($rel, '..') !== false) {
+        http_response_code(403);
         exit;
+    }
+    // Map web-asset extensions to correct MIME types — mime_content_type() often
+    // returns text/plain for CSS/JS which browsers refuse under strict MIME checking.
+    static $assetMimeMap = [
+        'css'   => 'text/css',
+        'js'    => 'application/javascript',
+        'mjs'   => 'application/javascript',
+        'json'  => 'application/json',
+        'html'  => 'text/html; charset=utf-8',
+        'svg'   => 'image/svg+xml',
+        'png'   => 'image/png',
+        'jpg'   => 'image/jpeg',
+        'jpeg'  => 'image/jpeg',
+        'gif'   => 'image/gif',
+        'webp'  => 'image/webp',
+        'avif'  => 'image/avif',
+        'ico'   => 'image/x-icon',
+        'woff'  => 'font/woff',
+        'woff2' => 'font/woff2',
+        'ttf'   => 'font/ttf',
+        'otf'   => 'font/otf',
+        'eot'   => 'application/vnd.ms-fontobject',
+        'map'   => 'application/json',
+        'txt'   => 'text/plain',
+        'xml'   => 'application/xml',
+    ];
+    foreach (PluginController::getPluginRoots() as $root) {
+        $file = $root . '/' . $rel;
+        if (is_file($file)) {
+            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            $mime = $assetMimeMap[$ext] ?? (mime_content_type($file) ?: 'application/octet-stream');
+            header("Content-Type: $mime");
+            header('Cache-Control: public, max-age=2592000');
+            // HTML pages shipped by plugins (admin pages) are loaded inside the
+            // admin SPA via an iframe — the global X-Frame-Options: DENY would
+            // otherwise block the embed. Allow same-origin framing only.
+            if ($ext === 'html') {
+                header('X-Frame-Options: SAMEORIGIN');
+            }
+            readfile($file);
+            exit;
+        }
     }
     http_response_code(404);
     exit;
@@ -1002,6 +1061,11 @@ try {
         $user = authenticate_token();
         require_min_role($user, 'editor');
         CustomPostTypeController::deleteItem($params['postType'], (int) $params['id']);
+    }
+
+    // ── Plugin routes (fallback before 404) ──
+    elseif (dispatch_plugin_routes($method, $path)) {
+        // handled by a plugin
     }
 
     // ── 404 ──

@@ -376,9 +376,15 @@ async function loadSection(section) {
         const pageSlug = parts[2];
         const pluginDef = loadedPlugins.find(p => p.name === pluginName);
         const page = pluginDef && (pluginDef.admin_pages || []).find(p => p.slug === pageSlug);
-        if (page && page.url) {
-          const safeUrl = String(page.url).replace(/"/g, '&quot;');
+        const url = page && typeof page.url === 'string' ? page.url.trim() : '';
+        if (url && url.startsWith('/plugin-assets/')) {
+          // Cache-bust : the browser may have a cached HTML with stale headers
+          // (e.g. older X-Frame-Options DENY) that survives header updates.
+          const sep = url.includes('?') ? '&' : '?';
+          const safeUrl = (url + sep + 'v=' + Date.now()).replace(/"/g, '&quot;');
           content.innerHTML = `<iframe src="${safeUrl}" style="width:100%;height:calc(100vh - 80px);border:0;" title="${escapeHtml(page.label || page.slug)}"></iframe>`;
+        } else {
+          content.innerHTML = `<div style="padding:32px;text-align:center;color:#666"><h2>Page admin introuvable</h2><p>Le plugin <code>${escapeHtml(pluginName)}</code> n'a pas déclaré d'URL valide pour la page <code>${escapeHtml(pageSlug)}</code>.</p><p style="font-size:12px">Attendu : <code>/plugin-assets/&lt;plugin&gt;/admin/&lt;page&gt;.html</code> dans <code>plugin.json</code> → <code>admin_pages[]</code>.</p></div>`;
         }
       } else if (section.startsWith('form-edit:')) {
         const formId = parseInt(section.split(':')[1]) || null;
@@ -581,7 +587,7 @@ async function loadPlugins() {
   }
 
   // Remove previously injected plugin sidebar entries before re-rendering
-  document.querySelectorAll('.nav-item[data-section^="cpt:"], .nav-sub-items[data-parent^="cpt:"], .nav-item[data-section^="plugin-options:"]').forEach(el => el.remove());
+  document.querySelectorAll('.nav-item[data-section^="cpt:"], .nav-sub-items[data-parent^="cpt:"], .nav-item[data-section^="plugin-options:"], .nav-item[data-section^="plugin-page:"], .nav-item[data-section^="plugin-group:"], .nav-sub-items[data-parent^="plugin-group:"]').forEach(el => el.remove());
 
   // Strip prior plugin-injected entries from MODULE_CATEGORIES and BLOCK_TYPES
   // so deactivated plugins disappear from the page builder's "add module" list.
@@ -976,15 +982,37 @@ function renderCPTListRows() {
     const safeTitle = escapeHtml(item.title).replace(/'/g, "\\'");
     const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
+    // Color swatch thumbnail (manifest: previewType=color_swatch, previewColorField=<field>)
+    let thumbHtml = '';
+    if (ptDef.previewType === 'color_swatch' && ptDef.previewColorField) {
+      const cfItem = typeof item.custom_fields === 'string'
+        ? (() => { try { return JSON.parse(item.custom_fields); } catch { return {}; } })()
+        : (item.custom_fields || {});
+      const rawHex = String(cfItem[ptDef.previewColorField] || '').trim();
+      const isValidHex = /^#?[0-9a-f]{3,8}$/i.test(rawHex);
+      const hex = isValidHex ? (rawHex.startsWith('#') ? rawHex : '#' + rawHex) : '';
+      thumbHtml = hex
+        ? '<div style="width:48px;height:48px;border-radius:50%;background:' + escapeHtml(hex) + ';flex-shrink:0;box-shadow:0 1px 2px rgba(0,0,0,0.08);"></div>'
+        : '<div style="width:48px;height:48px;border-radius:50%;border:1px dashed var(--gray-300,#d1d5db);flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#fff;">'
+          + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gray-400,#9ca3af)"><circle cx="12" cy="12" r="10"/><line x1="5" y1="19" x2="19" y2="5"/></svg>'
+          + '</div>';
+    } else if (thumbUrl) {
+      thumbHtml = '<img src="' + escapeHtml(thumbUrl) + '" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;">';
+    } else {
+      thumbHtml = '<div style="width:48px;height:48px;background:var(--gray-100);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);flex-shrink:0;">'
+        + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>'
+        + '</div>';
+    }
+
     return '<div class="page-item">'
       + '<div class="page-item__info" style="cursor:pointer" onclick="loadSection(\'cpt-edit:' + escapeHtml(ptDef.slug) + ':' + item.id + '\')">'
       +   '<div style="display:flex;align-items:center;gap:12px;min-width:0;">'
-      +     (thumbUrl
-            ? '<img src="' + escapeHtml(thumbUrl) + '" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;">'
-            : '<div style="width:48px;height:48px;background:var(--gray-100);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);flex-shrink:0;font-size:18px;">' + (ptDef.icon || '📷') + '</div>')
+      +     thumbHtml
       +     '<div style="min-width:0;overflow:hidden;">'
       +       '<div class="page-item__title">' + escapeHtml(item.title) + '</div>'
-      +       '<div class="page-item__slug">/' + escapeHtml(ptDef.slug) + '/' + escapeHtml(item.slug) + '</div>'
+      +       ((ptDef.supports || ['title','slug','featured_image','content','status']).includes('slug')
+              ? '<div class="page-item__slug">/' + escapeHtml(ptDef.slug) + '/' + escapeHtml(item.slug) + '</div>'
+              : '')
       +     '</div>'
       +   '</div>'
       + '</div>'
@@ -1308,10 +1336,12 @@ async function renderCPTEditPage(ptDef, itemId) {
               <label class="form-label">Titre *</label>
               <input type="text" class="form-input" name="title" value="${escapeHtml(item?.title || '')}" required id="cptTitleInput">
             </div>
+            ${supports.includes('slug') ? `
             <div class="form-group">
               <label class="form-label">Slug</label>
               <input type="text" class="form-input" name="slug" value="${escapeHtml(item?.slug || '')}" id="cptSlugInput">
             </div>
+            ` : `<input type="hidden" name="slug" value="${escapeHtml(item?.slug || '')}" id="cptSlugInput">`}
           </div>
 
           <div class="card" style="margin-bottom:24px;">
@@ -1336,6 +1366,7 @@ async function renderCPTEditPage(ptDef, itemId) {
             </div>
           </div>
 
+          ${supports.includes('featured_image') ? `
           <div class="card" style="margin-bottom:16px;">
             <h3 style="margin-bottom:12px;">Image à la une</h3>
             <div id="cptFeaturedPreview" style="margin-bottom:8px;">${featuredImgPreview}</div>
@@ -1345,6 +1376,7 @@ async function renderCPTEditPage(ptDef, itemId) {
               ${fi ? '<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearCPTFeatured()">Supprimer</button>' : ''}
             </div>
           </div>
+          ` : ''}
 
           ${categoriesHtml ? `<div class="card" style="margin-bottom:16px;">${categoriesHtml}</div>` : ''}
 
@@ -1352,13 +1384,16 @@ async function renderCPTEditPage(ptDef, itemId) {
           ${hasCustomFields ? `
           <div class="card cpt-preview-card" style="margin-bottom:16px;position:sticky;top:16px;">
             <h3 style="margin-bottom:12px;display:flex;align-items:center;gap:6px;">
-              <span style="font-size:14px;">👁</span> Aperçu
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              Aperçu
             </h3>
-            <div id="cptLivePreview" style="border:1px solid var(--border,#e5e7eb);border-radius:8px;overflow:hidden;background:#fff;">
-              <div id="cptPreviewImage" style="width:100%;height:140px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;overflow:hidden;">
-                ${fi ? `<img src="${escapeHtml(getOptimizedUrl(fi.sizes?.medium || fi.url || '', 400, 70))}" style="width:100%;height:100%;object-fit:cover;">` : 'Aucune image'}
+            <div id="cptLivePreview" style="border:1px solid var(--border,#e5e7eb);border-radius:8px;overflow:hidden;background:#fff;" data-preview-type="${escapeHtml(ptDef.previewType || '')}" data-preview-color-field="${escapeHtml(ptDef.previewColorField || '')}">
+              <div id="cptPreviewImage" style="${ptDef.previewType === 'color_swatch' ? 'padding:24px 12px;display:flex;align-items:center;justify-content:center;background:#fff;' : 'width:100%;height:140px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;overflow:hidden;'}">
+                ${ptDef.previewType === 'color_swatch'
+                  ? `<div id="cptPreviewSwatch" style="width:80px;height:80px;border-radius:50%;background:${escapeHtml(cf[ptDef.previewColorField] || '#ddd')};box-shadow:0 1px 3px rgba(0,0,0,0.08);"></div>`
+                  : (fi ? `<img src="${escapeHtml(getOptimizedUrl(fi.sizes?.medium || fi.url || '', 400, 70))}" style="width:100%;height:100%;object-fit:cover;">` : 'Aucune image')}
               </div>
-              <div style="padding:12px;">
+              <div style="padding:12px;${ptDef.previewType === 'color_swatch' ? 'text-align:center;' : ''}">
                 <div id="cptPreviewBadges" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;min-height:0;"></div>
                 <h4 id="cptPreviewTitle" style="font-size:15px;font-weight:700;margin:0 0 6px 0;line-height:1.3;color:#1a1a1a;">${escapeHtml(item?.title || 'Titre de l\'élément')}</h4>
                 <div id="cptPreviewDates" style="font-size:12px;color:#666;margin-bottom:6px;display:flex;align-items:center;gap:4px;"></div>
@@ -1475,6 +1510,15 @@ function initCPTLivePreview(ptDef) {
     const titleInput = form.querySelector('[name="title"]');
     if (titleEl && titleInput) {
       titleEl.textContent = titleInput.value || 'Titre de l\'élément';
+    }
+
+    // Color swatch preview (manifest: previewType=color_swatch, previewColorField=<field>)
+    if (ptDef.previewType === 'color_swatch' && ptDef.previewColorField) {
+      const swatch = document.getElementById('cptPreviewSwatch');
+      if (swatch) {
+        const v = getVal(ptDef.previewColorField);
+        swatch.style.background = v && /^#?[0-9a-f]{3,8}$/i.test(v) ? (v.startsWith('#') ? v : '#' + v) : '#ddd';
+      }
     }
 
     // Badges
@@ -2546,7 +2590,7 @@ const moduleTemplatePromises = {};
 const moduleStylesLoaded = new Set();
 let baseStylesLoaded = false;
 let mediaState = { folders: [], items: [], currentFolderId: null, selectedIds: [], search: '' };
-let mediaPickerState = { isOpen: false, blockId: null, fieldName: null, type: 'all', folderId: null, folders: [], items: [], search: '' };
+let mediaPickerState = { isOpen: false, blockId: null, fieldName: null, fieldEl: null, type: 'all', folderId: null, folders: [], items: [], search: '' };
 let siteSettingsCache = null;
 
 function applyCssVariablesFromSettings(settings) {
@@ -8161,8 +8205,8 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
           <div class="media-preview-meta">${escapeHtml(meta)}</div>
           <input type="hidden" name="${escapeHtml(inputName)}"${rfieldAttr} value="${escapeHtml(media ? JSON.stringify(media) : '')}">
           <div class="media-field-actions">
-            <button type="button" class="btn btn-sm btn-outline" onclick="openMediaPicker('${pickerType}', '${blockId}', '${escapeHtml(inputName)}')">Choisir</button>
-            <button type="button" class="btn btn-sm btn-outline" onclick="clearMediaSelection('${blockId}', '${escapeHtml(inputName)}')">Retirer</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="openMediaPicker('${pickerType}', '${blockId}', '${escapeHtml(inputName)}', { trigger: this })">Choisir</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="clearMediaSelection('${blockId}', '${escapeHtml(inputName)}', this)">Retirer</button>
           </div>
         </div>
       </div>
@@ -8233,13 +8277,13 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
     `;
   }
   if (type === 'Repeater') {
-    return renderRepeaterFieldHTML(field, value, blockId);
+    return renderRepeaterFieldHTML(field, value, blockId, rowCtx);
   }
   if (type === 'FlexibleContent') {
     return renderFlexibleContentFieldHTML(field, value, blockId, rowCtx);
   }
   if (type === 'Group') {
-    return renderGroupFieldHTML(field, value, blockId);
+    return renderGroupFieldHTML(field, value, blockId, rowCtx);
   }
   return `
     <div class="form-group">
@@ -8251,16 +8295,24 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
 
 // ── Repeater UI ──────────────────────────────────────────────────────────────
 
-function renderRepeaterFieldHTML(field, value, blockId) {
+function renderRepeaterFieldHTML(field, value, blockId, rowCtx) {
   const rows = Array.isArray(value) ? value : [];
   const subFields = field.subFields || [];
+  // Build compound name when nested inside a Repeater/FC item, so child input
+  // names stay unique across e.g. ColumnsTab columns containing the same module.
+  let compoundName = field.name;
+  if (rowCtx) {
+    compoundName = rowCtx.rowIndex !== null
+      ? `${rowCtx.parentName}::${rowCtx.rowIndex}::${field.name}`
+      : `${rowCtx.parentName}::${field.name}`;
+  }
   const rowsHtml = rows.map((rowData, i) =>
-    renderRepeaterRowHTML(subFields, rowData, i, blockId, field.name)
+    renderRepeaterRowHTML(subFields, rowData, i, blockId, compoundName)
   ).join('');
   return `
     <div class="form-group">
       <label class="form-label">${escapeHtml(field.label || field.name)}</label>
-      <div class="repeater-field" data-field-name="${escapeHtml(field.name)}" data-block-id="${escapeHtml(blockId)}">
+      <div class="repeater-field" data-field-name="${escapeHtml(field.name)}" data-field-compound="${escapeHtml(compoundName)}" data-block-id="${escapeHtml(blockId)}">
         <div class="repeater-rows">${rowsHtml}</div>
         <button type="button" class="repeater-add-btn"
           onclick="addRepeaterRow(this, '${escapeHtml(blockId)}', '${escapeHtml(field.name)}')">
@@ -8292,6 +8344,10 @@ function renderRepeaterRowHTML(subFields, rowData, rowIndex, blockId, repeaterNa
             onclick="event.stopPropagation(); moveRepeaterRow(this, 1)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
           </button>
+          <button type="button" class="btn-icon-sm" title="Dupliquer"
+            onclick="event.stopPropagation(); duplicateRepeaterRow(this)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
           <button type="button" class="btn-icon-sm btn-icon-sm--danger" title="Supprimer"
             onclick="event.stopPropagation(); removeRepeaterRow(this)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
@@ -8304,10 +8360,16 @@ function renderRepeaterRowHTML(subFields, rowData, rowIndex, blockId, repeaterNa
   `;
 }
 
-function renderGroupFieldHTML(field, value, blockId) {
+function renderGroupFieldHTML(field, value, blockId, parentRowCtx) {
   const subFields = field.subFields || [];
   const groupData = (value && typeof value === 'object') ? value : {};
-  const rowCtx = { parentName: field.name, rowIndex: null };
+  let compoundName = field.name;
+  if (parentRowCtx) {
+    compoundName = parentRowCtx.rowIndex !== null
+      ? `${parentRowCtx.parentName}::${parentRowCtx.rowIndex}::${field.name}`
+      : `${parentRowCtx.parentName}::${field.name}`;
+  }
+  const rowCtx = { parentName: compoundName, rowIndex: null };
   const bodyHtml = subFields.map(f => {
     const val = groupData[f.name] !== undefined ? groupData[f.name] : f.defaultValue;
     return renderSchemaField(f, val, blockId, groupData, rowCtx);
@@ -8406,6 +8468,10 @@ function renderFlexibleContentItemHTML(item, index, blockId, fcCompoundName) {
           <button type="button" class="btn-icon-sm" title="Descendre"
             onclick="event.stopPropagation(); moveFlexibleContentItem(this, 1)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <button type="button" class="btn-icon-sm" title="Dupliquer"
+            onclick="event.stopPropagation(); duplicateFlexibleContentItem(this)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           </button>
           <button type="button" class="btn-icon-sm btn-icon-sm--danger" title="Supprimer"
             onclick="event.stopPropagation(); removeFlexibleContentItem(this)">
@@ -8539,6 +8605,28 @@ function moveFlexibleContentItem(button, direction) {
   syncFlexibleContentToBlock(blockId, fcCompoundName, allData);
 }
 
+function duplicateFlexibleContentItem(button) {
+  const item = button.closest('.flexible-content-item');
+  const container = item?.closest('.flexible-content-field');
+  if (!container) return;
+  const blockId = container.dataset.blockId;
+  const fcCompoundName = container.dataset.fieldName;
+  const form = container.closest('form');
+  const allData = form ? collectFlexibleContentData(form, fcCompoundName) : [];
+  const idx = parseInt(item.dataset.rowIndex, 10);
+  const clone = JSON.parse(JSON.stringify(allData[idx]));
+  allData.splice(idx + 1, 0, clone);
+  reRenderFlexibleContentItems(container, allData, blockId, fcCompoundName);
+  syncFlexibleContentToBlock(blockId, fcCompoundName, allData);
+  const items = container.querySelectorAll('.flexible-content-items > .flexible-content-item');
+  const dup = items[idx + 1];
+  if (dup) {
+    const body = dup.querySelector('.repeater-row-body');
+    if (body) body.style.display = '';
+    dup.classList.add('is-open');
+  }
+}
+
 function reRenderFlexibleContentItems(container, allData, blockId, fcCompoundName) {
   destroyWysiwygEditors(container);
   const itemsContainer = container.querySelector('.flexible-content-items');
@@ -8629,9 +8717,12 @@ function _getRepeaterSchema(blockId, fieldName, domContext) {
 
 // Collect repeater data directly from a container element (avoids form-wide search ambiguity)
 function _collectRepeaterFromContainer(container, fieldName, subFields) {
+  // Use compound name for input name queries when nested (ensures sub-field
+  // inputs match unique names like "columns_list::0::columns_module::0::logos::0::logo")
+  const compound = container.dataset.fieldCompound || fieldName;
   const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
   return Array.from(rows).map((row, i) =>
-    collectContainerData(row, fieldName, subFields, i)
+    collectContainerData(row, compound, subFields, i)
   );
 }
 
@@ -8711,6 +8802,8 @@ function collectContainerData(scope, parentName, subFields, rowIndex) {
     } else if (f.type === 'FlexibleContent') {
       const form = scope.closest('form') || scope;
       rowData[f.name] = collectFlexibleContentData(form, compoundName);
+    } else if (f.type === 'Repeater') {
+      rowData[f.name] = collectRepeaterData(scope, f.name, f.subFields || []);
     } else {
       const input = scope.querySelector(`[name="${CSS.escape(compoundName)}"]`);
       rowData[f.name] = input ? input.value : '';
@@ -8722,11 +8815,14 @@ function collectContainerData(scope, parentName, subFields, rowIndex) {
 function collectRepeaterData(form, repeaterName, subFields) {
   const container = form.querySelector(`.repeater-field[data-field-name="${CSS.escape(repeaterName)}"]`);
   if (!container) return [];
+  // Use compound name for sub-field input lookups when this repeater is nested
+  // inside a FlexibleContent item (e.g. ColumnsTab columns).
+  const compound = container.dataset.fieldCompound || repeaterName;
   // Use :scope > .repeater-rows > .repeater-row to avoid selecting nested
   // FlexibleContent items that also have the .repeater-row class.
   const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
   return Array.from(rows).map((row, rowIndex) =>
-    collectContainerData(row, repeaterName, subFields, rowIndex)
+    collectContainerData(row, compound, subFields, rowIndex)
   );
 }
 
@@ -8746,6 +8842,7 @@ function addRepeaterRow(button, blockId, fieldName) {
   if (!container) return;
   const repeaterField = _getRepeaterSchema(blockId, fieldName, container);
   if (!repeaterField?.subFields) return;
+  const compound = container.dataset.fieldCompound || fieldName;
   const existingData = _collectRepeaterFromContainer(container, fieldName, repeaterField.subFields);
   // Initialize new row: default TrueFalse sub-fields to true so image/visibility fields start ON
   const newRowDefaults = {};
@@ -8753,7 +8850,7 @@ function addRepeaterRow(button, blockId, fieldName) {
     if (f.type === 'TrueFalse') newRowDefaults[f.name] = true;
   }
   existingData.push(newRowDefaults);
-  reRenderRepeaterRows(container, repeaterField.subFields, existingData, blockId, fieldName);
+  reRenderRepeaterRows(container, repeaterField.subFields, existingData, blockId, compound);
   _syncRepeaterToBlock(container, blockId);
   // Expand the last row
   const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
@@ -8773,12 +8870,13 @@ function removeRepeaterRow(button) {
   if (!container) return;
   const blockId = container.dataset.blockId;
   const fieldName = container.dataset.fieldName;
+  const compound = container.dataset.fieldCompound || fieldName;
   const repeaterField = _getRepeaterSchema(blockId, fieldName, container);
   if (!repeaterField?.subFields) return;
   const allData = _collectRepeaterFromContainer(container, fieldName, repeaterField.subFields);
   const rowIndex = parseInt(row.dataset.rowIndex, 10);
   allData.splice(rowIndex, 1);
-  reRenderRepeaterRows(container, repeaterField.subFields, allData, blockId, fieldName);
+  reRenderRepeaterRows(container, repeaterField.subFields, allData, blockId, compound);
   _syncRepeaterToBlock(container, blockId);
 }
 
@@ -8788,6 +8886,7 @@ function moveRepeaterRow(button, direction) {
   if (!container) return;
   const blockId = container.dataset.blockId;
   const fieldName = container.dataset.fieldName;
+  const compound = container.dataset.fieldCompound || fieldName;
   const repeaterField = _getRepeaterSchema(blockId, fieldName, container);
   if (!repeaterField?.subFields) return;
   const allData = _collectRepeaterFromContainer(container, fieldName, repeaterField.subFields);
@@ -8795,7 +8894,7 @@ function moveRepeaterRow(button, direction) {
   const targetIndex = rowIndex + direction;
   if (targetIndex < 0 || targetIndex >= allData.length) return;
   [allData[rowIndex], allData[targetIndex]] = [allData[targetIndex], allData[rowIndex]];
-  reRenderRepeaterRows(container, repeaterField.subFields, allData, blockId, fieldName);
+  reRenderRepeaterRows(container, repeaterField.subFields, allData, blockId, compound);
   _syncRepeaterToBlock(container, blockId);
   // Expand the moved row
   const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
@@ -8804,6 +8903,32 @@ function moveRepeaterRow(button, direction) {
     const body = movedRow.querySelector('.repeater-row-body');
     if (body) body.style.display = '';
   }
+}
+
+function duplicateRepeaterRow(button) {
+  const row = button.closest('.repeater-row');
+  const container = row?.closest('.repeater-field');
+  if (!container) return;
+  const blockId = container.dataset.blockId;
+  const fieldName = container.dataset.fieldName;
+  const compound = container.dataset.fieldCompound || fieldName;
+  const repeaterField = _getRepeaterSchema(blockId, fieldName, container);
+  if (!repeaterField?.subFields) return;
+  const allData = _collectRepeaterFromContainer(container, fieldName, repeaterField.subFields);
+  const rowIndex = parseInt(row.dataset.rowIndex, 10);
+  const clone = JSON.parse(JSON.stringify(allData[rowIndex]));
+  allData.splice(rowIndex + 1, 0, clone);
+  reRenderRepeaterRows(container, repeaterField.subFields, allData, blockId, compound);
+  _syncRepeaterToBlock(container, blockId);
+  const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
+  const dup = rows[rowIndex + 1];
+  if (dup) {
+    const body = dup.querySelector('.repeater-row-body');
+    if (body) body.style.display = '';
+    dup.classList.add('is-open');
+  }
+  const form = container.closest('form');
+  if (form) updateSchemaConditionals(form);
 }
 
 function renderKeyValueRow(key, value) {
@@ -11308,10 +11433,16 @@ const _origSelectMediaFromPicker = typeof selectMediaFromPicker === 'function' ?
 
 async function openMediaPicker(type, blockId, fieldName, options = {}) {
   const normalizedOptions = typeof options === 'boolean' ? { multiple: options } : options;
+  // trigger is the button element clicked — used to scope DOM writes to the
+  // correct .media-field when duplicate field names exist in the form (e.g.
+  // two same-type sub-modules in ColumnsTab columns).
+  const triggerEl = normalizedOptions.trigger || null;
+  const fieldEl = triggerEl ? triggerEl.closest('.media-field') : null;
   mediaPickerState = {
     isOpen: true,
     blockId,
     fieldName,
+    fieldEl,
     type: type || 'all',
     folderId: null,
     folders: [],
@@ -11585,7 +11716,14 @@ function setBlockDataField(block, fieldName, value) {
 function applyMediaSelection(blockId, fieldName, item) {
   const panel = document.getElementById('builderSettings');
   if (!panel) return;
-  const input = panel.querySelector(`input[name="${CSS.escape(fieldName)}"]`);
+  // Prefer the exact .media-field element the user clicked. Falls back to
+  // name-based lookup for callers that don't supply a trigger element.
+  const scopedField = mediaPickerState.fieldEl && document.contains(mediaPickerState.fieldEl)
+    ? mediaPickerState.fieldEl
+    : null;
+  const input = scopedField
+    ? scopedField.querySelector('input[type="hidden"]')
+    : panel.querySelector(`input[name="${CSS.escape(fieldName)}"]`);
   if (!input) return;
   const payload = {
     id: item.id,
@@ -11687,7 +11825,12 @@ function confirmMediaPickerSelection() {
 function applyMediaSelectionMultiple(blockId, fieldName, items) {
   const panel = document.getElementById('builderSettings');
   if (!panel) return;
-  const input = panel.querySelector(`input[name="${CSS.escape(fieldName)}"]`);
+  const scopedField = mediaPickerState.fieldEl && document.contains(mediaPickerState.fieldEl)
+    ? mediaPickerState.fieldEl
+    : null;
+  const input = scopedField
+    ? scopedField.querySelector('input[type="hidden"]')
+    : panel.querySelector(`input[name="${CSS.escape(fieldName)}"]`);
   if (!input) return;
   const payloadItems = items.map(item => ({
     id: item.id,
@@ -11881,10 +12024,15 @@ function initGoogleMapField(uid) {
   });
 }
 
-function clearMediaSelection(blockId, fieldName) {
+function clearMediaSelection(blockId, fieldName, triggerEl) {
   const panel = document.getElementById('builderSettings');
   if (!panel) return;
-  const input = panel.querySelector(`input[name="${CSS.escape(fieldName)}"]`);
+  // Scope to the .media-field the user clicked when available — avoids
+  // collisions when multiple sub-modules share the same field name.
+  const scopedField = triggerEl ? triggerEl.closest('.media-field') : null;
+  const input = scopedField
+    ? scopedField.querySelector('input[type="hidden"]')
+    : panel.querySelector(`input[name="${CSS.escape(fieldName)}"]`);
   if (!input) return;
   input.value = '';
   const wrapper = input.closest('.media-field');
@@ -14330,7 +14478,7 @@ async function openMenuEditor(menuId) {
     _menuItems = (menu.flatItems || []).map(item => ({
       id: item.id,
       temp_id: null,
-      title: item.type === 'page' && item.page_title ? item.page_title : item.title,
+      title: item.title || (item.type === 'page' ? item.page_title : '') || '',
       url: item.url || '',
       type: item.type || 'custom',
       page_id: item.page_id || null,

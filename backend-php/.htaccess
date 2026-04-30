@@ -1,5 +1,8 @@
 RewriteEngine On
 
+# ── Redirect 403 Forbidden to home ──
+ErrorDocument 403 /
+
 # ── Block access to sensitive files ──
 # Block all dotfiles (.env, .htaccess, .git, etc.)
 <FilesMatch "^\.">

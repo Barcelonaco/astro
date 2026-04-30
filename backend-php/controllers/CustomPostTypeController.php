@@ -2,7 +2,8 @@
 
 class CustomPostTypeController {
     private static function safeCPTSlug(string $input): ?string {
-        return preg_match('/^[a-z0-9-]+$/', $input) ? $input : null;
+        // Allows underscores (used by plugin CPTs like poolp_boxes) in addition to letters/digits/hyphens.
+        return preg_match('/^[a-z0-9_-]+$/', $input) ? $input : null;
     }
 
     private static function ensureCPTTable(string $slug): void {

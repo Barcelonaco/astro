@@ -15,7 +15,8 @@ interface Props {
 }
 
 const { siteName: propSiteName, navigation, secondaryNavigation = [], siteSettings: s = {}, styleSettings: st = {} } = Astro.props;
-const hasSecondaryNav = secondaryNavigation.length > 0;
+const altSecondaryMenu = s.alt_secondary_menu === '1';
+const hasSecondaryNav = altSecondaryMenu && secondaryNavigation.length > 0;
 const siteName = propSiteName || (await getSiteInfo()).siteName;
 
 const apiOrigin = MEDIA_ORIGIN;
@@ -23,9 +24,9 @@ const apiOrigin = MEDIA_ORIGIN;
 // Header & menu settings
 const menuSeamless = s.menu_seamless === '1';
 const menuStyle = s.menu_style || 'default'; // default | center | burger
-const showPhone = s.show_phone === '1';
-const showSearch = s.show_search === '1';
-const showSocials = s.show_socials === '1';
+const showPhone = altSecondaryMenu && s.show_phone === '1';
+const showSearch = altSecondaryMenu && s.show_search === '1';
+const showSocials = altSecondaryMenu && s.show_socials === '1';
 const phone = s.phone || '';
 const phone2 = s.phone_2 || '';
 const email = s.email || '';
@@ -58,13 +59,13 @@ const socialNetworks = [
 ].filter(item => s[item.key]);
 
 // Top links
-const topLink1Url = s.link_1_url || '';
-const topLink1Text = s.link_1_text || '';
-const topLink2Url = s.link_2_url || '';
-const topLink2Text = s.link_2_text || '';
+const topLink1Url = s.top_link_1_url || '';
+const topLink1Text = s.top_link_1_text || '';
+const topLink2Url = s.top_link_2_url || '';
+const topLink2Text = s.top_link_2_text || '';
 
-// Determine if top menu should display
-const hasTopMenu = showPhone || showSocials || topLink1Url || topLink2Url || hasSecondaryNav;
+// Determine if top menu should display (gated by alt_secondary_menu toggle)
+const hasTopMenu = altSecondaryMenu && (showPhone || showSocials || topLink1Url || topLink2Url || hasSecondaryNav);
 
 // Header classes (matching Nickl exactly)
 const headerClasses = [

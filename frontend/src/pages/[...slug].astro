@@ -7,7 +7,7 @@ import BlockRenderer from '../components/BlockRenderer.astro';
 import DeferredLoader from '../components/DeferredLoader.astro';
 import SiteOverlays from '../components/SiteOverlays.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
-import { getAllPages, getPageBySlug, formatContent, getFrontendBootstrap } from '../lib/api';
+import { getAllPages, formatContent, getFrontendBootstrap } from '../lib/api';
 import { optimizedImageUrl, responsiveSrcset, IMAGE_PRESETS, setDefaultImageUrl } from '../lib/module-helpers';
 
 export async function getStaticPaths() {
@@ -23,7 +23,7 @@ export async function getStaticPaths() {
       if (p.published_date && new Date(p.published_date) > now) return false;
       return true;
     })
-    .map((p: any) => ({ params: { slug: p.slug }, props: { isPrivate: p.status === 'private' } }));
+    .map((p: any) => ({ params: { slug: p.slug }, props: { page: p, isPrivate: p.status === 'private' } }));
 }
 
 function parseBlocks(content: string): unknown[] | null {
@@ -75,12 +75,8 @@ function extractLcpImages(blocks: any[] | null): { desktop: string; mobile: stri
 }
 
 const { slug } = Astro.params;
-const { isPrivate } = Astro.props as { isPrivate?: boolean };
-// Fetch page + bootstrap data in parallel (2 HTTP calls instead of 4+)
-const [page, { siteInfo, styleSettings, siteSettings, navigation: navigationData, secondaryNavigation }] = await Promise.all([
-  getPageBySlug(slug as string),
-  getFrontendBootstrap(),
-]);
+const { page, isPrivate } = Astro.props as { page: any; isPrivate?: boolean };
+const { siteInfo, styleSettings, siteSettings, navigation: navigationData, secondaryNavigation } = await getFrontendBootstrap();
 const siteName = siteInfo.siteName || SITE_TITLE;
 const siteDescription = siteInfo.siteDescription || SITE_DESCRIPTION;
 setDefaultImageUrl(siteSettings.replacement_image || '');

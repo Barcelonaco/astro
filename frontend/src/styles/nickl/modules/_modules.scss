@@ -327,4 +327,11 @@
             }
         }
     }
+
+    /* Heading colors — h1/h3 primary, h2/h5 default, h4 secondary */
+    h1, .h1, .title-section-1 { color: $color3; }
+    h2, .h2, .title-section-2 { color: $color-default; }
+    h3, .h3, .title-section-3 { color: $color3; }
+    h4, .h4, .title-section-4 { color: $color4; }
+    h5, .h5, .title-section-5 { color: $color-default; }
 }

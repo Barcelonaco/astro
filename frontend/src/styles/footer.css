@@ -167,7 +167,7 @@
 #footer.has-background-secondary .btn-primary,
 #footer.has-background-dark .btn-primary {
   background-color: var(--color-background, #fff);
-  color: currentColor;
+  color: var(--color-primary, var(--accent));
   border-color: var(--color-background, #fff);
 }
 #footer.has-background-primary .btn-primary:hover,
@@ -187,7 +187,7 @@
 #footer.has-background-dark .btn-secondary:hover {
   background-color: var(--color-background, #fff);
   border-color: var(--color-background, #fff);
-  color: currentColor;
+  color: var(--color-primary, var(--accent));
 }
 
 /* Footer text */

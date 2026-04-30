@@ -5232,13 +5232,19 @@ body.sidebar-collapsed .builder-settings {
   pointer-events: none;
 }
 
-/* Title-module color per level (rich preview) */
+/* Title-module color per level (rich preview) — h1/h3 primary, h2/h5 default, h4 secondary */
+.builder-block-render .title-module.title-section-1 {
+  color: var(--color-primary);
+}
 .builder-block-render .title-module.title-section-2 {
-  color: var(--color-primary, #333);
+  color: var(--color-default);
 }
 .builder-block-render .title-module.title-section-3 {
-  color: var(--color-secondary, #666);
+  color: var(--color-primary);
 }
 .builder-block-render .title-module.title-section-4 {
-  color: var(--color-tertiary, #999);
+  color: var(--color-secondary);
+}
+.builder-block-render .title-module.title-section-5 {
+  color: var(--color-default);
 }

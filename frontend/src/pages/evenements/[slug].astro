@@ -7,22 +7,19 @@ import BlockRenderer from '../../components/BlockRenderer.astro';
 import DeferredLoader from '../../components/DeferredLoader.astro';
 import SiteOverlays from '../../components/SiteOverlays.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
-import { getEvenements, getEvenementBySlug, getFrontendBootstrap, type EvenementItem } from '../../lib/api';
+import { getEvenements, getFrontendBootstrap, type EvenementItem } from '../../lib/api';
 import { cleanHtml } from '../../lib/module-classes';
 import { optimizedImageUrl, responsiveSrcset, setDefaultImageUrl, getDefaultImageUrl } from '../../lib/module-helpers';
 
 export async function getStaticPaths() {
   const result = await getEvenements({ status: 'published', limit: 10000 });
   const items = Array.isArray(result) ? result : result.items;
-  return items.map((item: any) => ({ params: { slug: item.slug } }));
+  return items.map((item: any) => ({ params: { slug: item.slug }, props: { item } }));
 }
 
 const { slug } = Astro.params;
-
-const [item, { siteInfo, styleSettings, siteSettings, navigation: navigationData, secondaryNavigation }] = await Promise.all([
-  getEvenementBySlug(slug as string),
-  getFrontendBootstrap(),
-]);
+const { item } = Astro.props as { item: EvenementItem };
+const { siteInfo, styleSettings, siteSettings, navigation: navigationData, secondaryNavigation } = await getFrontendBootstrap();
 
 const siteName = siteInfo.siteName || SITE_TITLE;
 const siteDescription = siteInfo.siteDescription || SITE_DESCRIPTION;

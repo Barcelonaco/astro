@@ -16,7 +16,25 @@ $dotenv->load();
 
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/helpers/response.php';
+require_once __DIR__ . '/helpers/plugin-hooks.php';
+require_once __DIR__ . '/controllers/PluginController.php';
 require_once __DIR__ . '/controllers/EcommerceMigrationController.php';
+
+// Discover external plugins and their backend/autoload.php so that plugins
+// can register their migration hooks before we run them.
+try {
+    foreach (PluginController::getPluginRoots() as $__pluginRoot) {
+        if (!is_dir($__pluginRoot)) continue;
+        foreach (glob($__pluginRoot . '/*/backend/autoload.php') as $__autoload) {
+            $__pluginDir = basename(dirname(dirname($__autoload)));
+            if (!PluginController::isPluginActive($__pluginDir)) continue;
+            require_once $__autoload;
+        }
+    }
+    unset($__pluginRoot, $__autoload, $__pluginDir);
+} catch (\Throwable $__e) {
+    echo "  WARN plugin autoload failed during migrate: " . $__e->getMessage() . "\n";
+}
 
 $db = Database::getInstance();
 
@@ -738,6 +756,10 @@ if ($oldPricingCount > 0) {
 
 echo "\nE-commerce (Phase 0+) :\n";
 $changes += EcommerceMigrationController::migrate(function (string $msg) { echo $msg . "\n"; });
+
+// ─── Plugin migrations (registered via plugin-hooks.php) ────────────────────
+echo "\nPlugin migrations:";
+$changes += run_plugin_migrations(function (string $msg) { echo $msg . "\n"; });
 
 // ─── Summary ────────────────────────────────────────────────────────────────
 
