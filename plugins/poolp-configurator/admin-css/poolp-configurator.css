@@ -1,0 +1,43 @@
+/* POOLP — admin pages styles (used inside iframe-rendered admin sub-pages) */
+:root {
+  --p-primary: #0d2a55;
+  --p-accent: #1e70bf;
+  --p-bg: #f8f9fb;
+  --p-text: #1a1a1a;
+  --p-muted: #6b7280;
+  --p-border: #e5e7eb;
+  --p-radius: 6px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--p-bg); color: var(--p-text); }
+
+.poolp-admin { width: 100%; max-width: none; margin: 0; }
+.poolp-admin header { margin-bottom: 24px; }
+.poolp-admin h1 { color: var(--p-primary); font-size: 22px; margin: 0 0 6px; }
+.poolp-admin h2 { color: var(--p-primary); font-size: 16px; margin: 24px 0 8px; border-bottom: 1px solid var(--p-border); padding-bottom: 4px; }
+.poolp-admin p { color: var(--p-muted); margin: 4px 0; }
+.poolp-admin .meta { font-size: 12px; }
+
+.poolp-admin section { background: white; padding: 16px; border: 1px solid var(--p-border); border-radius: var(--p-radius); margin-bottom: 16px; }
+
+.poolp-admin table { width: 100%; border-collapse: collapse; }
+.poolp-admin th, .poolp-admin td { padding: 8px 6px; border-bottom: 1px solid var(--p-border); text-align: left; font-size: 13px; vertical-align: top; }
+.poolp-admin th { background: #f4f6fa; color: var(--p-muted); text-transform: uppercase; font-size: 11px; letter-spacing: .04em; }
+.poolp-admin code { font-size: 12px; color: #555; background: #f4f6fa; padding: 1px 4px; border-radius: 3px; }
+
+.poolp-admin form label { display: block; margin: 8px 0; font-size: 13px; color: var(--p-text); }
+.poolp-admin form input, .poolp-admin form textarea { width: 100%; padding: 6px 8px; border: 1px solid var(--p-border); border-radius: 4px; font-size: 13px; font-family: inherit; }
+.poolp-admin form .row { display: flex; gap: 12px; flex-wrap: wrap; }
+.poolp-admin form .row label { flex: 1; min-width: 140px; }
+.poolp-admin form label.check { display: inline-flex; align-items: center; gap: 6px; }
+.poolp-admin form label.check input { width: auto; }
+
+.poolp-admin .actions { margin-top: 12px; display: flex; gap: 8px; align-items: center; }
+.poolp-admin button { padding: 6px 14px; border: 1px solid var(--p-border); border-radius: 4px; background: white; cursor: pointer; font-size: 13px; }
+.poolp-admin button.primary { background: var(--p-primary); color: white; border-color: var(--p-primary); }
+.poolp-admin button.del { color: #c33; border-color: #f3c1c1; }
+.poolp-admin button:hover { filter: brightness(1.05); }
+
+.poolp-admin #form-status { color: var(--p-muted); font-size: 12px; }
+.poolp-admin .badge { padding: 2px 8px; border-radius: 99px; background: #e0e7ff; color: var(--p-primary); font-size: 11px; text-transform: uppercase; }
