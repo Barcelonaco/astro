@@ -42,8 +42,8 @@ ErrorDocument 403 /
 <IfModule mod_headers.c>
   # Prevent MIME sniffing
   Header always set X-Content-Type-Options "nosniff"
-  # Clickjacking protection
-  Header always set X-Frame-Options "DENY"
+  # Clickjacking protection (SAMEORIGIN: admin SPA iframes plugin admin pages on same origin)
+  Header always set X-Frame-Options "SAMEORIGIN"
   # XSS protection
   Header always set X-XSS-Protection "1; mode=block"
   # Referrer policy
