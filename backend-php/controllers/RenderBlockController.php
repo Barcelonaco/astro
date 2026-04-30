@@ -16,7 +16,7 @@ class RenderBlockController {
         }, $html);
 
         // Remove Blade directives we can't process
-        $html = preg_replace('/@(if|else|elseif|endif|foreach|endforeach|unless|endunless|empty|endempty|isset|endisset|section|endsection|yield|extends|include|php|endphp)\b[^]*?(?=@|$)/', '', $html);
+        $html = preg_replace('/@(if|else|elseif|endif|foreach|endforeach|unless|endunless|empty|endempty|isset|endisset|section|endsection|yield|extends|include|php|endphp)\b[\s\S]*?(?=@|$)/', '', $html);
 
         return $html;
     }
