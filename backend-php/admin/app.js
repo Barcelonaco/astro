@@ -1241,6 +1241,45 @@ async function renderCPTEditPage(ptDef, itemId) {
         </div>`;
       }
 
+      // --- Select (static options or CPT-sourced) ---
+      if (ftype === 'select') {
+        const fnEsc = escapeHtml(field.name);
+        const opts = field.options && typeof field.options === 'object' ? field.options : {};
+        const optionsHtml = Object.entries(opts).map(([k, label]) =>
+          `<option value="${escapeHtml(k)}" ${String(val) === String(k) ? 'selected' : ''}>${escapeHtml(label)}</option>`
+        ).join('');
+        const sourceAttr = field.source ? ` data-cf-source="${escapeHtml(field.source)}" data-cf-current="${escapeHtml(val)}"` : '';
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <select class="form-input" name="cf_${fnEsc}"${sourceAttr}>
+            <option value="">— Sélectionner —</option>
+            ${optionsHtml}
+          </select>
+        </div>`;
+      }
+
+      // --- Image / File / Video (media picker) ---
+      if (ftype === 'image' || ftype === 'file' || ftype === 'video') {
+        let img = null;
+        try { if (val) img = typeof val === 'string' ? JSON.parse(val) : val; } catch { img = null; }
+        const url = (img && typeof img === 'object') ? (img.url || '') : (typeof val === 'string' && val.startsWith('/') ? val : '');
+        const fnEsc = escapeHtml(field.name);
+        const hiddenVal = val ? (typeof val === 'string' ? val : JSON.stringify(val)) : '';
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <div class="cpt-cf-image-field" data-cf="${fnEsc}" data-cf-type="${ftype}">
+            <div id="cptCfImagePreview_${fnEsc}" style="margin-bottom:8px;min-height:0;">
+              ${url ? `<img src="${escapeHtml(getOptimizedUrl(url, 400, 70))}" style="max-width:240px;max-height:160px;object-fit:cover;border-radius:8px;display:block;">` : ''}
+            </div>
+            <input type="hidden" name="cf_${fnEsc}" id="cptCfImageInput_${fnEsc}" value="${escapeHtml(hiddenVal)}">
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="openCPTCfImagePicker('${fnEsc}', '${ftype}')">Choisir ${ftype === 'video' ? 'une vidéo' : ftype === 'file' ? 'un fichier' : 'une image'}</button>
+              ${url ? `<button type="button" class="btn btn-outline btn-sm" onclick="clearCPTCfImage('${fnEsc}')">Retirer</button>` : ''}
+            </div>
+          </div>
+        </div>`;
+      }
+
       // --- Address (Mapbox geocoding + mini-map) ---
       if (ftype === 'address') {
         let addr = { address: '', city: '', post_code: '', street_name: '', street_number: '', lat: '', lng: '' };
@@ -1738,6 +1777,41 @@ function openCPTFeaturedPicker() {
 function clearCPTFeatured() {
   document.getElementById('cptFeaturedInput').value = '';
   document.getElementById('cptFeaturedPreview').innerHTML = '<div style="width:200px;height:150px;background:#f5f5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#999;">Aucune image</div>';
+}
+
+// CPT custom_fields image picker — opens shared media picker, scoped to a single cf field
+function openCPTCfImagePicker(fieldName, ftype) {
+  const pickerType = ftype === 'video' ? 'video' : ftype === 'file' ? 'all' : 'image';
+  mediaPickerState = {
+    isOpen: true,
+    blockId: '__cpt_cf__',
+    fieldName,
+    type: pickerType,
+    folderId: null,
+    folders: [],
+    items: [],
+    multiple: false,
+    selectedIds: []
+  };
+  ensureMediaPickerModal();
+  showLoading();
+  Promise.all([apiFetch('/media/folders'), apiFetch('/media?all=1')])
+    .then(([res, items]) => {
+      mediaPickerState.folders = res.folders || [];
+      mediaPickerState.totalCount = res.total || 0;
+      mediaPickerState.items = items;
+      hideLoading();
+      document.getElementById('mediaPickerModal').classList.add('is-open');
+      updateMediaPickerContent();
+    })
+    .catch(() => hideLoading());
+}
+
+function clearCPTCfImage(fieldName) {
+  const input = document.getElementById(`cptCfImageInput_${fieldName}`);
+  const preview = document.getElementById(`cptCfImagePreview_${fieldName}`);
+  if (input) input.value = '';
+  if (preview) preview.innerHTML = '';
 }
 
 // CPT Builder featured image picker (for page builder CPT mode)
@@ -3071,6 +3145,28 @@ async function renderPageBuilder() {
               <input type="hidden" name="cf_${fnEsc}__place_id" value="">
               <input type="hidden" name="cf_${fnEsc}__name" value="">
               <input type="hidden" name="cf_${fnEsc}__street_name_short" value="">
+            </div>
+          </div>`;
+        }
+
+        // Image / File / Video (media picker)
+        if (ftype === 'image' || ftype === 'file' || ftype === 'video') {
+          let img = null;
+          try { if (val) img = typeof val === 'string' ? JSON.parse(val) : val; } catch { img = null; }
+          const url = (img && typeof img === 'object') ? (img.url || '') : (typeof val === 'string' && val.startsWith('/') ? val : '');
+          const fnEsc = escapeHtml(field.name);
+          const hiddenVal = val ? (typeof val === 'string' ? val : JSON.stringify(val)) : '';
+          return `<div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">${escapeHtml(field.label)}</label>
+            <div class="cpt-cf-image-field" data-cf="${fnEsc}" data-cf-type="${ftype}">
+              <div id="cptCfImagePreview_${fnEsc}" style="margin-bottom:8px;">
+                ${url ? `<img src="${escapeHtml(getOptimizedUrl(url, 200, 70))}" style="max-width:100%;max-height:120px;object-fit:cover;border-radius:6px;display:block;">` : ''}
+              </div>
+              <input type="hidden" class="cpt-builder-cf" data-cf="${fnEsc}" id="cptCfImageInput_${fnEsc}" value="${escapeHtml(hiddenVal)}">
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-outline btn-xs" onclick="openCPTCfImagePicker('${fnEsc}', '${ftype}')">Choisir</button>
+                ${url ? `<button type="button" class="btn btn-outline btn-xs" onclick="clearCPTCfImage('${fnEsc}')">Retirer</button>` : ''}
+              </div>
             </div>
           </div>`;
         }
@@ -11666,6 +11762,18 @@ function selectMediaFromPicker(id) {
     document.getElementById('cptBuilderFeaturedInput').value = JSON.stringify(payload);
     pageBuilderState.cptFeaturedImage = payload;
     document.getElementById('cptBuilderFeaturedPreview').innerHTML = `<img src="${escapeHtml(getOptimizedUrl(item.url, 400, 70))}" style="max-width:100%;max-height:150px;object-fit:cover;border-radius:8px;">`;
+    closeMediaPicker();
+    return;
+  }
+
+  // CPT custom_fields image picker (Image/File/Video field types)
+  if (mediaPickerState.blockId === '__cpt_cf__') {
+    const fn = mediaPickerState.fieldName;
+    const payload = { id: item.id, url: item.url, alt: item.alt || item.original_name || '', title: item.title || '', caption: item.caption || '', width: item.width || null, height: item.height || null, sizes: { thumbnail: item.url, half: item.url, banner: item.url } };
+    const input = document.getElementById(`cptCfImageInput_${fn}`);
+    const preview = document.getElementById(`cptCfImagePreview_${fn}`);
+    if (input) input.value = JSON.stringify(payload);
+    if (preview) preview.innerHTML = `<img src="${escapeHtml(getOptimizedUrl(item.url, 400, 70))}" style="max-width:240px;max-height:160px;object-fit:cover;border-radius:8px;display:block;">`;
     closeMediaPicker();
     return;
   }
