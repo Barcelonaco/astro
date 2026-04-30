@@ -279,15 +279,16 @@ class MenuModel {
             $stmtDelete->execute([$menuId, $pageId]);
         }
 
-        $stmtUpdate = $db->prepare("UPDATE menu_items SET title = ?, url = ?, parent_id = ?, menu_order = ? WHERE menu_id = ? AND page_id = ? AND type = 'page'");
-        $stmtInsert = $db->prepare("INSERT INTO menu_items (menu_id, title, url, type, page_id, parent_id, menu_order, open_in_new_tab) VALUES (?, ?, ?, 'page', ?, ?, ?, 0)");
+        // Preserve menu-item title (custom renames). Display layer falls back to page title when title is empty.
+        $stmtUpdate = $db->prepare("UPDATE menu_items SET url = ?, parent_id = ?, menu_order = ? WHERE menu_id = ? AND page_id = ? AND type = 'page'");
+        $stmtInsert = $db->prepare("INSERT INTO menu_items (menu_id, title, url, type, page_id, parent_id, menu_order, open_in_new_tab) VALUES (?, '', ?, 'page', ?, ?, ?, 0)");
 
         foreach ($assignments as $a) {
             $url = '/' . $pageSlug;
             if (in_array($a['menuId'], $currentMenuIds)) {
-                $stmtUpdate->execute([$pageTitle, $url, $a['parent_id'] ?? null, $a['menu_order'] ?? 0, $a['menuId'], $pageId]);
+                $stmtUpdate->execute([$url, $a['parent_id'] ?? null, $a['menu_order'] ?? 0, $a['menuId'], $pageId]);
             } else {
-                $stmtInsert->execute([$a['menuId'], $pageTitle, $url, $pageId, $a['parent_id'] ?? null, $a['menu_order'] ?? 0]);
+                $stmtInsert->execute([$a['menuId'], $url, $pageId, $a['parent_id'] ?? null, $a['menu_order'] ?? 0]);
             }
         }
     }

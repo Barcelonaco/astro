@@ -43,6 +43,15 @@ class EcommerceMigrationController {
             INDEX idx_anonymized (anonymized_at)
         ", $log) ? 1 : 0;
 
+        // Pro signup workflow : siret + activity persistés ; pro_status gate
+        // is_pro=1 (interdit l'auto-promotion à l'inscription, exige validation
+        // manuelle admin).
+        if (self::tableExists($db, 'customers')) {
+            if (self::ensureColumn($db, 'customers', 'siret', "VARCHAR(20) DEFAULT NULL", 'vat_number', $log)) $changes++;
+            if (self::ensureColumn($db, 'customers', 'activity', "VARCHAR(40) DEFAULT NULL", 'siret', $log)) $changes++;
+            if (self::ensureColumn($db, 'customers', 'pro_status', "ENUM('none','pending','approved','rejected') NOT NULL DEFAULT 'none'", 'is_pro', $log)) $changes++;
+        }
+
         $changes += self::createTable($db, 'customer_addresses', "
             id INT AUTO_INCREMENT PRIMARY KEY,
             customer_id INT NOT NULL,

@@ -1,0 +1,805 @@
+---
+/**
+ * PoolpWizard — wizard 6 étapes du configurateur POOLP.
+ *
+ * Layout calqué sur le wireframe Scanzi v2 (Georgia serif, palette neutre,
+ * pills + séparateurs, sidebar par étape, equip-cards, color swatches).
+ * État côté client : lib/poolp-store.ts (publish/subscribe + localStorage).
+ * Recalcul live debounce 300ms via POST /api/poolp/compute.
+ */
+import type { PoolpBootstrap, PoolpProject } from '../../lib/poolp-types'
+
+interface Props {
+  bootstrap: PoolpBootstrap | null
+  initialProject?: PoolpProject | null
+}
+
+const { bootstrap, initialProject } = Astro.props
+const finitions = bootstrap?.finitions || []
+const initialState = initialProject?.state || null
+---
+
+<div class="poolp-page" data-component="poolp-wizard">
+  <div class="poolp-steps-bar">
+    <div class="poolp-steps-inner" id="poolp-stepper"></div>
+  </div>
+  <div class="poolp-body">
+    <aside class="poolp-sidebar" id="poolp-sidebar"></aside>
+    <section class="poolp-main" id="poolp-step-content"></section>
+  </div>
+  <script
+    type="application/json"
+    id="poolp-bootstrap-data"
+    set:html={JSON.stringify({ finitions, initialState, projectToken: initialProject?.token ?? null })}
+  ></script>
+  <noscript><p style="padding:24px;text-align:center">Le configurateur nécessite JavaScript activé.</p></noscript>
+</div>
+
+<script>
+  import {
+    isPoolpPluginActive,
+    getPoolpBootstrap,
+    getProject,
+    saveProject,
+    exportProjectPdf,
+    addProjectToCart,
+    API_URL,
+  } from '../../lib/poolp-api'
+  import { resolveImageUrl } from '../../lib/module-helpers'
+  import {
+    subscribe,
+    setStep,
+    updateInput,
+    runCompute,
+    setProjectToken,
+    getState,
+  } from '../../lib/poolp-store'
+  import type {
+    PoolpInput,
+    Traitement,
+    FiltreType,
+    PompeType,
+  } from '../../lib/poolp-types'
+
+  const dataNode = document.getElementById('poolp-bootstrap-data')
+  const data = dataNode ? JSON.parse(dataNode.textContent || '{}') : {}
+  let finitions: Array<{ id: number; title: string; custom_fields: Record<string, unknown> }> = data.finitions || []
+  const initialState: Partial<PoolpInput> | null = data.initialState
+  const initialToken: string | null = data.projectToken
+
+  const STEP_LABELS = ['Bassin', 'Équipements', 'Votre box', 'Finitions', 'Livraison', 'Récapitulatif']
+  const STEP_KEYS: Array<1|3|4|5|6|7> = [1, 3, 4, 5, 6, 7]
+
+  function escapeHtml(s: unknown): string {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] as string))
+  }
+  function money(n: number | null | undefined): string {
+    if (n === null || n === undefined) return '— €'
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Number(n))
+  }
+  function fmtVol(v: number): string {
+    return Number.isFinite(v) ? `${v.toFixed(0)} m³` : '—'
+  }
+
+  // Récap bassin — données saisies à l'étape 1 + grandeurs hydrauliques calculées
+  function bassinItems(
+    input: PoolpInput,
+    c: ReturnType<typeof getState>['computed'],
+  ): Array<[string, string]> {
+    const localVol = (input.longueur * input.largeur * input.hauteur)
+    const vol = c?.hydraulic ? fmtVol(c.hydraulic.volume) : `${localVol.toFixed(0)} m³`
+    const items: Array<[string, string]> = [
+      ['Dimensions', `${input.longueur} × ${input.largeur} × ${String(input.hauteur).replace('.', ',')} m`],
+      ['Volume', vol],
+    ]
+    if (c?.hydraulic) {
+      items.push(['Débit requis', `${c.hydraulic.debit.toFixed(0)} m³/h`])
+      items.push(['Skimmers', String(c.hydraulic.nb_skimmers)])
+    }
+    items.push(['Volet immergé', input.volet_immerge ? 'Oui' : 'Non'])
+    items.push(['Prise balai', input.prise_balai ? 'Oui' : 'Non'])
+    items.push(['Bassin couvert', input.bassin_couvert ? 'Oui' : 'Non'])
+    items.push(['Projecteurs LED', String(input.projecteurs_led)])
+    return items
+  }
+  function recapRows(items: Array<[string, string]>): string {
+    return items.map(([k, v]) => `<div class="poolp-recap-row"><span class="poolp-recap-label">${escapeHtml(k)}</span><span class="poolp-recap-val">${escapeHtml(v)}</span></div>`).join('')
+  }
+
+  // ── Bootstrap (client) ────────────────────────────────────────────────
+  async function clientBootstrap(): Promise<boolean> {
+    const root = document.querySelector<HTMLElement>('[data-component="poolp-wizard"]')
+    if (!root) return false
+    const active = await isPoolpPluginActive()
+    if (!active) {
+      root.innerHTML = `<div style="padding:64px 24px;text-align:center;font-family:Georgia,serif">
+        <h1 style="font-size:22px;color:#1a1a18;margin-bottom:12px">Configurateur indisponible</h1>
+        <p style="color:#6b6b67;margin-bottom:16px">Cet outil n'est pas actif sur ce site.</p>
+        <p><a href="/" style="color:#1a1a18">← Retour à l'accueil</a></p>
+      </div>`
+      return false
+    }
+    if (finitions.length === 0) {
+      const bs = await getPoolpBootstrap()
+      if (bs) finitions = bs.finitions || []
+    }
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('p')
+    if (token) {
+      const proj = await getProject(token)
+      if (proj?.state) { updateInput(proj.state as Partial<PoolpInput>); setProjectToken(token) }
+    } else if (initialState) {
+      updateInput(initialState as Partial<PoolpInput>)
+    }
+    if (initialToken && !token) setProjectToken(initialToken)
+    return true
+  }
+
+  // ── Stepper render ────────────────────────────────────────────────────
+  function renderStepper(currentStep: number): void {
+    const root = document.getElementById('poolp-stepper')
+    if (!root) return
+    const idx = STEP_KEYS.indexOf(currentStep as 1|3|4|5|6|7)
+    const parts: string[] = []
+    STEP_KEYS.forEach((s, i) => {
+      const cls = i < idx ? 'done' : i === idx ? 'active' : 'todo'
+      const num = i < idx ? '✓' : String(i + 1)
+      parts.push(`<button class="poolp-step-pill ${cls}" data-go-step="${s}"><span class="poolp-pill-num">${num}</span>${escapeHtml(STEP_LABELS[i])}</button>`)
+      if (i < STEP_KEYS.length - 1) parts.push('<span class="poolp-step-sep"></span>')
+    })
+    root.innerHTML = parts.join('')
+    root.querySelectorAll<HTMLButtonElement>('[data-go-step]').forEach(btn => {
+      btn.addEventListener('click', () => setStep(Number(btn.dataset.goStep) as 1|3|4|5|6|7))
+    })
+  }
+
+  // ── Sidebar render (varies per step) ──────────────────────────────────
+  function renderSidebar(): void {
+    const root = document.getElementById('poolp-sidebar')
+    if (!root) return
+    const s = getState()
+    const c = s.computed
+
+    // Étape 1 — récap bassin live (dimensions + options saisies)
+    if (s.step === 1) {
+      root.innerHTML = `
+        <div class="poolp-sidebar-title">Récap bassin</div>
+        ${recapRows(bassinItems(s.input, c))}`
+      return
+    }
+
+    // Étape 3 — récap bassin complet + box compatible
+    if (s.step === 3) {
+      const boxBlock = c?.box ? `
+        <div class="poolp-sidebar-divider"></div>
+        <div class="poolp-sidebar-mini-label">Box compatible</div>
+        <div class="poolp-sidebar-pick">${escapeHtml(c.box.label)}</div>
+        <div class="poolp-sidebar-pick-sub">Volume max ${c.box.volume_max} m³</div>` : ''
+      root.innerHTML = `
+        <div class="poolp-sidebar-title">Récap bassin</div>
+        ${recapRows(bassinItems(s.input, c))}
+        ${boxBlock}`
+      return
+    }
+
+    const tShort: Record<string, string> = {
+      aucun: 'Aucun', regul_ph: 'Régul pH', electrolyse_ph: 'pH + électro.',
+      electrolyse_ph_redox: 'pH + REDOX', uv_oxygene: 'UV + oxy.',
+    }
+    const equipItems = (): Array<[string, string]> => [
+      ['Filtre', s.input.filtre === 'sable' ? 'Sable' : 'Cartouche'],
+      ['Pompe', s.input.pompe === 'mono' ? 'Mono' : 'Variable'],
+      ['Traitement', tShort[s.input.traitement || 'aucun']],
+      ['PAC', s.input.bypass_pac ? 'Avec by-pass' : 'Sans by-pass'],
+      ['Coffret', s.input.pompe === 'variable' ? 'Wi-Fi' : 'Bluetooth'],
+    ]
+    const bassinSection = `
+      <div class="poolp-sidebar-mini-label">Bassin</div>
+      ${recapRows(bassinItems(s.input, c))}`
+
+    // Étape 4 — bassin + équipements + box
+    if (s.step === 4) {
+      const boxBlock = c?.box ? `
+        <div class="poolp-sidebar-divider"></div>
+        <div class="poolp-sidebar-mini-label">Box sélectionnée</div>
+        <div class="poolp-sidebar-pick">${escapeHtml(c.box.label)}</div>` : ''
+      root.innerHTML = `
+        <div class="poolp-sidebar-title">Votre sélection</div>
+        ${bassinSection}
+        <div class="poolp-sidebar-divider"></div>
+        <div class="poolp-sidebar-mini-label">Équipements</div>
+        ${recapRows(equipItems())}
+        ${boxBlock}`
+      return
+    }
+
+    // Étape 5 — bassin + équipements + finition
+    if (s.step === 5) {
+      const fin = finitions.find(f => f.id === s.input.finition_id)
+      const finHex = fin ? ((fin.custom_fields as { color_hex?: string })?.color_hex || '#ddd') : '#ddd'
+      const finBlock = fin ? `
+        <div class="poolp-sidebar-divider"></div>
+        <div class="poolp-sidebar-mini-label">Finition choisie</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:${escapeHtml(finHex)};border:2px solid var(--p-text);flex-shrink:0"></span>
+          <span style="font-size:13px;font-weight:600">${escapeHtml(fin.title)}</span>
+        </div>` : ''
+      root.innerHTML = `
+        <div class="poolp-sidebar-title">Configuration</div>
+        ${bassinSection}
+        <div class="poolp-sidebar-divider"></div>
+        <div class="poolp-sidebar-mini-label">Équipements${c?.box ? ` · ${escapeHtml(c.box.label)}` : ''}</div>
+        ${recapRows(equipItems())}
+        ${finBlock}`
+      return
+    }
+
+    // Étape 6 — bassin + équipements + finition + livraison
+    if (s.step === 6) {
+      const fin = finitions.find(f => f.id === s.input.finition_id)
+      const finHex = fin ? ((fin.custom_fields as { color_hex?: string })?.color_hex || '#ddd') : null
+      const finBlock = fin ? `
+        <div class="poolp-sidebar-divider"></div>
+        <div class="poolp-sidebar-mini-label">Finition choisie</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:${escapeHtml(finHex || '#ddd')};border:2px solid var(--p-text);flex-shrink:0"></span>
+          <span style="font-size:13px;font-weight:600">${escapeHtml(fin.title)}</span>
+        </div>` : ''
+      const livBlock = `
+        <div class="poolp-sidebar-divider"></div>
+        <div class="poolp-sidebar-mini-label">Livraison</div>
+        <div class="poolp-empty-note">${c?.livraison ? escapeHtml(c.livraison.zone_label) : 'En cours…'}</div>`
+      root.innerHTML = `
+        <div class="poolp-sidebar-title">Configuration</div>
+        ${bassinSection}
+        <div class="poolp-sidebar-divider"></div>
+        <div class="poolp-sidebar-mini-label">Équipements${c?.box ? ` · ${escapeHtml(c.box.label)}` : ''}</div>
+        ${recapRows(equipItems())}
+        ${finBlock}
+        ${livBlock}`
+      return
+    }
+
+    // Étape 7 — récap complet + total
+    if (s.step === 7) {
+      const fin = finitions.find(f => f.id === s.input.finition_id)
+      const finalItems: Array<[string, string]> = []
+      if (c?.box) finalItems.push(['Box', c.box.label])
+      finalItems.push(...equipItems())
+      if (fin) finalItems.push(['Finition', fin.title])
+      if (c?.livraison) finalItems.push(['Livraison', `${s.input.mode_livraison === 'kit' ? 'Kit' : 'Montée'} · ${c.livraison.zone_label}`])
+      const total = c?.totaux?.ttc != null ? money(c.totaux.ttc) : '— €'
+      root.innerHTML = `
+        <div class="poolp-sidebar-title">Ma configuration</div>
+        ${bassinSection}
+        <div class="poolp-sidebar-divider"></div>
+        <div class="poolp-sidebar-mini-label">Sélection</div>
+        ${recapRows(finalItems)}
+        <div class="poolp-sidebar-divider"></div>
+        <div class="poolp-sidebar-mini-label">Total TTC estimé</div>
+        <div class="poolp-sidebar-total">${total}</div>
+        <div class="poolp-sidebar-mini-label" style="margin-top:4px">Prix pro HT après connexion</div>`
+      return
+    }
+  }
+
+  // ── Step content render ───────────────────────────────────────────────
+  function renderStep(): void {
+    const s = getState()
+    const root = document.getElementById('poolp-step-content')
+    if (!root) return
+
+    // Preserve text-input focus & cursor position across innerHTML replace
+    // (otherwise typing in an input loses focus on every keystroke since the
+    // store's `notify()` triggers a full re-render).
+    const active = document.activeElement as HTMLInputElement | HTMLTextAreaElement | null
+    const isTextInput = !!active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')
+    const focusedName = isTextInput ? (active as HTMLInputElement).name : null
+    const selStart = isTextInput ? (active as HTMLInputElement).selectionStart : null
+    const selEnd = isTextInput ? (active as HTMLInputElement).selectionEnd : null
+
+    if (s.step === 1) root.innerHTML = stepBassin(s.input)
+    else if (s.step === 3) root.innerHTML = stepEquipements(s)
+    else if (s.step === 4) root.innerHTML = stepBoxResult(s)
+    else if (s.step === 5) root.innerHTML = stepFinitions(s)
+    else if (s.step === 6) root.innerHTML = stepLivraison(s)
+    else if (s.step === 7) root.innerHTML = stepRecap(s)
+    bindStepEvents()
+
+    // Restore focus & selection (must happen AFTER innerHTML + bindStepEvents)
+    if (focusedName) {
+      const newInput = root.querySelector<HTMLInputElement>(`input[name="${focusedName}"], textarea[name="${focusedName}"]`)
+      if (newInput) {
+        newInput.focus()
+        try {
+          if (selStart != null) newInput.setSelectionRange(selStart, selEnd ?? selStart)
+        } catch { /* setSelectionRange not supported on this input type */ }
+      }
+    }
+  }
+
+  // ── Step 1 : Bassin ───────────────────────────────────────────────────
+  function stepBassin(input: PoolpInput): string {
+    const vol = (input.longueur * input.largeur * input.hauteur).toFixed(1).replace('.', ',')
+    return `
+      <div class="poolp-step-title">Étape 1 — Données du bassin</div>
+      <p class="poolp-step-sub">Renseignez les dimensions de votre bassin. Le volume sera calculé automatiquement.</p>
+
+      <div class="poolp-grid-3">
+        <div class="poolp-field-group">
+          <div class="poolp-field-label"><strong>Longueur (m)</strong> *</div>
+          <input class="poolp-field-input" type="number" min="2" max="25" step="0.1" name="longueur" value="${input.longueur}">
+        </div>
+        <div class="poolp-field-group">
+          <div class="poolp-field-label"><strong>Largeur (m)</strong> *</div>
+          <input class="poolp-field-input" type="number" min="1" max="15" step="0.1" name="largeur" value="${input.largeur}">
+        </div>
+        <div class="poolp-field-group">
+          <div class="poolp-field-label">
+            <strong>Hauteur moyenne eau (m)</strong> *
+            <span class="poolp-info-btn" tabindex="0">i<span class="poolp-tooltip">La hauteur moyenne correspond à la profondeur moyenne du bassin. Ex : bassin plat à 1,5 m → saisir 1,5 m.</span></span>
+          </div>
+          <input class="poolp-field-input" type="number" min="0.5" max="3" step="0.1" name="hauteur" value="${input.hauteur}">
+        </div>
+      </div>
+
+      <div class="poolp-calc-box"><strong>Volume calculé : ${vol} m³</strong><em>(${input.longueur} × ${input.largeur} × ${String(input.hauteur).replace('.', ',')})</em></div>
+
+      <div class="poolp-field-label" style="margin-bottom:10px"><strong>Options du bassin</strong></div>
+      <div class="poolp-toggle-list">
+        <div class="poolp-toggle-row">
+          <div class="poolp-toggle-label">Volet immergé <span class="poolp-info-btn" tabindex="0">i<span class="poolp-tooltip">Un volet immergé impacte le nombre de bondes de fond et de refoulements nécessaires.</span></span></div>
+          <button class="poolp-toggle ${input.volet_immerge ? 'on' : ''}" data-toggle="volet_immerge" type="button" aria-pressed="${input.volet_immerge}"></button>
+        </div>
+        <div class="poolp-toggle-row">
+          <div class="poolp-toggle-label">Prise balai</div>
+          <button class="poolp-toggle ${input.prise_balai ? 'on' : ''}" data-toggle="prise_balai" type="button" aria-pressed="${input.prise_balai}"></button>
+        </div>
+        <div class="poolp-toggle-row">
+          <div class="poolp-toggle-label">Bassin couvert <span class="poolp-info-btn" tabindex="0">i<span class="poolp-tooltip">Si le bassin est couvert (volet, abri…), certains traitements sont adaptés pour éviter un excès de chlore.</span></span></div>
+          <button class="poolp-toggle ${input.bassin_couvert ? 'on' : ''}" data-toggle="bassin_couvert" type="button" aria-pressed="${input.bassin_couvert}"></button>
+        </div>
+        <div class="poolp-toggle-row">
+          <div class="poolp-toggle-label">Projecteurs LED <span class="poolp-info-btn" tabindex="0">i<span class="poolp-tooltip">Seuls les projecteurs LED sont pris en charge. Les halogènes ne sont pas inclus dans la box.</span></span></div>
+          <div class="poolp-choice-group">
+            <button class="poolp-choice-btn ${input.projecteurs_led === 0 ? 'sel' : ''}" data-led="0" type="button">0</button>
+            <button class="poolp-choice-btn ${input.projecteurs_led === 1 ? 'sel' : ''}" data-led="1" type="button">1</button>
+            <button class="poolp-choice-btn ${input.projecteurs_led === 2 ? 'sel' : ''}" data-led="2" type="button">2</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="poolp-nav-btns">
+        <a class="poolp-btn ghost" href="/">← Retour boutique</a>
+        <button class="poolp-btn cta" data-go-step="3" type="button">Étape suivante →</button>
+      </div>`
+  }
+
+  // ── SVG icons ─────────────────────────────────────────────────────────
+  const ICONS: Record<string, string> = {
+    sable: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"/><line x1="5" y1="9" x2="19" y2="9"/><circle cx="12" cy="15" r="2"/></svg>',
+    cartouche: '<svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="13" x2="15" y2="13"/></svg>',
+    mono: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/></svg>',
+    variable: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>',
+    aucun: '<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+    regul_ph: '<svg viewBox="0 0 24 24"><path d="M12 2C8 2 5 7 5 12s3 10 7 10 7-5 7-10S16 2 12 2z"/><line x1="12" y1="8" x2="12" y2="16"/></svg>',
+    electrolyse_ph: '<svg viewBox="0 0 24 24"><path d="M12 2C8 2 5 7 5 12s3 10 7 10 7-5 7-10S16 2 12 2z"/><path d="M9 12h6M12 9v6"/></svg>',
+    electrolyse_ph_redox: '<svg viewBox="0 0 24 24"><path d="M12 2C8 2 5 7 5 12s3 10 7 10 7-5 7-10S16 2 12 2z"/><path d="M9 12h6M12 9v6"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>',
+    uv_oxygene: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M8 12h8"/></svg>',
+    bypass_off: '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="2"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="12" y1="8" x2="12" y2="16"/></svg>',
+    bypass_on: '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="2"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="12" y1="8" x2="12" y2="16"/><path d="M17 5l2 3h-4z"/></svg>',
+    coffret_distrib: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.2" stroke-linecap="round"><rect x="3" y="6" width="18" height="12" rx="2"/><line x1="7" y1="6" x2="7" y2="18"/><line x1="12" y1="6" x2="12" y2="18"/></svg>',
+    coffret_wifi: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.2" stroke-linecap="round"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 10h6M9 14h4"/></svg>',
+    box_l: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="3"/><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/></svg>',
+    delivery_kit: '<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.2" stroke-linecap="round"><rect x="3" y="8" width="18" height="10" rx="1"/><path d="M7 8V6a2 2 0 012-2h6a2 2 0 012 2v2"/><line x1="8" y1="13" x2="16" y2="13"/></svg>',
+    delivery_assembled: '<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="3"/><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><line x1="10" y1="8" x2="10" y2="16"/></svg>',
+  }
+
+  // ── Step 3 : Équipements ──────────────────────────────────────────────
+  function stepEquipements(s: { input: PoolpInput; computed: ReturnType<typeof getState>['computed'] }): string {
+    const allowed = s.computed?.allowed_treatments || ['aucun', 'regul_ph', 'electrolyse_ph', 'electrolyse_ph_redox', 'uv_oxygene']
+    const tCard = (slug: Traitement, name: string, desc: string) => {
+      const isSel = s.input.traitement === slug
+      const isAllowed = allowed.includes(slug)
+      return `<button class="poolp-equip-card ${isSel ? 'sel' : ''} ${!isAllowed ? 'disabled' : ''}" data-set-traitement="${slug}" type="button" ${!isAllowed ? 'disabled' : ''}>
+        <div class="poolp-equip-card-header">
+          <div class="poolp-equip-picto">${ICONS[slug] || ICONS.aucun}</div>
+          <div class="poolp-equip-card-name">${escapeHtml(name)}</div>
+        </div>
+        <div class="poolp-equip-card-desc">${escapeHtml(desc)}</div>
+      </button>`
+    }
+
+    return `
+      <div class="poolp-step-title">Étape 2 — Équipements</div>
+      <p class="poolp-step-sub">Faites vos choix — le système sélectionnera automatiquement les références adaptées à votre bassin.</p>
+
+      <div class="poolp-field-group">
+        <div class="poolp-field-label"><strong>Filtre</strong> <span class="poolp-info-btn" tabindex="0">i<span class="poolp-tooltip">Le filtre à sable est robuste et économique. Le filtre à cartouche offre une filtration plus fine.</span></span></div>
+        <div class="poolp-equip-grid">
+          <button class="poolp-equip-card ${s.input.filtre === 'sable' ? 'sel' : ''}" data-set-filtre="sable" type="button">
+            <div class="poolp-equip-card-header"><div class="poolp-equip-picto">${ICONS.sable}</div><div class="poolp-equip-card-name">Filtre à sable</div></div>
+            <div class="poolp-equip-card-desc">Robuste, entretien facile, économique</div>
+          </button>
+          <button class="poolp-equip-card ${s.input.filtre === 'cartouche' ? 'sel' : ''}" data-set-filtre="cartouche" type="button">
+            <div class="poolp-equip-card-header"><div class="poolp-equip-picto">${ICONS.cartouche}</div><div class="poolp-equip-card-name">Filtre à cartouche</div></div>
+            <div class="poolp-equip-card-desc">Filtration plus fine, plus efficace</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="poolp-field-group">
+        <div class="poolp-field-label"><strong>Pompe</strong> <span class="poolp-info-btn" tabindex="0">i<span class="poolp-tooltip">La pompe à vitesse variable adapte sa puissance et consomme jusqu'à 3× moins d'énergie qu'une mono-vitesse.</span></span></div>
+        <div class="poolp-equip-grid">
+          <button class="poolp-equip-card ${s.input.pompe === 'mono' ? 'sel' : ''}" data-set-pompe="mono" type="button">
+            <div class="poolp-equip-card-header"><div class="poolp-equip-picto">${ICONS.mono}</div><div class="poolp-equip-card-name">Mono-vitesse</div></div>
+            <div class="poolp-equip-card-desc">Simple, fiable, économique à l'achat</div>
+          </button>
+          <button class="poolp-equip-card ${s.input.pompe === 'variable' ? 'sel' : ''}" data-set-pompe="variable" type="button">
+            <div class="poolp-equip-card-header"><div class="poolp-equip-picto">${ICONS.variable}</div><div class="poolp-equip-card-name">Vitesse variable</div></div>
+            <div class="poolp-equip-card-desc">Économique, silencieuse, recommandée</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="poolp-field-group">
+        <div class="poolp-field-label"><strong>Traitement de l'eau</strong> <span class="poolp-info-btn" tabindex="0">i<span class="poolp-tooltip">Automatisez la qualité de l'eau. L'électrolyse au sel produit du chlore naturellement. Le REDOX mesure l'oxydoréduction pour un dosage précis.</span></span></div>
+        <div class="poolp-equip-grid-4">
+          ${tCard('aucun', 'Aucun', 'Traitement manuel')}
+          ${tCard('regul_ph', 'Régul pH', 'Dosage auto du pH')}
+          ${tCard('electrolyse_ph', 'pH + électrolyse', 'Chlore naturel au sel')}
+          ${tCard('electrolyse_ph_redox', '+ REDOX', 'Dosage précis oxydation')}
+        </div>
+      </div>
+
+      <div class="poolp-field-group">
+        <div class="poolp-field-label"><strong>Pompe à chaleur</strong> <span class="poolp-info-btn" tabindex="0">i<span class="poolp-tooltip">La pompe à chaleur n'est pas fournie avec la box. Le by-pass intègre le raccordement hydraulique.</span></span></div>
+        <div class="poolp-equip-grid">
+          <button class="poolp-equip-card ${!s.input.bypass_pac ? 'sel' : ''}" data-set-bypass="0" type="button">
+            <div class="poolp-equip-card-header"><div class="poolp-equip-picto">${ICONS.bypass_off}</div><div class="poolp-equip-card-name">Sans by-pass PAC</div></div>
+            <div class="poolp-equip-card-desc">Pas de PAC prévue</div>
+          </button>
+          <button class="poolp-equip-card ${s.input.bypass_pac ? 'sel' : ''}" data-set-bypass="1" type="button">
+            <div class="poolp-equip-card-header"><div class="poolp-equip-picto">${ICONS.bypass_on}</div><div class="poolp-equip-card-name">Avec by-pass PAC</div></div>
+            <div class="poolp-equip-card-desc">Raccordement PAC extérieure</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="poolp-auto-box">
+        <div class="poolp-auto-label">Sélectionnés automatiquement</div>
+        <div style="display:flex;gap:24px;font-size:13px;flex-wrap:wrap">
+          <span><span style="color:var(--p-text2)">Coffret distribution : </span><strong>1 coffret unique</strong></span>
+          <span><span style="color:var(--p-text2)">Coffret programmation : </span><strong>${s.input.pompe === 'variable' ? 'Wi-Fi (pompe variable)' : 'Bluetooth'}</strong></span>
+        </div>
+      </div>
+
+      <div class="poolp-nav-btns">
+        <button class="poolp-btn sec" data-go-step="1" type="button">← Étape précédente</button>
+        <button class="poolp-btn cta" data-go-step="4" type="button">Étape suivante →</button>
+      </div>`
+  }
+
+  // ── Step 4 : Box result ───────────────────────────────────────────────
+  function stepBoxResult(s: { input: PoolpInput; computed: ReturnType<typeof getState>['computed'] }): string {
+    const c = s.computed
+    if (!c || c.error || !c.box) {
+      const msg = c?.error === 'volume_hors_gamme'
+        ? "Volume hors gamme — votre bassin dépasse la capacité maximale (75 m³). Contactez l'équipe pour un devis adapté."
+        : 'Calcul en cours…'
+      return `<div class="poolp-step-title">Étape 3 — Votre box</div>
+        <div class="poolp-error">${escapeHtml(msg)}</div>
+        <div class="poolp-nav-btns"><button class="poolp-btn sec" data-go-step="3" type="button">← Étape précédente</button></div>`
+    }
+
+    const eqEntries = Object.entries(c.equipements || {}).filter(([, eq]) => eq)
+    const cards = eqEntries.map(([key, eq]) => {
+      const iconKey = (key === 'filtre') ? (s.input.filtre === 'cartouche' ? 'cartouche' : 'sable')
+        : (key === 'pompe') ? (s.input.pompe === 'variable' ? 'variable' : 'mono')
+        : (key === 'traitement') ? (s.input.traitement || 'aucun')
+        : (key === 'coffret_programmation') ? 'coffret_wifi'
+        : (key === 'coffret_distribution') ? 'coffret_distrib'
+        : 'coffret_distrib'
+      return `<div class="poolp-product-card">
+        <div class="poolp-product-img">${ICONS[iconKey] || ICONS.coffret_distrib}</div>
+        <div class="poolp-product-body">
+          <div class="poolp-product-name">${escapeHtml(eq!.label)}</div>
+          <div class="poolp-product-ref">${eq!.reference ? `Réf. ${escapeHtml(eq!.reference)}` : 'Réf. [à fournir Scanzi]'}</div>
+        </div>
+      </div>`
+    }).join('')
+
+    return `
+      <div class="poolp-step-title">Étape 3 — Votre box configurée</div>
+      <p class="poolp-step-sub">Voici les équipements sélectionnés pour votre bassin de ${fmtVol(c.hydraulic.volume)}. Tout est intégré dans votre box POOLP.</p>
+
+      <div class="poolp-product-grid">
+        ${cards}
+        <div class="poolp-product-card featured">
+          <div class="poolp-product-img">${(() => {
+            const apiOrigin = API_URL.replace(/\/api\/?$/, '')
+            const src = c.box.photo_url ? resolveImageUrl(c.box.photo_url, apiOrigin, 'banner') : ''
+            return src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(c.box.label)}">` : ICONS.box_l
+          })()}</div>
+          <div class="poolp-product-body">
+            <div class="poolp-product-name">${escapeHtml(c.box.label)} — ${c.box.surface_utile} m²</div>
+            <div class="poolp-product-ref">Inclut tous les équipements ci-dessus</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="poolp-nav-btns">
+        <button class="poolp-btn sec" data-go-step="3" type="button">← Étape précédente</button>
+        <button class="poolp-btn cta" data-go-step="5" type="button">Choisir les finitions →</button>
+      </div>`
+  }
+
+  // ── Step 5 : Finitions ────────────────────────────────────────────────
+  function stepFinitions(s: { input: PoolpInput }): string {
+    const swatches = (finitions as Array<{ id: number; title: string; custom_fields: Record<string, unknown> }>).map(f => {
+      const cf = f.custom_fields || {}
+      const hex = (cf as { color_hex?: string }).color_hex || '#ddd'
+      const isSel = s.input.finition_id === f.id
+      return `<button class="poolp-color-swatch" data-set-finition="${f.id}" type="button">
+        <div class="poolp-color-circle ${isSel ? 'sel' : ''}" style="background:${escapeHtml(hex)}"></div>
+        <div class="poolp-color-name ${isSel ? 'sel' : ''}">${escapeHtml(f.title)}</div>
+      </button>`
+    }).join('') || '<div class="poolp-empty-note">Aucune finition disponible. Configurez le catalogue dans l\'admin.</div>'
+
+    const apiOrigin = API_URL.replace(/\/api\/?$/, '')
+    const selectedFin = finitions.find(f => f.id === s.input.finition_id)
+    let previewRaw: unknown = selectedFin ? (selectedFin.custom_fields as { preview_image?: unknown }).preview_image : null
+    if (typeof previewRaw === 'string' && previewRaw.trim().startsWith('{')) {
+      try { previewRaw = JSON.parse(previewRaw) } catch { /* keep raw */ }
+    }
+    const previewSrc = previewRaw ? resolveImageUrl(previewRaw, apiOrigin, 'banner') : ''
+    const previewBlock = previewSrc
+      ? `<div class="poolp-color-preview has-img"><img src="${escapeHtml(previewSrc)}" alt="${escapeHtml(selectedFin?.title || 'Aperçu finition')}"></div>`
+      : `<div class="poolp-color-preview">${selectedFin ? 'Aperçu indisponible' : 'Sélectionnez une finition pour voir l\'aperçu.'}</div>`
+
+    return `
+      <div class="poolp-step-title">Étape 4 — Finitions</div>
+      <p class="poolp-step-sub">Choisissez la couleur des panneaux thermolaqués de votre box.</p>
+
+      <div class="poolp-color-grid">${swatches}</div>
+
+      ${previewBlock}
+      
+      <div class="poolp-nav-btns">
+        <button class="poolp-btn sec" data-go-step="4" type="button">← Étape précédente</button>
+        <button class="poolp-btn cta" data-go-step="6" type="button">Étape suivante →</button>
+      </div>`
+  }
+
+  // ── Step 6 : Livraison ────────────────────────────────────────────────
+  function stepLivraison(s: { input: PoolpInput; computed: ReturnType<typeof getState>['computed'] }): string {
+    const c = s.computed
+    const zoneBlock = c?.livraison ? `
+      <div class="poolp-zone-box">
+        <div style="font-size:11px;color:var(--p-text3);margin-bottom:8px">Zone logistique calculée</div>
+        <div class="poolp-zone-row">
+          <span><span style="color:var(--p-text2)">Zone : </span><strong>${escapeHtml(c.livraison.zone_label)}</strong></span>
+          <span><span style="color:var(--p-text2)">Délai : </span><strong>${escapeHtml(c.livraison.delay_label || '—')}</strong></span>
+          <span><span style="color:var(--p-text2)">Frais : </span><strong>${money(c.livraison.fee_ttc)}</strong></span>
+        </div>
+      </div>` : '<div class="poolp-zone-box"><div class="poolp-empty-note">Saisissez un code postal pour calculer la zone.</div></div>'
+
+    return `
+      <div class="poolp-step-title">Étape 5 — Livraison</div>
+      <p class="poolp-step-sub">Renseignez votre code postal et choisissez le mode de livraison.</p>
+
+      <div class="poolp-field-group" style="max-width:200px;margin-bottom:20px">
+        <div class="poolp-field-label"><strong>Code postal</strong> *</div>
+        <input class="poolp-field-input" type="text" pattern="\\d{5}" maxlength="5" name="code_postal" value="${escapeHtml(s.input.code_postal || '')}">
+      </div>
+
+      ${zoneBlock}
+
+      <div style="font-size:13px;font-weight:600;margin-bottom:14px">Mode de livraison</div>
+      <div class="poolp-delivery-grid">
+        <button class="poolp-delivery-card ${s.input.mode_livraison === 'kit' ? 'sel' : ''}" data-set-mode="kit" type="button">
+          <div class="poolp-delivery-img">${ICONS.delivery_kit}Photo box en kit / palette</div>
+          <div class="poolp-delivery-body">
+            <div class="poolp-delivery-header">
+              <div class="poolp-delivery-name">Box en kit</div>
+              <div class="poolp-radio ${s.input.mode_livraison === 'kit' ? 'sel' : ''}"></div>
+            </div>
+            <div class="poolp-delivery-desc">Livrée démontée sur palette — montage sur site avec notice incluse</div>
+          </div>
+        </button>
+        <button class="poolp-delivery-card ${s.input.mode_livraison === 'montee' ? 'sel' : ''}" data-set-mode="montee" type="button">
+          <div class="poolp-delivery-img">${ICONS.delivery_assembled}Photo box montée livrée</div>
+          <div class="poolp-delivery-body">
+            <div class="poolp-delivery-header">
+              <div class="poolp-delivery-name">Box montée</div>
+              <div class="poolp-radio ${s.input.mode_livraison === 'montee' ? 'sel' : ''}"></div>
+            </div>
+            <div class="poolp-delivery-desc">Livrée assemblée — prête à raccorder sur site</div>
+          </div>
+        </button>
+      </div>
+
+      <div style="font-size:12px;color:var(--p-text3);margin-bottom:20px">Tarif de livraison valable 1 semaine à compter du calcul.</div>
+
+      <div class="poolp-nav-btns">
+        <button class="poolp-btn sec" data-go-step="5" type="button">← Étape précédente</button>
+        <button class="poolp-btn cta" data-go-step="7" type="button">Voir le récapitulatif →</button>
+      </div>`
+  }
+
+  // ── Step 7 : Récap ────────────────────────────────────────────────────
+  function stepRecap(s: { input: PoolpInput; computed: ReturnType<typeof getState>['computed'] }): string {
+    const c = s.computed
+    if (!c || c.error || !c.box) {
+      return `<div class="poolp-step-title">Étape 6 — Récapitulatif</div>
+        <div class="poolp-error">Configuration incomplète. Revenez aux étapes précédentes.</div>`
+    }
+
+    const fin = finitions.find(f => f.id === s.input.finition_id)
+    const eqLabel = `${c.box.label} + filtre ${s.input.filtre} + pompe ${s.input.pompe} + ${s.input.traitement?.replace('_', ' ') || 'sans traitement'} + coffret ${s.input.pompe === 'variable' ? 'Wi-Fi' : 'Bluetooth'}`
+    const eqPrice = c.box.prix_base_ttc + Object.values(c.equipements || {}).reduce((sum, eq) => sum + (eq?.prix_ttc || 0), 0)
+
+    return `
+      <div class="poolp-step-title">Étape 6 — Récapitulatif</div>
+      <p class="poolp-step-sub">Vérifiez votre configuration avant de passer commande ou de demander un devis.</p>
+
+      <div class="poolp-bassin-box">
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px">Données bassin</div>
+        <div style="display:flex;gap:20px;font-size:13px;flex-wrap:wrap;margin-bottom:8px">
+          <span><span style="color:var(--p-text2)">L × l × h : </span><strong>${s.input.longueur} × ${s.input.largeur} × ${String(s.input.hauteur).replace('.', ',')} m</strong></span>
+          <span><span style="color:var(--p-text2)">Volume : </span><strong>${fmtVol(c.hydraulic.volume)}</strong></span>
+          <span><span style="color:var(--p-text2)">Débit : </span><strong>${c.hydraulic.debit.toFixed(0)} m³/h</strong></span>
+          <span><span style="color:var(--p-text2)">Skimmers : </span><strong>${c.hydraulic.nb_skimmers}</strong></span>
+        </div>
+        <div style="display:flex;gap:20px;font-size:13px;flex-wrap:wrap">
+          <span><span style="color:var(--p-text2)">Volet immergé : </span><strong>${s.input.volet_immerge ? 'Oui' : 'Non'}</strong></span>
+          <span><span style="color:var(--p-text2)">Prise balai : </span><strong>${s.input.prise_balai ? 'Oui' : 'Non'}</strong></span>
+          <span><span style="color:var(--p-text2)">Bassin couvert : </span><strong>${s.input.bassin_couvert ? 'Oui' : 'Non'}</strong></span>
+          <span><span style="color:var(--p-text2)">Projecteurs LED : </span><strong>${s.input.projecteurs_led}</strong></span>
+        </div>
+      </div>
+
+      <div class="poolp-recap-table">
+        <div class="poolp-recap-table-header"><span>Équipement</span><span>Prix TTC</span></div>
+        <div class="poolp-recap-table-row"><span>${escapeHtml(eqLabel)}</span><span>${money(eqPrice)}</span></div>
+        ${fin && fin.title ? `<div class="poolp-recap-table-row"><span>Finition ${escapeHtml(fin.title)}</span><span>${money((fin.custom_fields as { prix_supplement_ttc?: number })?.prix_supplement_ttc ?? 0)}</span></div>` : ''}
+        ${c.livraison ? `<div class="poolp-recap-table-row"><span>Livraison ${escapeHtml(c.livraison.zone_label)} (${s.input.mode_livraison})</span><span>${money(c.livraison.fee_ttc)}</span></div>` : ''}
+        <div class="poolp-recap-table-total"><span>Total TTC</span><span>${money(c.totaux.ttc)}</span></div>
+      </div>
+
+      ${c.warnings?.includes('triphase') ? `<div class="poolp-warn-band">⚠ Installation triphasée ou ERP ? Contactez-nous pour un devis adapté.</div>` : ''}
+
+      <div class="poolp-pro-prompt">
+        <div class="poolp-pro-prompt-title">Vous êtes professionnel ?</div>
+        <p class="poolp-pro-prompt-desc">Connectez-vous ou créez un compte pro pour accéder à vos tarifs revendeurs HT.</p>
+        <div style="display:flex;gap:10px">
+          <a class="poolp-btn sec" href="/login" style="font-size:12px;padding:7px 14px">Me connecter</a>
+          <a class="poolp-btn sec" href="/inscription-pro" style="font-size:12px;padding:7px 14px">Créer un compte pro</a>
+        </div>
+      </div>
+
+      <div class="poolp-actions-grid">
+        <button class="poolp-btn cta" data-action="add-to-cart" type="button" style="text-align:center">Ajouter au panier</button>
+        <button class="poolp-btn sec" data-action="save-project" type="button" style="text-align:center">Sauvegarder le projet</button>
+        ${c.is_pro ? `<button class="poolp-btn sec" data-action="export-pdf" type="button" style="text-align:center">Exporter en PDF</button>` : ''}
+      </div>
+
+      <div class="poolp-nav-btns">
+        <button class="poolp-btn sec" data-go-step="6" type="button">← Modifier la livraison</button>
+      </div>
+
+      <div class="poolp-status" id="poolp-recap-status"></div>`
+  }
+
+  // ── Event binding ─────────────────────────────────────────────────────
+  function bindStepEvents(): void {
+    const root = document.getElementById('poolp-step-content')
+    if (!root) return
+
+    root.querySelectorAll<HTMLInputElement>('input[type="number"]').forEach(input => {
+      input.addEventListener('input', () => {
+        const v = parseFloat(input.value.replace(',', '.'))
+        if (!isNaN(v)) updateInput({ [input.name]: v } as Partial<PoolpInput>)
+      })
+    })
+    root.querySelectorAll<HTMLInputElement>('input[type="text"]').forEach(input => {
+      input.addEventListener('input', () => updateInput({ [input.name]: input.value } as Partial<PoolpInput>))
+    })
+
+    root.querySelectorAll<HTMLButtonElement>('[data-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.toggle as keyof PoolpInput
+        const current = getState().input[key] as boolean
+        updateInput({ [key]: !current } as Partial<PoolpInput>)
+      })
+    })
+
+    root.querySelectorAll<HTMLButtonElement>('[data-go-step]').forEach(btn => {
+      btn.addEventListener('click', () => setStep(Number(btn.dataset.goStep) as 1|3|4|5|6|7))
+    })
+    root.querySelectorAll<HTMLButtonElement>('[data-set-filtre]').forEach(btn => {
+      btn.addEventListener('click', () => updateInput({ filtre: btn.dataset.setFiltre as FiltreType }))
+    })
+    root.querySelectorAll<HTMLButtonElement>('[data-set-pompe]').forEach(btn => {
+      btn.addEventListener('click', () => updateInput({ pompe: btn.dataset.setPompe as PompeType }))
+    })
+    root.querySelectorAll<HTMLButtonElement>('[data-set-traitement]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return
+        updateInput({ traitement: btn.dataset.setTraitement as Traitement })
+      })
+    })
+    root.querySelectorAll<HTMLButtonElement>('[data-set-bypass]').forEach(btn => {
+      btn.addEventListener('click', () => updateInput({ bypass_pac: btn.dataset.setBypass === '1' }))
+    })
+    root.querySelectorAll<HTMLButtonElement>('[data-set-finition]').forEach(btn => {
+      btn.addEventListener('click', () => updateInput({ finition_id: Number(btn.dataset.setFinition) }))
+    })
+    root.querySelectorAll<HTMLButtonElement>('[data-set-mode]').forEach(btn => {
+      btn.addEventListener('click', () => updateInput({ mode_livraison: btn.dataset.setMode as 'kit'|'montee' }))
+    })
+    root.querySelectorAll<HTMLButtonElement>('[data-led]').forEach(btn => {
+      btn.addEventListener('click', () => updateInput({ projecteurs_led: Number(btn.dataset.led) as 0|1|2 }))
+    })
+    root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(btn => {
+      btn.addEventListener('click', () => onRecapAction(btn.dataset.action as string))
+    })
+  }
+
+  async function onRecapAction(action: string): Promise<void> {
+    const status = document.getElementById('poolp-recap-status')
+    const setStatus = (msg: string) => { if (status) status.textContent = msg }
+    const s = getState()
+
+    if (action === 'save-project') {
+      setStatus('Sauvegarde…')
+      const result = await saveProject(s.input)
+      if (!result) return setStatus('Erreur lors de la sauvegarde.')
+      setProjectToken(result.token)
+      const url = new URL(window.location.href)
+      url.searchParams.set('p', result.token)
+      window.history.replaceState({}, '', url.toString())
+      setStatus(`Projet sauvegardé (réf : ${result.token.slice(0, 8)}…)`)
+      return
+    }
+    if (action === 'export-pdf') {
+      setStatus('Génération du PDF…')
+      let token = s.projectToken
+      if (!token) {
+        const saved = await saveProject(s.input)
+        if (!saved) return setStatus('Sauvegarde du projet échouée.')
+        setProjectToken(saved.token); token = saved.token
+      }
+      const result = await exportProjectPdf(token)
+      if (!result) return setStatus('Erreur PDF — vérifiez que Dompdf est installé côté backend.')
+      window.open(result.url, '_blank')
+      setStatus(`PDF prêt : ${result.url}`)
+      return
+    }
+    if (action === 'add-to-cart') {
+      setStatus('Ajout au panier…')
+      let token = s.projectToken
+      if (!token) {
+        const saved = await saveProject(s.input)
+        if (!saved) return setStatus('Sauvegarde du projet échouée.')
+        setProjectToken(saved.token); token = saved.token
+      }
+      const result = await addProjectToCart(token)
+      if (!result) return setStatus("Le panier nécessite l'activation du plugin ecommerce.")
+      setStatus('Ajouté au panier ✓')
+      window.location.href = '/panier'
+    }
+  }
+
+  // ── Subscribe + bootstrap ─────────────────────────────────────────────
+  subscribe(state => {
+    renderStepper(state.step)
+    renderSidebar()
+    renderStep()
+  })
+
+  void (async () => {
+    const ok = await clientBootstrap()
+    if (ok) void runCompute()
+  })()
+</script>

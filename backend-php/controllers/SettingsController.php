@@ -26,11 +26,12 @@ class SettingsController {
     }
 
     public static function getSiteInfo(): void {
-        $s = self::getSettingsMap(['site_name', 'site_description', 'front_page']);
+        $s = self::getSettingsMap(['site_name', 'site_description', 'front_page', 'favicon']);
         json_response([
             'siteName' => $s['site_name'] ?? '',
             'siteDescription' => $s['site_description'] ?? '',
             'frontPage' => $s['front_page'] ?? '',
+            'favicon' => $s['favicon'] ?? '',
         ]);
     }
 

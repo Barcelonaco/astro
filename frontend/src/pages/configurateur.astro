@@ -1,0 +1,60 @@
+---
+/**
+ * Configurateur POOLP — page dédiée /configurateur.
+ *
+ * Page statique (build time) ; le plugin-active check, le fetch bootstrap et
+ * le restore de projet se font en client-side via lib/poolp-api.ts.
+ * Si le plugin n'est pas actif sur ce site (cas test/prod1/prod2), le wizard
+ * affiche un message neutre et propose un retour vers /.
+ *
+ * URL :
+ *   /configurateur            → wizard vide
+ *   /configurateur?p=<token>  → restaure un projet sauvegardé
+ */
+import BaseHead from '../components/BaseHead.astro'
+import Header from '../components/Header.astro'
+import Footer from '../components/Footer.astro'
+import SiteOverlays from '../components/SiteOverlays.astro'
+import DeferredLoader from '../components/DeferredLoader.astro'
+import PoolpWizard from '../components/poolp/PoolpWizard.astro'
+import { SITE_TITLE } from '../consts'
+import { getFrontendBootstrap } from '../lib/api'
+import { setDefaultImageUrl } from '../lib/module-helpers'
+
+// Cache-bust at build time so updated plugin CSS is fetched even when
+// the browser holds the previous (long-cached) version of the file.
+const cssVersion = Date.now()
+
+// Single API call for all bootstrap data (site info + navigation + style settings)
+const { siteInfo, styleSettings, siteSettings, navigation: navigationData, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title="Configurateur POOLP" description="Configurez votre box piscine en quelques étapes." styleSettings={styleSettings} siteSettings={siteSettings} />
+    <link rel="stylesheet" href={`/plugin-assets/poolp-configurator/css/poolp-configurator.css?v=${cssVersion}`} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigationData} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+    <main class="main-page poolp-page-wrap">
+      <div class="poolp-container">
+        <PoolpWizard bootstrap={null} initialProject={null} />
+      </div>
+    </main>
+    <Footer siteSettings={siteSettings} />
+    <style is:global>
+      .poolp-page-wrap { min-height: 60vh; padding: 0; width: 100%; }
+      .poolp-container { width: 100%; max-width: none; margin: 0; padding: 0; }
+    </style>
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+  </body>
+</html>
