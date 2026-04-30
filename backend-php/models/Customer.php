@@ -18,7 +18,7 @@ class CustomerModel {
         $db = Database::getInstance();
         $cols = $includeSensitive
             ? '*'
-            : 'id, email, first_name, last_name, phone, company, vat_number, is_pro, accepts_marketing, email_verified_at, locale, last_login_at, created_at, updated_at, anonymized_at';
+            : 'id, email, first_name, last_name, phone, company, vat_number, siret, activity, is_pro, pro_status, accepts_marketing, email_verified_at, locale, last_login_at, created_at, updated_at, anonymized_at';
         $stmt = $db->prepare("SELECT {$cols} FROM customers WHERE id = ?");
         $stmt->execute([$id]);
         $row = $stmt->fetch();
@@ -28,10 +28,14 @@ class CustomerModel {
     public static function create(array $data): int {
         $db = Database::getInstance();
         $hash = password_hash($data['password'], PASSWORD_BCRYPT);
+        // is_pro est dérivé de pro_status='approved' — interdit l'auto-promotion
+        // à la création (cf. CustomerAuthController::register qui force pending).
+        $proStatus = self::normalizeProStatus($data['pro_status'] ?? 'none');
+        $isPro = $proStatus === 'approved' ? 1 : 0;
         $stmt = $db->prepare('
             INSERT INTO customers
-                (email, password_hash, first_name, last_name, phone, company, vat_number, is_pro, accepts_marketing, locale, last_activity_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                (email, password_hash, first_name, last_name, phone, company, vat_number, siret, activity, is_pro, pro_status, accepts_marketing, locale, last_activity_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ');
         $stmt->execute([
             $data['email'],
@@ -41,22 +45,43 @@ class CustomerModel {
             $data['phone'] ?? null,
             $data['company'] ?? null,
             $data['vat_number'] ?? null,
-            !empty($data['is_pro']) ? 1 : 0,
+            $data['siret'] ?? null,
+            $data['activity'] ?? null,
+            $isPro,
+            $proStatus,
             !empty($data['accepts_marketing']) ? 1 : 0,
             $data['locale'] ?? 'fr',
         ]);
         return (int) $db->lastInsertId();
     }
 
+    /** Borne pro_status aux valeurs ENUM ; tout invalid → 'none'. */
+    private static function normalizeProStatus(?string $status): string {
+        $allowed = ['none', 'pending', 'approved', 'rejected'];
+        return in_array($status, $allowed, true) ? $status : 'none';
+    }
+
     public static function updateProfile(int $id, array $data): void {
         $db = Database::getInstance();
         $fields = [];
         $values = [];
-        $allowed = ['first_name', 'last_name', 'phone', 'company', 'vat_number', 'is_pro', 'accepts_marketing', 'locale'];
+        // is_pro retiré : maintenant dérivé exclusivement de pro_status (réservé
+        // à l'admin). Un changement de pro_status recompute is_pro.
+        $allowed = ['first_name', 'last_name', 'phone', 'company', 'vat_number', 'siret', 'activity', 'pro_status', 'accepts_marketing', 'locale'];
         foreach ($allowed as $f) {
-            if (array_key_exists($f, $data)) {
+            if (!array_key_exists($f, $data)) continue;
+            if ($f === 'pro_status') {
+                $status = self::normalizeProStatus($data[$f]);
+                $fields[] = 'pro_status = ?';
+                $values[] = $status;
+                $fields[] = 'is_pro = ?';
+                $values[] = $status === 'approved' ? 1 : 0;
+            } elseif ($f === 'accepts_marketing') {
                 $fields[] = "{$f} = ?";
-                $values[] = in_array($f, ['is_pro', 'accepts_marketing']) ? (!empty($data[$f]) ? 1 : 0) : $data[$f];
+                $values[] = !empty($data[$f]) ? 1 : 0;
+            } else {
+                $fields[] = "{$f} = ?";
+                $values[] = $data[$f];
             }
         }
         if (empty($fields)) return;

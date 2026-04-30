@@ -24,10 +24,12 @@ require_once __DIR__ . '/controllers/EcommerceMigrationController.php';
 // can register their migration hooks before we run them.
 try {
     foreach (PluginController::getPluginRoots() as $__pluginRoot) {
-        if (!is_dir($__pluginRoot)) continue;
+        if (!is_dir($__pluginRoot))
+            continue;
         foreach (glob($__pluginRoot . '/*/backend/autoload.php') as $__autoload) {
             $__pluginDir = basename(dirname(dirname($__autoload)));
-            if (!PluginController::isPluginActive($__pluginDir)) continue;
+            if (!PluginController::isPluginActive($__pluginDir))
+                continue;
             require_once $__autoload;
         }
     }
@@ -46,13 +48,15 @@ $changes = 0;
 
 // ─── Helper functions ───────────────────────────────────────────────────────
 
-function table_exists(PDO $db, string $table): bool {
+function table_exists(PDO $db, string $table): bool
+{
     $safe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
     $result = $db->query("SHOW TABLES LIKE '{$safe}'")->fetch();
     return (bool) $result;
 }
 
-function get_columns(PDO $db, string $table): array {
+function get_columns(PDO $db, string $table): array
+{
     $cols = [];
     foreach ($db->query("SHOW COLUMNS FROM `{$table}`")->fetchAll() as $col) {
         $cols[$col['Field']] = $col;
@@ -60,12 +64,15 @@ function get_columns(PDO $db, string $table): array {
     return $cols;
 }
 
-function ensure_column(PDO $db, string $table, string $column, string $definition, ?string $after = null): bool {
+function ensure_column(PDO $db, string $table, string $column, string $definition, ?string $after = null): bool
+{
     $cols = get_columns($db, $table);
-    if (isset($cols[$column])) return false;
+    if (isset($cols[$column]))
+        return false;
 
     $sql = "ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}";
-    if ($after) $sql .= " AFTER `{$after}`";
+    if ($after)
+        $sql .= " AFTER `{$after}`";
     $db->exec($sql);
     echo "  + Added column {$table}.{$column}\n";
     return true;
@@ -89,11 +96,11 @@ if (!table_exists($db, 'users')) {
 
     // Default admin users
     $defaultUsers = [
-        ['Chulee',   'chulee@barcelona-co.fr',   'GS3iQMjJROQj'],
-        ['Quentin',  'quentin@barcelona-co.fr',   'Linoleum-Impurity-Launder0-Scariness'],
-        ['Olivier',  'olivier@barcelona-co.fr',    'Overvalue-Cactus-Hunter0'],
+        ['Chulee', 'chulee@barcelona-co.fr', 'GS3iQMjJROQj', 'chulee'],
+        ['Quentin', 'quentin@barcelona-co.fr', 'Linoleum-Impurity-Launder0-Scariness', 'quentin'],
+        ['Olivier', 'olivier@barcelona-co.fr', 'Overvalue-Cactus-Hunter0', 'olivier'],
     ];
-    $stmt = $db->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'super_admin')");
+    $stmt = $db->prepare("INSERT INTO users (name, email, password, username, role) VALUES (?, ?, ?, ?, 'super_admin')");
     foreach ($defaultUsers as [$name, $email, $pwd]) {
         $stmt->execute([$name, $email, password_hash($pwd, PASSWORD_DEFAULT)]);
         echo "  + Created admin ({$email})\n";
@@ -112,9 +119,9 @@ if (!table_exists($db, 'users')) {
 
     // Ensure default admin users exist
     $defaultUsers = [
-        ['Chulee',   'chulee@barcelona-co.fr',   'GS3iQMjJROQj'],
-        ['Quentin',  'quentin@barcelona-co.fr',   'Linoleum-Impurity-Launder0-Scariness'],
-        ['Olivier',  'olivier@barcelona-co.fr',    'Overvalue-Cactus-Hunter0'],
+        ['Chulee', 'chulee@barcelona-co.fr', 'GS3iQMjJROQj'],
+        ['Quentin', 'quentin@barcelona-co.fr', 'Linoleum-Impurity-Launder0-Scariness'],
+        ['Olivier', 'olivier@barcelona-co.fr', 'Overvalue-Cactus-Hunter0'],
     ];
     $check = $db->prepare("SELECT id FROM users WHERE email = ?");
     $insert = $db->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'super_admin')");
@@ -126,7 +133,8 @@ if (!table_exists($db, 'users')) {
             $changes++;
         }
     }
-    if ($changes === 0) echo "  OK\n";
+    if ($changes === 0)
+        echo "  OK\n";
 }
 $changes += ensure_column($db, 'users', 'username', "VARCHAR(100) DEFAULT NULL", 'name') ? 1 : 0;
 // Add UNIQUE index on username if column was just added or index doesn't exist
@@ -269,10 +277,14 @@ if (!table_exists($db, 'pages')) {
     $changes++;
 } else {
     // Add columns that may be missing on older installs
-    if (ensure_column($db, 'pages', 'color_overrides', 'JSON DEFAULT NULL', 'content')) $changes++;
-    if (ensure_column($db, 'pages', 'seo_meta', 'JSON DEFAULT NULL', 'color_overrides')) $changes++;
-    if (ensure_column($db, 'pages', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP', 'created_at')) $changes++;
-    if (ensure_column($db, 'pages', 'published_date', 'DATETIME DEFAULT NULL', 'status')) $changes++;
+    if (ensure_column($db, 'pages', 'color_overrides', 'JSON DEFAULT NULL', 'content'))
+        $changes++;
+    if (ensure_column($db, 'pages', 'seo_meta', 'JSON DEFAULT NULL', 'color_overrides'))
+        $changes++;
+    if (ensure_column($db, 'pages', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP', 'created_at'))
+        $changes++;
+    if (ensure_column($db, 'pages', 'published_date', 'DATETIME DEFAULT NULL', 'status'))
+        $changes++;
 
     // Expand status ENUM to include 'private'
     $colInfo = $db->query("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pages' AND COLUMN_NAME = 'status'")->fetchColumn();
@@ -284,9 +296,13 @@ if (!table_exists($db, 'pages')) {
 
     // Backfill published_date for existing published pages that have NULL
     $backfilled = $db->exec("UPDATE pages SET published_date = created_at WHERE status = 'published' AND published_date IS NULL");
-    if ($backfilled > 0) { echo "  + Backfilled published_date for {$backfilled} pages\n"; $changes++; }
+    if ($backfilled > 0) {
+        echo "  + Backfilled published_date for {$backfilled} pages\n";
+        $changes++;
+    }
 
-    if ($changes === 0) echo "  OK\n";
+    if ($changes === 0)
+        echo "  OK\n";
 }
 
 // ─── Fix dangerous CASCADE on author_id → users ────────────────────────────
@@ -391,12 +407,18 @@ if (!table_exists($db, 'media_items')) {
     $changes++;
 } else {
     // Add columns that may be missing
-    if (ensure_column($db, 'media_items', 'alt', "VARCHAR(500) DEFAULT ''", 'original_name')) $changes++;
-    if (ensure_column($db, 'media_items', 'title', "VARCHAR(500) DEFAULT ''", 'alt')) $changes++;
-    if (ensure_column($db, 'media_items', 'caption', 'TEXT', 'title')) $changes++;
-    if (ensure_column($db, 'media_items', 'description', 'TEXT', 'caption')) $changes++;
-    if (ensure_column($db, 'media_items', 'width', 'INT', 'size')) $changes++;
-    if (ensure_column($db, 'media_items', 'height', 'INT', 'width')) $changes++;
+    if (ensure_column($db, 'media_items', 'alt', "VARCHAR(500) DEFAULT ''", 'original_name'))
+        $changes++;
+    if (ensure_column($db, 'media_items', 'title', "VARCHAR(500) DEFAULT ''", 'alt'))
+        $changes++;
+    if (ensure_column($db, 'media_items', 'caption', 'TEXT', 'title'))
+        $changes++;
+    if (ensure_column($db, 'media_items', 'description', 'TEXT', 'caption'))
+        $changes++;
+    if (ensure_column($db, 'media_items', 'width', 'INT', 'size'))
+        $changes++;
+    if (ensure_column($db, 'media_items', 'height', 'INT', 'width'))
+        $changes++;
     // Ensure type column supports 'document' (migrate from ENUM to VARCHAR if needed)
     $typeCol = $db->query("SHOW COLUMNS FROM media_items LIKE 'type'")->fetch();
     if ($typeCol && stripos($typeCol['Type'], 'enum') !== false && stripos($typeCol['Type'], 'document') === false) {
@@ -404,7 +426,8 @@ if (!table_exists($db, 'media_items')) {
         echo "  ~ type column: ENUM → VARCHAR(20)\n";
         $changes++;
     }
-    if ($changes === 0) echo "  OK\n";
+    if ($changes === 0)
+        echo "  OK\n";
 }
 
 // ─── Table: menus ───────────────────────────────────────────────────────────
@@ -422,9 +445,9 @@ if (!table_exists($db, 'menus')) {
 
     // Default menus
     $defaultMenus = [
-        ['Footer',            'footer'],
-        ['Menu principale',   'primary'],
-        ['Menu secondaire',   'secondary'],
+        ['Footer', 'footer'],
+        ['Menu principale', 'primary'],
+        ['Menu secondaire', 'secondary'],
     ];
     $stmt = $db->prepare("INSERT INTO menus (name, location) VALUES (?, ?)");
     foreach ($defaultMenus as [$name, $loc]) {
@@ -435,9 +458,9 @@ if (!table_exists($db, 'menus')) {
 } else {
     // Ensure default menus exist
     $defaultMenus = [
-        ['Footer',            'footer'],
-        ['Menu principale',   'primary'],
-        ['Menu secondaire',   'secondary'],
+        ['Footer', 'footer'],
+        ['Menu principale', 'primary'],
+        ['Menu secondaire', 'secondary'],
     ];
     $menuChanges = 0;
     $check = $db->prepare("SELECT id FROM menus WHERE location = ?");
@@ -451,7 +474,8 @@ if (!table_exists($db, 'menus')) {
         }
     }
     $changes += $menuChanges;
-    if ($menuChanges === 0) echo "  OK\n";
+    if ($menuChanges === 0)
+        echo "  OK\n";
 }
 
 // ─── Table: menu_items ──────────────────────────────────────────────────────
@@ -475,8 +499,10 @@ if (!table_exists($db, 'menu_items')) {
     echo "  + Created table\n";
     $changes++;
 } else {
-    if (ensure_column($db, 'menu_items', 'open_in_new_tab', "TINYINT(1) NOT NULL DEFAULT 0", 'menu_order')) $changes++;
-    if ($changes === 0) echo "  OK\n";
+    if (ensure_column($db, 'menu_items', 'open_in_new_tab', "TINYINT(1) NOT NULL DEFAULT 0", 'menu_order'))
+        $changes++;
+    if ($changes === 0)
+        echo "  OK\n";
 }
 
 // ─── Table: reusable_blocs ──────────────────────────────────────────────────
@@ -534,7 +560,8 @@ if (!table_exists($db, 'forms')) {
         echo "  OK\n";
     }
     // Ensure updated_at column exists (older installs lack it)
-    if (ensure_column($db, 'forms', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP', 'created_at')) $changes++;
+    if (ensure_column($db, 'forms', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP', 'created_at'))
+        $changes++;
 }
 
 // ─── Table: form_fields ─────────────────────────────────────────────────────
@@ -611,10 +638,12 @@ $pluginsDir = __DIR__ . '/../plugins';
 if (is_dir($pluginsDir)) {
     foreach (scandir($pluginsDir) as $dir) {
         $manifest = $pluginsDir . '/' . $dir . '/plugin.json';
-        if (!file_exists($manifest)) continue;
+        if (!file_exists($manifest))
+            continue;
 
         $plugin = json_decode(file_get_contents($manifest), true);
-        if (!$plugin || empty($plugin['postTypes'])) continue;
+        if (!$plugin || empty($plugin['postTypes']))
+            continue;
 
         foreach ($plugin['postTypes'] as $pt) {
             $slug = $pt['slug'];
@@ -644,8 +673,10 @@ if (is_dir($pluginsDir)) {
                 $changes++;
             } else {
                 // Colonne seo_meta peut manquer sur des CPT anciens (pre-Phase 0)
-                if (ensure_column($db, $table, 'seo_meta', 'JSON DEFAULT NULL', 'custom_fields')) $changes++;
-                else echo "    OK\n";
+                if (ensure_column($db, $table, 'seo_meta', 'JSON DEFAULT NULL', 'custom_fields'))
+                    $changes++;
+                else
+                    echo "    OK\n";
             }
 
             if (!empty($pt['hasCategories'])) {
@@ -755,11 +786,13 @@ if ($oldPricingCount > 0) {
 // ─── E-commerce tables ──────────────────────────────────────────────────────
 
 echo "\nE-commerce (Phase 0+) :\n";
-$changes += EcommerceMigrationController::migrate(function (string $msg) { echo $msg . "\n"; });
+$changes += EcommerceMigrationController::migrate(function (string $msg) {
+    echo $msg . "\n"; });
 
 // ─── Plugin migrations (registered via plugin-hooks.php) ────────────────────
 echo "\nPlugin migrations:";
-$changes += run_plugin_migrations(function (string $msg) { echo $msg . "\n"; });
+$changes += run_plugin_migrations(function (string $msg) {
+    echo $msg . "\n"; });
 
 // ─── Summary ────────────────────────────────────────────────────────────────
 

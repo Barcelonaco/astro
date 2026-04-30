@@ -17,6 +17,7 @@ class CustomerAuthController {
         $password = $body['password'] ?? '';
         $firstName = trim($body['first_name'] ?? '');
         $lastName = trim($body['last_name'] ?? '');
+        $isProRequest = !empty($body['is_pro']);
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             error_response('Email invalide', 400);
@@ -25,11 +26,27 @@ class CustomerAuthController {
             error_response('Le mot de passe doit contenir au moins 8 caractères', 400);
         }
 
+        // Validation pro : SIRET + activité requis. SIRET = 14 chiffres après
+        // strip espaces. Activité bornée à la liste front (cf. /inscription-pro).
+        $siret = preg_replace('/\s+/', '', (string) ($body['siret'] ?? '')) ?: null;
+        $activity = trim((string) ($body['activity'] ?? '')) ?: null;
+        $allowedActivities = ['pisciniste', 'paysagiste', 'batiment', 'thermique', 'distributeur', 'autre'];
+        if ($isProRequest) {
+            if (!$siret || !preg_match('/^\d{14}$/', $siret)) {
+                error_response('Numéro SIRET invalide (14 chiffres requis)', 400);
+            }
+            if (!$activity || !in_array($activity, $allowedActivities, true)) {
+                error_response('Activité invalide', 400);
+            }
+        }
+
         // Refuser si customer déjà existant
         if (CustomerModel::findByEmail($email)) {
             error_response('Cet email est déjà utilisé', 409);
         }
 
+        // Gate : is_pro=true demandé → pro_status='pending', is_pro reste 0
+        // jusqu'à validation manuelle admin (CustomerModel applique la règle).
         $id = CustomerModel::create([
             'email' => $email,
             'password' => $password,
@@ -38,7 +55,9 @@ class CustomerAuthController {
             'phone' => trim($body['phone'] ?? '') ?: null,
             'company' => trim($body['company'] ?? '') ?: null,
             'vat_number' => trim($body['vat_number'] ?? '') ?: null,
-            'is_pro' => !empty($body['is_pro']),
+            'siret' => $siret,
+            'activity' => $activity,
+            'pro_status' => $isProRequest ? 'pending' : 'none',
             'accepts_marketing' => !empty($body['accepts_marketing']),
         ]);
 
@@ -103,9 +122,11 @@ class CustomerAuthController {
         $auth = authenticate_customer();
         $body = get_json_body();
 
+        // is_pro retiré : self-promotion impossible. pro_status réservé à l'admin
+        // (un futur AdminCustomerController appellera CustomerModel::updateProfile).
         $data = array_intersect_key($body, array_flip([
             'first_name', 'last_name', 'phone', 'company', 'vat_number',
-            'is_pro', 'accepts_marketing', 'locale'
+            'siret', 'activity', 'accepts_marketing', 'locale'
         ]));
         CustomerModel::updateProfile($auth['id'], $data);
 
