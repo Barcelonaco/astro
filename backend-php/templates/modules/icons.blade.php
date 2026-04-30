@@ -46,16 +46,21 @@
                                 target="{{ !empty($logo['link']['target']) ? $logo['link']['target'] : '_self' }}">
                         @endif
                             @php
-                                if ($module['icon_type'] == 0) {
-                                    $img = $logo['logo']['sizes']['thumbnail'];
-                                } else {
-                                    $img = $logo['logo']['url'];
+                                $img = null;
+                                if (!empty($logo['logo'])) {
+                                    if ($module['icon_type'] == 0) {
+                                        $img = $logo['logo']['sizes']['thumbnail'] ?? null;
+                                    } else {
+                                        $img = $logo['logo']['url'] ?? null;
+                                    }
                                 }
                             @endphp
 
-                            <div class="illus-wrapper">
-                                <img src="{{ $img }}" alt="" class="illus{{ $module['icon_type'] ? null : ' icon_type_jpg' }}">
-                            </div>{{-- /.illus-wrapper --}}
+                            @if (!empty($img))
+                                <div class="illus-wrapper">
+                                    <img src="{{ $img }}" alt="" class="illus{{ $module['icon_type'] ? null : ' icon_type_jpg' }}">
+                                </div>{{-- /.illus-wrapper --}}
+                            @endif
                             @if (!empty($logo['titre']) || !empty($logo['desc']))
                                 <div class="desc">
                                     @if (!empty($logo['titre']))
