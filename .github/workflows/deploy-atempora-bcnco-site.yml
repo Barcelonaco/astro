@@ -83,8 +83,8 @@ jobs:
             cd "$REMOTE_ROOT/backend-php"
             $PHP migrate.php
 
-            # Start temporary PHP server for build-time API access (port 8892 to avoid collision with other sites)
-            $PHP -S 127.0.0.1:8892 index.php > /dev/null 2>&1 &
+            # Start temporary PHP server for build-time API access (port 8894 to avoid collision with other sites)
+            $PHP -S 127.0.0.1:8894 index.php > /dev/null 2>&1 &
             PHP_PID=$!
 
             # Wait until PHP server is ready (max 15s)
