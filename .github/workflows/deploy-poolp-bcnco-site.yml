@@ -103,7 +103,7 @@ jobs:
             # Backup dist before build (astro build wipes dist/ first)
             if [ -d dist ]; then cp -r dist dist_backup; fi
 
-            if BUILD_API_URL=http://127.0.0.1:8893/api BUILD_MEDIA_ORIGIN=https://poolp.bcnco.site npm run build; then
+            if BUILD_API_URL=http://127.0.0.1:8893/api BUILD_SITE_URL=https://poolp.bcnco.site BUILD_MEDIA_ORIGIN=https://poolp.bcnco.site npm run build; then
               rm -rf dist_backup
             else
               echo "⚠️ Build failed, restoring previous dist"

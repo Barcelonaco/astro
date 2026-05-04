@@ -32,7 +32,16 @@ interface Props {
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
-const { title, description, image = FallbackImage, styleSettings, siteSettings: s = {}, lcpImage } = Astro.props;
+const { title, description, image, styleSettings, siteSettings: s = {}, lcpImage } = Astro.props;
+
+const settingsOgImage = s.og_image || s.share_image || s.logo || '';
+const ogImageHref = image
+  ? new URL(image.src, Astro.url).toString()
+  : settingsOgImage
+    ? (settingsOgImage.startsWith('http')
+        ? settingsOgImage
+        : new URL(settingsOgImage.startsWith('/') ? settingsOgImage : `/${settingsOgImage}`, Astro.url).toString())
+    : new URL(FallbackImage.src, Astro.url).toString();
 
 // Cookie consent
 const cookieEnabled = s.cookie_enabled || '0';
@@ -129,14 +138,14 @@ const faviconType = faviconUrl
 <meta property="og:url" content={Astro.url} />
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
-<meta property="og:image" content={new URL(image.src, Astro.url)} />
+<meta property="og:image" content={ogImageHref} />
 
 <!-- Twitter -->
 <meta property="twitter:card" content="summary_large_image" />
 <meta property="twitter:url" content={Astro.url} />
 <meta property="twitter:title" content={title} />
 <meta property="twitter:description" content={description} />
-<meta property="twitter:image" content={new URL(image.src, Astro.url)} />
+<meta property="twitter:image" content={ogImageHref} />
 
 <ThemeInjector styleSettings={styleSettings} />
 <AdminBar siteSettings={s} />
