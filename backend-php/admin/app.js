@@ -135,6 +135,10 @@ async function init() {
     // Charger les paramètres globaux du site (couleurs, etc.) pour les formulaires de modules
     await loadSiteSettings();
 
+    // Must run before loadPlugins: plugin-injected nav-items have their own click handlers; a generic listener on top would close the accordion immediately after the parent's toggle opens it.
+    setupNavigation();
+    setupSidebarToggle();
+
     // Charger les plugins et injecter modules + CPT
     await loadPlugins();
 
@@ -143,10 +147,6 @@ async function init() {
 
     // Admin top bar
     initAdminTopBar();
-
-    // Setup navigation
-    setupNavigation();
-    setupSidebarToggle();
 
     // Restaurer la dernière vue ou le fragment d'URL
     const hash = window.location.hash.replace('#', '');
