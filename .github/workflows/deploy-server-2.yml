@@ -1,4 +1,4 @@
-name: Deploy to Production astro.bcnco.site
+name: Deploy Server 2 (poolp)
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-server-1
+  group: deploy-server-2
   cancel-in-progress: false
 
 jobs:
@@ -16,6 +16,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.POOLP_PLUGIN_TOKEN }}
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -31,9 +34,9 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.POOLP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.ASTRO_SSH_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.POOLP_SSH_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy backend-php
         run: |
@@ -41,7 +44,7 @@ jobs:
             --exclude='.env' \
             --exclude='dist' \
             --exclude='uploads/' \
-            ./backend-php/ ${{ secrets.ASTRO_SSH_USER }}@${{ secrets.ASTRO_SSH_HOST }}:~/astro.bcnco.site/httpdocs/backend-php/
+            ./backend-php/ ${{ secrets.POOLP_SSH_USER }}@${{ secrets.POOLP_SSH_HOST }}:~/httpdocs/backend-php/
 
       - name: Deploy frontend
         run: |
@@ -49,29 +52,29 @@ jobs:
             --exclude='.env' \
             --exclude='dist/' \
             --exclude='node_modules/' \
-            ./frontend/ ${{ secrets.ASTRO_SSH_USER }}@${{ secrets.ASTRO_SSH_HOST }}:~/astro.bcnco.site/httpdocs/frontend/
+            ./frontend/ ${{ secrets.POOLP_SSH_USER }}@${{ secrets.POOLP_SSH_HOST }}:~/httpdocs/frontend/
 
       - name: Deploy root package.json
         run: |
           rsync -avz \
-            ./package.json ${{ secrets.ASTRO_SSH_USER }}@${{ secrets.ASTRO_SSH_HOST }}:~/astro.bcnco.site/httpdocs/
+            ./package.json ${{ secrets.POOLP_SSH_USER }}@${{ secrets.POOLP_SSH_HOST }}:~/httpdocs/
 
       - name: Deploy plugins
         run: |
           rsync -avz --delete \
-            ./plugins/ ${{ secrets.ASTRO_SSH_USER }}@${{ secrets.ASTRO_SSH_HOST }}:~/astro.bcnco.site/httpdocs/plugins/
+            ./plugins/ ${{ secrets.POOLP_SSH_USER }}@${{ secrets.POOLP_SSH_HOST }}:~/httpdocs/plugins/
 
       - name: Post-deploy
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.ASTRO_SSH_HOST }}
-          username: ${{ secrets.ASTRO_SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ secrets.POOLP_SSH_HOST }}
+          username: ${{ secrets.POOLP_SSH_USER }}
+          key: ${{ secrets.POOLP_SSH_PRIVATE_KEY }}
           script: |
             set -e
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-            REMOTE_ROOT=~/astro.bcnco.site/httpdocs
+            REMOTE_ROOT=~/httpdocs
 
             # Use PHP 8.x from Plesk (default php is 7.4)
             PHP=$(ls /opt/plesk/php/8.*/bin/php 2>/dev/null | sort -V | tail -1 || echo php)
@@ -102,7 +105,7 @@ jobs:
 
             if [ -d dist ]; then cp -r dist dist_backup; fi
 
-            if BUILD_API_URL=http://127.0.0.1:$PORT/api BUILD_SITE_URL=https://astro.bcnco.site BUILD_MEDIA_ORIGIN=https://astro.bcnco.site npm run build; then
+            if BUILD_API_URL=http://127.0.0.1:$PORT/api BUILD_SITE_URL=https://poolp.bcnco.site BUILD_MEDIA_ORIGIN=https://poolp.bcnco.site npm run build; then
               rm -rf dist_backup
             else
               echo "Build failed, restoring previous dist"
@@ -111,4 +114,4 @@ jobs:
             fi
 
             ln -sfn "$REMOTE_ROOT/frontend/dist" "$REMOTE_ROOT/backend-php/dist"
-            echo "✅ Déploiement astro.bcnco.site terminé"
+            echo "✅ Déploiement poolp.bcnco.site terminé"

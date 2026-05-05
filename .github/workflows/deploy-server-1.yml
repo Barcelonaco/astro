@@ -1,0 +1,176 @@
+name: Deploy Server 1 (alp, astro, atempora, audition-confiance, masaiges)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      site:
+        description: Site to deploy
+        type: choice
+        options:
+          - all
+          - alp
+          - astro
+          - atempora
+          - audition-confiance
+          - masaiges
+        default: all
+
+concurrency:
+  group: deploy-server-1
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - id: set
+        run: |
+          SITE='${{ github.event.inputs.site }}'
+          if [ -z "$SITE" ] || [ "$SITE" = "all" ]; then
+            echo 'matrix=["alp","astro","atempora","audition-confiance","masaiges"]' >> $GITHUB_OUTPUT
+          else
+            echo "matrix=[\"$SITE\"]" >> $GITHUB_OUTPUT
+          fi
+
+  deploy:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        site: ${{ fromJSON(needs.setup.outputs.matrix) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, intl, zip, pdo_mysql
+          coverage: none
+
+      - name: Install backend PHP deps
+        working-directory: ./backend-php
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Resolve site config
+        id: cfg
+        env:
+          ALP_SSH_HOST: ${{ secrets.ALP_SSH_HOST }}
+          ALP_SSH_USER: ${{ secrets.ALP_SSH_USER }}
+          ASTRO_SSH_HOST: ${{ secrets.ASTRO_SSH_HOST }}
+          ASTRO_SSH_USER: ${{ secrets.ASTRO_SSH_USER }}
+          ATEMPORA_SSH_HOST: ${{ secrets.ATEMPORA_SSH_HOST }}
+          ATEMPORA_SSH_USER: ${{ secrets.ATEMPORA_SSH_USER }}
+          AUDITION_CONFIANCE_SSH_HOST: ${{ secrets.AUDITION_CONFIANCE_SSH_HOST }}
+          AUDITION_CONFIANCE_SSH_USER: ${{ secrets.AUDITION_CONFIANCE_SSH_USER }}
+          MASAIGES_SSH_HOST: ${{ secrets.MASAIGES_SSH_HOST }}
+          MASAIGES_SSH_USER: ${{ secrets.MASAIGES_SSH_USER }}
+        run: |
+          SITE='${{ matrix.site }}'
+          UPPER=$(echo "$SITE" | tr 'a-z-' 'A-Z_')
+          HOST_VAR="${UPPER}_SSH_HOST"
+          USER_VAR="${UPPER}_SSH_USER"
+          SSH_HOST=$(printf '%s' "${!HOST_VAR}" | tr -d '[:space:]')
+          SSH_USER=$(printf '%s' "${!USER_VAR}" | tr -d '[:space:]')
+          URL="${SITE}.bcnco.site"
+          echo "::add-mask::$SSH_HOST"
+          echo "::add-mask::$SSH_USER"
+          echo "ssh_host=$SSH_HOST" >> $GITHUB_OUTPUT
+          echo "ssh_user=$SSH_USER" >> $GITHUB_OUTPUT
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Site: $SITE → $URL"
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -T 10 -H "${{ steps.cfg.outputs.ssh_host }}" >> ~/.ssh/known_hosts || true
+          printf "Host *\n  StrictHostKeyChecking accept-new\n  UserKnownHostsFile ~/.ssh/known_hosts\n" >> ~/.ssh/config
+
+      - name: Deploy backend-php
+        run: |
+          rsync -avz --delete \
+            --exclude='.env' \
+            --exclude='dist' \
+            --exclude='uploads/' \
+            ./backend-php/ ${{ steps.cfg.outputs.ssh_user }}@${{ steps.cfg.outputs.ssh_host }}:~/${{ steps.cfg.outputs.url }}/httpdocs/backend-php/
+
+      - name: Deploy frontend
+        run: |
+          rsync -avz --delete \
+            --exclude='.env' \
+            --exclude='dist/' \
+            --exclude='node_modules/' \
+            ./frontend/ ${{ steps.cfg.outputs.ssh_user }}@${{ steps.cfg.outputs.ssh_host }}:~/${{ steps.cfg.outputs.url }}/httpdocs/frontend/
+
+      - name: Deploy root package.json
+        run: |
+          rsync -avz \
+            ./package.json ${{ steps.cfg.outputs.ssh_user }}@${{ steps.cfg.outputs.ssh_host }}:~/${{ steps.cfg.outputs.url }}/httpdocs/
+
+      - name: Deploy plugins
+        run: |
+          rsync -avz --delete \
+            ./plugins/ ${{ steps.cfg.outputs.ssh_user }}@${{ steps.cfg.outputs.ssh_host }}:~/${{ steps.cfg.outputs.url }}/httpdocs/plugins/
+
+      - name: Post-deploy
+        uses: appleboy/ssh-action@v1
+        env:
+          URL: ${{ steps.cfg.outputs.url }}
+        with:
+          host: ${{ steps.cfg.outputs.ssh_host }}
+          username: ${{ steps.cfg.outputs.ssh_user }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: URL
+          script: |
+            set -e
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+            REMOTE_ROOT=~/${URL}/httpdocs
+
+            PHP=$(ls /opt/plesk/php/8.*/bin/php 2>/dev/null | sort -V | tail -1 || echo php)
+            echo "Using PHP: $PHP ($($PHP -v | head -1))"
+
+            cd "$REMOTE_ROOT"
+            npm i
+
+            cd "$REMOTE_ROOT/backend-php"
+            $PHP migrate.php
+
+            PORT=$($PHP -r '$s=stream_socket_server("tcp://127.0.0.1:0");$n=stream_socket_get_name($s,false);echo (int)substr(strrchr($n,":"),1);fclose($s);')
+            echo "Using PHP server port: $PORT"
+
+            $PHP -S 127.0.0.1:$PORT index.php > /dev/null 2>&1 &
+            PHP_PID=$!
+            trap 'kill $PHP_PID 2>/dev/null || true' EXIT
+
+            for i in $(seq 1 15); do
+              curl -sf http://127.0.0.1:$PORT/api/settings/site > /dev/null 2>&1 && break
+              echo "Waiting for PHP server... ($i)"
+              sleep 1
+            done
+
+            cd "$REMOTE_ROOT/frontend"
+            npm i
+
+            if [ -d dist ]; then cp -r dist dist_backup; fi
+
+            if BUILD_API_URL=http://127.0.0.1:$PORT/api BUILD_SITE_URL=https://${URL} BUILD_MEDIA_ORIGIN=https://${URL} npm run build; then
+              rm -rf dist_backup
+            else
+              echo "Build failed, restoring previous dist"
+              if [ -d dist_backup ]; then rm -rf dist; mv dist_backup dist; fi
+              exit 1
+            fi
+
+            ln -sfn "$REMOTE_ROOT/frontend/dist" "$REMOTE_ROOT/backend-php/dist"
+            echo "Déploiement ${URL} terminé"
