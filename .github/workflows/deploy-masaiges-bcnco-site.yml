@@ -40,7 +40,7 @@ jobs:
             --exclude='.env' \
             --exclude='dist' \
             --exclude='uploads/' \
-            ./backend-php/ ${{ secrets.MASAIGE_SSH_USER }}@${{ secrets.MASAIGES_SSH_HOST }}:~/masaiges.bcnco.site/httpdocs/backend-php/
+            ./backend-php/ ${{ secrets.MASAIGES_SSH_USER }}@${{ secrets.MASAIGES_SSH_HOST }}:~/masaiges.bcnco.site/httpdocs/backend-php/
 
       - name: Deploy frontend
         run: |
@@ -48,23 +48,23 @@ jobs:
             --exclude='.env' \
             --exclude='dist/' \
             --exclude='node_modules/' \
-            ./frontend/ ${{ secrets.MASAIGE_SSH_USER }}@${{ secrets.MASAIGES_SSH_HOST }}:~/masaiges.bcnco.site/httpdocs/frontend/
+            ./frontend/ ${{ secrets.MASAIGES_SSH_USER }}@${{ secrets.MASAIGES_SSH_HOST }}:~/masaiges.bcnco.site/httpdocs/frontend/
 
       - name: Deploy root package.json
         run: |
           rsync -avz \
-            ./package.json ${{ secrets.MASAIGE_SSH_USER }}@${{ secrets.MASAIGES_SSH_HOST }}:~/masaiges.bcnco.site/httpdocs/
+            ./package.json ${{ secrets.MASAIGES_SSH_USER }}@${{ secrets.MASAIGES_SSH_HOST }}:~/masaiges.bcnco.site/httpdocs/
 
       - name: Deploy plugins
         run: |
           rsync -avz --delete \
-            ./plugins/ ${{ secrets.MASAIGE_SSH_USER }}@${{ secrets.MASAIGES_SSH_HOST }}:~/masaiges.bcnco.site/httpdocs/plugins/
+            ./plugins/ ${{ secrets.MASAIGES_SSH_USER }}@${{ secrets.MASAIGES_SSH_HOST }}:~/masaiges.bcnco.site/httpdocs/plugins/
 
       - name: Post-deploy
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.MASAIGES_SSH_HOST }}
-          username: ${{ secrets.MASAIGE_SSH_USER }}
+          username: ${{ secrets.MASAIGES_SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
