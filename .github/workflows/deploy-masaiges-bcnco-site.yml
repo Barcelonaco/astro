@@ -3,6 +3,7 @@ name: Deploy to production masaiges.bcnco.site
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 concurrency:
   group: deploy-masaiges
@@ -32,7 +33,9 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.MASAIGES_SSH_HOST }} >> ~/.ssh/known_hosts
+          HOST=$(echo "${{ secrets.MASAIGES_SSH_HOST }}" | tr -d '[:space:]')
+          ssh-keyscan -T 10 -H "$HOST" >> ~/.ssh/known_hosts || true
+          printf "Host *\n  StrictHostKeyChecking accept-new\n  UserKnownHostsFile ~/.ssh/known_hosts\n" >> ~/.ssh/config
 
       - name: Deploy backend-php
         run: |
