@@ -261,18 +261,47 @@ async function loadSection(section) {
   localStorage.setItem('adminLastView', section);
   const content = document.getElementById('content');
 
-  // Highlight the correct nav item
+  // Highlight the correct nav item(s) and open the parent sub-nav
   document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-  let navSection = section;
-  if (/^cpt-(add|edit|categories|options):/.test(section)) {
-    navSection = 'cpt:' + section.split(':')[1];
+  document.querySelectorAll('.nav-sub-items').forEach(s => s.style.display = 'none');
+
+  let parentSection = section;
+  let subSection = section;
+  if (/^cpt-(add|categories|options):/.test(section)) {
+    parentSection = 'cpt:' + section.split(':')[1];
+  } else if (/^cpt-edit:/.test(section)) {
+    const slug = section.split(':')[1];
+    parentSection = `cpt:${slug}`;
+    subSection = `cpt:${slug}`;
   } else if (section.startsWith('builder:')) {
-    navSection = 'pages';
+    parentSection = 'pages';
+    subSection = 'pages';
+  } else if (section.startsWith('rb-builder:')) {
+    parentSection = 'reusable-blocs';
+    subSection = 'reusable-blocs';
   } else if (/^form-(edit|entries|entry-detail):/.test(section)) {
-    navSection = 'forms';
+    parentSection = 'forms';
+    subSection = 'forms';
   }
-  const activeNav = document.querySelector(`.nav-item[data-section="${navSection}"]`);
-  if (activeNav) activeNav.classList.add('active');
+
+  // Activate sub-item + open its container + activate the container's parent link
+  const subItem = document.querySelector(`.nav-sub-items .nav-sub-item[data-section="${subSection}"]`);
+  if (subItem) {
+    subItem.classList.add('active');
+    const container = subItem.closest('.nav-sub-items');
+    if (container) {
+      container.style.display = 'block';
+      const parentKey = container.dataset.parent;
+      if (parentKey) {
+        const parentLink = document.querySelector(`.nav-item[data-section="${parentKey}"]:not(.nav-sub-item)`);
+        if (parentLink) parentLink.classList.add('active');
+      }
+    }
+  }
+
+  // Activate top-level link (covers sections without sub-nav)
+  const topLink = document.querySelector(`.nav-item[data-section="${parentSection}"]:not(.nav-sub-item)`);
+  if (topLink) topLink.classList.add('active');
 
   // Section-level role guards
   const sectionMinRoles = {
@@ -577,14 +606,53 @@ const BLOCK_TYPES = { ...NICKL_MODULE_TYPES, ...LEGACY_BLOCK_TYPES };
 let loadedPlugins = [];
 let INACTIVE_PLUGIN_TYPES = new Set();
 
+/**
+ * Build pseudo-manifests from the core registry (actualites, evenements,
+ * references). They share the same shape as plugin manifests so the existing
+ * sidebar/module-injection loop handles them uniformly. `_core: true` flags
+ * them so the plugins manager skips rendering a toggle.
+ */
+function buildCorePseudoManifests(registry) {
+  const cpts = registry?.cpts || [];
+  const modules = registry?.modules || [];
+  // Group modules by CPT slug via category.id (matches CPT slug).
+  const modulesBySlug = {};
+  for (const m of modules) {
+    const slug = m.category?.id;
+    if (!slug) continue;
+    (modulesBySlug[slug] = modulesBySlug[slug] || []).push(m);
+  }
+  return cpts.map(pt => {
+    const slug = pt.slug;
+    const items = modulesBySlug[slug] || [];
+    const category = items[0]?.category || { id: slug, label: pt.labelPlural || pt.label };
+    return {
+      name: slug,
+      label: pt.labelPlural || pt.label,
+      _dir: slug,
+      _core: true,
+      _active: true,
+      postTypes: [pt],
+      modules: items.length ? { category, items: items.map(({ name, label }) => ({ name, label })) } : null,
+    };
+  });
+}
+
 async function loadPlugins() {
+  let pluginManifests = [];
+  let coreManifests = [];
   try {
-    const data = await apiFetch('/plugins');
-    loadedPlugins = data.plugins || [];
+    const [plugins, core] = await Promise.all([
+      apiFetch('/plugins').catch(() => ({ plugins: [] })),
+      apiFetch('/core/registry').catch(() => ({ cpts: [], modules: [] })),
+    ]);
+    pluginManifests = plugins.plugins || [];
+    coreManifests = buildCorePseudoManifests(core);
   } catch {
     loadedPlugins = [];
     return;
   }
+  loadedPlugins = [...coreManifests, ...pluginManifests];
 
   // Remove previously injected plugin sidebar entries before re-rendering
   document.querySelectorAll('.nav-item[data-section^="cpt:"], .nav-sub-items[data-parent^="cpt:"], .nav-item[data-section^="plugin-options:"], .nav-item[data-section^="plugin-page:"], .nav-item[data-section^="plugin-group:"], .nav-sub-items[data-parent^="plugin-group:"]').forEach(el => el.remove());
@@ -8302,6 +8370,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
     const isPdf = isDocument || /\.pdf$/i.test(url);
     const pickerType = type === 'File' ? 'all' : (type === 'Video' ? 'video' : 'image');
     const meta = media?.original_name || media?.name || url || 'Aucun média sélectionné';
+    const canCrop = type === 'Image' && media?.id && url && !isPdf && !isVideo;
     return `
       <div class="form-group">
         <label class="form-label">${escapeHtml(label)}</label>
@@ -8313,6 +8382,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
           <input type="hidden" name="${escapeHtml(inputName)}"${rfieldAttr} value="${escapeHtml(media ? JSON.stringify(media) : '')}">
           <div class="media-field-actions">
             <button type="button" class="btn btn-sm btn-outline" onclick="openMediaPicker('${pickerType}', '${blockId}', '${escapeHtml(inputName)}', { trigger: this })">Choisir</button>
+            ${canCrop ? `<button type="button" class="btn btn-sm btn-outline" onclick="openCropEditorForField(${media.id}, '${escapeHtml(url)}', '${blockId}', '${escapeHtml(inputName)}', this)">Recadrer</button>` : ''}
             <button type="button" class="btn btn-sm btn-outline" onclick="clearMediaSelection('${blockId}', '${escapeHtml(inputName)}', this)">Retirer</button>
           </div>
         </div>
@@ -11519,6 +11589,7 @@ async function saveMediaDetail(event, id) {
 
 // ── Crop editor ──
 let _cropperInstance = null;
+let _cropperOptions = null;
 
 function ensureCropperLib() {
   return new Promise((resolve) => {
@@ -11534,8 +11605,9 @@ function ensureCropperLib() {
   });
 }
 
-async function openCropEditor(mediaId, imageUrl) {
+async function openCropEditor(mediaId, imageUrl, options = {}) {
   await ensureCropperLib();
+  _cropperOptions = options || {};
 
   // Remove existing
   const existing = document.getElementById('cropEditorModal');
@@ -11594,6 +11666,7 @@ function setCropRatio(ratio, btn) {
 async function applyCrop(mediaId) {
   if (!_cropperInstance) return;
   const data = _cropperInstance.getData(true); // rounded integers
+  const opts = _cropperOptions || {};
   showLoading();
   try {
     await apiFetch(`/media/${mediaId}/crop`, {
@@ -11607,14 +11680,39 @@ async function applyCrop(mediaId) {
     });
     showToast('Image recadrée', 'success');
     closeCropEditor();
-    closeMediaDetail();
-    await fetchMediaItems(mediaState.currentFolderId);
-    document.getElementById('content').innerHTML = await renderMediaLibrary();
+    if (typeof opts.onApply === 'function') {
+      try { await opts.onApply(); } catch (cbErr) { console.error(cbErr); }
+    }
+    if (!opts.skipMediaRefresh) {
+      closeMediaDetail();
+      await fetchMediaItems(mediaState.currentFolderId);
+      const contentEl = document.getElementById('content');
+      if (contentEl && document.querySelector('.media-library')) {
+        contentEl.innerHTML = await renderMediaLibrary();
+      }
+    }
   } catch (e) {
     showToast(e.message || 'Erreur lors du recadrage', 'error');
   } finally {
     hideLoading();
   }
+}
+
+async function openCropEditorForField(mediaId, imageUrl, blockId, inputName, btn) {
+  const field = btn?.closest('.media-field') || document.querySelector(`.media-field[data-field="${CSS.escape(inputName)}"]`);
+  await openCropEditor(mediaId, imageUrl, {
+    skipMediaRefresh: true,
+    onApply: () => {
+      if (!field) return;
+      const img = field.querySelector('.media-preview img');
+      if (img) {
+        const base = (imageUrl || '').split('?')[0];
+        const opt = getOptimizedUrl(base, 400, 70);
+        const sep = opt.includes('?') ? '&' : '?';
+        img.src = `${opt}${sep}t=${Date.now()}`;
+      }
+    }
+  });
 }
 
 function closeCropEditor() {
@@ -15444,6 +15542,7 @@ const FORM_FIELD_TYPES = [
 ];
 
 let _formsCache = [];
+let _formsSelected = new Set();
 let _formBuilderFields = [];
 let _formBuilderSelectedIdx = -1;
 let _formBuilderSettings = {};
@@ -15460,23 +15559,141 @@ async function renderFormsList() {
     hideLoading();
     return `<div class="card"><p>Erreur: ${e.message}</p></div>`;
   }
+  _formsSelected = new Set();
+  return renderFormsView();
+}
 
+function renderFormsView() {
   return `
     <div class="page-header">
       <h1>Formulaires</h1>
       <button class="btn btn-primary" onclick="loadSection('form-edit:new')">+ Nouveau formulaire</button>
     </div>
+    ${_formsSelected.size > 0 ? renderFormsBulkBar() : ''}
     <div class="card">
       ${_formsCache.length > 0 ? renderFormsTable() : renderEmptyState('📝', 'Aucun formulaire', 'Créez votre premier formulaire')}
     </div>
   `;
 }
 
+function refreshFormsView() {
+  const el = document.getElementById('content');
+  if (el) el.innerHTML = renderFormsView();
+}
+
+function toggleFormSelect(id, checked) {
+  if (checked) _formsSelected.add(id);
+  else _formsSelected.delete(id);
+  refreshFormsView();
+}
+
+function toggleAllFormsOnPage(checked, ids) {
+  ids.forEach(id => checked ? _formsSelected.add(id) : _formsSelected.delete(id));
+  refreshFormsView();
+}
+
+function clearFormsSelection() {
+  _formsSelected.clear();
+  refreshFormsView();
+}
+
+function renderFormsBulkBar() {
+  const count = _formsSelected.size;
+  return `
+    <div class="pages-bulk-bar">
+      <span class="pages-bulk-bar__count">${count} formulaire${count > 1 ? 's' : ''} sélectionné${count > 1 ? 's' : ''}</span>
+      <div class="pages-bulk-bar__actions">
+        <button type="button" class="btn btn-sm btn-outline" onclick="bulkFormsStatus('active')">Activer</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="bulkFormsStatus('inactive')">Désactiver</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="bulkFormsDuplicate()">Dupliquer</button>
+        <button type="button" class="btn btn-sm btn-danger" onclick="bulkFormsDelete()">Supprimer</button>
+      </div>
+      <button type="button" class="pages-bulk-bar__close" onclick="clearFormsSelection()" title="Annuler la sélection">✕</button>
+    </div>
+  `;
+}
+
+async function bulkFormsStatus(status) {
+  const ids = [..._formsSelected];
+  const label = status === 'active' ? 'activé' : 'désactivé';
+  showLoading();
+  try {
+    await Promise.all(ids.map(id => {
+      const source = _formsCache.find(f => f.id === id);
+      if (!source) return null;
+      return apiFetch(`/forms/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          title: source.title,
+          slug: source.slug,
+          description: source.description,
+          settings: typeof source.settings === 'string' ? JSON.parse(source.settings) : (source.settings || {}),
+          status,
+          fields: source.fields,
+        }),
+      });
+    }));
+    showToast(`${ids.length} formulaire${ids.length > 1 ? 's' : ''} ${label}${ids.length > 1 ? 's' : ''}`, 'success');
+    _formsSelected.clear();
+    loadSection('forms');
+  } catch (e) {
+    hideLoading();
+    showToast('Erreur: ' + e.message, 'error');
+  }
+}
+
+async function bulkFormsDuplicate() {
+  const ids = [..._formsSelected];
+  showLoading();
+  try {
+    for (const id of ids) {
+      const form = await apiFetch(`/forms/${id}`);
+      const newSlug = form.slug + '-copie-' + Date.now().toString(36) + '-' + id;
+      await apiFetch('/forms', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: form.title + ' (copie)',
+          slug: newSlug,
+          description: form.description,
+          settings: typeof form.settings === 'string' ? JSON.parse(form.settings) : form.settings,
+          status: form.status,
+          fields: form.fields,
+        }),
+      });
+    }
+    showToast(`${ids.length} formulaire${ids.length > 1 ? 's' : ''} dupliqué${ids.length > 1 ? 's' : ''}`, 'success');
+    _formsSelected.clear();
+    loadSection('forms');
+  } catch (e) {
+    hideLoading();
+    showToast('Erreur: ' + e.message, 'error');
+  }
+}
+
+async function bulkFormsDelete() {
+  const ids = [..._formsSelected];
+  const ok = await confirmModal(`Supprimer ${ids.length} formulaire${ids.length > 1 ? 's' : ''} et toutes leurs entrées ? Cette action est irréversible.`);
+  if (!ok) return;
+  showLoading();
+  try {
+    await Promise.all(ids.map(id => apiFetch(`/forms/${id}`, { method: 'DELETE' })));
+    showToast(`${ids.length} formulaire${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}`, 'success');
+    _formsSelected.clear();
+    loadSection('forms');
+  } catch (e) {
+    hideLoading();
+    showToast('Erreur: ' + e.message, 'error');
+  }
+}
+
 function renderFormsTable() {
-  const gridCols = '1fr 80px 120px 80px 140px';
+  const gridCols = '40px 1fr 80px 120px 80px 140px';
+  const allIds = _formsCache.map(f => f.id);
+  const allChecked = allIds.length > 0 && allIds.every(id => _formsSelected.has(id));
   return `
     <div class="pages-list">
       <div class="pages-list-header" style="display:grid; grid-template-columns:${gridCols}; align-items:center;">
+        <label class="page-item__checkbox"><input type="checkbox" ${allChecked ? 'checked' : ''} onchange="toggleAllFormsOnPage(this.checked, [${allIds.join(',')}])"></label>
         <span>Titre</span>
         <span style="text-align:center">Champs</span>
         <span style="text-align:center">Entrées</span>
@@ -15485,8 +15702,10 @@ function renderFormsTable() {
       </div>
       ${_formsCache.map(f => {
         const safeName = escapeHtml(f.title).replace(/'/g, "\\'");
+        const checked = _formsSelected.has(f.id);
         return `
-        <div class="page-item" style="display:grid; grid-template-columns:${gridCols}; align-items:center;">
+        <div class="page-item${checked ? ' page-item--selected' : ''}" style="display:grid; grid-template-columns:${gridCols}; align-items:center;">
+          <label class="page-item__checkbox"><input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleFormSelect(${f.id}, this.checked)"></label>
           <div onclick="loadSection('form-edit:${f.id}')" style="cursor:pointer; overflow:hidden;">
             <strong>${escapeHtml(f.title)}</strong>
             <span class="page-item__slug" style="display:block; font-size:12px; color:var(--gray-400)">${escapeHtml(f.slug)}</span>
@@ -16209,7 +16428,7 @@ async function renderPluginsManager() {
   let plugins = [];
   try {
     const data = await apiFetch('/plugins');
-    plugins = data.plugins || [];
+    plugins = (data.plugins || []).filter(p => !p._core);
   } catch {
     return '<h1>Plugins</h1><p>Erreur lors du chargement des plugins.</p>';
   }

@@ -31,47 +31,59 @@ try {
   posts = await getAllPosts();
 } catch { /* silent */ }
 
-// --- Discover CPTs from plugin.json files ---
+// --- Discover CPTs from core registry + plugin.json files ---
 interface CptSection {
   label: string;
   slug: string;
   items: any[];
 }
 
-let cptSections: CptSection[] = [];
+interface PostTypeDef { slug: string; label?: string; labelPlural?: string; }
+
+const collectedPostTypes: PostTypeDef[] = [];
+
+// 1. Core CPTs (actualites, evenements, references) — always included
+try {
+  const coreRegistryPath = path.resolve(process.cwd(), '..', 'backend-php', 'config', 'core_modules.json');
+  if (fs.existsSync(coreRegistryPath)) {
+    const registry = JSON.parse(fs.readFileSync(coreRegistryPath, 'utf-8'));
+    for (const pt of registry.cpts || []) collectedPostTypes.push(pt);
+  }
+} catch { /* silent */ }
+
+// 2. Plugin CPTs
 try {
   const pluginsDir = path.resolve(process.cwd(), '..', 'plugins');
   if (fs.existsSync(pluginsDir)) {
     const pluginDirs = fs.readdirSync(pluginsDir, { withFileTypes: true })
       .filter(d => d.isDirectory());
-
     for (const dir of pluginDirs) {
       const manifestPath = path.join(pluginsDir, dir.name, 'plugin.json');
       if (!fs.existsSync(manifestPath)) continue;
-
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-      const postTypes = manifest.postTypes || [];
-
-      for (const pt of postTypes) {
-        try {
-          const res = await fetch(`${API_URL}/cpt/${pt.slug}`);
-          if (res.ok) {
-            const cptData = await res.json();
-            const items = (Array.isArray(cptData) ? cptData : cptData.items || [])
-              .filter((item: any) => item.status === 'published');
-            if (items.length > 0) {
-              cptSections.push({
-                label: pt.labelPlural || pt.label || pt.slug,
-                slug: pt.slug,
-                items,
-              });
-            }
-          }
-        } catch { /* silent */ }
-      }
+      for (const pt of manifest.postTypes || []) collectedPostTypes.push(pt);
     }
   }
 } catch { /* silent */ }
+
+let cptSections: CptSection[] = [];
+for (const pt of collectedPostTypes) {
+  try {
+    const res = await fetch(`${API_URL}/cpt/${pt.slug}`);
+    if (res.ok) {
+      const cptData = await res.json();
+      const items = (Array.isArray(cptData) ? cptData : cptData.items || [])
+        .filter((item: any) => item.status === 'published');
+      if (items.length > 0) {
+        cptSections.push({
+          label: pt.labelPlural || pt.label || pt.slug,
+          slug: pt.slug,
+          items,
+        });
+      }
+    }
+  } catch { /* silent */ }
+}
 ---
 
 <NicklModuleWrapper data={data} moduleName="plansite">

@@ -46,7 +46,7 @@ class PluginController {
         $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'active_plugins'");
         $stmt->execute();
         $row = $stmt->fetch();
-        if (!$row) return ['references', 'actualites', 'evenements']; // default active plugins
+        if (!$row) return []; // default: no active plugins (actualites/evenements/references are core, not plugins)
         $decoded = json_decode($row['setting_value'], true);
         return is_array($decoded) ? $decoded : null;
     }

@@ -17,6 +17,7 @@ $dotenv->load();
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/helpers/response.php';
 require_once __DIR__ . '/helpers/plugin-hooks.php';
+require_once __DIR__ . '/helpers/CoreRegistry.php';
 require_once __DIR__ . '/controllers/PluginController.php';
 require_once __DIR__ . '/controllers/EcommerceMigrationController.php';
 
@@ -348,7 +349,7 @@ if (!table_exists($db, 'settings')) {
         ['posts_per_page', '10'],
         ['theme_use_child', '0'],
         ['active_theme', 'default'],
-        ['active_plugins', '["references","actualites","evenements"]'],
+        ['active_plugins', '[]'],
     ];
     $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)");
     foreach ($defaults as [$key, $val]) {
@@ -629,6 +630,85 @@ if (!table_exists($db, 'form_entry_values')) {
     $changes++;
 } else {
     echo "  OK\n";
+}
+
+// ─── CPT tables (core: actualites, evenements, references) ─────────────────
+
+echo "\nCustom Post Types (core):\n";
+foreach (CoreRegistry::getCPTs() as $pt) {
+    $slug = $pt['slug'] ?? null;
+    if (!$slug) continue;
+    $table = "cpt_{$slug}";
+    echo "  Table: {$table}\n";
+    if (!table_exists($db, $table)) {
+        $db->exec("
+            CREATE TABLE `{$table}` (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                slug VARCHAR(255) NOT NULL,
+                excerpt TEXT,
+                content LONGTEXT,
+                featured_image JSON DEFAULT NULL,
+                custom_fields JSON DEFAULT NULL,
+                seo_meta JSON DEFAULT NULL,
+                author_id INT NOT NULL,
+                status ENUM('draft', 'published') NOT NULL DEFAULT 'draft',
+                published_date DATETIME,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE INDEX idx_slug (slug)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        echo "    + Created table\n";
+        $changes++;
+    } else {
+        if (ensure_column($db, $table, 'seo_meta', 'JSON DEFAULT NULL', 'custom_fields')) $changes++;
+        else echo "    OK\n";
+    }
+    if (!empty($pt['hasCategories'])) {
+        $catTable = "cpt_{$slug}_categories";
+        $mapTable = "cpt_{$slug}_category_map";
+        if (!table_exists($db, $catTable)) {
+            $db->exec("
+                CREATE TABLE `{$catTable}` (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    slug VARCHAR(255) NOT NULL,
+                    UNIQUE INDEX idx_slug (slug)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+            echo "    + Created {$catTable}\n";
+            $changes++;
+        }
+        if (!table_exists($db, $mapTable)) {
+            $db->exec("
+                CREATE TABLE `{$mapTable}` (
+                    item_id INT NOT NULL,
+                    category_id INT NOT NULL,
+                    PRIMARY KEY (item_id, category_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+            echo "    + Created {$mapTable}\n";
+            $changes++;
+        }
+    }
+}
+
+// ─── Migration: clean removed-plugin entries from active_plugins ────────────
+// Since references/actualites/evenements are now core, drop them from any
+// previously-saved active_plugins list to keep the listing tidy.
+$row = $db->query("SELECT setting_value FROM settings WHERE setting_key='active_plugins'")->fetch();
+if ($row) {
+    $list = json_decode($row['setting_value'], true);
+    if (is_array($list)) {
+        $cleaned = array_values(array_filter($list, fn($d) => !in_array($d, ['references', 'actualites', 'evenements'], true)));
+        if ($cleaned !== $list) {
+            $stmt = $db->prepare("UPDATE settings SET setting_value=? WHERE setting_key='active_plugins'");
+            $stmt->execute([json_encode($cleaned, JSON_UNESCAPED_UNICODE)]);
+            echo "  + Cleaned active_plugins (removed core ex-plugins)\n";
+            $changes++;
+        }
+    }
 }
 
 // ─── CPT tables (from plugins) ──────────────────────────────────────────────

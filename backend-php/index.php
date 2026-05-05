@@ -33,6 +33,7 @@ require_once __DIR__ . '/helpers/slug.php';
 require_once __DIR__ . '/helpers/rebuild.php';
 require_once __DIR__ . '/helpers/media-enricher.php';
 require_once __DIR__ . '/helpers/plugin-hooks.php';
+require_once __DIR__ . '/helpers/CoreRegistry.php';
 require_once __DIR__ . '/middleware/auth.php';
 require_once __DIR__ . '/helpers/rate-limit.php';
 
@@ -629,6 +630,17 @@ try {
         $user = authenticate_token();
         require_min_role($user, 'editor');
         ModuleTemplatesController::getModuleTemplate();
+    }
+
+    // ── Core registry (built-in CPTs + modules) ──
+    elseif ($method === 'GET' && $path === '/core/post-types') {
+        json_response(['postTypes' => CoreRegistry::getCPTs()]);
+    }
+    elseif ($method === 'GET' && $path === '/core/modules') {
+        json_response(['modules' => CoreRegistry::getModules()]);
+    }
+    elseif ($method === 'GET' && $path === '/core/registry') {
+        json_response(CoreRegistry::load());
     }
 
     // ── Plugins ──

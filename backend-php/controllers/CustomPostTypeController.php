@@ -56,6 +56,13 @@ class CustomPostTypeController {
     }
 
     public static function migratePluginTables(): void {
+        // Core CPTs (always present, not togglable)
+        foreach (CoreRegistry::getCPTs() as $pt) {
+            if (empty($pt['slug'])) continue;
+            self::ensureCPTTable($pt['slug']);
+            if (!empty($pt['hasCategories'])) self::ensureCPTCategoryTables($pt['slug']);
+        }
+        // Plugin CPTs
         $manifests = PluginController::getPluginManifests();
         foreach ($manifests as $manifest) {
             foreach ($manifest['postTypes'] ?? [] as $pt) {

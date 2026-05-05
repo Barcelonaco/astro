@@ -1,29 +1,20 @@
 {
-  "name": "evenements",
-  "label": "Événements",
-  "version": "1.0.0",
-  "description": "Custom Post Type Événements avec archive, vue single et module events-slider.",
-
-  "modules": {
-    "category": {
-      "id": "evenements",
-      "label": "Événements",
-      "icon": "📅"
+  "cpts": [
+    {
+      "slug": "actualites",
+      "label": "Actualité",
+      "labelPlural": "Actualités",
+      "icon": "newspaper",
+      "supports": ["title", "slug", "featured_image", "content", "excerpt", "status"],
+      "fields": [],
+      "hasCategories": true,
+      "categoryLabel": "Catégories d'actualités"
     },
-    "items": [
-      {
-        "name": "EventsSlider",
-        "label": "Événements à la une"
-      }
-    ]
-  },
-
-  "postTypes": [
     {
       "slug": "evenements",
       "label": "Événement",
       "labelPlural": "Événements",
-      "icon": "📅",
+      "icon": "calendar",
       "supports": ["title", "slug", "featured_image", "content", "excerpt", "status"],
       "fields": [
         { "name": "is_sticky", "label": "Mettre en avant", "type": "TrueFalse", "width": 50 },
@@ -46,6 +37,39 @@
       "hasCategories": true,
       "categoryLabel": "Catégories d'événements",
       "hasModules": false
+    },
+    {
+      "slug": "references",
+      "label": "Référence",
+      "labelPlural": "Références",
+      "isFemale": true,
+      "icon": "palette",
+      "supports": ["title", "slug", "featured_image", "content", "status"],
+      "fields": [
+        { "name": "customer_name", "label": "Sous-titre / Nom du client", "type": "Text" },
+        { "name": "text", "label": "Description", "type": "Textarea" },
+        { "name": "photos", "label": "Galerie photos", "type": "Photos" },
+        { "name": "link", "label": "Lien", "type": "Link" }
+      ],
+      "hasCategories": true,
+      "categoryLabel": "Catégories de références"
+    }
+  ],
+  "modules": [
+    {
+      "name": "NewsSlider",
+      "label": "Actualités à la une",
+      "category": { "id": "actualites", "label": "Actualités", "icon": "newspaper" }
+    },
+    {
+      "name": "EventsSlider",
+      "label": "Événements à la une",
+      "category": { "id": "evenements", "label": "Événements", "icon": "calendar" }
+    },
+    {
+      "name": "BlocReferences",
+      "label": "Références",
+      "category": { "id": "references", "label": "Références", "icon": "palette" }
     }
   ]
 }
