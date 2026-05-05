@@ -1836,6 +1836,38 @@ tr:hover {
 .media-library {
   display: flex;
   gap: 20px;
+  position: relative;
+}
+
+.media-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(102, 126, 234, 0.08);
+  border: 2px dashed var(--primary, #667eea);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.media-library.is-os-dragover .media-drop-overlay {
+  display: flex;
+}
+
+.media-drop-overlay-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 32px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  color: var(--primary, #667eea);
+  font-weight: 500;
+  font-size: 15px;
 }
 
 .media-sidebar {
@@ -1957,9 +1989,10 @@ tr:hover {
 .media-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, 200px);
   gap: 12px;
   align-content: start;
+  justify-content: start;
   overflow-y: auto;
   max-height: calc(100vh - 150px);
 }
@@ -1971,10 +2004,12 @@ tr:hover {
   border-radius: 8px;
   overflow: hidden;
   cursor: default;
-  height: 240px !important;
-  min-height: 240px !important;
+  width: 200px !important;
+  height: 280px !important;
   align-self: start !important;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .media-card:hover {
@@ -2006,8 +2041,8 @@ tr:hover {
 }
 
 .media-thumb {
-  width: 100%;
-  aspect-ratio: 1 / 1;
+  width: 200px;
+  height: 200px;
   position: relative;
   background: var(--gray-100);
   overflow: hidden;

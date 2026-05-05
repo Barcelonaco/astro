@@ -428,13 +428,13 @@ async function renderDashboard() {
       aiHtml = `
         <div class="stat-card" style="cursor:pointer" onclick="navigateTo('ai-credits')" title="Gérer les crédits IA">
           <div class="label">Crédits IA disponibles</div>
-          <div class="value" style="color:${barColor}">${aiCredits.available.toFixed(2)} €</div>
+          <div class="value" style="color:${barColor}">${Math.round(aiCredits.available * 100).toLocaleString('fr-FR')} crédits</div>
           <div style="margin-top:8px;background:var(--border-color,#e5e7eb);border-radius:6px;height:8px;overflow:hidden">
             <div style="width:${pct}%;height:100%;background:${barColor};border-radius:6px;transition:width .3s"></div>
           </div>
           <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--text-muted,#6b7280)">
-            <span>Utilisé ce mois : ${aiCredits.total_used.toFixed(4)} €</span>
-            <span>Alloué : ${aiCredits.total_credits.toFixed(2)} €</span>
+            <span>Utilisé ce mois : ${Math.round(aiCredits.total_used * 100).toLocaleString('fr-FR')} crédits</span>
+            <span>Alloué : ${Math.round(aiCredits.total_credits * 100).toLocaleString('fr-FR')} crédits</span>
           </div>
         </div>
       `;
@@ -10901,7 +10901,13 @@ async function renderMediaLibrary() {
         </button>
       </div>
     </div>
-    <div class="media-library">
+    <div class="media-library" ondragenter="onMediaLibraryDragEnter(event)" ondragover="onMediaLibraryDragOver(event)" ondragleave="onMediaLibraryDragLeave(event)" ondrop="onMediaLibraryDrop(event)">
+      <div class="media-drop-overlay">
+        <div class="media-drop-overlay-inner">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span>Déposer fichiers ou dossiers ici</span>
+        </div>
+      </div>
       <aside class="media-sidebar">
         <div class="media-search">
           <input type="text" class="media-search-input" placeholder="Rechercher un média…" value="${escapeHtml(mediaState.search)}" oninput="handleMediaSearch(this.value)" />
@@ -10989,10 +10995,10 @@ function renderMediaCard(item, forPicker = false) {
         </div>
       `;
   return `
-    <article class="media-card ${forPicker ? 'is-picker' : ''} ${isSelected ? 'is-selected' : ''}" ${!forPicker ? `draggable="true" ondragstart="onMediaDragStart(event, ${item.id})"` : ''} onclick="${forPicker ? `selectMediaFromPicker(${item.id})` : `openMediaDetail(${item.id})`}">
+    <article class="media-card ${forPicker ? 'is-picker' : ''} ${isSelected ? 'is-selected' : ''}" ${!forPicker ? `data-media-id="${item.id}" draggable="true" ondragstart="onMediaDragStart(event, ${item.id})"` : ''} onclick="${forPicker ? `selectMediaFromPicker(${item.id})` : `onMediaCardClick(event, ${item.id})`}">
       ${!forPicker ? `
         <label class="media-select" onclick="event.stopPropagation()">
-          <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleMediaSelection(${item.id}, this.checked); event.stopPropagation();" />
+          <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="onMediaCheckboxClick(event, ${item.id})" onchange="toggleMediaSelection(${item.id}, this.checked); event.stopPropagation();" />
         </label>
       ` : ''}
       <div class="media-thumb ${isImage ? '' : isDocument ? 'is-document' : 'is-video'}">${thumb}</div>
@@ -11128,11 +11134,57 @@ async function moveMediaItem(id, folderId) {
   }
 }
 
+async function moveMediaItems(ids, folderId) {
+  if (!ids || !ids.length) return;
+  showLoading(`Déplacement ${ids.length} média(s)…`);
+  try {
+    await Promise.all(ids.map(id =>
+      apiFetch(`/media/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ folder_id: folderId || null })
+      }).catch(e => { console.warn(`move ${id} failed`, e); return null; })
+    ));
+    mediaState.selectedIds = [];
+    _lastSelectedMediaId = null;
+    await fetchMediaFolders();
+    await fetchMediaItems(mediaState.currentFolderId);
+    document.getElementById('content').innerHTML = await renderMediaLibrary();
+    showToast(`${ids.length} média(s) déplacé(s)`, 'success');
+  } catch (e) {
+    showToast(e.message || 'Erreur lors du déplacement', 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
 // ── Drag & drop media → folder ──
 function onMediaDragStart(event, mediaId) {
-  event.dataTransfer.setData('text/plain', String(mediaId));
+  // If dragged item is part of current selection → drag the whole selection
+  const key = String(mediaId);
+  const selected = Array.isArray(mediaState.selectedIds) ? mediaState.selectedIds.map(String) : [];
+  const ids = selected.includes(key) && selected.length > 1 ? selected : [key];
+
+  event.dataTransfer.setData('text/plain', ids.join(','));
   event.dataTransfer.effectAllowed = 'move';
   event.currentTarget.classList.add('is-dragging');
+
+  // Highlight all dragged cards (when multi)
+  if (ids.length > 1) {
+    ids.forEach(id => {
+      const card = document.querySelector(`.media-card[data-media-id="${id}"]`);
+      if (card) card.classList.add('is-dragging');
+    });
+    // Visual hint: show count badge near drag image (browser default uses single card thumbnail)
+    try {
+      const ghost = document.createElement('div');
+      ghost.style.cssText = 'position:absolute;top:-1000px;left:-1000px;padding:6px 12px;background:#667eea;color:#fff;border-radius:6px;font-weight:600;font-size:13px;';
+      ghost.textContent = `${ids.length} médias`;
+      document.body.appendChild(ghost);
+      event.dataTransfer.setDragImage(ghost, 20, 20);
+      setTimeout(() => ghost.remove(), 0);
+    } catch (e) { /* setDragImage unsupported */ }
+  }
+
   // Highlight all folder targets
   document.querySelectorAll('.media-folder-item').forEach(el => el.classList.add('is-drop-target'));
 }
@@ -11140,6 +11192,18 @@ function onMediaDragStart(event, mediaId) {
 document.addEventListener('dragend', () => {
   document.querySelectorAll('.is-dragging').forEach(el => el.classList.remove('is-dragging'));
   document.querySelectorAll('.is-drop-target, .is-drag-over').forEach(el => el.classList.remove('is-drop-target', 'is-drag-over'));
+});
+
+// Prevent browser from opening files dropped outside designated drop zones in admin SPA
+window.addEventListener('dragover', (e) => {
+  if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
+    if (!e.target.closest('.media-library')) e.preventDefault();
+  }
+});
+window.addEventListener('drop', (e) => {
+  if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
+    if (!e.target.closest('.media-library')) e.preventDefault();
+  }
 });
 
 function onFolderDragOver(event) {
@@ -11156,9 +11220,180 @@ async function onFolderDrop(event, folderId) {
   event.preventDefault();
   event.currentTarget.classList.remove('is-drag-over');
   document.querySelectorAll('.is-drop-target').forEach(el => el.classList.remove('is-drop-target'));
-  const mediaId = event.dataTransfer.getData('text/plain');
-  if (!mediaId) return;
-  await moveMediaItem(parseInt(mediaId), folderId);
+  // Ignore OS file drops here — handled by media-library drop zone
+  if (event.dataTransfer.types && Array.from(event.dataTransfer.types).includes('Files')) return;
+  const payload = event.dataTransfer.getData('text/plain');
+  if (!payload) return;
+  const ids = payload.split(',').map(s => parseInt(s, 10)).filter(n => Number.isFinite(n));
+  if (!ids.length) return;
+  if (ids.length === 1) {
+    await moveMediaItem(ids[0], folderId);
+  } else {
+    await moveMediaItems(ids, folderId);
+  }
+}
+
+// ── Drag & drop OS files/folders → media library ──
+let _mediaDropDepth = 0;
+
+function _isOsFileDrag(event) {
+  const types = event.dataTransfer && event.dataTransfer.types;
+  if (!types) return false;
+  return Array.from(types).includes('Files');
+}
+
+function onMediaLibraryDragEnter(event) {
+  if (!_isOsFileDrag(event)) return;
+  event.preventDefault();
+  _mediaDropDepth++;
+  event.currentTarget.classList.add('is-os-dragover');
+}
+
+function onMediaLibraryDragOver(event) {
+  if (!_isOsFileDrag(event)) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+}
+
+function onMediaLibraryDragLeave(event) {
+  if (!_isOsFileDrag(event)) return;
+  _mediaDropDepth = Math.max(0, _mediaDropDepth - 1);
+  if (_mediaDropDepth === 0) {
+    event.currentTarget.classList.remove('is-os-dragover');
+  }
+}
+
+async function _readAllEntries(reader) {
+  const all = [];
+  while (true) {
+    const batch = await new Promise((res, rej) => reader.readEntries(res, rej));
+    if (!batch.length) break;
+    all.push(...batch);
+  }
+  return all;
+}
+
+async function _walkEntry(entry, files) {
+  if (entry.isFile) {
+    const file = await new Promise((res, rej) => entry.file(res, rej));
+    files.push(file);
+  } else if (entry.isDirectory) {
+    const sub = await _readAllEntries(entry.createReader());
+    for (const e of sub) await _walkEntry(e, files);
+  }
+}
+
+async function _uploadBatch(files, folderId, onProgress) {
+  // Filter out anything that isn't a real File (defensive)
+  files = files.filter(f => f instanceof File && f.size >= 0);
+  if (!files.length) return;
+
+  // PHP limits: post_max_size 8M, max_file_uploads 20. Stay well under.
+  const MAX_BYTES = 7 * 1024 * 1024; // 7 Mo per request
+  const MAX_COUNT = 15;
+
+  let i = 0;
+  while (i < files.length) {
+    const slice = [];
+    let bytes = 0;
+    while (i < files.length && slice.length < MAX_COUNT && (bytes + files[i].size) <= MAX_BYTES) {
+      bytes += files[i].size;
+      slice.push(files[i]);
+      i++;
+    }
+
+    // Lone file bigger than MAX_BYTES → send alone (will fail server-side, surfaced clearly)
+    if (slice.length === 0 && i < files.length) {
+      slice.push(files[i]);
+      i++;
+    }
+
+    const formData = new FormData();
+    slice.forEach(f => formData.append('files[]', f));
+    if (folderId) formData.append('folder_id', folderId);
+    try {
+      await apiUpload('/media/upload', formData);
+      if (onProgress) onProgress(slice.length);
+    } catch (e) {
+      // If a single oversized file failed, skip it but keep going
+      if (slice.length === 1) {
+        console.warn(`Échec import "${slice[0].name}" (${(slice[0].size / 1024 / 1024).toFixed(1)} Mo) — fichier trop volumineux ?`, e);
+        showToast(`Fichier ignoré : ${slice[0].name} (trop volumineux)`, 'error');
+        if (onProgress) onProgress(0);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
+async function onMediaLibraryDrop(event) {
+  if (!_isOsFileDrag(event)) return;
+  event.preventDefault();
+  _mediaDropDepth = 0;
+  event.currentTarget.classList.remove('is-os-dragover');
+
+  const items = event.dataTransfer.items;
+  if (!items || !items.length) return;
+
+  // Collect: top-level folders (each → new media folder) and loose files (→ current folder)
+  const folderGroups = []; // { name, files[] }
+  const looseFiles = [];
+
+  // Snapshot entries first (items list is invalidated after async work)
+  const entries = [];
+  for (const item of items) {
+    const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+    if (entry) entries.push(entry);
+  }
+
+  showLoading('Lecture des fichiers…');
+  try {
+    for (const entry of entries) {
+      if (entry.isFile) {
+        const file = await new Promise((res, rej) => entry.file(res, rej));
+        looseFiles.push(file);
+      } else if (entry.isDirectory) {
+        const files = [];
+        const sub = await _readAllEntries(entry.createReader());
+        for (const e of sub) await _walkEntry(e, files);
+        folderGroups.push({ name: entry.name, files });
+      }
+    }
+
+    let totalFiles = looseFiles.length + folderGroups.reduce((n, g) => n + g.files.length, 0);
+    if (totalFiles === 0 && folderGroups.length === 0) {
+      showToast('Aucun fichier détecté', 'error');
+      return;
+    }
+
+    let done = 0;
+    const tick = (n) => { done += n; showLoading(`Import ${done}/${totalFiles}…`); };
+
+    if (looseFiles.length) {
+      await _uploadBatch(looseFiles, mediaState.currentFolderId, tick);
+    }
+
+    for (const g of folderGroups) {
+      const folder = await apiFetch('/media/folders', {
+        method: 'POST',
+        body: JSON.stringify({ name: g.name, parent_id: null })
+      });
+      if (g.files.length) {
+        await _uploadBatch(g.files, folder.id, tick);
+      }
+    }
+
+    showToast(`Import terminé (${totalFiles} fichier${totalFiles > 1 ? 's' : ''})`, 'success');
+    await fetchMediaFolders();
+    await fetchMediaItems(mediaState.currentFolderId);
+    document.getElementById('content').innerHTML = await renderMediaLibrary();
+  } catch (e) {
+    console.error(e);
+    showToast(e.message || 'Erreur lors de l\'import', 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
 // ── Media detail panel ──
@@ -12179,12 +12414,11 @@ function selectAllMedia() {
   const allSelected = allIds.length > 0 && allIds.every(id => mediaState.selectedIds.includes(id));
   if (allSelected) {
     mediaState.selectedIds = [];
+    _lastSelectedMediaId = null;
   } else {
     mediaState.selectedIds = [...allIds];
   }
-  document.querySelectorAll('.media-card .media-select input[type="checkbox"]').forEach(cb => {
-    cb.checked = !allSelected;
-  });
+  syncMediaCardSelectionUI();
   updateMediaSelectionUI();
 }
 
@@ -12197,7 +12431,81 @@ function toggleMediaSelection(id, isChecked) {
   if (isChecked) set.add(key);
   else set.delete(key);
   mediaState.selectedIds = Array.from(set);
+  _lastSelectedMediaId = id;
+  syncMediaCardSelectionUI();
   updateMediaSelectionUI();
+}
+
+let _lastSelectedMediaId = null;
+
+function onMediaCardClick(event, id) {
+  // Shift-click → range select
+  if (event.shiftKey) {
+    event.preventDefault();
+    event.stopPropagation();
+    rangeSelectMedia(id);
+    return;
+  }
+  // Cmd/Ctrl-click → toggle single without opening detail
+  if (event.metaKey || event.ctrlKey) {
+    event.preventDefault();
+    event.stopPropagation();
+    const key = String(id);
+    const already = mediaState.selectedIds.includes(key);
+    toggleMediaSelection(id, !already);
+    return;
+  }
+  // Default → open detail panel
+  openMediaDetail(id);
+}
+
+function onMediaCheckboxClick(event, id) {
+  // Shift+click on checkbox → range select instead of toggle
+  if (event.shiftKey) {
+    event.preventDefault();
+    event.stopPropagation();
+    rangeSelectMedia(id);
+  }
+  // Otherwise let `onchange` (toggleMediaSelection) handle it
+}
+
+function rangeSelectMedia(targetId) {
+  const ids = mediaState.items.map(i => String(i.id));
+  const target = String(targetId);
+  const targetIdx = ids.indexOf(target);
+  if (targetIdx < 0) return;
+
+  // No prior anchor → just toggle current and remember
+  if (_lastSelectedMediaId === null) {
+    toggleMediaSelection(targetId, !mediaState.selectedIds.includes(target));
+    return;
+  }
+
+  const anchor = String(_lastSelectedMediaId);
+  const anchorIdx = ids.indexOf(anchor);
+  if (anchorIdx < 0) {
+    toggleMediaSelection(targetId, !mediaState.selectedIds.includes(target));
+    return;
+  }
+
+  const [from, to] = anchorIdx < targetIdx ? [anchorIdx, targetIdx] : [targetIdx, anchorIdx];
+  const range = ids.slice(from, to + 1);
+  const set = new Set(mediaState.selectedIds);
+  range.forEach(id => set.add(id));
+  mediaState.selectedIds = Array.from(set);
+  syncMediaCardSelectionUI();
+  updateMediaSelectionUI();
+}
+
+function syncMediaCardSelectionUI() {
+  const selected = new Set(mediaState.selectedIds.map(String));
+  document.querySelectorAll('.media-card[data-media-id]').forEach(card => {
+    const id = card.dataset.mediaId;
+    const isSel = selected.has(id);
+    card.classList.toggle('is-selected', isSel);
+    const cb = card.querySelector('.media-select input[type="checkbox"]');
+    if (cb) cb.checked = isSel;
+  });
 }
 
 async function deleteSelectedMedia() {
@@ -16007,7 +16315,7 @@ async function renderAiCredits() {
         <td style="text-align:center">${u.request_count}</td>
         <td style="text-align:right">${Number(u.total_input_tokens).toLocaleString()}</td>
         <td style="text-align:right">${Number(u.total_output_tokens).toLocaleString()}</td>
-        <td style="text-align:right;font-weight:600">${Number(u.total_credits_used).toFixed(4)} €</td>
+        <td style="text-align:right;font-weight:600">${Math.round(Number(u.total_credits_used) * 100).toLocaleString('fr-FR')} crédits</td>
       </tr>
     `).join('');
 
@@ -16020,7 +16328,7 @@ async function renderAiCredits() {
         <td style="text-align:right">${Number(m.total_input_tokens).toLocaleString()}</td>
         <td style="text-align:right">${Number(m.total_output_tokens).toLocaleString()}</td>
         <td style="text-align:right">${totalTokens.toLocaleString()}</td>
-        <td style="text-align:right;font-weight:600">${Number(m.total_credits_used).toFixed(4)} €</td>
+        <td style="text-align:right;font-weight:600">${Math.round(Number(m.total_credits_used) * 100).toLocaleString('fr-FR')} crédits</td>
       </tr>
     `;
     }).join('');
@@ -16029,7 +16337,7 @@ async function renderAiCredits() {
       <tr>
         <td>${new Date(e.created_at).toLocaleDateString('fr-FR')}</td>
         <td><span class="badge ${e.source === 'manual' ? 'badge-primary' : 'badge-success'}">${e.source === 'manual' ? 'Manuel' : 'Auto'}</span></td>
-        <td style="text-align:right;font-weight:600">${Number(e.credits).toFixed(4)} €</td>
+        <td style="text-align:right;font-weight:600">${Math.round(Number(e.credits) * 100).toLocaleString('fr-FR')} crédits</td>
         <td>${e.note || '—'}</td>
         <td>${e.added_by_name || 'Système'}</td>
         <td>
@@ -16045,7 +16353,7 @@ async function renderAiCredits() {
         <td><span class="badge badge-${u.model === 'sonnet' ? 'primary' : 'secondary'}">${u.model}</span></td>
         <td style="text-align:right">${Number(u.input_tokens).toLocaleString()}</td>
         <td style="text-align:right">${Number(u.output_tokens).toLocaleString()}</td>
-        <td style="text-align:right;font-weight:600">${Number(u.credits_used).toFixed(6)} €</td>
+        <td style="text-align:right;font-weight:600">${(Number(u.credits_used) * 100).toFixed(2)} crédits</td>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(u.prompt_summary || '')}">${escapeHtml(u.prompt_summary || '—')}</td>
       </tr>
     `).join('');
@@ -16059,11 +16367,11 @@ async function renderAiCredits() {
       <div class="stats-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:24px">
         <div class="stat-card">
           <div class="label">Disponible</div>
-          <div class="value" style="color:${availColor}">${overview.available.toFixed(4)} €</div>
+          <div class="value" style="color:${availColor}">${Math.round(overview.available * 100).toLocaleString('fr-FR')} crédits</div>
         </div>
         <div class="stat-card">
           <div class="label">Utilisé ce mois</div>
-          <div class="value">${overview.total_used.toFixed(4)} €</div>
+          <div class="value">${Math.round(overview.total_used * 100).toLocaleString('fr-FR')} crédits</div>
         </div>
       </div>
 
@@ -16131,7 +16439,7 @@ async function renderAiCredits() {
               </div>
               <button class="btn btn-primary" onclick="saveAiMonthlyCredits()">Sauvegarder</button>
             </div>
-            <p class="ai-hint">Montant rechargé automatiquement le 1er de chaque mois.</p>
+            <p class="ai-hint">Montant rechargé automatiquement le 1er de chaque mois. 1 € = 100 crédits.</p>
           </div>
 
           <div class="ai-config-divider"></div>
@@ -16154,6 +16462,7 @@ async function renderAiCredits() {
                 Ajouter
               </button>
             </div>
+            <p class="ai-hint">1 € = 100 crédits.</p>
           </div>
         </div>
       </div>
@@ -16168,7 +16477,7 @@ async function renderAiCredits() {
                 <th>Modèle</th><th style="text-align:center">Requêtes</th>
                 <th style="text-align:right">Tokens entrée</th><th style="text-align:right">Tokens sortie</th>
                 <th style="text-align:right">Total tokens</th>
-                <th style="text-align:right">Coût</th>
+                <th style="text-align:right">Crédits</th>
               </tr>
             </thead>
             <tbody>${perModelRows}</tbody>
@@ -16186,7 +16495,7 @@ async function renderAiCredits() {
               <tr>
                 <th>Utilisateur</th><th>Email</th><th style="text-align:center">Requêtes</th>
                 <th style="text-align:right">Tokens entrée</th><th style="text-align:right">Tokens sortie</th>
-                <th style="text-align:right">Coût</th>
+                <th style="text-align:right">Crédits</th>
               </tr>
             </thead>
             <tbody>${perUserRows}</tbody>
@@ -16204,7 +16513,7 @@ async function renderAiCredits() {
               <tr>
                 <th>Date</th><th>Utilisateur</th><th>Modèle</th>
                 <th style="text-align:right">Input</th><th style="text-align:right">Output</th>
-                <th style="text-align:right">Coût</th><th>Prompt</th>
+                <th style="text-align:right">Crédits</th><th>Prompt</th>
               </tr>
             </thead>
             <tbody>${usageRows}</tbody>
@@ -16221,7 +16530,7 @@ async function renderAiCredits() {
           <table class="ai-table">
             <thead>
               <tr>
-                <th>Date</th><th>Type</th><th style="text-align:right">Montant</th>
+                <th>Date</th><th>Type</th><th style="text-align:right">Crédits</th>
                 <th>Note</th><th>Ajouté par</th><th></th>
               </tr>
             </thead>
@@ -16361,7 +16670,7 @@ async function loadAiUsagePage(page) {
         <td><span class="badge badge-${u.model === 'sonnet' ? 'primary' : 'secondary'}">${u.model}</span></td>
         <td style="text-align:right">${Number(u.input_tokens).toLocaleString()}</td>
         <td style="text-align:right">${Number(u.output_tokens).toLocaleString()}</td>
-        <td style="text-align:right;font-weight:600">${Number(u.credits_used).toFixed(6)} €</td>
+        <td style="text-align:right;font-weight:600">${(Number(u.credits_used) * 100).toFixed(2)} crédits</td>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(u.prompt_summary || '')}">${escapeHtml(u.prompt_summary || '—')}</td>
       </tr>
     `).join('');
