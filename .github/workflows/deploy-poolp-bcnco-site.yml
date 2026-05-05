@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-poolp
+  group: deploy-server-2
   cancel-in-progress: false
 
 jobs:
@@ -87,13 +87,15 @@ jobs:
             cd "$REMOTE_ROOT/backend-php"
             $PHP migrate.php
 
-            # Start temporary PHP server for build-time API access (port 8893 — unique per site on shared server)
-            $PHP -S 127.0.0.1:8893 index.php > /dev/null 2>&1 &
-            PHP_PID=$!
+            PORT=$($PHP -r '$s=stream_socket_server("tcp://127.0.0.1:0");$n=stream_socket_get_name($s,false);echo (int)substr(strrchr($n,":"),1);fclose($s);')
+            echo "Using PHP server port: $PORT"
 
-            # Wait until PHP server is ready (max 15s)
+            $PHP -S 127.0.0.1:$PORT index.php > /dev/null 2>&1 &
+            PHP_PID=$!
+            trap 'kill $PHP_PID 2>/dev/null || true' EXIT
+
             for i in $(seq 1 15); do
-              curl -sf http://127.0.0.1:8893/api/settings/site > /dev/null 2>&1 && break
+              curl -sf http://127.0.0.1:$PORT/api/settings/site > /dev/null 2>&1 && break
               echo "Waiting for PHP server... ($i)"
               sleep 1
             done
@@ -101,19 +103,15 @@ jobs:
             cd "$REMOTE_ROOT/frontend"
             npm i
 
-            # Backup dist before build (astro build wipes dist/ first)
             if [ -d dist ]; then cp -r dist dist_backup; fi
 
-            if BUILD_API_URL=http://127.0.0.1:8893/api BUILD_SITE_URL=https://poolp.bcnco.site BUILD_MEDIA_ORIGIN=https://poolp.bcnco.site npm run build; then
+            if BUILD_API_URL=http://127.0.0.1:$PORT/api BUILD_SITE_URL=https://poolp.bcnco.site BUILD_MEDIA_ORIGIN=https://poolp.bcnco.site npm run build; then
               rm -rf dist_backup
             else
-              echo "⚠️ Build failed, restoring previous dist"
+              echo "Build failed, restoring previous dist"
               if [ -d dist_backup ]; then rm -rf dist; mv dist_backup dist; fi
-              kill $PHP_PID 2>/dev/null || true
               exit 1
             fi
-
-            kill $PHP_PID 2>/dev/null || true
 
             ln -sfn "$REMOTE_ROOT/frontend/dist" "$REMOTE_ROOT/backend-php/dist"
             echo "✅ Déploiement poolp.bcnco.site terminé"
