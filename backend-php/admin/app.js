@@ -9296,14 +9296,12 @@ function _quillCleanPasteMatchers() {
   if (typeof Quill === 'undefined') return [];
   const Delta = Quill.import('delta');
   return [
-    // Strip all inline styles/classes — keep only text + block structure
+    // Strip all inline styles/classes — keep only text + block structure.
+    // Headings are handled by Quill's default matcher (places header attr on
+    // the trailing newline, where block formats belong); custom-handling them
+    // here previously put the attr on inline text, which Quill drops, causing
+    // h1-h6 to silently downgrade to paragraphs on init/paste.
     [Node.ELEMENT_NODE, function(node, delta) {
-      const tag = node.tagName;
-      // Keep heading levels
-      if (/^H[1-6]$/.test(tag)) {
-        const level = parseInt(tag[1]);
-        return new Delta().insert(node.textContent, { header: level }).insert('\n');
-      }
       // Strip all inline formatting attributes (color, font, size, background, etc.)
       const ops = delta.ops.map(op => {
         if (op.attributes) {
