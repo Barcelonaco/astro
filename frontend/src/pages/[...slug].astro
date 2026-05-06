@@ -9,6 +9,7 @@ import SiteOverlays from '../components/SiteOverlays.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
 import { getAllPages, formatContent, getFrontendBootstrap } from '../lib/api';
 import { optimizedImageUrl, responsiveSrcset, IMAGE_PRESETS, setDefaultImageUrl } from '../lib/module-helpers';
+import { buildSchemaOrg } from '../lib/schema-org';
 
 export async function getStaticPaths() {
   // Slugs réservés — correspondent aux dossiers/fichiers dans src/pages/
@@ -109,19 +110,24 @@ const hasColorOverrides = !!colorOverrideStyle;
 // Parse SEO meta for this page
 let seoTitle = `${page.title} | ${siteName}`;
 let seoDescription = siteDescription;
-let schemaOrg = '';
 try {
   const seo = page.seo_meta ? JSON.parse(page.seo_meta) : null;
   if (seo?.enabled) {
     if (seo.meta_title) seoTitle = seo.meta_title;
     if (seo.meta_description) seoDescription = seo.meta_description;
-    if (seo.schema_org) {
-      // Replace {{site_url}} placeholder with actual site URL
-      const siteUrl = Astro.site ? Astro.site.origin : '';
-      schemaOrg = seo.schema_org.replace(/\{\{site_url\}\}/g, siteUrl);
-    }
   }
 } catch {}
+
+// Schema.org — custom from back-office or fallback
+const siteUrl = Astro.site ? Astro.site.origin.replace(/\/$/, '') : '';
+const pageUrl = `${siteUrl}/${page.slug}`;
+const schemaOrg = buildSchemaOrg({
+  page,
+  siteInfo: { siteName, siteDescription },
+  url: pageUrl,
+  siteUrl,
+  isHome: false,
+});
 
 // Body classes from identity settings
 const bodyClasses = [

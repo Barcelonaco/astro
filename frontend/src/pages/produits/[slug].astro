@@ -97,7 +97,7 @@ try {
   <head>
     <BaseHead title={seoTitle} description={seoDesc} styleSettings={styleSettings} siteSettings={siteSettings} />
     <ModuleStyles blocks={contentBlocks} />
-    <script type="application/ld+json" set:html={JSON.stringify(schemaOrg)}></script>
+    <script type="application/ld+json" set:html={JSON.stringify(schemaOrg).replace(/</g, '\\u003c')}></script>
   </head>
   <body>
     <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
