@@ -12411,7 +12411,7 @@ function applyMediaSelectionMultiple(blockId, fieldName, items) {
 }
 
 // ── GoogleMap field: Mapbox geocoding + mini-map preview ──────────────────
-const MAPBOX_TOKEN = 'pk.eyJ1IjoiYmFyY2Vsb25hLWNvIiwiYSI6ImNsbm9mZmN3bzBpM2Yya29kcWYxbnZpcGkifQ.gsHaJQAk_Ua4vBbt3DxNGQ';
+const MAPBOX_TOKEN = 'pk.eyJ1Ijoibmlja2wzMCIsImEiOiJjbW91M3p3Z3AwMmhtMnNxemoxNmtmb2xrIn0.N-Mojx4V9-2xXANEdTAuMQ';
 let _mapboxGLLoaded = false;
 
 function ensureMapboxGL() {
