@@ -2731,7 +2731,7 @@ const moduleTemplateCache = {};
 const moduleTemplatePromises = {};
 const moduleStylesLoaded = new Set();
 let baseStylesLoaded = false;
-let mediaState = { folders: [], items: [], currentFolderId: null, selectedIds: [], search: '' };
+let mediaState = { folders: [], items: [], currentFolderId: null, selectedIds: [], search: '', typeFilter: '', sort: 'date_desc' };
 let mediaPickerState = { isOpen: false, blockId: null, fieldName: null, fieldEl: null, type: 'all', folderId: null, folders: [], items: [], search: '' };
 let siteSettingsCache = null;
 
@@ -10928,6 +10928,8 @@ async function fetchMediaItems(folderId = null) {
   } else {
     params.set('folder_id', folderId);
   }
+  if (mediaState.typeFilter) params.set('type', mediaState.typeFilter);
+  if (mediaState.sort) params.set('sort', mediaState.sort);
   try {
     mediaState.items = await apiFetch(`/media?${params.toString()}`);
   } catch (e) {
@@ -10982,6 +10984,40 @@ async function renderMediaLibrary() {
         <div class="media-search">
           <input type="text" class="media-search-input" placeholder="Rechercher un média…" value="${escapeHtml(mediaState.search)}" oninput="handleMediaSearch(this.value)" />
           ${mediaState.search ? `<button class="media-search-clear" onclick="clearMediaSearch()" title="Effacer">&times;</button>` : ''}
+        </div>
+        <div class="media-filters">
+          <div class="media-filter-group" role="group" aria-label="Filtrer par type">
+            <button type="button" class="media-pill ${mediaState.typeFilter === '' ? 'is-active' : ''}" onclick="handleMediaTypeFilter('')" title="Tous">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+              <span>Tous</span>
+            </button>
+            <button type="button" class="media-pill ${mediaState.typeFilter === 'image' ? 'is-active' : ''}" onclick="handleMediaTypeFilter('image')" title="Images">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.5-3.5L9 20"/></svg>
+              <span>Images</span>
+            </button>
+            <button type="button" class="media-pill ${mediaState.typeFilter === 'video' ? 'is-active' : ''}" onclick="handleMediaTypeFilter('video')" title="Vidéos">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m22 8-6 4 6 4V8z"/></svg>
+              <span>Vidéos</span>
+            </button>
+            <button type="button" class="media-pill ${mediaState.typeFilter === 'document' ? 'is-active' : ''}" onclick="handleMediaTypeFilter('document')" title="PDF">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span>PDF</span>
+            </button>
+          </div>
+          <div class="media-sort-group" role="group" aria-label="Trier">
+            ${['date','name','type'].map(key => {
+              const active = mediaState.sort.startsWith(key + '_');
+              const asc = mediaState.sort === key + '_asc';
+              const next = active ? (asc ? key + '_desc' : key + '_asc') : (key === 'date' ? key + '_desc' : key + '_asc');
+              const label = key === 'date' ? 'Date' : key === 'name' ? 'Nom' : 'Type';
+              return `
+                <button type="button" class="media-sort-btn ${active ? 'is-active' : ''}" onclick="handleMediaSort('${next}')" title="Trier par ${label}">
+                  <span>${label}</span>
+                  <svg class="media-sort-arrow ${active && asc ? 'is-asc' : ''}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+                </button>
+              `;
+            }).join('')}
+          </div>
         </div>
         <button class="media-folder-item media-folder-all ${currentFolder === null ? 'is-active' : ''}" onclick="selectMediaFolder(null)" ondragover="onFolderDragOver(event)" ondragleave="onFolderDragLeave(event)" ondrop="onFolderDrop(event, null)">
           Tous les médias <span class="media-folder-count">${mediaTotalCount}</span>
@@ -11137,6 +11173,46 @@ async function clearMediaSearch() {
   }
   const clearBtn = document.querySelector('.media-search-clear');
   if (clearBtn) clearBtn.style.display = 'none';
+}
+
+async function handleMediaTypeFilter(value) {
+  mediaState.typeFilter = value || '';
+  document.querySelectorAll('.media-filter-group .media-pill').forEach(btn => {
+    const onclickAttr = btn.getAttribute('onclick') || '';
+    const m = onclickAttr.match(/handleMediaTypeFilter\('([^']*)'\)/);
+    btn.classList.toggle('is-active', m && m[1] === mediaState.typeFilter);
+  });
+  await fetchMediaItems(mediaState.currentFolderId);
+  const grid = document.querySelector('.media-grid');
+  if (grid) {
+    grid.innerHTML = mediaState.items.length === 0
+      ? renderEmptyState('🗂️', 'Aucun média', 'Aucun média ne correspond à ce filtre.')
+      : mediaState.items.map(item => renderMediaCard(item)).join('');
+  }
+}
+
+async function handleMediaSort(value) {
+  mediaState.sort = value || 'date_desc';
+  const [activeKey, activeDir] = mediaState.sort.split('_');
+  document.querySelectorAll('.media-sort-group .media-sort-btn').forEach(btn => {
+    const label = (btn.querySelector('span')?.textContent || '').trim().toLowerCase();
+    const key = label === 'date' ? 'date' : label === 'nom' ? 'name' : 'type';
+    const isActive = key === activeKey;
+    btn.classList.toggle('is-active', isActive);
+    const next = isActive
+      ? (activeDir === 'asc' ? key + '_desc' : key + '_asc')
+      : (key === 'date' ? key + '_desc' : key + '_asc');
+    btn.setAttribute('onclick', `handleMediaSort('${next}')`);
+    const arrow = btn.querySelector('.media-sort-arrow');
+    if (arrow) arrow.classList.toggle('is-asc', isActive && activeDir === 'asc');
+  });
+  await fetchMediaItems(mediaState.currentFolderId);
+  const grid = document.querySelector('.media-grid');
+  if (grid) {
+    grid.innerHTML = mediaState.items.length === 0
+      ? renderEmptyState('🗂️', 'Aucun média', 'Aucun média à afficher.')
+      : mediaState.items.map(item => renderMediaCard(item)).join('');
+  }
 }
 
 async function handleMediaUpload(event) {
