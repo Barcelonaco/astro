@@ -135,6 +135,10 @@ async function init() {
     // Charger les paramètres globaux du site (couleurs, etc.) pour les formulaires de modules
     await loadSiteSettings();
 
+    // Must run before loadPlugins: plugin-injected nav-items have their own click handlers; a generic listener on top would close the accordion immediately after the parent's toggle opens it.
+    setupNavigation();
+    setupSidebarToggle();
+
     // Charger les plugins et injecter modules + CPT
     await loadPlugins();
 
@@ -143,10 +147,6 @@ async function init() {
 
     // Admin top bar
     initAdminTopBar();
-
-    // Setup navigation
-    setupNavigation();
-    setupSidebarToggle();
 
     // Restaurer la dernière vue ou le fragment d'URL
     const hash = window.location.hash.replace('#', '');
@@ -261,18 +261,47 @@ async function loadSection(section) {
   localStorage.setItem('adminLastView', section);
   const content = document.getElementById('content');
 
-  // Highlight the correct nav item
+  // Highlight the correct nav item(s) and open the parent sub-nav
   document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-  let navSection = section;
-  if (/^cpt-(add|edit|categories|options):/.test(section)) {
-    navSection = 'cpt:' + section.split(':')[1];
+  document.querySelectorAll('.nav-sub-items').forEach(s => s.style.display = 'none');
+
+  let parentSection = section;
+  let subSection = section;
+  if (/^cpt-(add|categories|options):/.test(section)) {
+    parentSection = 'cpt:' + section.split(':')[1];
+  } else if (/^cpt-edit:/.test(section)) {
+    const slug = section.split(':')[1];
+    parentSection = `cpt:${slug}`;
+    subSection = `cpt:${slug}`;
   } else if (section.startsWith('builder:')) {
-    navSection = 'pages';
+    parentSection = 'pages';
+    subSection = 'pages';
+  } else if (section.startsWith('rb-builder:')) {
+    parentSection = 'reusable-blocs';
+    subSection = 'reusable-blocs';
   } else if (/^form-(edit|entries|entry-detail):/.test(section)) {
-    navSection = 'forms';
+    parentSection = 'forms';
+    subSection = 'forms';
   }
-  const activeNav = document.querySelector(`.nav-item[data-section="${navSection}"]`);
-  if (activeNav) activeNav.classList.add('active');
+
+  // Activate sub-item + open its container + activate the container's parent link
+  const subItem = document.querySelector(`.nav-sub-items .nav-sub-item[data-section="${subSection}"]`);
+  if (subItem) {
+    subItem.classList.add('active');
+    const container = subItem.closest('.nav-sub-items');
+    if (container) {
+      container.style.display = 'block';
+      const parentKey = container.dataset.parent;
+      if (parentKey) {
+        const parentLink = document.querySelector(`.nav-item[data-section="${parentKey}"]:not(.nav-sub-item)`);
+        if (parentLink) parentLink.classList.add('active');
+      }
+    }
+  }
+
+  // Activate top-level link (covers sections without sub-nav)
+  const topLink = document.querySelector(`.nav-item[data-section="${parentSection}"]:not(.nav-sub-item)`);
+  if (topLink) topLink.classList.add('active');
 
   // Section-level role guards
   const sectionMinRoles = {
@@ -376,9 +405,15 @@ async function loadSection(section) {
         const pageSlug = parts[2];
         const pluginDef = loadedPlugins.find(p => p.name === pluginName);
         const page = pluginDef && (pluginDef.admin_pages || []).find(p => p.slug === pageSlug);
-        if (page && page.url) {
-          const safeUrl = String(page.url).replace(/"/g, '&quot;');
+        const url = page && typeof page.url === 'string' ? page.url.trim() : '';
+        if (url && url.startsWith('/plugin-assets/')) {
+          // Cache-bust : the browser may have a cached HTML with stale headers
+          // (e.g. older X-Frame-Options DENY) that survives header updates.
+          const sep = url.includes('?') ? '&' : '?';
+          const safeUrl = (url + sep + 'v=' + Date.now()).replace(/"/g, '&quot;');
           content.innerHTML = `<iframe src="${safeUrl}" style="width:100%;height:calc(100vh - 80px);border:0;" title="${escapeHtml(page.label || page.slug)}"></iframe>`;
+        } else {
+          content.innerHTML = `<div style="padding:32px;text-align:center;color:#666"><h2>Page admin introuvable</h2><p>Le plugin <code>${escapeHtml(pluginName)}</code> n'a pas déclaré d'URL valide pour la page <code>${escapeHtml(pageSlug)}</code>.</p><p style="font-size:12px">Attendu : <code>/plugin-assets/&lt;plugin&gt;/admin/&lt;page&gt;.html</code> dans <code>plugin.json</code> → <code>admin_pages[]</code>.</p></div>`;
         }
       } else if (section.startsWith('form-edit:')) {
         const formId = parseInt(section.split(':')[1]) || null;
@@ -422,13 +457,13 @@ async function renderDashboard() {
       aiHtml = `
         <div class="stat-card" style="cursor:pointer" onclick="navigateTo('ai-credits')" title="Gérer les crédits IA">
           <div class="label">Crédits IA disponibles</div>
-          <div class="value" style="color:${barColor}">${aiCredits.available.toFixed(2)} €</div>
+          <div class="value" style="color:${barColor}">${Math.round(aiCredits.available * 100).toLocaleString('fr-FR')} crédits</div>
           <div style="margin-top:8px;background:var(--border-color,#e5e7eb);border-radius:6px;height:8px;overflow:hidden">
             <div style="width:${pct}%;height:100%;background:${barColor};border-radius:6px;transition:width .3s"></div>
           </div>
           <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--text-muted,#6b7280)">
-            <span>Utilisé ce mois : ${aiCredits.total_used.toFixed(4)} €</span>
-            <span>Alloué : ${aiCredits.total_credits.toFixed(2)} €</span>
+            <span>Utilisé ce mois : ${Math.round(aiCredits.total_used * 100).toLocaleString('fr-FR')} crédits</span>
+            <span>Alloué : ${Math.round(aiCredits.total_credits * 100).toLocaleString('fr-FR')} crédits</span>
           </div>
         </div>
       `;
@@ -571,17 +606,56 @@ const BLOCK_TYPES = { ...NICKL_MODULE_TYPES, ...LEGACY_BLOCK_TYPES };
 let loadedPlugins = [];
 let INACTIVE_PLUGIN_TYPES = new Set();
 
+/**
+ * Build pseudo-manifests from the core registry (actualites, evenements,
+ * references). They share the same shape as plugin manifests so the existing
+ * sidebar/module-injection loop handles them uniformly. `_core: true` flags
+ * them so the plugins manager skips rendering a toggle.
+ */
+function buildCorePseudoManifests(registry) {
+  const cpts = registry?.cpts || [];
+  const modules = registry?.modules || [];
+  // Group modules by CPT slug via category.id (matches CPT slug).
+  const modulesBySlug = {};
+  for (const m of modules) {
+    const slug = m.category?.id;
+    if (!slug) continue;
+    (modulesBySlug[slug] = modulesBySlug[slug] || []).push(m);
+  }
+  return cpts.map(pt => {
+    const slug = pt.slug;
+    const items = modulesBySlug[slug] || [];
+    const category = items[0]?.category || { id: slug, label: pt.labelPlural || pt.label };
+    return {
+      name: slug,
+      label: pt.labelPlural || pt.label,
+      _dir: slug,
+      _core: true,
+      _active: true,
+      postTypes: [pt],
+      modules: items.length ? { category, items: items.map(({ name, label }) => ({ name, label })) } : null,
+    };
+  });
+}
+
 async function loadPlugins() {
+  let pluginManifests = [];
+  let coreManifests = [];
   try {
-    const data = await apiFetch('/plugins');
-    loadedPlugins = data.plugins || [];
+    const [plugins, core] = await Promise.all([
+      apiFetch('/plugins').catch(() => ({ plugins: [] })),
+      apiFetch('/core/registry').catch(() => ({ cpts: [], modules: [] })),
+    ]);
+    pluginManifests = plugins.plugins || [];
+    coreManifests = buildCorePseudoManifests(core);
   } catch {
     loadedPlugins = [];
     return;
   }
+  loadedPlugins = [...coreManifests, ...pluginManifests];
 
   // Remove previously injected plugin sidebar entries before re-rendering
-  document.querySelectorAll('.nav-item[data-section^="cpt:"], .nav-sub-items[data-parent^="cpt:"], .nav-item[data-section^="plugin-options:"]').forEach(el => el.remove());
+  document.querySelectorAll('.nav-item[data-section^="cpt:"], .nav-sub-items[data-parent^="cpt:"], .nav-item[data-section^="plugin-options:"], .nav-item[data-section^="plugin-page:"], .nav-item[data-section^="plugin-group:"], .nav-sub-items[data-parent^="plugin-group:"]').forEach(el => el.remove());
 
   // Strip prior plugin-injected entries from MODULE_CATEGORIES and BLOCK_TYPES
   // so deactivated plugins disappear from the page builder's "add module" list.
@@ -668,10 +742,12 @@ async function loadPlugins() {
 
         // Admin pages (custom HTML rendered in iframe)
         for (const page of plugin.admin_pages || []) {
+          const minRole = page.min_role || 'admin_site';
           const pa = document.createElement('a');
-          pa.href = '#'; pa.className = 'nav-item nav-sub-item';
+          pa.href = '#'; pa.className = `nav-item nav-sub-item role-${minRole}`;
           pa.dataset.section = `plugin-page:${plugin.name}:${page.slug}`;
           pa.textContent = page.label || page.slug;
+          if (!hasMinRole(minRole)) pa.style.display = 'none';
           sub.appendChild(pa);
         }
 
@@ -809,11 +885,14 @@ async function loadPlugins() {
       for (const page of plugin.admin_pages) {
         const sectionId = `plugin-page:${plugin.name}:${page.slug}`;
         if (!nav || nav.querySelector(`[data-section="${sectionId}"]`)) continue;
+        // min_role par page (défaut admin_site). Une page peut exiger super_admin
+        // (ex. page de configuration de paiement avec clés secrètes Stripe).
+        const minRole = page.min_role || 'admin_site';
         const a = document.createElement('a');
         a.href = '#';
-        a.className = 'nav-item role-admin_site';
+        a.className = `nav-item role-${minRole}`;
         a.dataset.section = sectionId;
-        if (!hasMinRole('admin_site')) a.style.display = 'none';
+        if (!hasMinRole(minRole)) a.style.display = 'none';
         const iconClass = page.faIcon || 'fa-solid fa-cube';
         a.innerHTML = `<i class="${iconClass}"></i><span>${escapeHtml(page.label || page.slug)}</span>`;
         a.addEventListener('click', (ev) => {
@@ -976,15 +1055,37 @@ function renderCPTListRows() {
     const safeTitle = escapeHtml(item.title).replace(/'/g, "\\'");
     const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
+    // Color swatch thumbnail (manifest: previewType=color_swatch, previewColorField=<field>)
+    let thumbHtml = '';
+    if (ptDef.previewType === 'color_swatch' && ptDef.previewColorField) {
+      const cfItem = typeof item.custom_fields === 'string'
+        ? (() => { try { return JSON.parse(item.custom_fields); } catch { return {}; } })()
+        : (item.custom_fields || {});
+      const rawHex = String(cfItem[ptDef.previewColorField] || '').trim();
+      const isValidHex = /^#?[0-9a-f]{3,8}$/i.test(rawHex);
+      const hex = isValidHex ? (rawHex.startsWith('#') ? rawHex : '#' + rawHex) : '';
+      thumbHtml = hex
+        ? '<div style="width:48px;height:48px;border-radius:50%;background:' + escapeHtml(hex) + ';flex-shrink:0;box-shadow:0 1px 2px rgba(0,0,0,0.08);"></div>'
+        : '<div style="width:48px;height:48px;border-radius:50%;border:1px dashed var(--gray-300,#d1d5db);flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#fff;">'
+          + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gray-400,#9ca3af)"><circle cx="12" cy="12" r="10"/><line x1="5" y1="19" x2="19" y2="5"/></svg>'
+          + '</div>';
+    } else if (thumbUrl) {
+      thumbHtml = '<img src="' + escapeHtml(thumbUrl) + '" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;">';
+    } else {
+      thumbHtml = '<div style="width:48px;height:48px;background:var(--gray-100);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);flex-shrink:0;">'
+        + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>'
+        + '</div>';
+    }
+
     return '<div class="page-item">'
       + '<div class="page-item__info" style="cursor:pointer" onclick="loadSection(\'cpt-edit:' + escapeHtml(ptDef.slug) + ':' + item.id + '\')">'
       +   '<div style="display:flex;align-items:center;gap:12px;min-width:0;">'
-      +     (thumbUrl
-            ? '<img src="' + escapeHtml(thumbUrl) + '" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;">'
-            : '<div style="width:48px;height:48px;background:var(--gray-100);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);flex-shrink:0;font-size:18px;">' + (ptDef.icon || '📷') + '</div>')
+      +     thumbHtml
       +     '<div style="min-width:0;overflow:hidden;">'
       +       '<div class="page-item__title">' + escapeHtml(item.title) + '</div>'
-      +       '<div class="page-item__slug">/' + escapeHtml(ptDef.slug) + '/' + escapeHtml(item.slug) + '</div>'
+      +       ((ptDef.supports || ['title','slug','featured_image','content','status']).includes('slug')
+              ? '<div class="page-item__slug">/' + escapeHtml(ptDef.slug) + '/' + escapeHtml(item.slug) + '</div>'
+              : '')
       +     '</div>'
       +   '</div>'
       + '</div>'
@@ -1213,6 +1314,45 @@ async function renderCPTEditPage(ptDef, itemId) {
         </div>`;
       }
 
+      // --- Select (static options or CPT-sourced) ---
+      if (ftype === 'select') {
+        const fnEsc = escapeHtml(field.name);
+        const opts = field.options && typeof field.options === 'object' ? field.options : {};
+        const optionsHtml = Object.entries(opts).map(([k, label]) =>
+          `<option value="${escapeHtml(k)}" ${String(val) === String(k) ? 'selected' : ''}>${escapeHtml(label)}</option>`
+        ).join('');
+        const sourceAttr = field.source ? ` data-cf-source="${escapeHtml(field.source)}" data-cf-current="${escapeHtml(val)}"` : '';
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <select class="form-input" name="cf_${fnEsc}"${sourceAttr}>
+            <option value="">— Sélectionner —</option>
+            ${optionsHtml}
+          </select>
+        </div>`;
+      }
+
+      // --- Image / File / Video (media picker) ---
+      if (ftype === 'image' || ftype === 'file' || ftype === 'video') {
+        let img = null;
+        try { if (val) img = typeof val === 'string' ? JSON.parse(val) : val; } catch { img = null; }
+        const url = (img && typeof img === 'object') ? (img.url || '') : (typeof val === 'string' && val.startsWith('/') ? val : '');
+        const fnEsc = escapeHtml(field.name);
+        const hiddenVal = val ? (typeof val === 'string' ? val : JSON.stringify(val)) : '';
+        return `<div class="form-group"${w}>
+          <label class="form-label">${escapeHtml(field.label)}</label>
+          <div class="cpt-cf-image-field" data-cf="${fnEsc}" data-cf-type="${ftype}">
+            <div id="cptCfImagePreview_${fnEsc}" style="margin-bottom:8px;min-height:0;">
+              ${url ? `<img src="${escapeHtml(getOptimizedUrl(url, 400, 70))}" style="max-width:240px;max-height:160px;object-fit:cover;border-radius:8px;display:block;">` : ''}
+            </div>
+            <input type="hidden" name="cf_${fnEsc}" id="cptCfImageInput_${fnEsc}" value="${escapeHtml(hiddenVal)}">
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="openCPTCfImagePicker('${fnEsc}', '${ftype}')">Choisir ${ftype === 'video' ? 'une vidéo' : ftype === 'file' ? 'un fichier' : 'une image'}</button>
+              ${url ? `<button type="button" class="btn btn-outline btn-sm" onclick="clearCPTCfImage('${fnEsc}')">Retirer</button>` : ''}
+            </div>
+          </div>
+        </div>`;
+      }
+
       // --- Address (Mapbox geocoding + mini-map) ---
       if (ftype === 'address') {
         let addr = { address: '', city: '', post_code: '', street_name: '', street_number: '', lat: '', lng: '' };
@@ -1308,10 +1448,12 @@ async function renderCPTEditPage(ptDef, itemId) {
               <label class="form-label">Titre *</label>
               <input type="text" class="form-input" name="title" value="${escapeHtml(item?.title || '')}" required id="cptTitleInput">
             </div>
+            ${supports.includes('slug') ? `
             <div class="form-group">
               <label class="form-label">Slug</label>
               <input type="text" class="form-input" name="slug" value="${escapeHtml(item?.slug || '')}" id="cptSlugInput">
             </div>
+            ` : `<input type="hidden" name="slug" value="${escapeHtml(item?.slug || '')}" id="cptSlugInput">`}
           </div>
 
           <div class="card" style="margin-bottom:24px;">
@@ -1336,6 +1478,7 @@ async function renderCPTEditPage(ptDef, itemId) {
             </div>
           </div>
 
+          ${supports.includes('featured_image') ? `
           <div class="card" style="margin-bottom:16px;">
             <h3 style="margin-bottom:12px;">Image à la une</h3>
             <div id="cptFeaturedPreview" style="margin-bottom:8px;">${featuredImgPreview}</div>
@@ -1345,6 +1488,7 @@ async function renderCPTEditPage(ptDef, itemId) {
               ${fi ? '<button type="button" class="btn btn-sm btn-danger-outline" onclick="clearCPTFeatured()">Supprimer</button>' : ''}
             </div>
           </div>
+          ` : ''}
 
           ${categoriesHtml ? `<div class="card" style="margin-bottom:16px;">${categoriesHtml}</div>` : ''}
 
@@ -1352,13 +1496,16 @@ async function renderCPTEditPage(ptDef, itemId) {
           ${hasCustomFields ? `
           <div class="card cpt-preview-card" style="margin-bottom:16px;position:sticky;top:16px;">
             <h3 style="margin-bottom:12px;display:flex;align-items:center;gap:6px;">
-              <span style="font-size:14px;">👁</span> Aperçu
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              Aperçu
             </h3>
-            <div id="cptLivePreview" style="border:1px solid var(--border,#e5e7eb);border-radius:8px;overflow:hidden;background:#fff;">
-              <div id="cptPreviewImage" style="width:100%;height:140px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;overflow:hidden;">
-                ${fi ? `<img src="${escapeHtml(getOptimizedUrl(fi.sizes?.medium || fi.url || '', 400, 70))}" style="width:100%;height:100%;object-fit:cover;">` : 'Aucune image'}
+            <div id="cptLivePreview" style="border:1px solid var(--border,#e5e7eb);border-radius:8px;overflow:hidden;background:#fff;" data-preview-type="${escapeHtml(ptDef.previewType || '')}" data-preview-color-field="${escapeHtml(ptDef.previewColorField || '')}">
+              <div id="cptPreviewImage" style="${ptDef.previewType === 'color_swatch' ? 'padding:24px 12px;display:flex;align-items:center;justify-content:center;background:#fff;' : 'width:100%;height:140px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;overflow:hidden;'}">
+                ${ptDef.previewType === 'color_swatch'
+                  ? `<div id="cptPreviewSwatch" style="width:80px;height:80px;border-radius:50%;background:${escapeHtml(cf[ptDef.previewColorField] || '#ddd')};box-shadow:0 1px 3px rgba(0,0,0,0.08);"></div>`
+                  : (fi ? `<img src="${escapeHtml(getOptimizedUrl(fi.sizes?.medium || fi.url || '', 400, 70))}" style="width:100%;height:100%;object-fit:cover;">` : 'Aucune image')}
               </div>
-              <div style="padding:12px;">
+              <div style="padding:12px;${ptDef.previewType === 'color_swatch' ? 'text-align:center;' : ''}">
                 <div id="cptPreviewBadges" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;min-height:0;"></div>
                 <h4 id="cptPreviewTitle" style="font-size:15px;font-weight:700;margin:0 0 6px 0;line-height:1.3;color:#1a1a1a;">${escapeHtml(item?.title || 'Titre de l\'élément')}</h4>
                 <div id="cptPreviewDates" style="font-size:12px;color:#666;margin-bottom:6px;display:flex;align-items:center;gap:4px;"></div>
@@ -1475,6 +1622,15 @@ function initCPTLivePreview(ptDef) {
     const titleInput = form.querySelector('[name="title"]');
     if (titleEl && titleInput) {
       titleEl.textContent = titleInput.value || 'Titre de l\'élément';
+    }
+
+    // Color swatch preview (manifest: previewType=color_swatch, previewColorField=<field>)
+    if (ptDef.previewType === 'color_swatch' && ptDef.previewColorField) {
+      const swatch = document.getElementById('cptPreviewSwatch');
+      if (swatch) {
+        const v = getVal(ptDef.previewColorField);
+        swatch.style.background = v && /^#?[0-9a-f]{3,8}$/i.test(v) ? (v.startsWith('#') ? v : '#' + v) : '#ddd';
+      }
     }
 
     // Badges
@@ -1694,6 +1850,41 @@ function openCPTFeaturedPicker() {
 function clearCPTFeatured() {
   document.getElementById('cptFeaturedInput').value = '';
   document.getElementById('cptFeaturedPreview').innerHTML = '<div style="width:200px;height:150px;background:#f5f5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#999;">Aucune image</div>';
+}
+
+// CPT custom_fields image picker — opens shared media picker, scoped to a single cf field
+function openCPTCfImagePicker(fieldName, ftype) {
+  const pickerType = ftype === 'video' ? 'video' : ftype === 'file' ? 'all' : 'image';
+  mediaPickerState = {
+    isOpen: true,
+    blockId: '__cpt_cf__',
+    fieldName,
+    type: pickerType,
+    folderId: null,
+    folders: [],
+    items: [],
+    multiple: false,
+    selectedIds: []
+  };
+  ensureMediaPickerModal();
+  showLoading();
+  Promise.all([apiFetch('/media/folders'), apiFetch('/media?all=1')])
+    .then(([res, items]) => {
+      mediaPickerState.folders = res.folders || [];
+      mediaPickerState.totalCount = res.total || 0;
+      mediaPickerState.items = items;
+      hideLoading();
+      document.getElementById('mediaPickerModal').classList.add('is-open');
+      updateMediaPickerContent();
+    })
+    .catch(() => hideLoading());
+}
+
+function clearCPTCfImage(fieldName) {
+  const input = document.getElementById(`cptCfImageInput_${fieldName}`);
+  const preview = document.getElementById(`cptCfImagePreview_${fieldName}`);
+  if (input) input.value = '';
+  if (preview) preview.innerHTML = '';
 }
 
 // CPT Builder featured image picker (for page builder CPT mode)
@@ -2545,8 +2736,8 @@ const moduleTemplateCache = {};
 const moduleTemplatePromises = {};
 const moduleStylesLoaded = new Set();
 let baseStylesLoaded = false;
-let mediaState = { folders: [], items: [], currentFolderId: null, selectedIds: [], search: '' };
-let mediaPickerState = { isOpen: false, blockId: null, fieldName: null, type: 'all', folderId: null, folders: [], items: [], search: '' };
+let mediaState = { folders: [], items: [], currentFolderId: null, selectedIds: [], search: '', typeFilter: '', sort: 'date_desc' };
+let mediaPickerState = { isOpen: false, blockId: null, fieldName: null, fieldEl: null, type: 'all', folderId: null, folders: [], items: [], search: '' };
 let siteSettingsCache = null;
 
 function applyCssVariablesFromSettings(settings) {
@@ -2623,10 +2814,21 @@ async function loadSiteSettings() {
   try {
     siteSettingsCache = await apiFetch('/settings');
     applyCssVariablesFromSettings(siteSettingsCache);
+    applyAdminFavicon(siteSettingsCache.favicon || '');
   } catch (e) {
     siteSettingsCache = {};
   }
   return siteSettingsCache;
+}
+
+function applyAdminFavicon(favicon) {
+  if (!favicon) return;
+  const el = document.getElementById('adminFavicon');
+  if (!el) return;
+  el.href = favicon;
+  const ext = (favicon.split('?')[0].match(/\.([a-z0-9]+)$/i) || [])[1] || '';
+  const map = { svg: 'image/svg+xml', png: 'image/png', ico: 'image/x-icon', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' };
+  if (map[ext.toLowerCase()]) el.type = map[ext.toLowerCase()];
 }
 
 async function loadModuleFieldSchema() {
@@ -3027,6 +3229,28 @@ async function renderPageBuilder() {
               <input type="hidden" name="cf_${fnEsc}__place_id" value="">
               <input type="hidden" name="cf_${fnEsc}__name" value="">
               <input type="hidden" name="cf_${fnEsc}__street_name_short" value="">
+            </div>
+          </div>`;
+        }
+
+        // Image / File / Video (media picker)
+        if (ftype === 'image' || ftype === 'file' || ftype === 'video') {
+          let img = null;
+          try { if (val) img = typeof val === 'string' ? JSON.parse(val) : val; } catch { img = null; }
+          const url = (img && typeof img === 'object') ? (img.url || '') : (typeof val === 'string' && val.startsWith('/') ? val : '');
+          const fnEsc = escapeHtml(field.name);
+          const hiddenVal = val ? (typeof val === 'string' ? val : JSON.stringify(val)) : '';
+          return `<div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">${escapeHtml(field.label)}</label>
+            <div class="cpt-cf-image-field" data-cf="${fnEsc}" data-cf-type="${ftype}">
+              <div id="cptCfImagePreview_${fnEsc}" style="margin-bottom:8px;">
+                ${url ? `<img src="${escapeHtml(getOptimizedUrl(url, 200, 70))}" style="max-width:100%;max-height:120px;object-fit:cover;border-radius:6px;display:block;">` : ''}
+              </div>
+              <input type="hidden" class="cpt-builder-cf" data-cf="${fnEsc}" id="cptCfImageInput_${fnEsc}" value="${escapeHtml(hiddenVal)}">
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-outline btn-xs" onclick="openCPTCfImagePicker('${fnEsc}', '${ftype}')">Choisir</button>
+                ${url ? `<button type="button" class="btn btn-outline btn-xs" onclick="clearCPTCfImage('${fnEsc}')">Retirer</button>` : ''}
+              </div>
             </div>
           </div>`;
         }
@@ -4625,7 +4849,9 @@ function buildTemplateContext(block) {
       const imgUrl = typeof img === 'string' ? img : (img.url || '');
       const imgAlt = typeof img === 'object' ? (img.alt || '') : '';
       const link1 = slide.link || {};
-      const link2 = slide.link_2 || null;
+      const link2Raw = slide.link_2;
+      const link2Url = typeof link2Raw === 'string' ? link2Raw : ((link2Raw && link2Raw.url) || '');
+      const link2 = link2Url ? link2Raw : null;
       const link1Url = typeof link1 === 'string' ? link1 : (link1.url || '');
       return {
         image_url: imgUrl,
@@ -7875,9 +8101,19 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
   const label = field.label || field.name;
   const name = field.name;
   const type = field.type || 'Text';
+  // Compute the compound input name for nested fields
+  const inputName = rowCtx
+    ? (rowCtx.rowIndex !== null
+        ? `${rowCtx.parentName}::${rowCtx.rowIndex}::${name}`
+        : `${rowCtx.parentName}::${name}`)
+    : name;
+  // data-rfield attribute for row-scoped conditional logic lookup
+  const rfieldAttr = rowCtx ? ` data-rfield="${escapeHtml(name)}"` : '';
+  // Suffix DOM ids with hash of inputName so multiple instances on same page (e.g. inside columns) stay unique
+  const idSuffix = rowCtx ? `-${inputName.replace(/[^a-zA-Z0-9_-]/g, '_')}` : '';
   // Dynamic select for form module: populate form_id from API
   if (name === 'form_id') {
-    const selectId = `form-select-${blockId}`;
+    const selectId = `form-select-${blockId}${idSuffix}`;
     setTimeout(async () => {
       const sel = document.getElementById(selectId);
       if (!sel) return;
@@ -7892,7 +8128,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
     return `
       <div class="form-group">
         <label class="form-label">${escapeHtml(label)}</label>
-        <select class="form-select" name="${escapeHtml(name)}" id="${selectId}">
+        <select class="form-select" name="${escapeHtml(inputName)}"${rfieldAttr} id="${selectId}">
           <option value="">Chargement…</option>
         </select>
       </div>
@@ -7900,7 +8136,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
   }
   // Dynamic select for reusable-bloc module: populate bloc_id from API
   if (name === 'bloc_id') {
-    const selectId = `rb-select-${blockId}`;
+    const selectId = `rb-select-${blockId}${idSuffix}`;
     // Render placeholder then fetch choices async
     setTimeout(async () => {
       const sel = document.getElementById(selectId);
@@ -7916,7 +8152,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
     return `
       <div class="form-group">
         <label class="form-label">${escapeHtml(label)}</label>
-        <select class="form-select" name="${escapeHtml(name)}" id="${selectId}">
+        <select class="form-select" name="${escapeHtml(inputName)}"${rfieldAttr} id="${selectId}">
           <option value="">Chargement…</option>
         </select>
       </div>
@@ -7924,7 +8160,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
   }
   // Dynamic select for summary module: populate menu_id from API
   if (name === 'menu_id') {
-    const selectId = `menu-select-${blockId}`;
+    const selectId = `menu-select-${blockId}${idSuffix}`;
     setTimeout(async () => {
       const sel = document.getElementById(selectId);
       if (!sel) return;
@@ -7939,20 +8175,12 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
     return `
       <div class="form-group">
         <label class="form-label">${escapeHtml(label)}</label>
-        <select class="form-select" name="${escapeHtml(name)}" id="${selectId}">
+        <select class="form-select" name="${escapeHtml(inputName)}"${rfieldAttr} id="${selectId}">
           <option value="">Chargement…</option>
         </select>
       </div>
     `;
   }
-  // Compute the compound input name for nested fields
-  const inputName = rowCtx
-    ? (rowCtx.rowIndex !== null
-        ? `${rowCtx.parentName}::${rowCtx.rowIndex}::${name}`
-        : `${rowCtx.parentName}::${name}`)
-    : name;
-  // data-rfield attribute for row-scoped conditional logic lookup
-  const rfieldAttr = rowCtx ? ` data-rfield="${escapeHtml(name)}"` : '';
   const safeValue = escapeHtml(value ?? '');
   const choices = Array.isArray(field.choices) ? field.choices : null;
   if (type === 'WYSIWYGEditor') {
@@ -8151,6 +8379,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
     const isPdf = isDocument || /\.pdf$/i.test(url);
     const pickerType = type === 'File' ? 'all' : (type === 'Video' ? 'video' : 'image');
     const meta = media?.original_name || media?.name || url || 'Aucun média sélectionné';
+    const canCrop = type === 'Image' && media?.id && url && !isPdf && !isVideo;
     return `
       <div class="form-group">
         <label class="form-label">${escapeHtml(label)}</label>
@@ -8161,8 +8390,9 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
           <div class="media-preview-meta">${escapeHtml(meta)}</div>
           <input type="hidden" name="${escapeHtml(inputName)}"${rfieldAttr} value="${escapeHtml(media ? JSON.stringify(media) : '')}">
           <div class="media-field-actions">
-            <button type="button" class="btn btn-sm btn-outline" onclick="openMediaPicker('${pickerType}', '${blockId}', '${escapeHtml(inputName)}')">Choisir</button>
-            <button type="button" class="btn btn-sm btn-outline" onclick="clearMediaSelection('${blockId}', '${escapeHtml(inputName)}')">Retirer</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="openMediaPicker('${pickerType}', '${blockId}', '${escapeHtml(inputName)}', { trigger: this })">Choisir</button>
+            ${canCrop ? `<button type="button" class="btn btn-sm btn-outline" onclick="openCropEditorForField(${media.id}, '${escapeHtml(url)}', '${blockId}', '${escapeHtml(inputName)}', this)">Recadrer</button>` : ''}
+            <button type="button" class="btn btn-sm btn-outline" onclick="clearMediaSelection('${blockId}', '${escapeHtml(inputName)}', this)">Retirer</button>
           </div>
         </div>
       </div>
@@ -8233,13 +8463,13 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
     `;
   }
   if (type === 'Repeater') {
-    return renderRepeaterFieldHTML(field, value, blockId);
+    return renderRepeaterFieldHTML(field, value, blockId, rowCtx);
   }
   if (type === 'FlexibleContent') {
     return renderFlexibleContentFieldHTML(field, value, blockId, rowCtx);
   }
   if (type === 'Group') {
-    return renderGroupFieldHTML(field, value, blockId);
+    return renderGroupFieldHTML(field, value, blockId, rowCtx);
   }
   return `
     <div class="form-group">
@@ -8251,16 +8481,24 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
 
 // ── Repeater UI ──────────────────────────────────────────────────────────────
 
-function renderRepeaterFieldHTML(field, value, blockId) {
+function renderRepeaterFieldHTML(field, value, blockId, rowCtx) {
   const rows = Array.isArray(value) ? value : [];
   const subFields = field.subFields || [];
+  // Build compound name when nested inside a Repeater/FC item, so child input
+  // names stay unique across e.g. ColumnsTab columns containing the same module.
+  let compoundName = field.name;
+  if (rowCtx) {
+    compoundName = rowCtx.rowIndex !== null
+      ? `${rowCtx.parentName}::${rowCtx.rowIndex}::${field.name}`
+      : `${rowCtx.parentName}::${field.name}`;
+  }
   const rowsHtml = rows.map((rowData, i) =>
-    renderRepeaterRowHTML(subFields, rowData, i, blockId, field.name)
+    renderRepeaterRowHTML(subFields, rowData, i, blockId, compoundName)
   ).join('');
   return `
     <div class="form-group">
       <label class="form-label">${escapeHtml(field.label || field.name)}</label>
-      <div class="repeater-field" data-field-name="${escapeHtml(field.name)}" data-block-id="${escapeHtml(blockId)}">
+      <div class="repeater-field" data-field-name="${escapeHtml(field.name)}" data-field-compound="${escapeHtml(compoundName)}" data-block-id="${escapeHtml(blockId)}">
         <div class="repeater-rows">${rowsHtml}</div>
         <button type="button" class="repeater-add-btn"
           onclick="addRepeaterRow(this, '${escapeHtml(blockId)}', '${escapeHtml(field.name)}')">
@@ -8292,6 +8530,10 @@ function renderRepeaterRowHTML(subFields, rowData, rowIndex, blockId, repeaterNa
             onclick="event.stopPropagation(); moveRepeaterRow(this, 1)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
           </button>
+          <button type="button" class="btn-icon-sm" title="Dupliquer"
+            onclick="event.stopPropagation(); duplicateRepeaterRow(this)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
           <button type="button" class="btn-icon-sm btn-icon-sm--danger" title="Supprimer"
             onclick="event.stopPropagation(); removeRepeaterRow(this)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
@@ -8304,10 +8546,16 @@ function renderRepeaterRowHTML(subFields, rowData, rowIndex, blockId, repeaterNa
   `;
 }
 
-function renderGroupFieldHTML(field, value, blockId) {
+function renderGroupFieldHTML(field, value, blockId, parentRowCtx) {
   const subFields = field.subFields || [];
   const groupData = (value && typeof value === 'object') ? value : {};
-  const rowCtx = { parentName: field.name, rowIndex: null };
+  let compoundName = field.name;
+  if (parentRowCtx) {
+    compoundName = parentRowCtx.rowIndex !== null
+      ? `${parentRowCtx.parentName}::${parentRowCtx.rowIndex}::${field.name}`
+      : `${parentRowCtx.parentName}::${field.name}`;
+  }
+  const rowCtx = { parentName: compoundName, rowIndex: null };
   const bodyHtml = subFields.map(f => {
     const val = groupData[f.name] !== undefined ? groupData[f.name] : f.defaultValue;
     return renderSchemaField(f, val, blockId, groupData, rowCtx);
@@ -8407,6 +8655,10 @@ function renderFlexibleContentItemHTML(item, index, blockId, fcCompoundName) {
             onclick="event.stopPropagation(); moveFlexibleContentItem(this, 1)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
           </button>
+          <button type="button" class="btn-icon-sm" title="Dupliquer"
+            onclick="event.stopPropagation(); duplicateFlexibleContentItem(this)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
           <button type="button" class="btn-icon-sm btn-icon-sm--danger" title="Supprimer"
             onclick="event.stopPropagation(); removeFlexibleContentItem(this)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
@@ -8462,6 +8714,33 @@ function collectFlexibleContentData(form, fcCompoundName) {
         const targetInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__target')}"]`);
         const url = urlInput ? urlInput.value : '';
         itemData[f.name] = url ? { url, title: titleInput ? titleInput.value : '', target: targetInput ? targetInput.value : '_self' } : '';
+      } else if (f.type === 'GoogleMap') {
+        const latInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__lat')}"]`);
+        const lngInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__lng')}"]`);
+        const placeIdInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__place_id')}"]`);
+        const searchInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__search')}"]`);
+        const streetNumberInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__street_number')}"]`);
+        const streetNameInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__street_name')}"]`);
+        const streetNameShortInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__street_name_short')}"]`);
+        const postCodeInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__post_code')}"]`);
+        const cityInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__city')}"]`);
+        const nameInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__name')}"]`);
+        const lat = latInput ? parseFloat(latInput.value) : 0;
+        const lng = lngInput ? parseFloat(lngInput.value) : 0;
+        itemData[f.name] = (lat || lng) ? {
+          lat: lat || 0,
+          lng: lng || 0,
+          place_id: placeIdInput ? placeIdInput.value : '',
+          address: searchInput ? searchInput.value : '',
+          name: nameInput ? nameInput.value : (searchInput ? searchInput.value : ''),
+          street_number: streetNumberInput ? streetNumberInput.value : '',
+          street_name: streetNameInput ? streetNameInput.value : '',
+          street_name_short: streetNameShortInput ? streetNameShortInput.value : '',
+          post_code: postCodeInput ? postCodeInput.value : '',
+          city: cityInput ? cityInput.value : '',
+        } : null;
+      } else if (f.type === 'FlexibleContent') {
+        itemData[f.name] = collectFlexibleContentData(form, compoundName);
       } else if (f.type === 'Repeater') {
         itemData[f.name] = collectRepeaterData(itemEl, f.name, f.subFields || []);
       } else {
@@ -8537,6 +8816,28 @@ function moveFlexibleContentItem(button, direction) {
   [allData[idx], allData[targetIdx]] = [allData[targetIdx], allData[idx]];
   reRenderFlexibleContentItems(container, allData, blockId, fcCompoundName);
   syncFlexibleContentToBlock(blockId, fcCompoundName, allData);
+}
+
+function duplicateFlexibleContentItem(button) {
+  const item = button.closest('.flexible-content-item');
+  const container = item?.closest('.flexible-content-field');
+  if (!container) return;
+  const blockId = container.dataset.blockId;
+  const fcCompoundName = container.dataset.fieldName;
+  const form = container.closest('form');
+  const allData = form ? collectFlexibleContentData(form, fcCompoundName) : [];
+  const idx = parseInt(item.dataset.rowIndex, 10);
+  const clone = JSON.parse(JSON.stringify(allData[idx]));
+  allData.splice(idx + 1, 0, clone);
+  reRenderFlexibleContentItems(container, allData, blockId, fcCompoundName);
+  syncFlexibleContentToBlock(blockId, fcCompoundName, allData);
+  const items = container.querySelectorAll('.flexible-content-items > .flexible-content-item');
+  const dup = items[idx + 1];
+  if (dup) {
+    const body = dup.querySelector('.repeater-row-body');
+    if (body) body.style.display = '';
+    dup.classList.add('is-open');
+  }
 }
 
 function reRenderFlexibleContentItems(container, allData, blockId, fcCompoundName) {
@@ -8629,9 +8930,12 @@ function _getRepeaterSchema(blockId, fieldName, domContext) {
 
 // Collect repeater data directly from a container element (avoids form-wide search ambiguity)
 function _collectRepeaterFromContainer(container, fieldName, subFields) {
+  // Use compound name for input name queries when nested (ensures sub-field
+  // inputs match unique names like "columns_list::0::columns_module::0::logos::0::logo")
+  const compound = container.dataset.fieldCompound || fieldName;
   const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
   return Array.from(rows).map((row, i) =>
-    collectContainerData(row, fieldName, subFields, i)
+    collectContainerData(row, compound, subFields, i)
   );
 }
 
@@ -8711,6 +9015,8 @@ function collectContainerData(scope, parentName, subFields, rowIndex) {
     } else if (f.type === 'FlexibleContent') {
       const form = scope.closest('form') || scope;
       rowData[f.name] = collectFlexibleContentData(form, compoundName);
+    } else if (f.type === 'Repeater') {
+      rowData[f.name] = collectRepeaterData(scope, f.name, f.subFields || []);
     } else {
       const input = scope.querySelector(`[name="${CSS.escape(compoundName)}"]`);
       rowData[f.name] = input ? input.value : '';
@@ -8722,11 +9028,14 @@ function collectContainerData(scope, parentName, subFields, rowIndex) {
 function collectRepeaterData(form, repeaterName, subFields) {
   const container = form.querySelector(`.repeater-field[data-field-name="${CSS.escape(repeaterName)}"]`);
   if (!container) return [];
+  // Use compound name for sub-field input lookups when this repeater is nested
+  // inside a FlexibleContent item (e.g. ColumnsTab columns).
+  const compound = container.dataset.fieldCompound || repeaterName;
   // Use :scope > .repeater-rows > .repeater-row to avoid selecting nested
   // FlexibleContent items that also have the .repeater-row class.
   const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
   return Array.from(rows).map((row, rowIndex) =>
-    collectContainerData(row, repeaterName, subFields, rowIndex)
+    collectContainerData(row, compound, subFields, rowIndex)
   );
 }
 
@@ -8746,6 +9055,7 @@ function addRepeaterRow(button, blockId, fieldName) {
   if (!container) return;
   const repeaterField = _getRepeaterSchema(blockId, fieldName, container);
   if (!repeaterField?.subFields) return;
+  const compound = container.dataset.fieldCompound || fieldName;
   const existingData = _collectRepeaterFromContainer(container, fieldName, repeaterField.subFields);
   // Initialize new row: default TrueFalse sub-fields to true so image/visibility fields start ON
   const newRowDefaults = {};
@@ -8753,7 +9063,7 @@ function addRepeaterRow(button, blockId, fieldName) {
     if (f.type === 'TrueFalse') newRowDefaults[f.name] = true;
   }
   existingData.push(newRowDefaults);
-  reRenderRepeaterRows(container, repeaterField.subFields, existingData, blockId, fieldName);
+  reRenderRepeaterRows(container, repeaterField.subFields, existingData, blockId, compound);
   _syncRepeaterToBlock(container, blockId);
   // Expand the last row
   const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
@@ -8773,12 +9083,13 @@ function removeRepeaterRow(button) {
   if (!container) return;
   const blockId = container.dataset.blockId;
   const fieldName = container.dataset.fieldName;
+  const compound = container.dataset.fieldCompound || fieldName;
   const repeaterField = _getRepeaterSchema(blockId, fieldName, container);
   if (!repeaterField?.subFields) return;
   const allData = _collectRepeaterFromContainer(container, fieldName, repeaterField.subFields);
   const rowIndex = parseInt(row.dataset.rowIndex, 10);
   allData.splice(rowIndex, 1);
-  reRenderRepeaterRows(container, repeaterField.subFields, allData, blockId, fieldName);
+  reRenderRepeaterRows(container, repeaterField.subFields, allData, blockId, compound);
   _syncRepeaterToBlock(container, blockId);
 }
 
@@ -8788,6 +9099,7 @@ function moveRepeaterRow(button, direction) {
   if (!container) return;
   const blockId = container.dataset.blockId;
   const fieldName = container.dataset.fieldName;
+  const compound = container.dataset.fieldCompound || fieldName;
   const repeaterField = _getRepeaterSchema(blockId, fieldName, container);
   if (!repeaterField?.subFields) return;
   const allData = _collectRepeaterFromContainer(container, fieldName, repeaterField.subFields);
@@ -8795,7 +9107,7 @@ function moveRepeaterRow(button, direction) {
   const targetIndex = rowIndex + direction;
   if (targetIndex < 0 || targetIndex >= allData.length) return;
   [allData[rowIndex], allData[targetIndex]] = [allData[targetIndex], allData[rowIndex]];
-  reRenderRepeaterRows(container, repeaterField.subFields, allData, blockId, fieldName);
+  reRenderRepeaterRows(container, repeaterField.subFields, allData, blockId, compound);
   _syncRepeaterToBlock(container, blockId);
   // Expand the moved row
   const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
@@ -8804,6 +9116,32 @@ function moveRepeaterRow(button, direction) {
     const body = movedRow.querySelector('.repeater-row-body');
     if (body) body.style.display = '';
   }
+}
+
+function duplicateRepeaterRow(button) {
+  const row = button.closest('.repeater-row');
+  const container = row?.closest('.repeater-field');
+  if (!container) return;
+  const blockId = container.dataset.blockId;
+  const fieldName = container.dataset.fieldName;
+  const compound = container.dataset.fieldCompound || fieldName;
+  const repeaterField = _getRepeaterSchema(blockId, fieldName, container);
+  if (!repeaterField?.subFields) return;
+  const allData = _collectRepeaterFromContainer(container, fieldName, repeaterField.subFields);
+  const rowIndex = parseInt(row.dataset.rowIndex, 10);
+  const clone = JSON.parse(JSON.stringify(allData[rowIndex]));
+  allData.splice(rowIndex + 1, 0, clone);
+  reRenderRepeaterRows(container, repeaterField.subFields, allData, blockId, compound);
+  _syncRepeaterToBlock(container, blockId);
+  const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
+  const dup = rows[rowIndex + 1];
+  if (dup) {
+    const body = dup.querySelector('.repeater-row-body');
+    if (body) body.style.display = '';
+    dup.classList.add('is-open');
+  }
+  const form = container.closest('form');
+  if (form) updateSchemaConditionals(form);
 }
 
 function renderKeyValueRow(key, value) {
@@ -8987,14 +9325,12 @@ function _quillCleanPasteMatchers() {
   if (typeof Quill === 'undefined') return [];
   const Delta = Quill.import('delta');
   return [
-    // Strip all inline styles/classes — keep only text + block structure
+    // Strip all inline styles/classes — keep only text + block structure.
+    // Headings are handled by Quill's default matcher (places header attr on
+    // the trailing newline, where block formats belong); custom-handling them
+    // here previously put the attr on inline text, which Quill drops, causing
+    // h1-h6 to silently downgrade to paragraphs on init/paste.
     [Node.ELEMENT_NODE, function(node, delta) {
-      const tag = node.tagName;
-      // Keep heading levels
-      if (/^H[1-6]$/.test(tag)) {
-        const level = parseInt(tag[1]);
-        return new Delta().insert(node.textContent, { header: level }).insert('\n');
-      }
       // Strip all inline formatting attributes (color, font, size, background, etc.)
       const ops = delta.ops.map(op => {
         if (op.attributes) {
@@ -10626,6 +10962,8 @@ async function fetchMediaItems(folderId = null) {
   } else {
     params.set('folder_id', folderId);
   }
+  if (mediaState.typeFilter) params.set('type', mediaState.typeFilter);
+  if (mediaState.sort) params.set('sort', mediaState.sort);
   try {
     mediaState.items = await apiFetch(`/media?${params.toString()}`);
   } catch (e) {
@@ -10669,11 +11007,51 @@ async function renderMediaLibrary() {
         </button>
       </div>
     </div>
-    <div class="media-library">
+    <div class="media-library" ondragenter="onMediaLibraryDragEnter(event)" ondragover="onMediaLibraryDragOver(event)" ondragleave="onMediaLibraryDragLeave(event)" ondrop="onMediaLibraryDrop(event)">
+      <div class="media-drop-overlay">
+        <div class="media-drop-overlay-inner">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span>Déposer fichiers ou dossiers ici</span>
+        </div>
+      </div>
       <aside class="media-sidebar">
         <div class="media-search">
           <input type="text" class="media-search-input" placeholder="Rechercher un média…" value="${escapeHtml(mediaState.search)}" oninput="handleMediaSearch(this.value)" />
           ${mediaState.search ? `<button class="media-search-clear" onclick="clearMediaSearch()" title="Effacer">&times;</button>` : ''}
+        </div>
+        <div class="media-filters">
+          <div class="media-filter-group" role="group" aria-label="Filtrer par type">
+            <button type="button" class="media-pill ${mediaState.typeFilter === '' ? 'is-active' : ''}" onclick="handleMediaTypeFilter('')" title="Tous">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+              <span>Tous</span>
+            </button>
+            <button type="button" class="media-pill ${mediaState.typeFilter === 'image' ? 'is-active' : ''}" onclick="handleMediaTypeFilter('image')" title="Images">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.5-3.5L9 20"/></svg>
+              <span>Images</span>
+            </button>
+            <button type="button" class="media-pill ${mediaState.typeFilter === 'video' ? 'is-active' : ''}" onclick="handleMediaTypeFilter('video')" title="Vidéos">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m22 8-6 4 6 4V8z"/></svg>
+              <span>Vidéos</span>
+            </button>
+            <button type="button" class="media-pill ${mediaState.typeFilter === 'document' ? 'is-active' : ''}" onclick="handleMediaTypeFilter('document')" title="PDF">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span>PDF</span>
+            </button>
+          </div>
+          <div class="media-sort-group" role="group" aria-label="Trier">
+            ${['date','name','type'].map(key => {
+              const active = mediaState.sort.startsWith(key + '_');
+              const asc = mediaState.sort === key + '_asc';
+              const next = active ? (asc ? key + '_desc' : key + '_asc') : (key === 'date' ? key + '_desc' : key + '_asc');
+              const label = key === 'date' ? 'Date' : key === 'name' ? 'Nom' : 'Type';
+              return `
+                <button type="button" class="media-sort-btn ${active ? 'is-active' : ''}" onclick="handleMediaSort('${next}')" title="Trier par ${label}">
+                  <span>${label}</span>
+                  <svg class="media-sort-arrow ${active && asc ? 'is-asc' : ''}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+                </button>
+              `;
+            }).join('')}
+          </div>
         </div>
         <button class="media-folder-item media-folder-all ${currentFolder === null ? 'is-active' : ''}" onclick="selectMediaFolder(null)" ondragover="onFolderDragOver(event)" ondragleave="onFolderDragLeave(event)" ondrop="onFolderDrop(event, null)">
           Tous les médias <span class="media-folder-count">${mediaTotalCount}</span>
@@ -10739,7 +11117,7 @@ function renderMediaCard(item, forPicker = false) {
     ? `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f8f9fa;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg></div>`
     : `<video src="${escapeHtml(item.url)}#t=0.5" preload="metadata" muted></video>`;
   const typeLabel = isImage ? 'Image' : isDocument ? 'PDF' : 'Vidéo';
-  const meta = `${typeLabel} · ${formatBytes(item.size)}`;
+  const meta = typeLabel;
   const folderSelect = forPicker ? '' : `
     <select class="media-move-select" onclick="event.stopPropagation()" onchange="moveMediaItem(${item.id}, this.value)">
       <option value="">Sans dossier</option>
@@ -10757,10 +11135,10 @@ function renderMediaCard(item, forPicker = false) {
         </div>
       `;
   return `
-    <article class="media-card ${forPicker ? 'is-picker' : ''} ${isSelected ? 'is-selected' : ''}" ${!forPicker ? `draggable="true" ondragstart="onMediaDragStart(event, ${item.id})"` : ''} onclick="${forPicker ? `selectMediaFromPicker(${item.id})` : `openMediaDetail(${item.id})`}">
+    <article class="media-card ${forPicker ? 'is-picker' : ''} ${isSelected ? 'is-selected' : ''}" ${!forPicker ? `data-media-id="${item.id}" draggable="true" ondragstart="onMediaDragStart(event, ${item.id})"` : ''} onclick="${forPicker ? `selectMediaFromPicker(${item.id})` : `onMediaCardClick(event, ${item.id})`}">
       ${!forPicker ? `
         <label class="media-select" onclick="event.stopPropagation()">
-          <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleMediaSelection(${item.id}, this.checked); event.stopPropagation();" />
+          <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="onMediaCheckboxClick(event, ${item.id})" onchange="toggleMediaSelection(${item.id}, this.checked); event.stopPropagation();" />
         </label>
       ` : ''}
       <div class="media-thumb ${isImage ? '' : isDocument ? 'is-document' : 'is-video'}">${thumb}</div>
@@ -10831,6 +11209,46 @@ async function clearMediaSearch() {
   if (clearBtn) clearBtn.style.display = 'none';
 }
 
+async function handleMediaTypeFilter(value) {
+  mediaState.typeFilter = value || '';
+  document.querySelectorAll('.media-filter-group .media-pill').forEach(btn => {
+    const onclickAttr = btn.getAttribute('onclick') || '';
+    const m = onclickAttr.match(/handleMediaTypeFilter\('([^']*)'\)/);
+    btn.classList.toggle('is-active', m && m[1] === mediaState.typeFilter);
+  });
+  await fetchMediaItems(mediaState.currentFolderId);
+  const grid = document.querySelector('.media-grid');
+  if (grid) {
+    grid.innerHTML = mediaState.items.length === 0
+      ? renderEmptyState('🗂️', 'Aucun média', 'Aucun média ne correspond à ce filtre.')
+      : mediaState.items.map(item => renderMediaCard(item)).join('');
+  }
+}
+
+async function handleMediaSort(value) {
+  mediaState.sort = value || 'date_desc';
+  const [activeKey, activeDir] = mediaState.sort.split('_');
+  document.querySelectorAll('.media-sort-group .media-sort-btn').forEach(btn => {
+    const label = (btn.querySelector('span')?.textContent || '').trim().toLowerCase();
+    const key = label === 'date' ? 'date' : label === 'nom' ? 'name' : 'type';
+    const isActive = key === activeKey;
+    btn.classList.toggle('is-active', isActive);
+    const next = isActive
+      ? (activeDir === 'asc' ? key + '_desc' : key + '_asc')
+      : (key === 'date' ? key + '_desc' : key + '_asc');
+    btn.setAttribute('onclick', `handleMediaSort('${next}')`);
+    const arrow = btn.querySelector('.media-sort-arrow');
+    if (arrow) arrow.classList.toggle('is-asc', isActive && activeDir === 'asc');
+  });
+  await fetchMediaItems(mediaState.currentFolderId);
+  const grid = document.querySelector('.media-grid');
+  if (grid) {
+    grid.innerHTML = mediaState.items.length === 0
+      ? renderEmptyState('🗂️', 'Aucun média', 'Aucun média à afficher.')
+      : mediaState.items.map(item => renderMediaCard(item)).join('');
+  }
+}
+
 async function handleMediaUpload(event) {
   const files = Array.from(event.target.files || []);
   if (files.length === 0) return;
@@ -10896,11 +11314,57 @@ async function moveMediaItem(id, folderId) {
   }
 }
 
+async function moveMediaItems(ids, folderId) {
+  if (!ids || !ids.length) return;
+  showLoading(`Déplacement ${ids.length} média(s)…`);
+  try {
+    await Promise.all(ids.map(id =>
+      apiFetch(`/media/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ folder_id: folderId || null })
+      }).catch(e => { console.warn(`move ${id} failed`, e); return null; })
+    ));
+    mediaState.selectedIds = [];
+    _lastSelectedMediaId = null;
+    await fetchMediaFolders();
+    await fetchMediaItems(mediaState.currentFolderId);
+    document.getElementById('content').innerHTML = await renderMediaLibrary();
+    showToast(`${ids.length} média(s) déplacé(s)`, 'success');
+  } catch (e) {
+    showToast(e.message || 'Erreur lors du déplacement', 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
 // ── Drag & drop media → folder ──
 function onMediaDragStart(event, mediaId) {
-  event.dataTransfer.setData('text/plain', String(mediaId));
+  // If dragged item is part of current selection → drag the whole selection
+  const key = String(mediaId);
+  const selected = Array.isArray(mediaState.selectedIds) ? mediaState.selectedIds.map(String) : [];
+  const ids = selected.includes(key) && selected.length > 1 ? selected : [key];
+
+  event.dataTransfer.setData('text/plain', ids.join(','));
   event.dataTransfer.effectAllowed = 'move';
   event.currentTarget.classList.add('is-dragging');
+
+  // Highlight all dragged cards (when multi)
+  if (ids.length > 1) {
+    ids.forEach(id => {
+      const card = document.querySelector(`.media-card[data-media-id="${id}"]`);
+      if (card) card.classList.add('is-dragging');
+    });
+    // Visual hint: show count badge near drag image (browser default uses single card thumbnail)
+    try {
+      const ghost = document.createElement('div');
+      ghost.style.cssText = 'position:absolute;top:-1000px;left:-1000px;padding:6px 12px;background:#667eea;color:#fff;border-radius:6px;font-weight:600;font-size:13px;';
+      ghost.textContent = `${ids.length} médias`;
+      document.body.appendChild(ghost);
+      event.dataTransfer.setDragImage(ghost, 20, 20);
+      setTimeout(() => ghost.remove(), 0);
+    } catch (e) { /* setDragImage unsupported */ }
+  }
+
   // Highlight all folder targets
   document.querySelectorAll('.media-folder-item').forEach(el => el.classList.add('is-drop-target'));
 }
@@ -10908,6 +11372,18 @@ function onMediaDragStart(event, mediaId) {
 document.addEventListener('dragend', () => {
   document.querySelectorAll('.is-dragging').forEach(el => el.classList.remove('is-dragging'));
   document.querySelectorAll('.is-drop-target, .is-drag-over').forEach(el => el.classList.remove('is-drop-target', 'is-drag-over'));
+});
+
+// Prevent browser from opening files dropped outside designated drop zones in admin SPA
+window.addEventListener('dragover', (e) => {
+  if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
+    if (!e.target.closest('.media-library')) e.preventDefault();
+  }
+});
+window.addEventListener('drop', (e) => {
+  if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
+    if (!e.target.closest('.media-library')) e.preventDefault();
+  }
 });
 
 function onFolderDragOver(event) {
@@ -10924,9 +11400,180 @@ async function onFolderDrop(event, folderId) {
   event.preventDefault();
   event.currentTarget.classList.remove('is-drag-over');
   document.querySelectorAll('.is-drop-target').forEach(el => el.classList.remove('is-drop-target'));
-  const mediaId = event.dataTransfer.getData('text/plain');
-  if (!mediaId) return;
-  await moveMediaItem(parseInt(mediaId), folderId);
+  // Ignore OS file drops here — handled by media-library drop zone
+  if (event.dataTransfer.types && Array.from(event.dataTransfer.types).includes('Files')) return;
+  const payload = event.dataTransfer.getData('text/plain');
+  if (!payload) return;
+  const ids = payload.split(',').map(s => parseInt(s, 10)).filter(n => Number.isFinite(n));
+  if (!ids.length) return;
+  if (ids.length === 1) {
+    await moveMediaItem(ids[0], folderId);
+  } else {
+    await moveMediaItems(ids, folderId);
+  }
+}
+
+// ── Drag & drop OS files/folders → media library ──
+let _mediaDropDepth = 0;
+
+function _isOsFileDrag(event) {
+  const types = event.dataTransfer && event.dataTransfer.types;
+  if (!types) return false;
+  return Array.from(types).includes('Files');
+}
+
+function onMediaLibraryDragEnter(event) {
+  if (!_isOsFileDrag(event)) return;
+  event.preventDefault();
+  _mediaDropDepth++;
+  event.currentTarget.classList.add('is-os-dragover');
+}
+
+function onMediaLibraryDragOver(event) {
+  if (!_isOsFileDrag(event)) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+}
+
+function onMediaLibraryDragLeave(event) {
+  if (!_isOsFileDrag(event)) return;
+  _mediaDropDepth = Math.max(0, _mediaDropDepth - 1);
+  if (_mediaDropDepth === 0) {
+    event.currentTarget.classList.remove('is-os-dragover');
+  }
+}
+
+async function _readAllEntries(reader) {
+  const all = [];
+  while (true) {
+    const batch = await new Promise((res, rej) => reader.readEntries(res, rej));
+    if (!batch.length) break;
+    all.push(...batch);
+  }
+  return all;
+}
+
+async function _walkEntry(entry, files) {
+  if (entry.isFile) {
+    const file = await new Promise((res, rej) => entry.file(res, rej));
+    files.push(file);
+  } else if (entry.isDirectory) {
+    const sub = await _readAllEntries(entry.createReader());
+    for (const e of sub) await _walkEntry(e, files);
+  }
+}
+
+async function _uploadBatch(files, folderId, onProgress) {
+  // Filter out anything that isn't a real File (defensive)
+  files = files.filter(f => f instanceof File && f.size >= 0);
+  if (!files.length) return;
+
+  // PHP limits: post_max_size 8M, max_file_uploads 20. Stay well under.
+  const MAX_BYTES = 7 * 1024 * 1024; // 7 Mo per request
+  const MAX_COUNT = 15;
+
+  let i = 0;
+  while (i < files.length) {
+    const slice = [];
+    let bytes = 0;
+    while (i < files.length && slice.length < MAX_COUNT && (bytes + files[i].size) <= MAX_BYTES) {
+      bytes += files[i].size;
+      slice.push(files[i]);
+      i++;
+    }
+
+    // Lone file bigger than MAX_BYTES → send alone (will fail server-side, surfaced clearly)
+    if (slice.length === 0 && i < files.length) {
+      slice.push(files[i]);
+      i++;
+    }
+
+    const formData = new FormData();
+    slice.forEach(f => formData.append('files[]', f));
+    if (folderId) formData.append('folder_id', folderId);
+    try {
+      await apiUpload('/media/upload', formData);
+      if (onProgress) onProgress(slice.length);
+    } catch (e) {
+      // If a single oversized file failed, skip it but keep going
+      if (slice.length === 1) {
+        console.warn(`Échec import "${slice[0].name}" (${(slice[0].size / 1024 / 1024).toFixed(1)} Mo) — fichier trop volumineux ?`, e);
+        showToast(`Fichier ignoré : ${slice[0].name} (trop volumineux)`, 'error');
+        if (onProgress) onProgress(0);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
+async function onMediaLibraryDrop(event) {
+  if (!_isOsFileDrag(event)) return;
+  event.preventDefault();
+  _mediaDropDepth = 0;
+  event.currentTarget.classList.remove('is-os-dragover');
+
+  const items = event.dataTransfer.items;
+  if (!items || !items.length) return;
+
+  // Collect: top-level folders (each → new media folder) and loose files (→ current folder)
+  const folderGroups = []; // { name, files[] }
+  const looseFiles = [];
+
+  // Snapshot entries first (items list is invalidated after async work)
+  const entries = [];
+  for (const item of items) {
+    const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+    if (entry) entries.push(entry);
+  }
+
+  showLoading('Lecture des fichiers…');
+  try {
+    for (const entry of entries) {
+      if (entry.isFile) {
+        const file = await new Promise((res, rej) => entry.file(res, rej));
+        looseFiles.push(file);
+      } else if (entry.isDirectory) {
+        const files = [];
+        const sub = await _readAllEntries(entry.createReader());
+        for (const e of sub) await _walkEntry(e, files);
+        folderGroups.push({ name: entry.name, files });
+      }
+    }
+
+    let totalFiles = looseFiles.length + folderGroups.reduce((n, g) => n + g.files.length, 0);
+    if (totalFiles === 0 && folderGroups.length === 0) {
+      showToast('Aucun fichier détecté', 'error');
+      return;
+    }
+
+    let done = 0;
+    const tick = (n) => { done += n; showLoading(`Import ${done}/${totalFiles}…`); };
+
+    if (looseFiles.length) {
+      await _uploadBatch(looseFiles, mediaState.currentFolderId, tick);
+    }
+
+    for (const g of folderGroups) {
+      const folder = await apiFetch('/media/folders', {
+        method: 'POST',
+        body: JSON.stringify({ name: g.name, parent_id: null })
+      });
+      if (g.files.length) {
+        await _uploadBatch(g.files, folder.id, tick);
+      }
+    }
+
+    showToast(`Import terminé (${totalFiles} fichier${totalFiles > 1 ? 's' : ''})`, 'success');
+    await fetchMediaFolders();
+    await fetchMediaItems(mediaState.currentFolderId);
+    document.getElementById('content').innerHTML = await renderMediaLibrary();
+  } catch (e) {
+    console.error(e);
+    showToast(e.message || 'Erreur lors de l\'import', 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
 // ── Media detail panel ──
@@ -11052,6 +11699,7 @@ async function saveMediaDetail(event, id) {
 
 // ── Crop editor ──
 let _cropperInstance = null;
+let _cropperOptions = null;
 
 function ensureCropperLib() {
   return new Promise((resolve) => {
@@ -11067,8 +11715,9 @@ function ensureCropperLib() {
   });
 }
 
-async function openCropEditor(mediaId, imageUrl) {
+async function openCropEditor(mediaId, imageUrl, options = {}) {
   await ensureCropperLib();
+  _cropperOptions = options || {};
 
   // Remove existing
   const existing = document.getElementById('cropEditorModal');
@@ -11127,6 +11776,7 @@ function setCropRatio(ratio, btn) {
 async function applyCrop(mediaId) {
   if (!_cropperInstance) return;
   const data = _cropperInstance.getData(true); // rounded integers
+  const opts = _cropperOptions || {};
   showLoading();
   try {
     await apiFetch(`/media/${mediaId}/crop`, {
@@ -11140,14 +11790,39 @@ async function applyCrop(mediaId) {
     });
     showToast('Image recadrée', 'success');
     closeCropEditor();
-    closeMediaDetail();
-    await fetchMediaItems(mediaState.currentFolderId);
-    document.getElementById('content').innerHTML = await renderMediaLibrary();
+    if (typeof opts.onApply === 'function') {
+      try { await opts.onApply(); } catch (cbErr) { console.error(cbErr); }
+    }
+    if (!opts.skipMediaRefresh) {
+      closeMediaDetail();
+      await fetchMediaItems(mediaState.currentFolderId);
+      const contentEl = document.getElementById('content');
+      if (contentEl && document.querySelector('.media-library')) {
+        contentEl.innerHTML = await renderMediaLibrary();
+      }
+    }
   } catch (e) {
     showToast(e.message || 'Erreur lors du recadrage', 'error');
   } finally {
     hideLoading();
   }
+}
+
+async function openCropEditorForField(mediaId, imageUrl, blockId, inputName, btn) {
+  const field = btn?.closest('.media-field') || document.querySelector(`.media-field[data-field="${CSS.escape(inputName)}"]`);
+  await openCropEditor(mediaId, imageUrl, {
+    skipMediaRefresh: true,
+    onApply: () => {
+      if (!field) return;
+      const img = field.querySelector('.media-preview img');
+      if (img) {
+        const base = (imageUrl || '').split('?')[0];
+        const opt = getOptimizedUrl(base, 400, 70);
+        const sep = opt.includes('?') ? '&' : '?';
+        img.src = `${opt}${sep}t=${Date.now()}`;
+      }
+    }
+  });
 }
 
 function closeCropEditor() {
@@ -11308,10 +11983,16 @@ const _origSelectMediaFromPicker = typeof selectMediaFromPicker === 'function' ?
 
 async function openMediaPicker(type, blockId, fieldName, options = {}) {
   const normalizedOptions = typeof options === 'boolean' ? { multiple: options } : options;
+  // trigger is the button element clicked — used to scope DOM writes to the
+  // correct .media-field when duplicate field names exist in the form (e.g.
+  // two same-type sub-modules in ColumnsTab columns).
+  const triggerEl = normalizedOptions.trigger || null;
+  const fieldEl = triggerEl ? triggerEl.closest('.media-field') : null;
   mediaPickerState = {
     isOpen: true,
     blockId,
     fieldName,
+    fieldEl,
     type: type || 'all',
     folderId: null,
     folders: [],
@@ -11539,6 +12220,18 @@ function selectMediaFromPicker(id) {
     return;
   }
 
+  // CPT custom_fields image picker (Image/File/Video field types)
+  if (mediaPickerState.blockId === '__cpt_cf__') {
+    const fn = mediaPickerState.fieldName;
+    const payload = { id: item.id, url: item.url, alt: item.alt || item.original_name || '', title: item.title || '', caption: item.caption || '', width: item.width || null, height: item.height || null, sizes: { thumbnail: item.url, half: item.url, banner: item.url } };
+    const input = document.getElementById(`cptCfImageInput_${fn}`);
+    const preview = document.getElementById(`cptCfImagePreview_${fn}`);
+    if (input) input.value = JSON.stringify(payload);
+    if (preview) preview.innerHTML = `<img src="${escapeHtml(getOptimizedUrl(item.url, 400, 70))}" style="max-width:240px;max-height:160px;object-fit:cover;border-radius:8px;display:block;">`;
+    closeMediaPicker();
+    return;
+  }
+
   // CPT Options image picker (header_img)
   if (mediaPickerState.blockId === '__cpt_options_img__') {
     const input = document.getElementById('cptOptionsImgInput');
@@ -11585,7 +12278,14 @@ function setBlockDataField(block, fieldName, value) {
 function applyMediaSelection(blockId, fieldName, item) {
   const panel = document.getElementById('builderSettings');
   if (!panel) return;
-  const input = panel.querySelector(`input[name="${CSS.escape(fieldName)}"]`);
+  // Prefer the exact .media-field element the user clicked. Falls back to
+  // name-based lookup for callers that don't supply a trigger element.
+  const scopedField = mediaPickerState.fieldEl && document.contains(mediaPickerState.fieldEl)
+    ? mediaPickerState.fieldEl
+    : null;
+  const input = scopedField
+    ? scopedField.querySelector('input[type="hidden"]')
+    : panel.querySelector(`input[name="${CSS.escape(fieldName)}"]`);
   if (!input) return;
   const payload = {
     id: item.id,
@@ -11687,7 +12387,12 @@ function confirmMediaPickerSelection() {
 function applyMediaSelectionMultiple(blockId, fieldName, items) {
   const panel = document.getElementById('builderSettings');
   if (!panel) return;
-  const input = panel.querySelector(`input[name="${CSS.escape(fieldName)}"]`);
+  const scopedField = mediaPickerState.fieldEl && document.contains(mediaPickerState.fieldEl)
+    ? mediaPickerState.fieldEl
+    : null;
+  const input = scopedField
+    ? scopedField.querySelector('input[type="hidden"]')
+    : panel.querySelector(`input[name="${CSS.escape(fieldName)}"]`);
   if (!input) return;
   const payloadItems = items.map(item => ({
     id: item.id,
@@ -11735,7 +12440,7 @@ function applyMediaSelectionMultiple(blockId, fieldName, items) {
 }
 
 // ── GoogleMap field: Mapbox geocoding + mini-map preview ──────────────────
-const MAPBOX_TOKEN = 'pk.eyJ1IjoiYmFyY2Vsb25hLWNvIiwiYSI6ImNsbm9mZmN3bzBpM2Yya29kcWYxbnZpcGkifQ.gsHaJQAk_Ua4vBbt3DxNGQ';
+const MAPBOX_TOKEN = 'pk.eyJ1Ijoibmlja2wzMCIsImEiOiJjbW91M3p3Z3AwMmhtMnNxemoxNmtmb2xrIn0.N-Mojx4V9-2xXANEdTAuMQ';
 let _mapboxGLLoaded = false;
 
 function ensureMapboxGL() {
@@ -11881,10 +12586,15 @@ function initGoogleMapField(uid) {
   });
 }
 
-function clearMediaSelection(blockId, fieldName) {
+function clearMediaSelection(blockId, fieldName, triggerEl) {
   const panel = document.getElementById('builderSettings');
   if (!panel) return;
-  const input = panel.querySelector(`input[name="${CSS.escape(fieldName)}"]`);
+  // Scope to the .media-field the user clicked when available — avoids
+  // collisions when multiple sub-modules share the same field name.
+  const scopedField = triggerEl ? triggerEl.closest('.media-field') : null;
+  const input = scopedField
+    ? scopedField.querySelector('input[type="hidden"]')
+    : panel.querySelector(`input[name="${CSS.escape(fieldName)}"]`);
   if (!input) return;
   input.value = '';
   const wrapper = input.closest('.media-field');
@@ -11912,12 +12622,11 @@ function selectAllMedia() {
   const allSelected = allIds.length > 0 && allIds.every(id => mediaState.selectedIds.includes(id));
   if (allSelected) {
     mediaState.selectedIds = [];
+    _lastSelectedMediaId = null;
   } else {
     mediaState.selectedIds = [...allIds];
   }
-  document.querySelectorAll('.media-card .media-select input[type="checkbox"]').forEach(cb => {
-    cb.checked = !allSelected;
-  });
+  syncMediaCardSelectionUI();
   updateMediaSelectionUI();
 }
 
@@ -11930,7 +12639,81 @@ function toggleMediaSelection(id, isChecked) {
   if (isChecked) set.add(key);
   else set.delete(key);
   mediaState.selectedIds = Array.from(set);
+  _lastSelectedMediaId = id;
+  syncMediaCardSelectionUI();
   updateMediaSelectionUI();
+}
+
+let _lastSelectedMediaId = null;
+
+function onMediaCardClick(event, id) {
+  // Shift-click → range select
+  if (event.shiftKey) {
+    event.preventDefault();
+    event.stopPropagation();
+    rangeSelectMedia(id);
+    return;
+  }
+  // Cmd/Ctrl-click → toggle single without opening detail
+  if (event.metaKey || event.ctrlKey) {
+    event.preventDefault();
+    event.stopPropagation();
+    const key = String(id);
+    const already = mediaState.selectedIds.includes(key);
+    toggleMediaSelection(id, !already);
+    return;
+  }
+  // Default → open detail panel
+  openMediaDetail(id);
+}
+
+function onMediaCheckboxClick(event, id) {
+  // Shift+click on checkbox → range select instead of toggle
+  if (event.shiftKey) {
+    event.preventDefault();
+    event.stopPropagation();
+    rangeSelectMedia(id);
+  }
+  // Otherwise let `onchange` (toggleMediaSelection) handle it
+}
+
+function rangeSelectMedia(targetId) {
+  const ids = mediaState.items.map(i => String(i.id));
+  const target = String(targetId);
+  const targetIdx = ids.indexOf(target);
+  if (targetIdx < 0) return;
+
+  // No prior anchor → just toggle current and remember
+  if (_lastSelectedMediaId === null) {
+    toggleMediaSelection(targetId, !mediaState.selectedIds.includes(target));
+    return;
+  }
+
+  const anchor = String(_lastSelectedMediaId);
+  const anchorIdx = ids.indexOf(anchor);
+  if (anchorIdx < 0) {
+    toggleMediaSelection(targetId, !mediaState.selectedIds.includes(target));
+    return;
+  }
+
+  const [from, to] = anchorIdx < targetIdx ? [anchorIdx, targetIdx] : [targetIdx, anchorIdx];
+  const range = ids.slice(from, to + 1);
+  const set = new Set(mediaState.selectedIds);
+  range.forEach(id => set.add(id));
+  mediaState.selectedIds = Array.from(set);
+  syncMediaCardSelectionUI();
+  updateMediaSelectionUI();
+}
+
+function syncMediaCardSelectionUI() {
+  const selected = new Set(mediaState.selectedIds.map(String));
+  document.querySelectorAll('.media-card[data-media-id]').forEach(card => {
+    const id = card.dataset.mediaId;
+    const isSel = selected.has(id);
+    card.classList.toggle('is-selected', isSel);
+    const cb = card.querySelector('.media-select input[type="checkbox"]');
+    if (cb) cb.checked = isSel;
+  });
 }
 
 async function deleteSelectedMedia() {
@@ -12437,6 +13220,8 @@ async function renderSiteSettings() {
 
     const fontTitle = settings.font_title || 'jakarta';
     const fontGeneral = settings.font_general || 'jakarta';
+    const customFontTitle = settings.custom_font_title_family || '';
+    const customFontGeneral = settings.custom_font_general_family || '';
 
     const logo = settings.logo || '';
     const logoWhite = settings.logo_white || '';
@@ -12762,6 +13547,18 @@ async function renderSiteSettings() {
                   <option value="${val}" ${fontGeneral === val ? 'selected' : ''}>${label}</option>
                 `).join('')}
               </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Police titre custom (Google Font)</label>
+              <input type="text" class="form-input" name="custom_font_title_family" value="${escapeHtml(customFontTitle)}" placeholder="ex: Bricolage Grotesque" autocomplete="off">
+              <small style="color:#999;font-size:11px;">Nom exact Google Font. Override la police titre. Vide = police select au-dessus. Rebuild requis.</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Police texte custom (Google Font)</label>
+              <input type="text" class="form-input" name="custom_font_general_family" value="${escapeHtml(customFontGeneral)}" placeholder="ex: Geist" autocomplete="off">
+              <small style="color:#999;font-size:11px;">Nom exact Google Font. Override la police texte. Vide = police select au-dessus. Rebuild requis.</small>
             </div>
           </div>
           <div id="font-preview-box" style="margin-top:16px;padding:24px 28px;border:1px solid var(--admin-border, #e0e0e0);border-radius:8px;background:#fff;">
@@ -13349,6 +14146,8 @@ async function saveSiteSettings(event) {
     bg_form_field: formData.get('bg_form_field') || '',
     font_title: formData.get('font_title') || '',
     font_general: formData.get('font_general') || '',
+    custom_font_title_family: (formData.get('custom_font_title_family') || '').trim(),
+    custom_font_general_family: (formData.get('custom_font_general_family') || '').trim(),
     menu_seamless: formData.get('menu_seamless') ? '1' : '0',
     rounded: formData.get('rounded') ? '1' : '0',
     uppercase: formData.get('uppercase') ? '1' : '0',
@@ -14330,7 +15129,7 @@ async function openMenuEditor(menuId) {
     _menuItems = (menu.flatItems || []).map(item => ({
       id: item.id,
       temp_id: null,
-      title: item.type === 'page' && item.page_title ? item.page_title : item.title,
+      title: item.title || (item.type === 'page' ? item.page_title : '') || '',
       url: item.url || '',
       type: item.type || 'custom',
       page_id: item.page_id || null,
@@ -14869,6 +15668,7 @@ const FORM_FIELD_TYPES = [
 ];
 
 let _formsCache = [];
+let _formsSelected = new Set();
 let _formBuilderFields = [];
 let _formBuilderSelectedIdx = -1;
 let _formBuilderSettings = {};
@@ -14885,23 +15685,141 @@ async function renderFormsList() {
     hideLoading();
     return `<div class="card"><p>Erreur: ${e.message}</p></div>`;
   }
+  _formsSelected = new Set();
+  return renderFormsView();
+}
 
+function renderFormsView() {
   return `
     <div class="page-header">
       <h1>Formulaires</h1>
       <button class="btn btn-primary" onclick="loadSection('form-edit:new')">+ Nouveau formulaire</button>
     </div>
+    ${_formsSelected.size > 0 ? renderFormsBulkBar() : ''}
     <div class="card">
       ${_formsCache.length > 0 ? renderFormsTable() : renderEmptyState('📝', 'Aucun formulaire', 'Créez votre premier formulaire')}
     </div>
   `;
 }
 
+function refreshFormsView() {
+  const el = document.getElementById('content');
+  if (el) el.innerHTML = renderFormsView();
+}
+
+function toggleFormSelect(id, checked) {
+  if (checked) _formsSelected.add(id);
+  else _formsSelected.delete(id);
+  refreshFormsView();
+}
+
+function toggleAllFormsOnPage(checked, ids) {
+  ids.forEach(id => checked ? _formsSelected.add(id) : _formsSelected.delete(id));
+  refreshFormsView();
+}
+
+function clearFormsSelection() {
+  _formsSelected.clear();
+  refreshFormsView();
+}
+
+function renderFormsBulkBar() {
+  const count = _formsSelected.size;
+  return `
+    <div class="pages-bulk-bar">
+      <span class="pages-bulk-bar__count">${count} formulaire${count > 1 ? 's' : ''} sélectionné${count > 1 ? 's' : ''}</span>
+      <div class="pages-bulk-bar__actions">
+        <button type="button" class="btn btn-sm btn-outline" onclick="bulkFormsStatus('active')">Activer</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="bulkFormsStatus('inactive')">Désactiver</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="bulkFormsDuplicate()">Dupliquer</button>
+        <button type="button" class="btn btn-sm btn-danger" onclick="bulkFormsDelete()">Supprimer</button>
+      </div>
+      <button type="button" class="pages-bulk-bar__close" onclick="clearFormsSelection()" title="Annuler la sélection">✕</button>
+    </div>
+  `;
+}
+
+async function bulkFormsStatus(status) {
+  const ids = [..._formsSelected];
+  const label = status === 'active' ? 'activé' : 'désactivé';
+  showLoading();
+  try {
+    await Promise.all(ids.map(id => {
+      const source = _formsCache.find(f => f.id === id);
+      if (!source) return null;
+      return apiFetch(`/forms/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          title: source.title,
+          slug: source.slug,
+          description: source.description,
+          settings: typeof source.settings === 'string' ? JSON.parse(source.settings) : (source.settings || {}),
+          status,
+          fields: source.fields,
+        }),
+      });
+    }));
+    showToast(`${ids.length} formulaire${ids.length > 1 ? 's' : ''} ${label}${ids.length > 1 ? 's' : ''}`, 'success');
+    _formsSelected.clear();
+    loadSection('forms');
+  } catch (e) {
+    hideLoading();
+    showToast('Erreur: ' + e.message, 'error');
+  }
+}
+
+async function bulkFormsDuplicate() {
+  const ids = [..._formsSelected];
+  showLoading();
+  try {
+    for (const id of ids) {
+      const form = await apiFetch(`/forms/${id}`);
+      const newSlug = form.slug + '-copie-' + Date.now().toString(36) + '-' + id;
+      await apiFetch('/forms', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: form.title + ' (copie)',
+          slug: newSlug,
+          description: form.description,
+          settings: typeof form.settings === 'string' ? JSON.parse(form.settings) : form.settings,
+          status: form.status,
+          fields: form.fields,
+        }),
+      });
+    }
+    showToast(`${ids.length} formulaire${ids.length > 1 ? 's' : ''} dupliqué${ids.length > 1 ? 's' : ''}`, 'success');
+    _formsSelected.clear();
+    loadSection('forms');
+  } catch (e) {
+    hideLoading();
+    showToast('Erreur: ' + e.message, 'error');
+  }
+}
+
+async function bulkFormsDelete() {
+  const ids = [..._formsSelected];
+  const ok = await confirmModal(`Supprimer ${ids.length} formulaire${ids.length > 1 ? 's' : ''} et toutes leurs entrées ? Cette action est irréversible.`);
+  if (!ok) return;
+  showLoading();
+  try {
+    await Promise.all(ids.map(id => apiFetch(`/forms/${id}`, { method: 'DELETE' })));
+    showToast(`${ids.length} formulaire${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}`, 'success');
+    _formsSelected.clear();
+    loadSection('forms');
+  } catch (e) {
+    hideLoading();
+    showToast('Erreur: ' + e.message, 'error');
+  }
+}
+
 function renderFormsTable() {
-  const gridCols = '1fr 80px 120px 80px 140px';
+  const gridCols = '40px 1fr 80px 120px 80px 140px';
+  const allIds = _formsCache.map(f => f.id);
+  const allChecked = allIds.length > 0 && allIds.every(id => _formsSelected.has(id));
   return `
     <div class="pages-list">
       <div class="pages-list-header" style="display:grid; grid-template-columns:${gridCols}; align-items:center;">
+        <label class="page-item__checkbox"><input type="checkbox" ${allChecked ? 'checked' : ''} onchange="toggleAllFormsOnPage(this.checked, [${allIds.join(',')}])"></label>
         <span>Titre</span>
         <span style="text-align:center">Champs</span>
         <span style="text-align:center">Entrées</span>
@@ -14910,8 +15828,10 @@ function renderFormsTable() {
       </div>
       ${_formsCache.map(f => {
         const safeName = escapeHtml(f.title).replace(/'/g, "\\'");
+        const checked = _formsSelected.has(f.id);
         return `
-        <div class="page-item" style="display:grid; grid-template-columns:${gridCols}; align-items:center;">
+        <div class="page-item${checked ? ' page-item--selected' : ''}" style="display:grid; grid-template-columns:${gridCols}; align-items:center;">
+          <label class="page-item__checkbox"><input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleFormSelect(${f.id}, this.checked)"></label>
           <div onclick="loadSection('form-edit:${f.id}')" style="cursor:pointer; overflow:hidden;">
             <strong>${escapeHtml(f.title)}</strong>
             <span class="page-item__slug" style="display:block; font-size:12px; color:var(--gray-400)">${escapeHtml(f.slug)}</span>
@@ -15634,7 +16554,7 @@ async function renderPluginsManager() {
   let plugins = [];
   try {
     const data = await apiFetch('/plugins');
-    plugins = data.plugins || [];
+    plugins = (data.plugins || []).filter(p => !p._core);
   } catch {
     return '<h1>Plugins</h1><p>Erreur lors du chargement des plugins.</p>';
   }
@@ -15740,7 +16660,7 @@ async function renderAiCredits() {
         <td style="text-align:center">${u.request_count}</td>
         <td style="text-align:right">${Number(u.total_input_tokens).toLocaleString()}</td>
         <td style="text-align:right">${Number(u.total_output_tokens).toLocaleString()}</td>
-        <td style="text-align:right;font-weight:600">${Number(u.total_credits_used).toFixed(4)} €</td>
+        <td style="text-align:right;font-weight:600">${Math.round(Number(u.total_credits_used) * 100).toLocaleString('fr-FR')} crédits</td>
       </tr>
     `).join('');
 
@@ -15753,7 +16673,7 @@ async function renderAiCredits() {
         <td style="text-align:right">${Number(m.total_input_tokens).toLocaleString()}</td>
         <td style="text-align:right">${Number(m.total_output_tokens).toLocaleString()}</td>
         <td style="text-align:right">${totalTokens.toLocaleString()}</td>
-        <td style="text-align:right;font-weight:600">${Number(m.total_credits_used).toFixed(4)} €</td>
+        <td style="text-align:right;font-weight:600">${Math.round(Number(m.total_credits_used) * 100).toLocaleString('fr-FR')} crédits</td>
       </tr>
     `;
     }).join('');
@@ -15762,7 +16682,7 @@ async function renderAiCredits() {
       <tr>
         <td>${new Date(e.created_at).toLocaleDateString('fr-FR')}</td>
         <td><span class="badge ${e.source === 'manual' ? 'badge-primary' : 'badge-success'}">${e.source === 'manual' ? 'Manuel' : 'Auto'}</span></td>
-        <td style="text-align:right;font-weight:600">${Number(e.credits).toFixed(4)} €</td>
+        <td style="text-align:right;font-weight:600">${Math.round(Number(e.credits) * 100).toLocaleString('fr-FR')} crédits</td>
         <td>${e.note || '—'}</td>
         <td>${e.added_by_name || 'Système'}</td>
         <td>
@@ -15778,7 +16698,7 @@ async function renderAiCredits() {
         <td><span class="badge badge-${u.model === 'sonnet' ? 'primary' : 'secondary'}">${u.model}</span></td>
         <td style="text-align:right">${Number(u.input_tokens).toLocaleString()}</td>
         <td style="text-align:right">${Number(u.output_tokens).toLocaleString()}</td>
-        <td style="text-align:right;font-weight:600">${Number(u.credits_used).toFixed(6)} €</td>
+        <td style="text-align:right;font-weight:600">${(Number(u.credits_used) * 100).toFixed(2)} crédits</td>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(u.prompt_summary || '')}">${escapeHtml(u.prompt_summary || '—')}</td>
       </tr>
     `).join('');
@@ -15792,11 +16712,11 @@ async function renderAiCredits() {
       <div class="stats-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:24px">
         <div class="stat-card">
           <div class="label">Disponible</div>
-          <div class="value" style="color:${availColor}">${overview.available.toFixed(4)} €</div>
+          <div class="value" style="color:${availColor}">${Math.round(overview.available * 100).toLocaleString('fr-FR')} crédits</div>
         </div>
         <div class="stat-card">
           <div class="label">Utilisé ce mois</div>
-          <div class="value">${overview.total_used.toFixed(4)} €</div>
+          <div class="value">${Math.round(overview.total_used * 100).toLocaleString('fr-FR')} crédits</div>
         </div>
       </div>
 
@@ -15864,7 +16784,7 @@ async function renderAiCredits() {
               </div>
               <button class="btn btn-primary" onclick="saveAiMonthlyCredits()">Sauvegarder</button>
             </div>
-            <p class="ai-hint">Montant rechargé automatiquement le 1er de chaque mois.</p>
+            <p class="ai-hint">Montant rechargé automatiquement le 1er de chaque mois. 1 € = 100 crédits.</p>
           </div>
 
           <div class="ai-config-divider"></div>
@@ -15887,6 +16807,7 @@ async function renderAiCredits() {
                 Ajouter
               </button>
             </div>
+            <p class="ai-hint">1 € = 100 crédits.</p>
           </div>
         </div>
       </div>
@@ -15901,7 +16822,7 @@ async function renderAiCredits() {
                 <th>Modèle</th><th style="text-align:center">Requêtes</th>
                 <th style="text-align:right">Tokens entrée</th><th style="text-align:right">Tokens sortie</th>
                 <th style="text-align:right">Total tokens</th>
-                <th style="text-align:right">Coût</th>
+                <th style="text-align:right">Crédits</th>
               </tr>
             </thead>
             <tbody>${perModelRows}</tbody>
@@ -15919,7 +16840,7 @@ async function renderAiCredits() {
               <tr>
                 <th>Utilisateur</th><th>Email</th><th style="text-align:center">Requêtes</th>
                 <th style="text-align:right">Tokens entrée</th><th style="text-align:right">Tokens sortie</th>
-                <th style="text-align:right">Coût</th>
+                <th style="text-align:right">Crédits</th>
               </tr>
             </thead>
             <tbody>${perUserRows}</tbody>
@@ -15937,7 +16858,7 @@ async function renderAiCredits() {
               <tr>
                 <th>Date</th><th>Utilisateur</th><th>Modèle</th>
                 <th style="text-align:right">Input</th><th style="text-align:right">Output</th>
-                <th style="text-align:right">Coût</th><th>Prompt</th>
+                <th style="text-align:right">Crédits</th><th>Prompt</th>
               </tr>
             </thead>
             <tbody>${usageRows}</tbody>
@@ -15954,7 +16875,7 @@ async function renderAiCredits() {
           <table class="ai-table">
             <thead>
               <tr>
-                <th>Date</th><th>Type</th><th style="text-align:right">Montant</th>
+                <th>Date</th><th>Type</th><th style="text-align:right">Crédits</th>
                 <th>Note</th><th>Ajouté par</th><th></th>
               </tr>
             </thead>
@@ -16094,7 +17015,7 @@ async function loadAiUsagePage(page) {
         <td><span class="badge badge-${u.model === 'sonnet' ? 'primary' : 'secondary'}">${u.model}</span></td>
         <td style="text-align:right">${Number(u.input_tokens).toLocaleString()}</td>
         <td style="text-align:right">${Number(u.output_tokens).toLocaleString()}</td>
-        <td style="text-align:right;font-weight:600">${Number(u.credits_used).toFixed(6)} €</td>
+        <td style="text-align:right;font-weight:600">${(Number(u.credits_used) * 100).toFixed(2)} crédits</td>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(u.prompt_summary || '')}">${escapeHtml(u.prompt_summary || '—')}</td>
       </tr>
     `).join('');

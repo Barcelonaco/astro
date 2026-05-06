@@ -736,6 +736,23 @@
   background-color: rgba(0, 0, 0, 0.1);
   color: #fff;
 }
+.module-clickable .item .desc,
+.module-clickable .item .desc .title,
+.module-clickable .item .desc h1,
+.module-clickable .item .desc h2,
+.module-clickable .item .desc h3,
+.module-clickable .item .desc h4,
+.module-clickable .item .desc h5,
+.module-clickable .item .desc h6,
+.module-clickable .item .desc .title-section-1,
+.module-clickable .item .desc .title-section-2,
+.module-clickable .item .desc .title-section-3,
+.module-clickable .item .desc .title-section-4,
+.module-clickable .item .desc .title-section-5,
+.module-clickable .item .desc p,
+.module-clickable .item .desc li {
+  color: #fff;
+}
 .module-clickable .item::before {
   display: block;
   width: 0;

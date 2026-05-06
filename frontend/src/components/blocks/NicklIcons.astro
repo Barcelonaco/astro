@@ -28,15 +28,20 @@ const iconLayout = isTruthy(data.icon_layout);
       {logos.map((logo) => {
         const link = resolveLink(logo.link);
         // icon_type 0 = jpg (thumbnail), 1 = svg (full url)
-        const imgUrl = !iconType
-          ? resolveImageUrl(logo.logo, apiOrigin, 'thumbnail')
-          : resolveImageUrl(logo.logo, apiOrigin, 'icon');
+        const hasLogo = !!logo.logo && (typeof logo.logo === 'string' ? logo.logo : (logo.logo.url || logo.logo.sizes?.thumbnail));
+        const imgUrl = hasLogo
+          ? (!iconType
+              ? resolveImageUrl(logo.logo, apiOrigin, 'thumbnail')
+              : resolveImageUrl(logo.logo, apiOrigin, 'icon'))
+          : '';
 
         const innerContent = (
           <>
-            <div class="illus-wrapper">
-              <img src={imgUrl} alt="" class={`illus${!iconType ? ' icon_type_jpg' : ''}`} width="80" height="80" loading="lazy" decoding="async" />
-            </div>
+            {imgUrl && (
+              <div class="illus-wrapper">
+                <img src={imgUrl} alt="" class={`illus${!iconType ? ' icon_type_jpg' : ''}`} width="80" height="80" loading="lazy" decoding="async" />
+              </div>
+            )}
             {(logo.titre || logo.desc) && (
               <div class="desc">
                 {logo.titre && <p class="title">{logo.titre}</p>}

@@ -354,3 +354,9 @@
         }
     }
 }
+
+
+/* === Migré depuis NicklNewsSlider.astro === */
+.module-news-slider.has-background-tertiary:not(.cols_have_background) {
+    background-color: var(--color-tertiary, #d6d6d6);
+}

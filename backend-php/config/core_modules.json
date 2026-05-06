@@ -1,0 +1,75 @@
+{
+  "cpts": [
+    {
+      "slug": "actualites",
+      "label": "Actualité",
+      "labelPlural": "Actualités",
+      "icon": "newspaper",
+      "supports": ["title", "slug", "featured_image", "content", "excerpt", "status"],
+      "fields": [],
+      "hasCategories": true,
+      "categoryLabel": "Catégories d'actualités"
+    },
+    {
+      "slug": "evenements",
+      "label": "Événement",
+      "labelPlural": "Événements",
+      "icon": "calendar",
+      "supports": ["title", "slug", "featured_image", "content", "excerpt", "status"],
+      "fields": [
+        { "name": "is_sticky", "label": "Mettre en avant", "type": "TrueFalse", "width": 50 },
+        { "name": "sold_out", "label": "Complet", "type": "TrueFalse", "width": 50 },
+        { "name": "cta", "label": "Lien personnalisé", "type": "Link" },
+        { "name": "desc", "label": "Description courte (vue liste)", "type": "Textarea" },
+        { "name": "text", "label": "Description longue", "type": "WYSIWYG" },
+        { "name": "start_date", "label": "Date de début", "type": "Date", "width": 50 },
+        { "name": "end_date", "label": "Date de fin", "type": "Date", "width": 50 },
+        { "name": "start_time", "label": "Heure de début", "type": "Time", "width": 50 },
+        { "name": "end_time", "label": "Heure de fin", "type": "Time", "width": 50 },
+        { "name": "contact_name", "label": "Nom de l'organisateur", "type": "Text", "width": 50 },
+        { "name": "contact_phone", "label": "Téléphone", "type": "Text", "width": 50 },
+        { "name": "contact_email", "label": "Email", "type": "Email", "width": 50 },
+        { "name": "website", "label": "Site web", "type": "URL", "width": 50 },
+        { "name": "price", "label": "Entrée (ex: Gratuit, 5€ - 15€)", "type": "Text", "width": 50 },
+        { "name": "location_name", "label": "Nom du lieu", "type": "Text", "width": 50 },
+        { "name": "location", "label": "Adresse complète", "type": "Address" }
+      ],
+      "hasCategories": true,
+      "categoryLabel": "Catégories d'événements",
+      "hasModules": false
+    },
+    {
+      "slug": "references",
+      "label": "Référence",
+      "labelPlural": "Références",
+      "isFemale": true,
+      "icon": "palette",
+      "supports": ["title", "slug", "featured_image", "content", "status"],
+      "fields": [
+        { "name": "customer_name", "label": "Sous-titre / Nom du client", "type": "Text" },
+        { "name": "text", "label": "Description", "type": "Textarea" },
+        { "name": "photos", "label": "Galerie photos", "type": "Photos" },
+        { "name": "link", "label": "Lien", "type": "Link" }
+      ],
+      "hasCategories": true,
+      "categoryLabel": "Catégories de références"
+    }
+  ],
+  "modules": [
+    {
+      "name": "NewsSlider",
+      "label": "Actualités à la une",
+      "category": { "id": "actualites", "label": "Actualités", "icon": "newspaper" }
+    },
+    {
+      "name": "EventsSlider",
+      "label": "Événements à la une",
+      "category": { "id": "evenements", "label": "Événements", "icon": "calendar" }
+    },
+    {
+      "name": "BlocReferences",
+      "label": "Références",
+      "category": { "id": "references", "label": "Références", "icon": "palette" }
+    }
+  ]
+}

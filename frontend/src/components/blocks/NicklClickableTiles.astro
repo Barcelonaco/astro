@@ -435,34 +435,3 @@ function hasDesc(item: any): boolean {
     </div>
   </div>
 )}
-
-<style is:global>
-/* Clickable tiles 6-8 items: desc hidden by default, revealed on hover */
-.module-clickable .list.items-6 .item .desc,
-.module-clickable .list.items-7 .item .desc,
-.module-clickable .list.items-8 .item .desc {
-  opacity: 0 !important;
-  transition: opacity 0.3s ease;
-}
-.module-clickable .list.items-6 .item:hover .desc,
-.module-clickable .list.items-7 .item:hover .desc,
-.module-clickable .list.items-8 .item:hover .desc {
-  opacity: 1 !important;
-}
-/* Hover expansion + height for 6-8 items row */
-.module-clickable .list.items-6 .item,
-.module-clickable .list.items-7 .item,
-.module-clickable .list.items-8 .item {
-  transition: flex-basis 0.3s ease;
-}
-.module-clickable .list.items-6 .item::before,
-.module-clickable .list.items-7 .item::before,
-.module-clickable .list.items-8 .item::before {
-  padding-top: 40.625rem !important; /* 650px — tall vertical strips */
-}
-.module-clickable .list.items-6 .item:hover,
-.module-clickable .list.items-7 .item:hover,
-.module-clickable .list.items-8 .item:hover {
-  flex-basis: 25% !important;
-}
-</style>

@@ -26,11 +26,12 @@ class SettingsController {
     }
 
     public static function getSiteInfo(): void {
-        $s = self::getSettingsMap(['site_name', 'site_description', 'front_page']);
+        $s = self::getSettingsMap(['site_name', 'site_description', 'front_page', 'favicon']);
         json_response([
             'siteName' => $s['site_name'] ?? '',
             'siteDescription' => $s['site_description'] ?? '',
             'frontPage' => $s['front_page'] ?? '',
+            'favicon' => $s['favicon'] ?? '',
         ]);
     }
 
@@ -47,7 +48,7 @@ class SettingsController {
             'text_color', 'primary_color', 'brand_primary_dark',
             'secondary_color', 'brand_secondary_dark', 'tertiary_color',
             'background_color', 'bg_form_field',
-            'font_title', 'font_general', 'logo_height',
+            'font_title', 'font_general', 'custom_font_title_family', 'custom_font_general_family', 'logo_height',
             'theme_use_child', 'active_theme'
         ];
         json_response(self::getSettingsMap($keys));
@@ -76,7 +77,7 @@ class SettingsController {
             'text_color', 'primary_color', 'brand_primary_dark',
             'secondary_color', 'brand_secondary_dark', 'tertiary_color',
             'background_color', 'bg_form_field',
-            'font_title', 'font_general', 'logo_height',
+            'font_title', 'font_general', 'custom_font_title_family', 'custom_font_general_family', 'logo_height',
             'theme_use_child', 'active_theme'
         ];
         $styleSettings = [];
@@ -114,13 +115,15 @@ class SettingsController {
             'cookie_privacy_url', 'cookie_accept_text', 'cookie_reject_text',
             'is_onepage', 'is_activate_schemas', 'custom_balise', 'google_api_key',
             // E-commerce (public-safe uniquement, aucun secret)
-            'ecommerce_enabled', 'shop_currency', 'shop_country', 'shop_payment_methods',
+            'shop_currency', 'shop_country', 'shop_payment_methods',
             'checkout_guest_enabled'
         ];
         $siteSettings = [];
         foreach ($frontendKeys as $k) {
             if (isset($s[$k])) $siteSettings[$k] = $s[$k];
         }
+        // ecommerce_enabled est dérivé de l'état du plugin (plus de toggle séparé).
+        $siteSettings['ecommerce_enabled'] = PluginController::isPluginActive('ecommerce') ? '1' : '0';
 
         // Front page content
         $frontPage = null;
@@ -156,7 +159,7 @@ class SettingsController {
             'logo', 'logo_white', 'logo_loader', 'favicon', 'replacement_image',
             'brand_primary', 'brand_primary_dark', 'brand_secondary', 'brand_secondary_dark',
             'primary_color', 'secondary_color', 'tertiary_color', 'text_color', 'background_color', 'bg_form_field',
-            'font_title', 'font_general',
+            'font_title', 'font_general', 'custom_font_title_family', 'custom_font_general_family',
             'menu_seamless', 'rounded', 'uppercase', 'home_loader', 'menu_style',
             'secret_menu', 'logo_custom_height', 'logo_height', 'accessibility', 'show_breadcrumb',
             'pages_share_btn', 'share_btn_position',

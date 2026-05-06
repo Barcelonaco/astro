@@ -190,3 +190,240 @@ export function formatPrice(cents: number, currency = 'EUR'): string {
     style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2,
   }).format(amount)
 }
+
+// ─── Cart ────────────────────────────────────────────────────────────────────
+
+const CART_TOKEN_KEY = 'shop_cart_token'
+const CART_AUTH_KEY = 'customer_token'
+
+export interface CartItem {
+  id: number
+  kind: 'product' | 'custom'
+  product_id?: number
+  product_slug?: string
+  product_title?: string
+  variant_id?: number
+  sku?: string
+  attributes?: Record<string, string>
+  quantity: number
+  unit_price_cents: number
+  line_total_cents: number
+  weight_grams?: number | null
+  tax_code?: string
+  is_digital?: boolean
+  requires_shipping?: boolean
+  featured_image?: any
+  source_type?: string
+  source_id?: number | null
+  title?: string
+  config_snapshot?: any
+  unit_price_pro_ht_cents?: number | null
+}
+
+export interface Cart {
+  id: number | null
+  token: string | null
+  customer_id?: number | null
+  currency: string
+  coupon_code: string | null
+  shipping_method_id?: number | null
+  items: CartItem[]
+  custom_items: CartItem[]
+  subtotal_cents: number
+  tax_cents: number
+  total_cents: number
+  tax_breakdown: Record<string, number>
+  items_count: number
+}
+
+export interface ShippingRate {
+  method_id: number
+  zone_id: number
+  zone_name: string
+  name: string
+  description: string | null
+  type: 'flat' | 'free' | 'weight' | 'price'
+  price_cents: number
+  tax_code: string | null
+  delivery_min_days: number | null
+  delivery_max_days: number | null
+}
+
+export interface OrderItem {
+  id: number
+  product_id: number
+  variant_id: number
+  sku: string
+  product_title: string
+  variant_attributes: Record<string, any>
+  quantity: number
+  unit_price_cents: number
+  tax_rate: string | number
+  line_subtotal_cents: number
+  line_tax_cents: number
+  line_total_cents: number
+  is_digital: number | boolean
+  requires_shipping: number | boolean
+}
+
+export interface OrderAddress {
+  type: 'billing' | 'shipping'
+  first_name: string | null
+  last_name: string | null
+  company: string | null
+  address_line1: string | null
+  address_line2: string | null
+  postcode: string | null
+  city: string | null
+  region: string | null
+  country_code: string | null
+  phone: string | null
+  email: string | null
+  vat_number: string | null
+}
+
+export interface Order {
+  id: number
+  order_number: string
+  customer_id: number | null
+  email: string
+  status: string
+  payment_status: string
+  payment_method: string
+  currency: string
+  subtotal_cents: number
+  discount_cents: number
+  shipping_cents: number
+  tax_cents: number
+  total_cents: number
+  tax_breakdown: Record<string, number>
+  coupon_code: string | null
+  shipping_method_id: number | null
+  shipping_method_label: string | null
+  notes: string | null
+  placed_at: string
+  paid_at: string | null
+  shipped_at: string | null
+  delivered_at: string | null
+  guest_token: string | null
+  items: OrderItem[]
+  billing_address: OrderAddress | null
+  shipping_address: OrderAddress | null
+}
+
+function getCartToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem(CART_TOKEN_KEY)
+}
+
+function setCartToken(t: string | null): void {
+  if (typeof window === 'undefined') return
+  if (t) localStorage.setItem(CART_TOKEN_KEY, t)
+  else localStorage.removeItem(CART_TOKEN_KEY)
+}
+
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem(CART_AUTH_KEY)
+}
+
+function shopHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extra }
+  const token = getCartToken()
+  if (token) headers['X-Cart-Token'] = token
+  const auth = getAuthToken()
+  if (auth) headers['Authorization'] = `Bearer ${auth}`
+  return headers
+}
+
+async function shopRequest<T>(method: string, path: string, body?: any): Promise<T | null> {
+  try {
+    const res = await fetch(`${API_URL}${path}`, {
+      method,
+      headers: shopHeaders(),
+      body: body ? JSON.stringify(body) : undefined,
+    })
+    const newToken = res.headers.get('X-Cart-Token')
+    if (newToken) setCartToken(newToken)
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Erreur serveur' }))
+      throw new Error(err.error || `HTTP ${res.status}`)
+    }
+    return await res.json()
+  } catch (err) {
+    console.error(`Shop request ${method} ${path}:`, err)
+    throw err
+  }
+}
+
+export async function getCart(): Promise<Cart> {
+  const c = await shopRequest<Cart>('GET', '/cart')
+  return c || emptyCart()
+}
+
+export async function addCartItem(variantId: number, quantity = 1): Promise<Cart> {
+  return (await shopRequest<Cart>('POST', '/cart/items', { variant_id: variantId, quantity }))!
+}
+
+export async function updateCartItem(itemId: number, quantity: number): Promise<Cart> {
+  return (await shopRequest<Cart>('PUT', `/cart/items/${itemId}`, { quantity }))!
+}
+
+export async function removeCartItem(itemId: number): Promise<Cart> {
+  return (await shopRequest<Cart>('DELETE', `/cart/items/${itemId}`))!
+}
+
+export async function removeCustomCartItem(itemId: number): Promise<Cart> {
+  return (await shopRequest<Cart>('DELETE', `/cart/items/custom/${itemId}`))!
+}
+
+export async function clearCart(): Promise<Cart> {
+  return (await shopRequest<Cart>('DELETE', '/cart'))!
+}
+
+export async function getShippingRates(postcode: string, country = 'FR'): Promise<ShippingRate[]> {
+  const token = getCartToken() || ''
+  const q = new URLSearchParams({ postcode, country })
+  if (token) q.set('cart_token', token)
+  const res = await shopRequest<{ rates: ShippingRate[] }>('GET', `/shop/shipping-rates?${q.toString()}`)
+  return res?.rates || []
+}
+
+export interface CheckoutPayload {
+  billing: Partial<OrderAddress>
+  shipping?: Partial<OrderAddress>
+  shipping_method_id: number
+  payment_method: 'stripe' | 'paypal' | 'bank_transfer' | 'on_invoice'
+  notes?: string
+}
+
+export async function createOrder(payload: CheckoutPayload): Promise<Order> {
+  const order = await shopRequest<Order>('POST', '/orders', payload)
+  setCartToken(null)
+  return order!
+}
+
+export async function getOrder(id: number, guestToken?: string): Promise<Order> {
+  const q = guestToken ? `?guest_token=${encodeURIComponent(guestToken)}` : ''
+  return (await shopRequest<Order>('GET', `/orders/${id}${q}`))!
+}
+
+export async function getOrderByNumber(number: string, guestToken?: string): Promise<Order> {
+  const q = guestToken ? `?guest_token=${encodeURIComponent(guestToken)}` : ''
+  return (await shopRequest<Order>('GET', `/orders/by-number/${encodeURIComponent(number)}${q}`))!
+}
+
+export async function listMyOrders(): Promise<Order[]> {
+  const res = await shopRequest<{ orders: Order[] }>('GET', '/orders')
+  return res?.orders || []
+}
+
+export function emptyCart(): Cart {
+  return {
+    id: null, token: null, currency: 'EUR', coupon_code: null,
+    items: [], custom_items: [],
+    subtotal_cents: 0, tax_cents: 0, total_cents: 0, tax_breakdown: {}, items_count: 0,
+  }
+}
+
+export { getCartToken, setCartToken }

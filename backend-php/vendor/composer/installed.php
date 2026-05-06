@@ -5,7 +5,7 @@
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
-        'reference' => '9dd392711c1204cdcc5270e5aa595bba3ad2ecb8',
+        'reference' => '1f2c60364685dc86ad97b8117a3affc5b8b3a716',
         'name' => 'cms-astro/backend-php',
         'dev' => true,
     ),
@@ -16,7 +16,7 @@
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
-            'reference' => '9dd392711c1204cdcc5270e5aa595bba3ad2ecb8',
+            'reference' => '1f2c60364685dc86ad97b8117a3affc5b8b3a716',
             'dev_requirement' => false,
         ),
         'firebase/php-jwt' => array(
@@ -44,6 +44,15 @@
             'install_path' => __DIR__ . '/../phpoption/phpoption',
             'aliases' => array(),
             'reference' => '75365b91986c2405cf5e1e012c5595cd487a98be',
+            'dev_requirement' => false,
+        ),
+        'stripe/stripe-php' => array(
+            'pretty_version' => 'v20.1.0',
+            'version' => '20.1.0.0',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../stripe/stripe-php',
+            'aliases' => array(),
+            'reference' => '6d0ec5ffa0678a408d63163ace1453b35a85fb24',
             'dev_requirement' => false,
         ),
         'symfony/polyfill-ctype' => array(

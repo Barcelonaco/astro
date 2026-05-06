@@ -2,7 +2,8 @@
 
 class CustomPostTypeController {
     private static function safeCPTSlug(string $input): ?string {
-        return preg_match('/^[a-z0-9-]+$/', $input) ? $input : null;
+        // Allows underscores (used by plugin CPTs like poolp_boxes) in addition to letters/digits/hyphens.
+        return preg_match('/^[a-z0-9_-]+$/', $input) ? $input : null;
     }
 
     private static function ensureCPTTable(string $slug): void {
@@ -55,6 +56,13 @@ class CustomPostTypeController {
     }
 
     public static function migratePluginTables(): void {
+        // Core CPTs (always present, not togglable)
+        foreach (CoreRegistry::getCPTs() as $pt) {
+            if (empty($pt['slug'])) continue;
+            self::ensureCPTTable($pt['slug']);
+            if (!empty($pt['hasCategories'])) self::ensureCPTCategoryTables($pt['slug']);
+        }
+        // Plugin CPTs
         $manifests = PluginController::getPluginManifests();
         foreach ($manifests as $manifest) {
             foreach ($manifest['postTypes'] ?? [] as $pt) {

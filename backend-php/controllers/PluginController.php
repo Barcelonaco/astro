@@ -2,6 +2,42 @@
 
 class PluginController {
     /**
+     * Return the plugin root directories to scan, in priority order.
+     * Always includes the monorepo's plugins/ folder (shared via git).
+     * If EXTERNAL_PLUGINS_DIR env var is set and the path exists, also scan it
+     * — used for site-specific plugins that must NOT be distributed to other sites.
+     *
+     * @return string[] absolute paths
+     */
+    public static function getPluginRoots(): array {
+        $roots = [realpath(__DIR__ . '/../../plugins')];
+        $external = getenv('EXTERNAL_PLUGINS_DIR') ?: ($_ENV['EXTERNAL_PLUGINS_DIR'] ?? null);
+        if ($external) {
+            $external = rtrim($external, '/');
+            if (is_dir($external)) {
+                $real = realpath($external);
+                if ($real && !in_array($real, $roots, true)) {
+                    $roots[] = $real;
+                }
+            }
+        }
+        return array_filter($roots);
+    }
+
+    /**
+     * Resolve the absolute filesystem path of a plugin directory across all roots.
+     * Returns null if the plugin dir doesn't exist anywhere.
+     */
+    public static function resolvePluginPath(string $dir): ?string {
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $dir)) return null;
+        foreach (self::getPluginRoots() as $root) {
+            $candidate = $root . '/' . $dir;
+            if (is_dir($candidate)) return $candidate;
+        }
+        return null;
+    }
+
+    /**
      * Return the list of active plugin directories from settings.
      * If the setting doesn't exist yet, defaults to a known list (backward-compatible).
      */
@@ -10,7 +46,7 @@ class PluginController {
         $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'active_plugins'");
         $stmt->execute();
         $row = $stmt->fetch();
-        if (!$row) return ['references', 'actualites', 'evenements']; // default active plugins
+        if (!$row) return []; // default: no active plugins (actualites/evenements/references are core, not plugins)
         $decoded = json_decode($row['setting_value'], true);
         return is_array($decoded) ? $decoded : null;
     }
@@ -27,28 +63,29 @@ class PluginController {
      * Returns null if no plugin owns the type (= core module).
      */
     public static function findPluginForBlockType(string $type): ?string {
-        $pluginsDir = __DIR__ . '/../../plugins';
-        if (!is_dir($pluginsDir)) return null;
-        foreach (scandir($pluginsDir) as $entry) {
-            if ($entry === '.' || $entry === '..') continue;
-            $pluginRoot = $pluginsDir . '/' . $entry;
-            if (!is_dir($pluginRoot)) continue;
-            $manifestPath = $pluginRoot . '/plugin.json';
-            if (file_exists($manifestPath)) {
-                $manifest = json_decode(file_get_contents($manifestPath), true);
-                if (is_array($manifest)) {
-                    $items = $manifest['modules']['items'] ?? [];
-                    foreach ($items as $m) {
-                        $name = $m['name'] ?? '';
-                        if ($name === '') continue;
-                        $kebab = strtolower(preg_replace('/(?<!^)([A-Z])/', '-$1', $name));
-                        if ($name === $type || $kebab === $type) return $entry;
+        foreach (self::getPluginRoots() as $pluginsDir) {
+            if (!is_dir($pluginsDir)) continue;
+            foreach (scandir($pluginsDir) as $entry) {
+                if ($entry === '.' || $entry === '..') continue;
+                $pluginRoot = $pluginsDir . '/' . $entry;
+                if (!is_dir($pluginRoot)) continue;
+                $manifestPath = $pluginRoot . '/plugin.json';
+                if (file_exists($manifestPath)) {
+                    $manifest = json_decode(file_get_contents($manifestPath), true);
+                    if (is_array($manifest)) {
+                        $items = $manifest['modules']['items'] ?? [];
+                        foreach ($items as $m) {
+                            $name = $m['name'] ?? '';
+                            if ($name === '') continue;
+                            $kebab = strtolower(preg_replace('/(?<!^)([A-Z])/', '-$1', $name));
+                            if ($name === $type || $kebab === $type) return $entry;
+                        }
                     }
                 }
+                // Template-based detection (templates/<type>.blade.php)
+                $tplPath = $pluginRoot . '/templates/' . $type . '.blade.php';
+                if (file_exists($tplPath)) return $entry;
             }
-            // Template-based detection (templates/<type>.blade.php)
-            $tplPath = $pluginRoot . '/templates/' . $type . '.blade.php';
-            if (file_exists($tplPath)) return $entry;
         }
         return null;
     }
@@ -63,34 +100,35 @@ class PluginController {
      * Return all block types that belong to inactive plugins (for frontend/admin filtering).
      */
     public static function getInactiveBlockTypes(): array {
-        $pluginsDir = __DIR__ . '/../../plugins';
-        if (!is_dir($pluginsDir)) return [];
         $activeList = self::getActiveList();
         $inactive = [];
-        foreach (scandir($pluginsDir) as $entry) {
-            if ($entry === '.' || $entry === '..') continue;
-            $pluginRoot = $pluginsDir . '/' . $entry;
-            if (!is_dir($pluginRoot)) continue;
-            $manifestPath = $pluginRoot . '/plugin.json';
-            if (!file_exists($manifestPath)) continue;
-            $isActive = $activeList === null ? true : in_array($entry, $activeList, true);
-            if ($isActive) continue;
-            $manifest = json_decode(file_get_contents($manifestPath), true);
-            if (!is_array($manifest)) continue;
-            $items = $manifest['modules']['items'] ?? [];
-            foreach ($items as $m) {
-                $name = $m['name'] ?? '';
-                if ($name === '') continue;
-                $kebab = strtolower(preg_replace('/(?<!^)([A-Z])/', '-$1', $name));
-                $inactive[] = $kebab;
-                if ($name !== $kebab) $inactive[] = $name;
-            }
-            // Template-based plugin types
-            $tplDir = $pluginRoot . '/templates';
-            if (is_dir($tplDir)) {
-                foreach (scandir($tplDir) as $f) {
-                    if (str_ends_with($f, '.blade.php')) {
-                        $inactive[] = substr($f, 0, -strlen('.blade.php'));
+        foreach (self::getPluginRoots() as $pluginsDir) {
+            if (!is_dir($pluginsDir)) continue;
+            foreach (scandir($pluginsDir) as $entry) {
+                if ($entry === '.' || $entry === '..') continue;
+                $pluginRoot = $pluginsDir . '/' . $entry;
+                if (!is_dir($pluginRoot)) continue;
+                $manifestPath = $pluginRoot . '/plugin.json';
+                if (!file_exists($manifestPath)) continue;
+                $isActive = $activeList === null ? true : in_array($entry, $activeList, true);
+                if ($isActive) continue;
+                $manifest = json_decode(file_get_contents($manifestPath), true);
+                if (!is_array($manifest)) continue;
+                $items = $manifest['modules']['items'] ?? [];
+                foreach ($items as $m) {
+                    $name = $m['name'] ?? '';
+                    if ($name === '') continue;
+                    $kebab = strtolower(preg_replace('/(?<!^)([A-Z])/', '-$1', $name));
+                    $inactive[] = $kebab;
+                    if ($name !== $kebab) $inactive[] = $name;
+                }
+                // Template-based plugin types
+                $tplDir = $pluginRoot . '/templates';
+                if (is_dir($tplDir)) {
+                    foreach (scandir($tplDir) as $f) {
+                        if (str_ends_with($f, '.blade.php')) {
+                            $inactive[] = substr($f, 0, -strlen('.blade.php'));
+                        }
                     }
                 }
             }
@@ -107,30 +145,34 @@ class PluginController {
     }
 
     public static function getPluginManifests(bool $activeOnly = false): array {
-        $pluginsDir = __DIR__ . '/../../plugins';
-        if (!is_dir($pluginsDir)) return [];
-
         $activeList = self::getActiveList();
 
         $manifests = [];
-        foreach (scandir($pluginsDir) as $entry) {
-            if ($entry === '.' || $entry === '..') continue;
-            $dir = $pluginsDir . '/' . $entry;
-            if (!is_dir($dir)) continue;
+        $seen = [];
+        foreach (self::getPluginRoots() as $pluginsDir) {
+            if (!is_dir($pluginsDir)) continue;
+            foreach (scandir($pluginsDir) as $entry) {
+                if ($entry === '.' || $entry === '..') continue;
+                if (isset($seen[$entry])) continue; // first root wins for duplicate dir names
+                $dir = $pluginsDir . '/' . $entry;
+                if (!is_dir($dir)) continue;
 
-            $manifestPath = $dir . '/plugin.json';
-            if (!file_exists($manifestPath)) continue;
+                $manifestPath = $dir . '/plugin.json';
+                if (!file_exists($manifestPath)) continue;
 
-            $json = file_get_contents($manifestPath);
-            $manifest = json_decode($json, true);
-            if (!$manifest) continue;
+                $json = file_get_contents($manifestPath);
+                $manifest = json_decode($json, true);
+                if (!$manifest) continue;
 
-            $manifest['_dir'] = $entry;
-            $manifest['_active'] = $activeList === null ? true : in_array($entry, $activeList, true);
+                $manifest['_dir'] = $entry;
+                $manifest['_root'] = $pluginsDir;
+                $manifest['_active'] = $activeList === null ? true : in_array($entry, $activeList, true);
 
-            if ($activeOnly && !$manifest['_active']) continue;
+                if ($activeOnly && !$manifest['_active']) continue;
 
-            $manifests[] = $manifest;
+                $manifests[] = $manifest;
+                $seen[$entry] = true;
+            }
         }
         return $manifests;
     }
@@ -159,10 +201,9 @@ class PluginController {
             error_response('Invalid plugin name', 400);
         }
 
-        // Verify the plugin directory exists
-        $pluginsDir = __DIR__ . '/../../plugins';
-        $manifestPath = $pluginsDir . '/' . $pluginDir . '/plugin.json';
-        if (!file_exists($manifestPath)) {
+        // Verify the plugin directory exists in any registered root
+        $resolved = self::resolvePluginPath($pluginDir);
+        if (!$resolved || !file_exists($resolved . '/plugin.json')) {
             error_response('Plugin not found', 404);
         }
 
@@ -193,11 +234,35 @@ class PluginController {
         // Invalidate bootstrap cache
         @unlink(__DIR__ . '/../uploads/.bootstrap_cache.json');
 
+        // À l'activation : charger l'autoload du plugin (s'il existe) puis
+        // exécuter sa migration enregistrée pour créer ses tables. Idempotent :
+        // CREATE TABLE IF NOT EXISTS, donc rejouer ne fait rien si déjà migré.
+        $migrationLog = [];
+        if ($active) {
+            $autoload = $resolved . '/backend/autoload.php';
+            if (file_exists($autoload)) {
+                try {
+                    require_once $autoload;
+                    $changes = run_single_plugin_migration($pluginDir, function (string $msg) use (&$migrationLog) {
+                        $migrationLog[] = $msg;
+                    });
+                    if ($changes !== null) {
+                        $migrationLog[] = sprintf('  [%s] %d change(s) appliquée(s)', $pluginDir, $changes);
+                    }
+                } catch (\Throwable $e) {
+                    error_log('Plugin migration failed on activate: ' . $e->getMessage());
+                    $migrationLog[] = '  ERROR: ' . $e->getMessage();
+                }
+            }
+        }
+
         // Rebuild the frontend so any pages containing modules from this plugin
         // re-render correctly (hidden when off, restored when on) without the
         // user needing to re-save each page.
         trigger_frontend_rebuild('plugin ' . ($active ? 'enabled' : 'disabled') . ': ' . $pluginDir, false);
 
-        json_response(['active' => (bool) $active, 'active_plugins' => $currentList]);
+        $response = ['active' => (bool) $active, 'active_plugins' => $currentList];
+        if (!empty($migrationLog)) $response['migration_log'] = $migrationLog;
+        json_response($response);
     }
 }

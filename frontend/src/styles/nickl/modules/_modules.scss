@@ -43,13 +43,18 @@
         }
     }
     .module-columns.has-background-primary:not(.cols_have_background) &,
-    &.has-background-primary:not(.cols_have_background),    
+    &.has-background-primary:not(.cols_have_background),
     .cols-background-primary &,
     .module-columns.has-background-secondary:not(.cols_have_background) &,
-    &.has-background-secondary:not(.cols_have_background), 
+    &.has-background-secondary:not(.cols_have_background),
     .cols-background-secondary & {
         color: $color1;
-        .title-section-4 {
+        .title-module,
+        .title-section-1,
+        .title-section-2,
+        .title-section-3,
+        .title-section-4,
+        .title-section-5 {
             color: currentColor;
         }
         .tabs .link {
@@ -218,11 +223,13 @@
                 }
             }
         }
-        .title-module {
-            color: currentColor;
-        }
-        .title-section-4 {
-            color: currentColor;
+        .title-module,
+        .title-section-1,
+        .title-section-2,
+        .title-section-3,
+        .title-section-4,
+        .title-section-5 {
+            color: var(--color-default, #{$color-default});
         }
         .tabs .link {
             @include hover {
@@ -289,6 +296,20 @@
     }
     &.has-background-image {
         overflow: hidden;
+        color: $color1;
+        .title-module,
+        .title-section-1,
+        .title-section-2,
+        .title-section-3,
+        .title-section-4,
+        .title-section-5,
+        h1, h2, h3, h4, h5, h6,
+        p, li, blockquote, figcaption {
+            color: currentColor;
+        }
+        a:not(.btn):not(.btn-primary):not(.btn-secondary):not(.btn-tertiary) {
+            color: currentColor;
+        }
         &.background-parallax .background {
             top: -25%;
             height: 125%;
@@ -327,4 +348,11 @@
             }
         }
     }
+
+    /* Heading colors — h1/h3 primary, h2/h5 default, h4 secondary */
+    h1, .h1, .title-section-1 { color: $color3; }
+    h2, .h2, .title-section-2 { color: $color-default; }
+    h3, .h3, .title-section-3 { color: $color3; }
+    h4, .h4, .title-section-4 { color: $color4; }
+    h5, .h5, .title-section-5 { color: $color-default; }
 }

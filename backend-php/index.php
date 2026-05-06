@@ -19,6 +19,13 @@ if (preg_match('#^/uploads/media/_optimized/(.+)$#', $uri, $m)) {
     exit;
 }
 
+// Sitemap / robots.txt fast-path: rewrite baked origin → current host so the
+// same dist build serves any domain (no rebuild per deploy).
+if (in_array($uri, ['/sitemap.xml', '/sitemap-index.xml', '/sitemap-0.xml', '/robots.txt'], true)) {
+    require_once __DIR__ . '/helpers/sitemap.php';
+    if (serve_dynamic_sitemap_or_robots($uri)) exit;
+}
+
 require_once __DIR__ . '/vendor/autoload.php';
 
 // Load environment
@@ -31,7 +38,10 @@ require_once __DIR__ . '/helpers/response.php';
 require_once __DIR__ . '/helpers/request.php';
 require_once __DIR__ . '/helpers/slug.php';
 require_once __DIR__ . '/helpers/rebuild.php';
+require_once __DIR__ . '/helpers/sitemap.php';
 require_once __DIR__ . '/helpers/media-enricher.php';
+require_once __DIR__ . '/helpers/plugin-hooks.php';
+require_once __DIR__ . '/helpers/CoreRegistry.php';
 require_once __DIR__ . '/middleware/auth.php';
 require_once __DIR__ . '/helpers/rate-limit.php';
 
@@ -66,19 +76,26 @@ require_once __DIR__ . '/controllers/AiCreditController.php';
 require_once __DIR__ . '/helpers/encryption.php';
 require_once __DIR__ . '/controllers/SearchController.php';
 
-// E-commerce
-require_once __DIR__ . '/helpers/ecommerce-flag.php';
-require_once __DIR__ . '/middleware/customer-auth.php';
-require_once __DIR__ . '/models/Customer.php';
-require_once __DIR__ . '/models/CustomerAddress.php';
-require_once __DIR__ . '/models/ProductVariant.php';
-require_once __DIR__ . '/models/ProductImage.php';
-require_once __DIR__ . '/models/ProductCategory.php';
-require_once __DIR__ . '/controllers/EcommerceSettingsController.php';
-require_once __DIR__ . '/controllers/EcommerceMigrationController.php';
-require_once __DIR__ . '/controllers/CustomerAuthController.php';
-require_once __DIR__ . '/controllers/ProductController.php';
-require_once __DIR__ . '/controllers/ProductCategoryController.php';
+// E-commerce : tout est isolé dans le plugin `ecommerce/` (chargé via autoload
+// si actif). Le cœur n'a aucune dépendance directe sur le commerce.
+
+// ─── Plugin autoload (monorepo plugins/ + EXTERNAL_PLUGINS_DIR) ──────────────
+// Each plugin can ship a backend/autoload.php that registers its controllers,
+// routes and migrations. Loaded only if the plugin is active.
+// Wrapped in try/catch so a bad plugin can't crash the entire boot.
+try {
+    foreach (PluginController::getPluginRoots() as $__pluginRoot) {
+        if (!is_dir($__pluginRoot)) continue;
+        foreach (glob($__pluginRoot . '/*/backend/autoload.php') as $__autoload) {
+            $__pluginDir = basename(dirname(dirname($__autoload)));
+            if (!PluginController::isPluginActive($__pluginDir)) continue;
+            require_once $__autoload;
+        }
+    }
+    unset($__pluginRoot, $__autoload, $__pluginDir);
+} catch (\Throwable $__e) {
+    error_log('Plugin autoload failed: ' . $__e->getMessage());
+}
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 $allowedOrigins = [
@@ -95,7 +112,7 @@ header('Access-Control-Allow-Credentials: true');
 
 // ─── Security headers ────────────────────────────────────────────────────────
 header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
+header('X-Frame-Options: SAMEORIGIN');
 header('X-XSS-Protection: 1; mode=block');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
@@ -244,15 +261,55 @@ if (preg_match('#^/nickl-assets/(.+)$#', $uri, $m)) {
     exit;
 }
 
-// Serve plugin-assets from the plugins directory
+// Serve plugin-assets from any registered plugin root (monorepo plugins/ + EXTERNAL_PLUGINS_DIR)
 if (preg_match('#^/plugin-assets/(.+)$#', $uri, $m)) {
-    $file = __DIR__ . '/../plugins/' . $m[1];
-    if (file_exists($file)) {
-        $mime = mime_content_type($file);
-        header("Content-Type: $mime");
-        header('Cache-Control: public, max-age=2592000');
-        readfile($file);
+    $rel = $m[1];
+    // Path traversal guard
+    if (strpos($rel, '..') !== false) {
+        http_response_code(403);
         exit;
+    }
+    // Map web-asset extensions to correct MIME types — mime_content_type() often
+    // returns text/plain for CSS/JS which browsers refuse under strict MIME checking.
+    static $assetMimeMap = [
+        'css'   => 'text/css',
+        'js'    => 'application/javascript',
+        'mjs'   => 'application/javascript',
+        'json'  => 'application/json',
+        'html'  => 'text/html; charset=utf-8',
+        'svg'   => 'image/svg+xml',
+        'png'   => 'image/png',
+        'jpg'   => 'image/jpeg',
+        'jpeg'  => 'image/jpeg',
+        'gif'   => 'image/gif',
+        'webp'  => 'image/webp',
+        'avif'  => 'image/avif',
+        'ico'   => 'image/x-icon',
+        'woff'  => 'font/woff',
+        'woff2' => 'font/woff2',
+        'ttf'   => 'font/ttf',
+        'otf'   => 'font/otf',
+        'eot'   => 'application/vnd.ms-fontobject',
+        'map'   => 'application/json',
+        'txt'   => 'text/plain',
+        'xml'   => 'application/xml',
+    ];
+    foreach (PluginController::getPluginRoots() as $root) {
+        $file = $root . '/' . $rel;
+        if (is_file($file)) {
+            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            $mime = $assetMimeMap[$ext] ?? (mime_content_type($file) ?: 'application/octet-stream');
+            header("Content-Type: $mime");
+            header('Cache-Control: public, max-age=2592000');
+            // HTML pages shipped by plugins (admin pages) are loaded inside the
+            // admin SPA via an iframe — the global X-Frame-Options: DENY would
+            // otherwise block the embed. Allow same-origin framing only.
+            if ($ext === 'html') {
+                header('X-Frame-Options: SAMEORIGIN');
+            }
+            readfile($file);
+            exit;
+        }
     }
     http_response_code(404);
     exit;
@@ -273,7 +330,7 @@ if (!preg_match('#^/api/(.*)$#', $uri, $apiMatch)) {
         $distHome = __DIR__ . '/dist/index.html';
         if (file_exists($distHome)) {
             header('Content-Type: text/html; charset=utf-8');
-            readfile($distHome);
+            echo rewrite_html_origin(file_get_contents($distHome));
             exit;
         }
         // Fallback: redirect to admin
@@ -311,13 +368,17 @@ if (!preg_match('#^/api/(.*)$#', $uri, $apiMatch)) {
         } elseif ($ext !== 'html') {
             header('Cache-Control: public, max-age=86400');
         }
-        readfile($distFile);
+        if ($ext === 'html') {
+            echo rewrite_html_origin(file_get_contents($distFile));
+        } else {
+            readfile($distFile);
+        }
         exit;
     }
 
     if (file_exists($distIndex)) {
         header('Content-Type: text/html; charset=utf-8');
-        readfile($distIndex);
+        echo rewrite_html_origin(file_get_contents($distIndex));
         exit;
     }
 
@@ -326,7 +387,7 @@ if (!preg_match('#^/api/(.*)$#', $uri, $apiMatch)) {
     if (file_exists($dist404)) {
         http_response_code(404);
         header('Content-Type: text/html; charset=utf-8');
-        readfile($dist404);
+        echo rewrite_html_origin(file_get_contents($dist404));
         exit;
     }
 
@@ -570,6 +631,17 @@ try {
         $user = authenticate_token();
         require_min_role($user, 'editor');
         ModuleTemplatesController::getModuleTemplate();
+    }
+
+    // ── Core registry (built-in CPTs + modules) ──
+    elseif ($method === 'GET' && $path === '/core/post-types') {
+        json_response(['postTypes' => CoreRegistry::getCPTs()]);
+    }
+    elseif ($method === 'GET' && $path === '/core/modules') {
+        json_response(['modules' => CoreRegistry::getModules()]);
+    }
+    elseif ($method === 'GET' && $path === '/core/registry') {
+        json_response(CoreRegistry::load());
     }
 
     // ── Plugins ──
@@ -832,125 +904,11 @@ try {
         AiCreditController::setEnabled();
     }
 
-    // ── E-commerce : Settings (super_admin) ──
-    elseif ($method === 'GET' && $path === '/ecommerce/settings') {
-        $user = authenticate_token();
-        require_admin($user);
-        EcommerceSettingsController::getAll();
-    }
-    elseif ($method === 'PUT' && $path === '/ecommerce/settings') {
-        $user = authenticate_token();
-        require_admin($user);
-        EcommerceSettingsController::update();
-    }
-    elseif ($method === 'GET' && match_route('/ecommerce/settings/secret/:key', $path, $params)) {
-        $user = authenticate_token();
-        require_admin($user);
-        EcommerceSettingsController::revealSecret($params['key']);
-    }
-
-    // ── Customer auth (client e-commerce, JWT distinct) ──
-    elseif ($method === 'POST' && $path === '/customer/auth/register') {
-        CustomerAuthController::register();
-    }
-    elseif ($method === 'POST' && $path === '/customer/auth/login') {
-        CustomerAuthController::login();
-    }
-    elseif ($method === 'POST' && $path === '/customer/auth/logout') {
-        CustomerAuthController::logout();
-    }
-    elseif ($method === 'GET' && $path === '/customer/auth/me') {
-        CustomerAuthController::me();
-    }
-    elseif ($method === 'PUT' && $path === '/customer/auth/profile') {
-        CustomerAuthController::updateProfile();
-    }
-    elseif ($method === 'POST' && $path === '/customer/auth/forgot-password') {
-        CustomerAuthController::forgotPassword();
-    }
-    elseif ($method === 'POST' && $path === '/customer/auth/reset-password') {
-        CustomerAuthController::resetPassword();
-    }
-    elseif ($method === 'GET' && $path === '/customer/addresses') {
-        CustomerAuthController::listAddresses();
-    }
-    elseif ($method === 'POST' && $path === '/customer/addresses') {
-        CustomerAuthController::createAddress();
-    }
-    elseif ($method === 'PUT' && match_route('/customer/addresses/:id', $path, $params)) {
-        CustomerAuthController::updateAddress((int) $params['id']);
-    }
-    elseif ($method === 'DELETE' && match_route('/customer/addresses/:id', $path, $params)) {
-        CustomerAuthController::deleteAddress((int) $params['id']);
-    }
-
-    // ── Shop : Catalogue public ──
-    elseif ($method === 'GET' && $path === '/shop/products') {
-        ProductController::listPublic();
-    }
-    elseif ($method === 'GET' && $path === '/shop/products/facets') {
-        ProductController::facets();
-    }
-    elseif ($method === 'GET' && match_route('/shop/products/by-id/:id', $path, $params)) {
-        ProductController::getById((int) $params['id']);
-    }
-    elseif ($method === 'GET' && match_route('/shop/products/:slug/variants', $path, $params)) {
-        $product = null;
-        // On expose variants via slug pour éviter de leaker les IDs
-        $db = Database::getInstance();
-        $stmt = $db->prepare('SELECT id FROM cpt_products WHERE slug = ? AND status = "published"');
-        $stmt->execute([$params['slug']]);
-        $row = $stmt->fetch();
-        if (!$row) { error_response('Produit introuvable', 404); }
-        ProductController::listVariants((int) $row['id']);
-    }
-    elseif ($method === 'GET' && match_route('/shop/products/:slug', $path, $params)) {
-        ProductController::getBySlug($params['slug']);
-    }
-    elseif ($method === 'GET' && $path === '/shop/categories') {
-        ProductCategoryController::listPublic();
-    }
-    elseif ($method === 'GET' && $path === '/shop/categories/by-path') {
-        ProductCategoryController::getByPath();
-    }
-    elseif ($method === 'GET' && match_route('/shop/categories/:slug', $path, $params)) {
-        ProductCategoryController::getBySlug($params['slug']);
-    }
-
-    // ── Shop : Admin variants & categories ──
-    elseif ($method === 'GET' && match_route('/admin/products/:id/variants', $path, $params)) {
-        $user = authenticate_token();
-        require_min_role($user, 'editor');
-        ProductController::listVariants((int) $params['id']);
-    }
-    elseif ($method === 'PUT' && match_route('/admin/products/:id/variants', $path, $params)) {
-        $user = authenticate_token();
-        require_min_role($user, 'editor');
-        ProductController::replaceVariants((int) $params['id']);
-    }
-    elseif ($method === 'POST' && match_route('/admin/products/:id/generate-matrix', $path, $params)) {
-        $user = authenticate_token();
-        require_min_role($user, 'editor');
-        ProductController::generateMatrix((int) $params['id']);
-    }
-    elseif ($method === 'POST' && $path === '/admin/product-categories') {
-        $user = authenticate_token();
-        require_min_role($user, 'editor');
-        require_ecommerce_enabled();
-        ProductCategoryController::create();
-    }
-    elseif ($method === 'PUT' && match_route('/admin/product-categories/:id', $path, $params)) {
-        $user = authenticate_token();
-        require_min_role($user, 'editor');
-        require_ecommerce_enabled();
-        ProductCategoryController::update((int) $params['id']);
-    }
-    elseif ($method === 'DELETE' && match_route('/admin/product-categories/:id', $path, $params)) {
-        $user = authenticate_token();
-        require_min_role($user, 'editor');
-        require_ecommerce_enabled();
-        ProductCategoryController::delete((int) $params['id']);
-    }
+    // ── E-commerce ──
+    // Toutes les routes /ecommerce/*, /customer/*, /shop/*, /cart, /orders,
+    // /payments/stripe/*, /admin/products/*, /admin/product-categories/* sont
+    // déclarées par le plugin `ecommerce/` (cf. plugins/ecommerce/backend/autoload.php)
+    // et résolues par dispatch_plugin_routes() à la fin du try.
 
     // ── Search ──
     elseif ($method === 'GET' && $path === '/search') {
@@ -1002,6 +960,11 @@ try {
         $user = authenticate_token();
         require_min_role($user, 'editor');
         CustomPostTypeController::deleteItem($params['postType'], (int) $params['id']);
+    }
+
+    // ── Plugin routes (fallback before 404) ──
+    elseif (dispatch_plugin_routes($method, $path)) {
+        // handled by a plugin
     }
 
     // ── 404 ──

@@ -1,0 +1,554 @@
+---
+/**
+ * Création de compte professionnel — page publique.
+ *
+ * Cible : pros (pisciniste, paysagiste, artisan, distributeur, …) souhaitant
+ * accéder aux tarifs HT et au programme de remise sur CA cumulé.
+ *
+ * Submit côté client :
+ *   1. POST /customer/auth/register   { is_pro: true, ... }
+ *   2. POST /customer/addresses        (billing)        ← avec le token retourné
+ *
+ * Note backend : `siret` et `activity` sont passés dans le body register mais
+ * ne sont pas (encore) persistés par CustomerModel — fields à ajouter quand
+ * le besoin de validation SIRET sera tranché.
+ */
+import BaseHead from '../components/BaseHead.astro'
+import Header from '../components/Header.astro'
+import Footer from '../components/Footer.astro'
+import SiteOverlays from '../components/SiteOverlays.astro'
+import DeferredLoader from '../components/DeferredLoader.astro'
+import { SITE_TITLE } from '../consts'
+import { getFrontendBootstrap } from '../lib/api'
+import { setDefaultImageUrl } from '../lib/module-helpers'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead
+      title={`Créer un compte professionnel — ${siteName}`}
+      description="Accédez à vos tarifs revendeurs HT et à votre programme de remise sur chiffre d'affaires cumulé."
+      styleSettings={styleSettings}
+      siteSettings={siteSettings}
+    />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page signup-pro-wrap">
+      <div class="signup-pro-container">
+        <div class="signup-pro-layout">
+
+          <!-- Formulaire -->
+          <div class="signup-pro-main">
+            <nav class="signup-pro-crumb" aria-label="Fil d'Ariane">
+              <a href="/">Accueil</a> / <a href="/espace-pro">Espace pro</a> / Créer un compte
+            </nav>
+            <h1 class="signup-pro-title">Créer un compte professionnel</h1>
+            <p class="signup-pro-sub">
+              Accédez à vos tarifs revendeurs HT et à votre programme de remise sur chiffre d'affaires cumulé.
+            </p>
+
+            <form id="signup-pro-form" novalidate>
+
+              <!-- Identité -->
+              <fieldset class="signup-pro-section">
+                <legend class="signup-pro-section-title">Votre identité</legend>
+
+                <div class="signup-pro-row">
+                  <label class="signup-pro-field">
+                    <span class="signup-pro-label">Prénom <em>*</em></span>
+                    <input class="signup-pro-input" type="text" name="first_name" placeholder="Jean" required autocomplete="given-name" />
+                  </label>
+                  <label class="signup-pro-field">
+                    <span class="signup-pro-label">Nom <em>*</em></span>
+                    <input class="signup-pro-input" type="text" name="last_name" placeholder="Dupont" required autocomplete="family-name" />
+                  </label>
+                </div>
+
+                <div class="signup-pro-row">
+                  <label class="signup-pro-field">
+                    <span class="signup-pro-label">Email professionnel <em>*</em></span>
+                    <input class="signup-pro-input" type="email" name="email" placeholder="jean@entreprise.fr" required autocomplete="email" />
+                  </label>
+                  <label class="signup-pro-field">
+                    <span class="signup-pro-label">Téléphone <em>*</em></span>
+                    <input class="signup-pro-input" type="tel" name="phone" placeholder="06 00 00 00 00" required autocomplete="tel" />
+                  </label>
+                </div>
+
+                <div class="signup-pro-row">
+                  <label class="signup-pro-field">
+                    <span class="signup-pro-label">Mot de passe <em>*</em></span>
+                    <input class="signup-pro-input" type="password" name="password" placeholder="••••••••" minlength="8" required autocomplete="new-password" />
+                    <span class="signup-pro-hint">8 caractères minimum</span>
+                  </label>
+                  <label class="signup-pro-field">
+                    <span class="signup-pro-label">Confirmer le mot de passe <em>*</em></span>
+                    <input class="signup-pro-input" type="password" name="password_confirm" placeholder="••••••••" minlength="8" required autocomplete="new-password" />
+                  </label>
+                </div>
+              </fieldset>
+
+              <!-- Entreprise -->
+              <fieldset class="signup-pro-section">
+                <legend class="signup-pro-section-title">Votre entreprise</legend>
+
+                <div class="signup-pro-row">
+                  <label class="signup-pro-field">
+                    <span class="signup-pro-label">Raison sociale <em>*</em></span>
+                    <input class="signup-pro-input" type="text" name="company" placeholder="Piscines Dupont SARL" required autocomplete="organization" />
+                  </label>
+                  <label class="signup-pro-field">
+                    <span class="signup-pro-label">Numéro SIRET <em>*</em></span>
+                    <input class="signup-pro-input" type="text" name="siret" placeholder="000 000 000 00000" pattern="[0-9 ]{14,18}" required inputmode="numeric" />
+                    <span class="signup-pro-hint">Utilisé pour la validation de votre statut pro</span>
+                  </label>
+                </div>
+
+                <div class="signup-pro-row">
+                  <label class="signup-pro-field">
+                    <span class="signup-pro-label">Activité <em>*</em></span>
+                    <select class="signup-pro-input" name="activity" required>
+                      <option value="">Sélectionner votre activité</option>
+                      <option value="pisciniste">Pisciniste</option>
+                      <option value="paysagiste">Paysagiste</option>
+                      <option value="batiment">Artisan du bâtiment</option>
+                      <option value="thermique">Installateur thermique</option>
+                      <option value="distributeur">Distributeur / Revendeur</option>
+                      <option value="autre">Autre</option>
+                    </select>
+                  </label>
+                  <label class="signup-pro-field">
+                    <span class="signup-pro-label">Numéro TVA intracommunautaire</span>
+                    <input class="signup-pro-input" type="text" name="vat_number" placeholder="FR 00 000000000" autocomplete="off" />
+                    <span class="signup-pro-hint">Optionnel — requis pour les factures HT</span>
+                  </label>
+                </div>
+
+                <div class="signup-pro-field">
+                  <span class="signup-pro-label">Adresse de facturation <em>*</em></span>
+                  <input class="signup-pro-input" type="text" name="address_line1" placeholder="12 rue des Artisans" required autocomplete="address-line1" />
+                </div>
+                <div class="signup-pro-row">
+                  <input class="signup-pro-input" type="text" name="postcode" placeholder="Code postal" required autocomplete="postal-code" inputmode="numeric" />
+                  <input class="signup-pro-input" type="text" name="city" placeholder="Ville" required autocomplete="address-level2" />
+                </div>
+              </fieldset>
+
+              <!-- Consentements -->
+              <fieldset class="signup-pro-section">
+                <legend class="signup-pro-section-title">Conditions d'utilisation</legend>
+
+                <label class="signup-pro-check">
+                  <input type="checkbox" name="cgv" required />
+                  <span>
+                    J'ai lu et j'accepte les <a href="/cgv" target="_blank" rel="noopener">Conditions Générales de Vente</a>,
+                    incluant la politique tarifaire pro et le programme de remise sur CA. <em>*</em>
+                  </span>
+                </label>
+
+                <label class="signup-pro-check">
+                  <input type="checkbox" name="rgpd" required />
+                  <span>
+                    J'accepte que mes données professionnelles soient utilisées pour la gestion de mon compte
+                    et le calcul de mes remises. Voir notre <a href="/confidentialite" target="_blank" rel="noopener">politique de confidentialité</a>. <em>*</em>
+                  </span>
+                </label>
+
+                <label class="signup-pro-check">
+                  <input type="checkbox" name="accepts_marketing" />
+                  <span>
+                    Je souhaite recevoir les actualités (nouvelles références, promotions pro, informations logistiques).
+                  </span>
+                </label>
+              </fieldset>
+
+              <div class="signup-pro-status" id="signup-pro-status" role="status" aria-live="polite"></div>
+
+              <button class="signup-pro-submit" type="submit" id="signup-pro-submit">
+                Créer mon compte professionnel
+              </button>
+              <p class="signup-pro-note">Votre compte sera activé sous 24h ouvrées après vérification de votre SIRET.</p>
+
+              <div class="signup-pro-login">
+                Vous avez déjà un compte ? <a href="/login">Me connecter</a>
+              </div>
+            </form>
+          </div>
+
+          <!-- Sidebar avantages -->
+          <aside class="signup-pro-side">
+            <div class="signup-pro-card">
+              <h2 class="signup-pro-side-title">Les avantages du compte pro</h2>
+
+              <div class="signup-pro-adv">
+                <div class="signup-pro-adv-icon">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="12" y1="1" x2="12" y2="23" />
+                    <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+                  </svg>
+                </div>
+                <div>
+                  <div class="signup-pro-adv-name">Prix HT revendeur</div>
+                  <p class="signup-pro-adv-desc">Vos prix professionnels HT s'affichent automatiquement après connexion, sur toute la boutique.</p>
+                </div>
+              </div>
+
+              <div class="signup-pro-adv">
+                <div class="signup-pro-adv-icon">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                    <polyline points="17 6 23 6 23 12" />
+                  </svg>
+                </div>
+                <div>
+                  <div class="signup-pro-adv-name">Remise sur CA cumulé</div>
+                  <p class="signup-pro-adv-desc">Votre statut progresse automatiquement selon votre chiffre d'affaires des 365 derniers jours.</p>
+                </div>
+              </div>
+
+              <div class="signup-pro-adv">
+                <div class="signup-pro-adv-icon">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="2" y="5" width="20" height="14" rx="2" />
+                    <line x1="2" y1="10" x2="22" y2="10" />
+                  </svg>
+                </div>
+                <div>
+                  <div class="signup-pro-adv-name">Paiement différé</div>
+                  <p class="signup-pro-adv-desc">Accès aux options de paiement différé après votre première commande comptant.</p>
+                </div>
+              </div>
+
+              <div class="signup-pro-adv signup-pro-adv-last">
+                <div class="signup-pro-adv-icon">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                </div>
+                <div>
+                  <div class="signup-pro-adv-name">Espace projets &amp; devis</div>
+                  <p class="signup-pro-adv-desc">Sauvegardez vos configurations, gérez vos devis et suivez vos commandes depuis votre tableau de bord.</p>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+        </div>
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+
+    <script>
+      const API_URL =
+        (import.meta.env.BUILD_API_URL as string | undefined) ||
+        (import.meta.env.PUBLIC_API_URL as string | undefined) ||
+        'http://localhost:3000/api'
+
+      const form = document.getElementById('signup-pro-form') as HTMLFormElement | null
+      const submit = document.getElementById('signup-pro-submit') as HTMLButtonElement | null
+      const status = document.getElementById('signup-pro-status') as HTMLDivElement | null
+
+      function setStatus(msg: string, kind: 'error' | 'success' | '' = ''): void {
+        if (!status) return
+        status.textContent = msg
+        status.dataset.kind = kind
+      }
+
+      form?.addEventListener('submit', async (ev) => {
+        ev.preventDefault()
+        if (!form || !submit) return
+
+        const fd = new FormData(form)
+        const password = String(fd.get('password') || '')
+        const confirm = String(fd.get('password_confirm') || '')
+
+        if (password !== confirm) {
+          setStatus('Les mots de passe ne correspondent pas.', 'error')
+          return
+        }
+        if (password.length < 8) {
+          setStatus('Le mot de passe doit contenir au moins 8 caractères.', 'error')
+          return
+        }
+
+        const registerBody = {
+          email: String(fd.get('email') || '').trim(),
+          password,
+          first_name: String(fd.get('first_name') || '').trim(),
+          last_name: String(fd.get('last_name') || '').trim(),
+          phone: String(fd.get('phone') || '').trim(),
+          company: String(fd.get('company') || '').trim(),
+          vat_number: String(fd.get('vat_number') || '').trim(),
+          siret: String(fd.get('siret') || '').replace(/\s+/g, ''),
+          activity: String(fd.get('activity') || ''),
+          is_pro: true,
+          accepts_marketing: !!fd.get('accepts_marketing'),
+        }
+
+        submit.disabled = true
+        const originalLabel = submit.textContent
+        submit.textContent = 'Création en cours…'
+        setStatus('')
+
+        try {
+          const res = await fetch(`${API_URL}/customer/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(registerBody),
+          })
+          const data = await res.json().catch(() => ({}))
+
+          if (!res.ok) {
+            setStatus(data.error || 'Une erreur est survenue lors de la création du compte.', 'error')
+            submit.disabled = false
+            submit.textContent = originalLabel
+            return
+          }
+
+          const token = data.token as string | undefined
+          if (token) {
+            try { localStorage.setItem('customer_token', token) } catch {}
+          }
+
+          if (token) {
+            const addressBody = {
+              type: 'billing',
+              is_default: true,
+              first_name: registerBody.first_name,
+              last_name: registerBody.last_name,
+              company: registerBody.company,
+              address_line1: String(fd.get('address_line1') || '').trim(),
+              postcode: String(fd.get('postcode') || '').trim(),
+              city: String(fd.get('city') || '').trim(),
+              country_code: 'FR',
+              phone: registerBody.phone,
+            }
+            try {
+              await fetch(`${API_URL}/customer/addresses`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify(addressBody),
+              })
+            } catch {}
+          }
+
+          setStatus('Compte créé. Vérification SIRET sous 24h ouvrées. Redirection…', 'success')
+          window.setTimeout(() => { window.location.href = '/espace-pro' }, 1500)
+        } catch {
+          setStatus('Connexion au serveur impossible. Réessayez plus tard.', 'error')
+          submit.disabled = false
+          submit.textContent = originalLabel
+        }
+      })
+    </script>
+
+    <style is:global>
+      .signup-pro-wrap { width: 100%; padding: 32px 0 56px; }
+      .signup-pro-container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+      .signup-pro-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+        gap: 40px;
+        align-items: flex-start;
+      }
+      @media (max-width: 900px) {
+        .signup-pro-layout { grid-template-columns: 1fr; }
+      }
+
+      .signup-pro-crumb {
+        font-size: 12px;
+        color: var(--color-text-muted, #6b6b67);
+        margin-bottom: 8px;
+      }
+      .signup-pro-crumb a { color: inherit; text-decoration: none; }
+      .signup-pro-crumb a:hover { text-decoration: underline; }
+
+      .signup-pro-title {
+        font-size: 28px;
+        font-weight: 700;
+        margin: 0 0 6px;
+        letter-spacing: -0.01em;
+      }
+      .signup-pro-sub {
+        font-size: 14px;
+        color: var(--color-text-muted, #6b6b67);
+        margin: 0 0 28px;
+        line-height: 1.6;
+      }
+
+      .signup-pro-section {
+        border: none;
+        padding: 0;
+        margin: 0 0 28px;
+      }
+      .signup-pro-section-title {
+        font-size: 13px;
+        font-weight: 600;
+        margin: 0 0 14px;
+        padding: 0 0 8px;
+        border-bottom: 1px solid rgba(0,0,0,0.1);
+        width: 100%;
+        display: block;
+      }
+
+      .signup-pro-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      @media (max-width: 600px) {
+        .signup-pro-row { grid-template-columns: 1fr; }
+      }
+
+      .signup-pro-field {
+        display: block;
+        margin-bottom: 14px;
+      }
+      .signup-pro-label {
+        display: block;
+        font-size: 12px;
+        color: var(--color-text-muted, #6b6b67);
+        margin-bottom: 5px;
+      }
+      .signup-pro-label em {
+        color: #a0a09c;
+        font-style: normal;
+        font-size: 11px;
+      }
+      .signup-pro-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid rgba(0,0,0,0.18);
+        border-radius: 8px;
+        font-size: 13px;
+        background: #f5f5f3;
+        color: inherit;
+        font-family: inherit;
+        appearance: none;
+      }
+      .signup-pro-input:focus {
+        outline: none;
+        border-color: var(--accent, #1a1a18);
+        background: #fff;
+      }
+      .signup-pro-hint {
+        display: block;
+        font-size: 11px;
+        color: #a0a09c;
+        margin-top: 4px;
+      }
+
+      .signup-pro-check {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 12px;
+        font-size: 13px;
+        color: var(--color-text-muted, #6b6b67);
+        line-height: 1.5;
+        cursor: pointer;
+      }
+      .signup-pro-check input { margin-top: 3px; flex-shrink: 0; width: 15px; height: 15px; }
+      .signup-pro-check a { color: inherit; font-weight: 500; text-decoration: underline; }
+      .signup-pro-check em { color: #a0a09c; font-style: normal; font-size: 11px; }
+
+      .signup-pro-status {
+        margin: 16px 0 0;
+        font-size: 13px;
+        min-height: 18px;
+      }
+      .signup-pro-status[data-kind="error"] { color: #b91c1c; }
+      .signup-pro-status[data-kind="success"] { color: #276022; }
+
+      .signup-pro-submit {
+        width: 100%;
+        padding: 14px;
+        background: var(--accent, #1a1a18);
+        color: #fff;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        font-family: inherit;
+        margin-top: 12px;
+      }
+      .signup-pro-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+      .signup-pro-note {
+        font-size: 11px;
+        color: #a0a09c;
+        text-align: center;
+        margin: 10px 0 0;
+      }
+      .signup-pro-login {
+        text-align: center;
+        font-size: 13px;
+        color: var(--color-text-muted, #6b6b67);
+        margin-top: 20px;
+      }
+      .signup-pro-login a { color: inherit; font-weight: 500; text-decoration: underline; }
+
+      .signup-pro-card {
+        background: #f5f5f3;
+        border-radius: 12px;
+        padding: 22px;
+      }
+      .signup-pro-side-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0 0 16px;
+        letter-spacing: -0.01em;
+      }
+      .signup-pro-adv {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px 0;
+        border-bottom: 1px solid rgba(0,0,0,0.1);
+      }
+      .signup-pro-adv-last { border-bottom: none; }
+      .signup-pro-adv-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .signup-pro-adv-name {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 2px;
+      }
+      .signup-pro-adv-desc {
+        font-size: 12px;
+        color: var(--color-text-muted, #6b6b67);
+        line-height: 1.5;
+        margin: 0;
+      }
+    </style>
+  </body>
+</html>

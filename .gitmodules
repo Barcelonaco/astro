@@ -1,0 +1,3 @@
+[submodule "plugins/poolp-configurator"]
+	path = plugins/poolp-configurator
+	url = https://github.com/Barcelonaco/plugin-configurateur-poolp.git

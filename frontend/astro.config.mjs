@@ -1,14 +1,46 @@
 // @ts-check
 
+import fs from 'node:fs';
+import path from 'node:path';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 import { defineConfig } from 'astro/config';
 
+const SITE_URL = process.env.BUILD_SITE_URL
+	|| process.env.BUILD_MEDIA_ORIGIN
+	|| 'http://localhost:4321';
+
+function robotsTxtIntegration() {
+	return {
+		name: 'robots-txt',
+		hooks: {
+			'astro:build:done': ({ dir }) => {
+				const outDir = typeof dir === 'string' ? dir : dir.pathname;
+				const body = [
+					'User-agent: *',
+					'Allow: /',
+					'Disallow: /admin/',
+					'Disallow: /api/',
+					'Disallow: /uploads/_optimized/',
+					'',
+					`Sitemap: ${SITE_URL.replace(/\/$/, '')}/sitemap-index.xml`,
+					'',
+				].join('\n');
+				fs.writeFileSync(path.join(outDir, 'robots.txt'), body);
+				// Sentinel read at runtime by backend-php to rewrite the baked origin
+				// (canonical, og:url, twitter:url, JSON-LD, …) to the actual request host,
+				// so a single build can serve any domain without a per-site rebuild.
+				fs.writeFileSync(path.join(outDir, '.built_origin'), SITE_URL.replace(/\/$/, ''));
+			},
+		},
+	};
+}
+
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://astro.bcnco.site',
+	site: SITE_URL,
 	output: 'static',
-	integrations: [mdx(), sitemap()],
+	integrations: [mdx(), sitemap(), robotsTxtIntegration()],
 	scopedStyleStrategy: 'where',
 	redirects: {
 		// Le CPT produits s'appelle "products" côté backend (DB + admin).

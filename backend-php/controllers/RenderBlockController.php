@@ -16,7 +16,7 @@ class RenderBlockController {
         }, $html);
 
         // Remove Blade directives we can't process
-        $html = preg_replace('/@(if|else|elseif|endif|foreach|endforeach|unless|endunless|empty|endempty|isset|endisset|section|endsection|yield|extends|include|php|endphp)\b[^]*?(?=@|$)/', '', $html);
+        $html = preg_replace('/@(if|else|elseif|endif|foreach|endforeach|unless|endunless|empty|endempty|isset|endisset|section|endsection|yield|extends|include|php|endphp)\b[\s\S]*?(?=@|$)/', '', $html);
 
         return $html;
     }
@@ -36,9 +36,9 @@ class RenderBlockController {
         $nicklPath = $repoRoot . '/nickl/resources/views/modules/' . $layout . '.blade.php';
         if (file_exists($nicklPath)) return file_get_contents($nicklPath);
 
-        // Try plugins (skip inactive)
-        $pluginsDir = $repoRoot . '/plugins';
-        if (is_dir($pluginsDir)) {
+        // Try plugins from all registered roots (monorepo + EXTERNAL_PLUGINS_DIR), skip inactive
+        foreach (PluginController::getPluginRoots() as $pluginsDir) {
+            if (!is_dir($pluginsDir)) continue;
             foreach (scandir($pluginsDir) as $dir) {
                 if ($dir === '.' || $dir === '..') continue;
                 if (!is_dir($pluginsDir . '/' . $dir)) continue;

@@ -117,24 +117,45 @@ class MediaController {
         $folderId = self::normalizeFolderId($_GET['folder_id'] ?? null);
         $search = trim($_GET['search'] ?? '');
         $showAll = ($_GET['all'] ?? '') === '1';
+        $typeFilter = trim($_GET['type'] ?? '');
+        $sort = trim($_GET['sort'] ?? 'date_desc');
 
         $fields = self::selectFields();
         $sql = "SELECT {$fields} FROM media_items";
         $params = [];
+        $where = [];
 
         if ($search) {
-            $sql .= ' WHERE original_name LIKE ?';
+            $where[] = 'original_name LIKE ?';
             $params[] = "%{$search}%";
             if (!$showAll && $folderId !== null) {
-                $sql .= ' AND folder_id <=> ?';
+                $where[] = 'folder_id <=> ?';
                 $params[] = $folderId;
             }
         } elseif (!$showAll) {
-            $sql .= ' WHERE folder_id <=> ?';
+            $where[] = 'folder_id <=> ?';
             $params[] = $folderId;
         }
 
-        $sql .= ' ORDER BY created_at DESC';
+        if (in_array($typeFilter, ['image', 'video', 'document'], true)) {
+            $where[] = 'type = ?';
+            $params[] = $typeFilter;
+        }
+
+        if ($where) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
+        $orderMap = [
+            'date_desc' => 'created_at DESC',
+            'date_asc'  => 'created_at ASC',
+            'name_asc'  => 'original_name ASC',
+            'name_desc' => 'original_name DESC',
+            'type_asc'  => 'type ASC, original_name ASC',
+            'type_desc' => 'type DESC, original_name ASC',
+        ];
+        $sql .= ' ORDER BY ' . ($orderMap[$sort] ?? $orderMap['date_desc']);
+
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         json_response($stmt->fetchAll());
