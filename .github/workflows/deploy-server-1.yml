@@ -1,8 +1,9 @@
-name: Deploy Server 1 (alp, astro, atempora, audition-confiance, masaiges)
+name: Deploy Server 192.19.56.20 (alp, astro, atempora, audition-confiance,
+  masaiges, darcy)
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       site:
@@ -15,6 +16,7 @@ on:
           - atempora
           - audition-confiance
           - masaiges
+          - darcy
         default: all
 
 concurrency:
@@ -31,7 +33,7 @@ jobs:
         run: |
           SITE='${{ github.event.inputs.site }}'
           if [ -z "$SITE" ] || [ "$SITE" = "all" ]; then
-            echo 'matrix=["alp","astro","atempora","audition-confiance","masaiges"]' >> $GITHUB_OUTPUT
+            echo 'matrix=["alp","astro","atempora","audition-confiance","masaiges","darcy"]' >> $GITHUB_OUTPUT
           else
             echo "matrix=[\"$SITE\"]" >> $GITHUB_OUTPUT
           fi
@@ -73,6 +75,8 @@ jobs:
           AUDITION_CONFIANCE_SSH_USER: ${{ secrets.AUDITION_CONFIANCE_SSH_USER }}
           MASAIGES_SSH_HOST: ${{ secrets.MASAIGES_SSH_HOST }}
           MASAIGES_SSH_USER: ${{ secrets.MASAIGES_SSH_USER }}
+          DARCY_SSH_HOST: ${{ secrets.DARCY_SSH_HOST }}
+          DARCY_SSH_USER: ${{ secrets.DARCY_SSH_USER }}
         run: |
           SITE='${{ matrix.site }}'
           UPPER=$(echo "$SITE" | tr 'a-z-' 'A-Z_')
