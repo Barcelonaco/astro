@@ -8101,9 +8101,19 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
   const label = field.label || field.name;
   const name = field.name;
   const type = field.type || 'Text';
+  // Compute the compound input name for nested fields
+  const inputName = rowCtx
+    ? (rowCtx.rowIndex !== null
+        ? `${rowCtx.parentName}::${rowCtx.rowIndex}::${name}`
+        : `${rowCtx.parentName}::${name}`)
+    : name;
+  // data-rfield attribute for row-scoped conditional logic lookup
+  const rfieldAttr = rowCtx ? ` data-rfield="${escapeHtml(name)}"` : '';
+  // Suffix DOM ids with hash of inputName so multiple instances on same page (e.g. inside columns) stay unique
+  const idSuffix = rowCtx ? `-${inputName.replace(/[^a-zA-Z0-9_-]/g, '_')}` : '';
   // Dynamic select for form module: populate form_id from API
   if (name === 'form_id') {
-    const selectId = `form-select-${blockId}`;
+    const selectId = `form-select-${blockId}${idSuffix}`;
     setTimeout(async () => {
       const sel = document.getElementById(selectId);
       if (!sel) return;
@@ -8118,7 +8128,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
     return `
       <div class="form-group">
         <label class="form-label">${escapeHtml(label)}</label>
-        <select class="form-select" name="${escapeHtml(name)}" id="${selectId}">
+        <select class="form-select" name="${escapeHtml(inputName)}"${rfieldAttr} id="${selectId}">
           <option value="">Chargement…</option>
         </select>
       </div>
@@ -8126,7 +8136,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
   }
   // Dynamic select for reusable-bloc module: populate bloc_id from API
   if (name === 'bloc_id') {
-    const selectId = `rb-select-${blockId}`;
+    const selectId = `rb-select-${blockId}${idSuffix}`;
     // Render placeholder then fetch choices async
     setTimeout(async () => {
       const sel = document.getElementById(selectId);
@@ -8142,7 +8152,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
     return `
       <div class="form-group">
         <label class="form-label">${escapeHtml(label)}</label>
-        <select class="form-select" name="${escapeHtml(name)}" id="${selectId}">
+        <select class="form-select" name="${escapeHtml(inputName)}"${rfieldAttr} id="${selectId}">
           <option value="">Chargement…</option>
         </select>
       </div>
@@ -8150,7 +8160,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
   }
   // Dynamic select for summary module: populate menu_id from API
   if (name === 'menu_id') {
-    const selectId = `menu-select-${blockId}`;
+    const selectId = `menu-select-${blockId}${idSuffix}`;
     setTimeout(async () => {
       const sel = document.getElementById(selectId);
       if (!sel) return;
@@ -8165,20 +8175,12 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
     return `
       <div class="form-group">
         <label class="form-label">${escapeHtml(label)}</label>
-        <select class="form-select" name="${escapeHtml(name)}" id="${selectId}">
+        <select class="form-select" name="${escapeHtml(inputName)}"${rfieldAttr} id="${selectId}">
           <option value="">Chargement…</option>
         </select>
       </div>
     `;
   }
-  // Compute the compound input name for nested fields
-  const inputName = rowCtx
-    ? (rowCtx.rowIndex !== null
-        ? `${rowCtx.parentName}::${rowCtx.rowIndex}::${name}`
-        : `${rowCtx.parentName}::${name}`)
-    : name;
-  // data-rfield attribute for row-scoped conditional logic lookup
-  const rfieldAttr = rowCtx ? ` data-rfield="${escapeHtml(name)}"` : '';
   const safeValue = escapeHtml(value ?? '');
   const choices = Array.isArray(field.choices) ? field.choices : null;
   if (type === 'WYSIWYGEditor') {
@@ -8712,6 +8714,33 @@ function collectFlexibleContentData(form, fcCompoundName) {
         const targetInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__target')}"]`);
         const url = urlInput ? urlInput.value : '';
         itemData[f.name] = url ? { url, title: titleInput ? titleInput.value : '', target: targetInput ? targetInput.value : '_self' } : '';
+      } else if (f.type === 'GoogleMap') {
+        const latInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__lat')}"]`);
+        const lngInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__lng')}"]`);
+        const placeIdInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__place_id')}"]`);
+        const searchInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__search')}"]`);
+        const streetNumberInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__street_number')}"]`);
+        const streetNameInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__street_name')}"]`);
+        const streetNameShortInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__street_name_short')}"]`);
+        const postCodeInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__post_code')}"]`);
+        const cityInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__city')}"]`);
+        const nameInput = itemEl.querySelector(`[name="${CSS.escape(compoundName + '__name')}"]`);
+        const lat = latInput ? parseFloat(latInput.value) : 0;
+        const lng = lngInput ? parseFloat(lngInput.value) : 0;
+        itemData[f.name] = (lat || lng) ? {
+          lat: lat || 0,
+          lng: lng || 0,
+          place_id: placeIdInput ? placeIdInput.value : '',
+          address: searchInput ? searchInput.value : '',
+          name: nameInput ? nameInput.value : (searchInput ? searchInput.value : ''),
+          street_number: streetNumberInput ? streetNumberInput.value : '',
+          street_name: streetNameInput ? streetNameInput.value : '',
+          street_name_short: streetNameShortInput ? streetNameShortInput.value : '',
+          post_code: postCodeInput ? postCodeInput.value : '',
+          city: cityInput ? cityInput.value : '',
+        } : null;
+      } else if (f.type === 'FlexibleContent') {
+        itemData[f.name] = collectFlexibleContentData(form, compoundName);
       } else if (f.type === 'Repeater') {
         itemData[f.name] = collectRepeaterData(itemEl, f.name, f.subFields || []);
       } else {
