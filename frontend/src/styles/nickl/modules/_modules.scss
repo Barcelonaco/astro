@@ -296,6 +296,20 @@
     }
     &.has-background-image {
         overflow: hidden;
+        color: $color1;
+        .title-module,
+        .title-section-1,
+        .title-section-2,
+        .title-section-3,
+        .title-section-4,
+        .title-section-5,
+        h1, h2, h3, h4, h5, h6,
+        p, li, blockquote, figcaption {
+            color: currentColor;
+        }
+        a:not(.btn):not(.btn-primary):not(.btn-secondary):not(.btn-tertiary) {
+            color: currentColor;
+        }
         &.background-parallax .background {
             top: -25%;
             height: 125%;

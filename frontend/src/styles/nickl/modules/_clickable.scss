@@ -184,6 +184,13 @@
         &.no-desc .illus-wrapper::before, &.no-desc .video-wrapper::before {
             display: none;
         }
+        .desc,
+        .desc .title,
+        .desc h1, .desc h2, .desc h3, .desc h4, .desc h5, .desc h6,
+        .desc .title-section-1, .desc .title-section-2, .desc .title-section-3, .desc .title-section-4, .desc .title-section-5,
+        .desc p, .desc li {
+            color: $color1;
+        }
     }
     .item-content {
         @include flex(flex-end, flex-start);
