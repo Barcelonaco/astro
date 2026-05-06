@@ -27,6 +27,10 @@ function robotsTxtIntegration() {
 					'',
 				].join('\n');
 				fs.writeFileSync(path.join(outDir, 'robots.txt'), body);
+				// Sentinel read at runtime by backend-php to rewrite the baked origin
+				// (canonical, og:url, twitter:url, JSON-LD, …) to the actual request host,
+				// so a single build can serve any domain without a per-site rebuild.
+				fs.writeFileSync(path.join(outDir, '.built_origin'), SITE_URL.replace(/\/$/, ''));
 			},
 		},
 	};

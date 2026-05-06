@@ -742,10 +742,12 @@ async function loadPlugins() {
 
         // Admin pages (custom HTML rendered in iframe)
         for (const page of plugin.admin_pages || []) {
+          const minRole = page.min_role || 'admin_site';
           const pa = document.createElement('a');
-          pa.href = '#'; pa.className = 'nav-item nav-sub-item';
+          pa.href = '#'; pa.className = `nav-item nav-sub-item role-${minRole}`;
           pa.dataset.section = `plugin-page:${plugin.name}:${page.slug}`;
           pa.textContent = page.label || page.slug;
+          if (!hasMinRole(minRole)) pa.style.display = 'none';
           sub.appendChild(pa);
         }
 
@@ -883,11 +885,14 @@ async function loadPlugins() {
       for (const page of plugin.admin_pages) {
         const sectionId = `plugin-page:${plugin.name}:${page.slug}`;
         if (!nav || nav.querySelector(`[data-section="${sectionId}"]`)) continue;
+        // min_role par page (défaut admin_site). Une page peut exiger super_admin
+        // (ex. page de configuration de paiement avec clés secrètes Stripe).
+        const minRole = page.min_role || 'admin_site';
         const a = document.createElement('a');
         a.href = '#';
-        a.className = 'nav-item role-admin_site';
+        a.className = `nav-item role-${minRole}`;
         a.dataset.section = sectionId;
-        if (!hasMinRole('admin_site')) a.style.display = 'none';
+        if (!hasMinRole(minRole)) a.style.display = 'none';
         const iconClass = page.faIcon || 'fa-solid fa-cube';
         a.innerHTML = `<i class="${iconClass}"></i><span>${escapeHtml(page.label || page.slug)}</span>`;
         a.addEventListener('click', (ev) => {
@@ -13186,6 +13191,8 @@ async function renderSiteSettings() {
 
     const fontTitle = settings.font_title || 'jakarta';
     const fontGeneral = settings.font_general || 'jakarta';
+    const customFontTitle = settings.custom_font_title_family || '';
+    const customFontGeneral = settings.custom_font_general_family || '';
 
     const logo = settings.logo || '';
     const logoWhite = settings.logo_white || '';
@@ -13511,6 +13518,18 @@ async function renderSiteSettings() {
                   <option value="${val}" ${fontGeneral === val ? 'selected' : ''}>${label}</option>
                 `).join('')}
               </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Police titre custom (Google Font)</label>
+              <input type="text" class="form-input" name="custom_font_title_family" value="${escapeHtml(customFontTitle)}" placeholder="ex: Bricolage Grotesque" autocomplete="off">
+              <small style="color:#999;font-size:11px;">Nom exact Google Font. Override la police titre. Vide = police select au-dessus. Rebuild requis.</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Police texte custom (Google Font)</label>
+              <input type="text" class="form-input" name="custom_font_general_family" value="${escapeHtml(customFontGeneral)}" placeholder="ex: Geist" autocomplete="off">
+              <small style="color:#999;font-size:11px;">Nom exact Google Font. Override la police texte. Vide = police select au-dessus. Rebuild requis.</small>
             </div>
           </div>
           <div id="font-preview-box" style="margin-top:16px;padding:24px 28px;border:1px solid var(--admin-border, #e0e0e0);border-radius:8px;background:#fff;">
@@ -14098,6 +14117,8 @@ async function saveSiteSettings(event) {
     bg_form_field: formData.get('bg_form_field') || '',
     font_title: formData.get('font_title') || '',
     font_general: formData.get('font_general') || '',
+    custom_font_title_family: (formData.get('custom_font_title_family') || '').trim(),
+    custom_font_general_family: (formData.get('custom_font_general_family') || '').trim(),
     menu_seamless: formData.get('menu_seamless') ? '1' : '0',
     rounded: formData.get('rounded') ? '1' : '0',
     uppercase: formData.get('uppercase') ? '1' : '0',

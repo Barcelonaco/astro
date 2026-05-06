@@ -3,7 +3,6 @@
  * SiteOverlays — Regroupe Popup/Alert, Bouton flottant et Mode maintenance.
  * Inclure une seule fois dans les layouts de page (body).
  */
-import CartIndicator from './shop/CartIndicator.astro';
 
 interface Props {
   siteSettings?: Record<string, string>;
@@ -78,9 +77,6 @@ const socials = [
     {floatingBtnLinkTitle && <span class="floating-btn-label">{floatingBtnLinkTitle}</span>}
   </a>
 )}
-
-{/* Pastille panier (toujours présente, masquée si vide) */}
-<CartIndicator />
 
 {/* Mode maintenance overlay */}
 {isMaintenance && (

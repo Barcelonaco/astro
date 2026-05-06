@@ -19,6 +19,13 @@ if (preg_match('#^/uploads/media/_optimized/(.+)$#', $uri, $m)) {
     exit;
 }
 
+// Sitemap / robots.txt fast-path: rewrite baked origin → current host so the
+// same dist build serves any domain (no rebuild per deploy).
+if (in_array($uri, ['/sitemap.xml', '/sitemap-index.xml', '/sitemap-0.xml', '/robots.txt'], true)) {
+    require_once __DIR__ . '/helpers/sitemap.php';
+    if (serve_dynamic_sitemap_or_robots($uri)) exit;
+}
+
 require_once __DIR__ . '/vendor/autoload.php';
 
 // Load environment
@@ -31,6 +38,7 @@ require_once __DIR__ . '/helpers/response.php';
 require_once __DIR__ . '/helpers/request.php';
 require_once __DIR__ . '/helpers/slug.php';
 require_once __DIR__ . '/helpers/rebuild.php';
+require_once __DIR__ . '/helpers/sitemap.php';
 require_once __DIR__ . '/helpers/media-enricher.php';
 require_once __DIR__ . '/helpers/plugin-hooks.php';
 require_once __DIR__ . '/helpers/CoreRegistry.php';
@@ -322,7 +330,7 @@ if (!preg_match('#^/api/(.*)$#', $uri, $apiMatch)) {
         $distHome = __DIR__ . '/dist/index.html';
         if (file_exists($distHome)) {
             header('Content-Type: text/html; charset=utf-8');
-            readfile($distHome);
+            echo rewrite_html_origin(file_get_contents($distHome));
             exit;
         }
         // Fallback: redirect to admin
@@ -360,13 +368,17 @@ if (!preg_match('#^/api/(.*)$#', $uri, $apiMatch)) {
         } elseif ($ext !== 'html') {
             header('Cache-Control: public, max-age=86400');
         }
-        readfile($distFile);
+        if ($ext === 'html') {
+            echo rewrite_html_origin(file_get_contents($distFile));
+        } else {
+            readfile($distFile);
+        }
         exit;
     }
 
     if (file_exists($distIndex)) {
         header('Content-Type: text/html; charset=utf-8');
-        readfile($distIndex);
+        echo rewrite_html_origin(file_get_contents($distIndex));
         exit;
     }
 
@@ -375,7 +387,7 @@ if (!preg_match('#^/api/(.*)$#', $uri, $apiMatch)) {
     if (file_exists($dist404)) {
         http_response_code(404);
         header('Content-Type: text/html; charset=utf-8');
-        readfile($dist404);
+        echo rewrite_html_origin(file_get_contents($dist404));
         exit;
     }
 

@@ -57,8 +57,10 @@ const colorForm = settings.bg_form_field || '#e3f3fc';
 // Fonts
 const fontTitleKey = settings.font_title || 'poppins';
 const fontGeneralKey = settings.font_general || 'jakarta';
-const fontTitle = FONT_TITLES[fontTitleKey] || 'Poppins';
-const fontGeneral = FONT_GENERALS[fontGeneralKey] || 'Plus Jakarta Sans';
+const customFontTitle = (settings.custom_font_title_family || '').trim();
+const customFontGeneral = (settings.custom_font_general_family || '').trim();
+const fontTitle = customFontTitle || FONT_TITLES[fontTitleKey] || 'Poppins';
+const fontGeneral = customFontGeneral || FONT_GENERALS[fontGeneralKey] || 'Plus Jakarta Sans';
 
 // Logo
 const logoHeight = parseInt(settings.logo_height || '100', 10);
