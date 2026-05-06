@@ -161,34 +161,4 @@ function normalizeCta(cta: any): { url: string; title: string; target: string } 
     </div>
   </div>
 )}
-
-<style is:global>
-  /* Critical Swiper CSS — prevents slides from stacking before JS loads */
-  .swiper{overflow:hidden;position:relative}
-  .swiper-wrapper{display:flex;position:relative;width:100%;height:auto;z-index:1;transition-property:transform}
-  .swiper-slide{flex-shrink:0;width:100%;height:100%;position:relative}
-  /* Hide non-first slides before JS — prevents 2nd slide from being LCP */
-  .module-hero.mode-slider .swiper-slide:not(:first-child){position:absolute;top:0;left:0;opacity:0;pointer-events:none}
-  /* Critical hero CSS only — full styles loaded via deferred hero.css */
-  .module-hero{padding:0 !important}
-  .module-hero .item{background-color:rgba(0,0,0,.1);color:#fff;overflow:hidden;position:relative}
-  .module-hero,
-  .module-hero .title,
-  .module-hero .title-section-1,
-  .module-hero .title-section-2,
-  .module-hero h1,
-  .module-hero .h1,
-  .module-hero p,
-  .module-hero .editor,
-  .module-hero .txt,
-  .module-hero .btn-scroll{color:#fff}
-  .module-hero .background,.module-hero picture{height:100%;left:0;position:absolute;top:0;width:100%}
-  .module-hero .illus{height:100%;width:100%;object-fit:cover;object-position:center}
-  .module-hero .desc{position:relative;width:100%;z-index:10}
-  .module-hero.mode-slider .container-large{align-items:flex-end;display:flex;justify-content:center}
-  .module-hero.mode-slider .container-large:before{content:"";display:block;flex:0 0 0;height:calc(100vh - 7.5rem);max-width:0;min-width:0;opacity:0;visibility:hidden;width:0}
-  .module-hero.mode-slider.medium .container-large,.module-hero.mode-slider.medium .container-large:before{height:67vh}
-  @media only screen and (max-width:960px){.module-hero.mode-slider .container-large:before{height:calc(100vh - 6.07rem)}}
-</style>
-
 {/* Swiper init handled by the unified end-of-body script (detects .js_slider-hero) */}

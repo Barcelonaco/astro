@@ -360,3 +360,161 @@
         }
     }
 }
+
+
+/* === Migré depuis NicklGallery.astro (popin gallery + Swiper critical) === */
+.popin-gallery-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    visibility: hidden;
+    opacity: 0;
+    z-index: 9999;
+    transition: all .6s ease;
+}
+.popin-gallery-wrapper::before {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: .74;
+    z-index: -1;
+    background-color: #000;
+    content: '';
+}
+.popin-gallery-wrapper.active {
+    visibility: visible;
+    opacity: 1;
+}
+.popin-gallery-wrapper .popin {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, .5);
+}
+.popin-gallery-wrapper .popin .btn-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 70px;
+    height: 70px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+.popin-gallery-wrapper .popin .btn-close .icon {
+    display: block;
+    max-width: 24px;
+}
+.popin-gallery-wrapper .popin .btn-close svg * {
+    fill: #fff;
+}
+.popin-gallery-wrapper .swiper {
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+}
+.popin-gallery-wrapper .swiper-wrapper {
+    display: flex;
+    height: 100%;
+}
+.popin-gallery-wrapper .swiper-slide {
+    flex-shrink: 0;
+    width: 100%;
+    height: 100%;
+}
+.popin-gallery-wrapper .item {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    height: 100vh;
+    max-height: 100vh;
+    color: #fff;
+}
+.popin-gallery-wrapper .item::after {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 50%;
+    z-index: 5;
+    background: linear-gradient(0deg, rgba(0,0,0,.5) 50%, rgba(255,255,255,0) 100%);
+    content: '';
+}
+.popin-gallery-wrapper .item.no-desc::after {
+    display: none;
+}
+.popin-gallery-wrapper .illus-wrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+.popin-gallery-wrapper .illus {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+}
+.popin-gallery-wrapper .container-large {
+    max-width: 100vw;
+}
+.popin-gallery-wrapper .container-2 {
+    padding-right: 0;
+    padding-left: 0;
+}
+.popin-gallery-wrapper .desc {
+    position: relative;
+    width: 100%;
+    padding: 0 3.5% 6%;
+    z-index: 10;
+    text-shadow: 0 0 20px rgba(0,0,0,.5);
+}
+.popin-gallery-wrapper .desc .title {
+    margin: 0;
+    max-width: 726px;
+    text-align: inherit;
+    color: #fff;
+}
+.popin-gallery-wrapper .desc .txt {
+    max-width: 726px;
+    margin-top: 18px;
+}
+.popin-gallery-wrapper .desc .btn-wrapper {
+    margin-top: 30px;
+}
+.popin-gallery-wrapper .slider-pagination {
+    top: auto;
+    bottom: 0;
+    padding-bottom: 2.72%;
+}
+.popin-gallery-wrapper .slider-pagination .swiper-pagination-bullet {
+    background-color: #fff;
+}
+.popin-gallery-wrapper .slider-navigation::before {
+    border-color: #fff;
+}
+.popin-gallery-wrapper .slider-navigation.prev {
+    left: 8px;
+}
+.popin-gallery-wrapper .slider-navigation.next {
+    right: 8px;
+}
+html.disable-scroll {
+    overflow: hidden;
+}

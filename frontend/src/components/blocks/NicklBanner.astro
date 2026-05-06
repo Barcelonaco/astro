@@ -79,34 +79,3 @@ const titleSizeClass = titleSize ? ` h1-${titleSize}` : '';
     </div>
   </div>
 )}
-
-<style is:global>
-  /* Banner heights — pure CSS, no JS layout shift */
-  .module-banner-page { position: relative; overflow: hidden; }
-  .module-banner-page.large  { height: 100vh; }
-  .module-banner-page.medium { height: 70vh; }
-  .module-banner-page.small  { height: 50vh; }
-  /* Offset for non-transparent header */
-  body:not(.scroll-down):not(.scroll-up) #header:not(.background-transparent) ~ main .module-banner-page.large {
-    height: calc(100vh - var(--header-height, 80px));
-  }
-  .module-banner-page .container-large {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    z-index: 10;
-  }
-  .module-banner-page .desc::before {
-    padding-top: 0 !important;
-    min-height: 0 !important;
-  }
-  .module-banner-page,
-  .module-banner-page .title,
-  .module-banner-page .title-section-1,
-  .module-banner-page h1,
-  .module-banner-page .h1,
-  .module-banner-page p,
-  .module-banner-page .editor,
-  .module-banner-page .txt { color: #fff; }
-</style>

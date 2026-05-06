@@ -473,3 +473,32 @@
         }
     }
 }
+
+
+/* === Migré depuis NicklClickableTiles.astro === */
+.module-clickable .list.items-6 .item .desc,
+.module-clickable .list.items-7 .item .desc,
+.module-clickable .list.items-8 .item .desc {
+    opacity: 0 !important;
+    transition: opacity 0.3s ease;
+}
+.module-clickable .list.items-6 .item:hover .desc,
+.module-clickable .list.items-7 .item:hover .desc,
+.module-clickable .list.items-8 .item:hover .desc {
+    opacity: 1 !important;
+}
+.module-clickable .list.items-6 .item,
+.module-clickable .list.items-7 .item,
+.module-clickable .list.items-8 .item {
+    transition: flex-basis 0.3s ease;
+}
+.module-clickable .list.items-6 .item::before,
+.module-clickable .list.items-7 .item::before,
+.module-clickable .list.items-8 .item::before {
+    padding-top: 40.625rem !important;
+}
+.module-clickable .list.items-6 .item:hover,
+.module-clickable .list.items-7 .item:hover,
+.module-clickable .list.items-8 .item:hover {
+    flex-basis: 25% !important;
+}

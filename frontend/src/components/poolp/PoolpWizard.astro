@@ -30,7 +30,7 @@ const initialState = initialProject?.state || null
   <script
     type="application/json"
     id="poolp-bootstrap-data"
-    set:html={JSON.stringify({ finitions, initialState, projectToken: initialProject?.token ?? null })}
+    set:html={JSON.stringify({ finitions, initialState, projectToken: initialProject?.token ?? null }).replace(/</g, '\\u003c')}
   ></script>
   <noscript><p style="padding:24px;text-align:center">Le configurateur nécessite JavaScript activé.</p></noscript>
 </div>

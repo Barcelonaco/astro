@@ -451,3 +451,227 @@
         }
     }
 }
+
+
+/* === Migré depuis NicklForm.astro === */
+.nickl-form-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+.nickl-form-field { width: 100%; }
+.nickl-form-field.w-50 { width: calc(50% - 10px); }
+.nickl-form-field.w-33 { width: calc(33.333% - 14px); }
+@media (max-width: 600px) {
+    .nickl-form-field.w-50,
+    .nickl-form-field.w-33 { width: 100%; }
+}
+.nickl-form-floating { position: relative; }
+.nickl-form-input,
+.nickl-form-textarea,
+.nickl-form-select {
+    width: 100%;
+    padding: 22px 22px 10px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 50px;
+    font-size: 15px;
+    font-family: inherit;
+    background: white;
+    color: #1a1a2e;
+    transition: border-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                background-color 0.35s ease,
+                transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    -webkit-appearance: none;
+}
+.nickl-form-textarea {
+    padding-top: 28px;
+    border-radius: 24px;
+    resize: vertical;
+}
+.nickl-form-select {
+    padding-top: 14px;
+    padding-bottom: 14px;
+    cursor: pointer;
+}
+.nickl-form-input:hover,
+.nickl-form-textarea:hover,
+.nickl-form-select:hover {
+    border-color: #a0aec0;
+    background-color: #fafbff;
+}
+.nickl-form-input:focus,
+.nickl-form-textarea:focus,
+.nickl-form-select:focus {
+    outline: none;
+    border-color: var(--color-primary, #667eea);
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.12),
+                0 2px 8px rgba(102, 126, 234, 0.08);
+    background-color: #fff;
+    transform: translateY(-1px);
+}
+.nickl-form-input.is-error,
+.nickl-form-textarea.is-error,
+.nickl-form-select.is-error {
+    border-color: #e53e3e;
+    box-shadow: 0 0 0 4px rgba(229, 62, 62, 0.1);
+    animation: nickl-form-shake 0.4s ease;
+}
+.nickl-form-floating .nickl-form-label {
+    position: absolute;
+    left: 22px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 15px;
+    font-weight: 500;
+    color: #9ca3af;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: left center;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+}
+.nickl-form-floating .nickl-form-textarea ~ .nickl-form-label {
+    top: 18px;
+    transform: translateY(0);
+}
+.nickl-form-floating .nickl-form-input:focus ~ .nickl-form-label,
+.nickl-form-floating .nickl-form-input:not(:placeholder-shown) ~ .nickl-form-label,
+.nickl-form-floating .nickl-form-textarea:focus ~ .nickl-form-label,
+.nickl-form-floating .nickl-form-textarea:not(:placeholder-shown) ~ .nickl-form-label {
+    top: 8px;
+    transform: translateY(0);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-primary, #667eea);
+    letter-spacing: 0.02em;
+}
+.nickl-form-label--static {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #374151;
+}
+.nickl-form-label .required {
+    color: #e53e3e;
+    margin-left: 2px;
+}
+.nickl-form-error {
+    color: #e53e3e;
+    font-size: 12px;
+    margin-top: 6px;
+    min-height: 0;
+    padding-left: 4px;
+}
+.nickl-form-radio-group,
+.nickl-form-checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 0;
+}
+.nickl-form-radio-label,
+.nickl-form-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 10px 18px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 50px;
+    transition: border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                background 0.3s ease,
+                transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s ease;
+}
+.nickl-form-radio-label:hover,
+.nickl-form-checkbox-label:hover {
+    border-color: var(--color-primary, #667eea);
+    background: rgba(102, 126, 234, 0.04);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+}
+.nickl-form-radio-label:has(input:checked),
+.nickl-form-checkbox-label:has(input:checked) {
+    border-color: var(--color-primary, #667eea);
+    background: rgba(102, 126, 234, 0.08);
+    box-shadow: 0 2px 10px rgba(102, 126, 234, 0.15);
+}
+.nickl-form-name-row {
+    display: flex;
+    gap: 16px;
+}
+.nickl-form-name-col { flex: 1; }
+@media (max-width: 480px) {
+    .nickl-form-name-row { flex-direction: column; }
+}
+.nickl-form-submit { margin-top: 28px; }
+.nickl-form-btn {
+    display: inline-block;
+    padding: 16px 44px;
+    background: var(--color-primary, #667eea);
+    color: white;
+    border: none;
+    border-radius: 50px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    letter-spacing: 0.02em;
+}
+.nickl-form-btn:active { transform: scale(0.97); }
+.nickl-form-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+.nickl-form-message {
+    margin-top: 20px;
+    padding: 16px 20px;
+    border-radius: 14px;
+    font-size: 15px;
+    animation: nickl-form-fadeIn 0.4s ease;
+}
+.nickl-form-message.success {
+    background: #f0fff4;
+    color: #276749;
+    border: 1.5px solid #c6f6d5;
+}
+.nickl-form-message.error {
+    background: #fff5f5;
+    color: #c53030;
+    border: 1.5px solid #fed7d7;
+}
+.nickl-form-field {
+    animation: nickl-form-fieldIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+.nickl-form-field:nth-child(1) { animation-delay: 0s; }
+.nickl-form-field:nth-child(2) { animation-delay: 0.06s; }
+.nickl-form-field:nth-child(3) { animation-delay: 0.12s; }
+.nickl-form-field:nth-child(4) { animation-delay: 0.18s; }
+.nickl-form-field:nth-child(5) { animation-delay: 0.24s; }
+.nickl-form-field:nth-child(6) { animation-delay: 0.30s; }
+.nickl-form-field:nth-child(7) { animation-delay: 0.36s; }
+.nickl-form-field:nth-child(8) { animation-delay: 0.42s; }
+.nickl-form-submit {
+    animation: nickl-form-fieldIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.5s both;
+}
+@keyframes nickl-form-fieldIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes nickl-form-fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes nickl-form-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+}

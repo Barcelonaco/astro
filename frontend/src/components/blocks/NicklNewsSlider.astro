@@ -119,14 +119,6 @@ function getDate(item: ActualiteItem): string {
   )}
 </NicklModuleWrapper>
 
-<style is:global>
-  /* Fix: Nickl CSS overrides tertiary bg with --color-default (text color swap).
-     Use the actual tertiary color instead. */
-  .module-news-slider.has-background-tertiary:not(.cols_have_background) {
-    background-color: var(--color-tertiary, #d6d6d6);
-  }
-</style>
-
 <script is:inline>
 (function() {
   function initNewsSliders() {
