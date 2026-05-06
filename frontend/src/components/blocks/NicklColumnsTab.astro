@@ -240,14 +240,7 @@ const isVisible = (data.is_visible as string) ?? 'yes';
 }
 
 /* ── Gallery in columns ─────────────────────────────────────────────────── */
-.module-columns .module-gallery .list.img-fixe .item {
-  flex-basis: calc(50% - 1.25rem);
-}
-.module-columns .module-gallery .list.img-fluid.columns-3,
-.module-columns .module-gallery .list.img-fluid.columns-4,
-.module-columns .module-gallery .list.img-fluid.columns-5 {
-  columns: 2;
-}
+/* No override — gallery respects its own nbr_column setting (1/2/3/4/5). */
 
 /* ── FreePost in columns ────────────────────────────────────────────────── */
 .module-columns .module-posts-list .item {
@@ -373,14 +366,7 @@ const isVisible = (data.is_visible as string) ?? 'yes';
     text-align: center;
   }
 
-  /* Gallery: single column */
-  .module-columns .module-gallery .list.img-fixe .item {
-    flex-basis: 100%;
-  }
-  .module-columns .module-gallery .list.img-fluid.columns-2,
-  .module-columns .module-gallery .list.img-fluid.columns-3 {
-    columns: 1;
-  }
+  /* Gallery: no override — base responsive (1024px/600px) applies */
 
   /* KeyFigures + Icons: 2 per row (already set above, remains valid) */
 

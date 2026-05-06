@@ -4849,7 +4849,9 @@ function buildTemplateContext(block) {
       const imgUrl = typeof img === 'string' ? img : (img.url || '');
       const imgAlt = typeof img === 'object' ? (img.alt || '') : '';
       const link1 = slide.link || {};
-      const link2 = slide.link_2 || null;
+      const link2Raw = slide.link_2;
+      const link2Url = typeof link2Raw === 'string' ? link2Raw : ((link2Raw && link2Raw.url) || '');
+      const link2 = link2Url ? link2Raw : null;
       const link1Url = typeof link1 === 'string' ? link1 : (link1.url || '');
       return {
         image_url: imgUrl,
