@@ -234,11 +234,35 @@ class PluginController {
         // Invalidate bootstrap cache
         @unlink(__DIR__ . '/../uploads/.bootstrap_cache.json');
 
+        // À l'activation : charger l'autoload du plugin (s'il existe) puis
+        // exécuter sa migration enregistrée pour créer ses tables. Idempotent :
+        // CREATE TABLE IF NOT EXISTS, donc rejouer ne fait rien si déjà migré.
+        $migrationLog = [];
+        if ($active) {
+            $autoload = $resolved . '/backend/autoload.php';
+            if (file_exists($autoload)) {
+                try {
+                    require_once $autoload;
+                    $changes = run_single_plugin_migration($pluginDir, function (string $msg) use (&$migrationLog) {
+                        $migrationLog[] = $msg;
+                    });
+                    if ($changes !== null) {
+                        $migrationLog[] = sprintf('  [%s] %d change(s) appliquée(s)', $pluginDir, $changes);
+                    }
+                } catch (\Throwable $e) {
+                    error_log('Plugin migration failed on activate: ' . $e->getMessage());
+                    $migrationLog[] = '  ERROR: ' . $e->getMessage();
+                }
+            }
+        }
+
         // Rebuild the frontend so any pages containing modules from this plugin
         // re-render correctly (hidden when off, restored when on) without the
         // user needing to re-save each page.
         trigger_frontend_rebuild('plugin ' . ($active ? 'enabled' : 'disabled') . ': ' . $pluginDir, false);
 
-        json_response(['active' => (bool) $active, 'active_plugins' => $currentList]);
+        $response = ['active' => (bool) $active, 'active_plugins' => $currentList];
+        if (!empty($migrationLog)) $response['migration_log'] = $migrationLog;
+        json_response($response);
     }
 }

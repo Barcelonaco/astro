@@ -19,7 +19,6 @@ require_once __DIR__ . '/helpers/response.php';
 require_once __DIR__ . '/helpers/plugin-hooks.php';
 require_once __DIR__ . '/helpers/CoreRegistry.php';
 require_once __DIR__ . '/controllers/PluginController.php';
-require_once __DIR__ . '/controllers/EcommerceMigrationController.php';
 
 // Discover external plugins and their backend/autoload.php so that plugins
 // can register their migration hooks before we run them.
@@ -863,13 +862,9 @@ if ($oldPricingCount > 0) {
     echo "  OK (already correct)\n";
 }
 
-// ─── E-commerce tables ──────────────────────────────────────────────────────
-
-echo "\nE-commerce (Phase 0+) :\n";
-$changes += EcommerceMigrationController::migrate(function (string $msg) {
-    echo $msg . "\n"; });
-
 // ─── Plugin migrations (registered via plugin-hooks.php) ────────────────────
+// Note : la migration e-commerce est désormais portée par le plugin
+// `ecommerce/` et passe par run_plugin_migrations() ci-dessous.
 echo "\nPlugin migrations:";
 $changes += run_plugin_migrations(function (string $msg) {
     echo $msg . "\n"; });

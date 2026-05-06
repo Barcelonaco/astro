@@ -13,46 +13,41 @@ const { productSlug, disabled = false } = Astro.props;
   <div id="shopAddToCartFeedback" class="shop-add-to-cart__feedback" role="status" aria-live="polite"></div>
 </div>
 
-<script is:inline>
-  (function () {
-    const btn = document.getElementById('shopAddToCartBtn');
-    if (!btn) return;
+<script>
+  import { addCartItem } from '../../lib/shop-api'
 
-    btn.addEventListener('click', async function () {
-      const variantInput = document.getElementById('selectedVariantId');
-      const qtyInput = document.getElementById('addToCartQty');
-      const fb = document.getElementById('shopAddToCartFeedback');
-      const variantId = variantInput?.value;
-      const qty = Math.max(1, parseInt(qtyInput?.value || '1', 10));
+  const btn = document.getElementById('shopAddToCartBtn') as HTMLButtonElement | null
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      const variantInput = document.getElementById('selectedVariantId') as HTMLInputElement | null
+      const qtyInput = document.getElementById('addToCartQty') as HTMLInputElement | null
+      const fb = document.getElementById('shopAddToCartFeedback')
+      const variantId = Number(variantInput?.value || 0)
+      const qty = Math.max(1, parseInt(qtyInput?.value || '1', 10))
 
       if (!variantId) {
-        if (fb) { fb.textContent = 'Veuillez sélectionner une variante.'; fb.className = 'shop-add-to-cart__feedback error'; }
-        return;
+        if (fb) { fb.textContent = 'Veuillez sélectionner une variante.'; fb.className = 'shop-add-to-cart__feedback error' }
+        return
       }
 
-      btn.disabled = true;
-      if (fb) { fb.textContent = 'Ajout en cours…'; fb.className = 'shop-add-to-cart__feedback pending'; }
+      btn.disabled = true
+      if (fb) { fb.textContent = 'Ajout en cours…'; fb.className = 'shop-add-to-cart__feedback pending' }
 
       try {
-        // Phase 3 : remplacer par /api/cart/items avec le token cart
-        // Pour l'instant, on stocke en localStorage comme fallback visuel.
-        const cart = JSON.parse(localStorage.getItem('shop_pending_cart') || '[]');
-        const existing = cart.find(i => i.variant_id === Number(variantId));
-        if (existing) existing.quantity += qty;
-        else cart.push({ variant_id: Number(variantId), quantity: qty });
-        localStorage.setItem('shop_pending_cart', JSON.stringify(cart));
-
+        const cart = await addCartItem(variantId, qty)
         if (fb) {
-          fb.textContent = '✓ Ajouté au panier (Phase 3 : synchronisation serveur à venir).';
-          fb.className = 'shop-add-to-cart__feedback success';
+          fb.innerHTML = `Ajouté au panier. <a href="/panier">Voir le panier (${cart.items_count})</a>`
+          fb.className = 'shop-add-to-cart__feedback success'
         }
+        window.dispatchEvent(new CustomEvent('cart:updated', { detail: cart }))
       } catch (err) {
-        if (fb) { fb.textContent = 'Erreur lors de l\'ajout.'; fb.className = 'shop-add-to-cart__feedback error'; }
+        const msg = err instanceof Error ? err.message : 'Erreur lors de l\'ajout.'
+        if (fb) { fb.textContent = msg; fb.className = 'shop-add-to-cart__feedback error' }
       } finally {
-        btn.disabled = false;
+        btn.disabled = false
       }
-    });
-  })();
+    })
+  }
 </script>
 
 <style>
@@ -83,6 +78,7 @@ const { productSlug, disabled = false } = Astro.props;
     font-size: 14px;
     min-height: 20px;
   }
+  .shop-add-to-cart__feedback a { color: inherit; text-decoration: underline; }
   .shop-add-to-cart__feedback.error { color: var(--danger, #dc2626); }
   .shop-add-to-cart__feedback.pending { color: var(--gray-600, #4b5563); }
   .shop-add-to-cart__feedback.success { color: var(--success, #059669); }

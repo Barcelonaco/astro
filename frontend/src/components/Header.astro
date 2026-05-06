@@ -27,6 +27,10 @@ const menuStyle = s.menu_style || 'default'; // default | center | burger
 const showPhone = altSecondaryMenu && s.show_phone === '1';
 const showSearch = altSecondaryMenu && s.show_search === '1';
 const showSocials = altSecondaryMenu && s.show_socials === '1';
+// Bouton compte client : visible uniquement si le plugin e-commerce est actif.
+// Le href est ajusté côté client (/compte si connecté, /login sinon) via le
+// script en bas du composant.
+const showAccount = s.ecommerce_enabled === '1';
 const phone = s.phone || '';
 const phone2 = s.phone_2 || '';
 const email = s.email || '';
@@ -172,6 +176,11 @@ const headerClasses = [
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
                 </button>
               )}
+              {showAccount && (
+                <a href="/login" class="btn-account js_btn-account" title="Mon compte" aria-label="Mon compte" data-account-link>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                </a>
+              )}
               <button type="button" title="Menu" class="hamburger desktop js_toggle-mega-menu">
                 <span class="line-wrapper">
                   <span class="line line-1"></span>
@@ -195,11 +204,18 @@ const headerClasses = [
           <>
             <div class="menu-primary classic desktop">
               <Navigation navigation={navigation} menuClass="menu" depth={3} />
-              {!hasTopMenu && showSearch && (
+              {!hasTopMenu && (showSearch || showAccount) && (
                 <div class="btn-wrapper desktop">
-                  <button type="button" title="Recherche" class="btn-search js_btn-toggle-search">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                  </button>
+                  {showSearch && (
+                    <button type="button" title="Recherche" class="btn-search js_btn-toggle-search">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                    </button>
+                  )}
+                  {showAccount && (
+                    <a href="/login" class="btn-account js_btn-account" title="Mon compte" aria-label="Mon compte" data-account-link>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                    </a>
+                  )}
                 </div>
               )}
             </div>
@@ -237,11 +253,18 @@ const headerClasses = [
                     </ul>
                   )}
                 </div>
-                {showSearch && (
+                {(showSearch || showAccount) && (
                   <div class="btn-wrapper desktop">
-                    <button type="button" title="Recherche" class="btn-search js_btn-toggle-search">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                    </button>
+                    {showSearch && (
+                      <button type="button" title="Recherche" class="btn-search js_btn-toggle-search">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                      </button>
+                    )}
+                    {showAccount && (
+                      <a href="/login" class="btn-account js_btn-account" title="Mon compte" aria-label="Mon compte" data-account-link>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                      </a>
+                    )}
                   </div>
                 )}
               </div>
@@ -255,6 +278,11 @@ const headerClasses = [
             <button type="button" title="Recherche" class="btn-search js_btn-toggle-search">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
             </button>
+          )}
+          {showAccount && (
+            <a href="/login" class="btn-account js_btn-account" title="Mon compte" aria-label="Mon compte" data-account-link>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </a>
           )}
         </div>
 
@@ -524,6 +552,18 @@ const headerClasses = [
 
     window.addEventListener('scroll', posHeader, { passive: true });
     posHeader();
+
+    // Bouton compte : si un token customer est présent, on pointe vers /compte
+    // sinon vers /login. Mise à jour côté client uniquement (le SSR reste neutre).
+    try {
+      const hasCustomerToken = !!localStorage.getItem('customer_token');
+      if (hasCustomerToken) {
+        document.querySelectorAll<HTMLAnchorElement>('[data-account-link]').forEach(el => {
+          el.href = '/compte';
+          el.title = 'Mon compte';
+        });
+      }
+    } catch { /* localStorage indisponible */ }
 
     // Search form toggle
     document.querySelectorAll('.js_btn-toggle-search').forEach(btn => {

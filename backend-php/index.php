@@ -68,19 +68,8 @@ require_once __DIR__ . '/controllers/AiCreditController.php';
 require_once __DIR__ . '/helpers/encryption.php';
 require_once __DIR__ . '/controllers/SearchController.php';
 
-// E-commerce
-require_once __DIR__ . '/helpers/ecommerce-flag.php';
-require_once __DIR__ . '/middleware/customer-auth.php';
-require_once __DIR__ . '/models/Customer.php';
-require_once __DIR__ . '/models/CustomerAddress.php';
-require_once __DIR__ . '/models/ProductVariant.php';
-require_once __DIR__ . '/models/ProductImage.php';
-require_once __DIR__ . '/models/ProductCategory.php';
-require_once __DIR__ . '/controllers/EcommerceSettingsController.php';
-require_once __DIR__ . '/controllers/EcommerceMigrationController.php';
-require_once __DIR__ . '/controllers/CustomerAuthController.php';
-require_once __DIR__ . '/controllers/ProductController.php';
-require_once __DIR__ . '/controllers/ProductCategoryController.php';
+// E-commerce : tout est isolé dans le plugin `ecommerce/` (chargé via autoload
+// si actif). Le cœur n'a aucune dépendance directe sur le commerce.
 
 // ─── Plugin autoload (monorepo plugins/ + EXTERNAL_PLUGINS_DIR) ──────────────
 // Each plugin can ship a backend/autoload.php that registers its controllers,
@@ -903,125 +892,11 @@ try {
         AiCreditController::setEnabled();
     }
 
-    // ── E-commerce : Settings (super_admin) ──
-    elseif ($method === 'GET' && $path === '/ecommerce/settings') {
-        $user = authenticate_token();
-        require_admin($user);
-        EcommerceSettingsController::getAll();
-    }
-    elseif ($method === 'PUT' && $path === '/ecommerce/settings') {
-        $user = authenticate_token();
-        require_admin($user);
-        EcommerceSettingsController::update();
-    }
-    elseif ($method === 'GET' && match_route('/ecommerce/settings/secret/:key', $path, $params)) {
-        $user = authenticate_token();
-        require_admin($user);
-        EcommerceSettingsController::revealSecret($params['key']);
-    }
-
-    // ── Customer auth (client e-commerce, JWT distinct) ──
-    elseif ($method === 'POST' && $path === '/customer/auth/register') {
-        CustomerAuthController::register();
-    }
-    elseif ($method === 'POST' && $path === '/customer/auth/login') {
-        CustomerAuthController::login();
-    }
-    elseif ($method === 'POST' && $path === '/customer/auth/logout') {
-        CustomerAuthController::logout();
-    }
-    elseif ($method === 'GET' && $path === '/customer/auth/me') {
-        CustomerAuthController::me();
-    }
-    elseif ($method === 'PUT' && $path === '/customer/auth/profile') {
-        CustomerAuthController::updateProfile();
-    }
-    elseif ($method === 'POST' && $path === '/customer/auth/forgot-password') {
-        CustomerAuthController::forgotPassword();
-    }
-    elseif ($method === 'POST' && $path === '/customer/auth/reset-password') {
-        CustomerAuthController::resetPassword();
-    }
-    elseif ($method === 'GET' && $path === '/customer/addresses') {
-        CustomerAuthController::listAddresses();
-    }
-    elseif ($method === 'POST' && $path === '/customer/addresses') {
-        CustomerAuthController::createAddress();
-    }
-    elseif ($method === 'PUT' && match_route('/customer/addresses/:id', $path, $params)) {
-        CustomerAuthController::updateAddress((int) $params['id']);
-    }
-    elseif ($method === 'DELETE' && match_route('/customer/addresses/:id', $path, $params)) {
-        CustomerAuthController::deleteAddress((int) $params['id']);
-    }
-
-    // ── Shop : Catalogue public ──
-    elseif ($method === 'GET' && $path === '/shop/products') {
-        ProductController::listPublic();
-    }
-    elseif ($method === 'GET' && $path === '/shop/products/facets') {
-        ProductController::facets();
-    }
-    elseif ($method === 'GET' && match_route('/shop/products/by-id/:id', $path, $params)) {
-        ProductController::getById((int) $params['id']);
-    }
-    elseif ($method === 'GET' && match_route('/shop/products/:slug/variants', $path, $params)) {
-        $product = null;
-        // On expose variants via slug pour éviter de leaker les IDs
-        $db = Database::getInstance();
-        $stmt = $db->prepare('SELECT id FROM cpt_products WHERE slug = ? AND status = "published"');
-        $stmt->execute([$params['slug']]);
-        $row = $stmt->fetch();
-        if (!$row) { error_response('Produit introuvable', 404); }
-        ProductController::listVariants((int) $row['id']);
-    }
-    elseif ($method === 'GET' && match_route('/shop/products/:slug', $path, $params)) {
-        ProductController::getBySlug($params['slug']);
-    }
-    elseif ($method === 'GET' && $path === '/shop/categories') {
-        ProductCategoryController::listPublic();
-    }
-    elseif ($method === 'GET' && $path === '/shop/categories/by-path') {
-        ProductCategoryController::getByPath();
-    }
-    elseif ($method === 'GET' && match_route('/shop/categories/:slug', $path, $params)) {
-        ProductCategoryController::getBySlug($params['slug']);
-    }
-
-    // ── Shop : Admin variants & categories ──
-    elseif ($method === 'GET' && match_route('/admin/products/:id/variants', $path, $params)) {
-        $user = authenticate_token();
-        require_min_role($user, 'editor');
-        ProductController::listVariants((int) $params['id']);
-    }
-    elseif ($method === 'PUT' && match_route('/admin/products/:id/variants', $path, $params)) {
-        $user = authenticate_token();
-        require_min_role($user, 'editor');
-        ProductController::replaceVariants((int) $params['id']);
-    }
-    elseif ($method === 'POST' && match_route('/admin/products/:id/generate-matrix', $path, $params)) {
-        $user = authenticate_token();
-        require_min_role($user, 'editor');
-        ProductController::generateMatrix((int) $params['id']);
-    }
-    elseif ($method === 'POST' && $path === '/admin/product-categories') {
-        $user = authenticate_token();
-        require_min_role($user, 'editor');
-        require_ecommerce_enabled();
-        ProductCategoryController::create();
-    }
-    elseif ($method === 'PUT' && match_route('/admin/product-categories/:id', $path, $params)) {
-        $user = authenticate_token();
-        require_min_role($user, 'editor');
-        require_ecommerce_enabled();
-        ProductCategoryController::update((int) $params['id']);
-    }
-    elseif ($method === 'DELETE' && match_route('/admin/product-categories/:id', $path, $params)) {
-        $user = authenticate_token();
-        require_min_role($user, 'editor');
-        require_ecommerce_enabled();
-        ProductCategoryController::delete((int) $params['id']);
-    }
+    // ── E-commerce ──
+    // Toutes les routes /ecommerce/*, /customer/*, /shop/*, /cart, /orders,
+    // /payments/stripe/*, /admin/products/*, /admin/product-categories/* sont
+    // déclarées par le plugin `ecommerce/` (cf. plugins/ecommerce/backend/autoload.php)
+    // et résolues par dispatch_plugin_routes() à la fin du try.
 
     // ── Search ──
     elseif ($method === 'GET' && $path === '/search') {

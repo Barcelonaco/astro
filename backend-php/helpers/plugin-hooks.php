@@ -49,6 +49,25 @@ function run_plugin_migrations(callable $log): int {
 }
 
 /**
+ * Run a single registered plugin migration by name. Returns the change count,
+ * or null if the plugin is not registered (autoload pas encore chargé).
+ *
+ * Utilisé par PluginController::togglePlugin pour créer les tables d'un plugin
+ * au moment où il est activé via l'UI, sans relancer toutes les migrations.
+ */
+function run_single_plugin_migration(string $name, callable $log): ?int {
+    if (!isset($GLOBALS['__plugin_migrations'][$name])) return null;
+    $fn = $GLOBALS['__plugin_migrations'][$name];
+    $log("\n  [plugin] {$name}:");
+    try {
+        return (int) $fn($log);
+    } catch (\Throwable $e) {
+        $log("    ERROR migration {$name} failed: " . $e->getMessage());
+        return 0;
+    }
+}
+
+/**
  * Register a route handler for a plugin. Called as a fallback after core
  * routes have not matched. The handler receives ($method, $path) and must:
  *   - return true if it handled the request (it must also send the response)

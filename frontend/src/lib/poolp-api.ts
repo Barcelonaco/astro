@@ -136,12 +136,21 @@ export async function addProjectToCart(
   token: string,
 ): Promise<{ ok: boolean; cart_token?: string } | null> {
   try {
+    const cartToken = typeof window !== 'undefined' ? localStorage.getItem('shop_cart_token') : null
+    const auth = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (cartToken) headers['X-Cart-Token'] = cartToken
+    if (auth) headers['Authorization'] = `Bearer ${auth}`
     const res = await fetch(`${API_URL}/poolp/projects/${token}/cart`, {
       method: 'POST',
-      credentials: 'include',
+      headers,
     })
     if (!res.ok) return null
-    return await res.json()
+    const newToken = res.headers.get('X-Cart-Token')
+    if (newToken && typeof window !== 'undefined') localStorage.setItem('shop_cart_token', newToken)
+    const data = await res.json()
+    if (data?.cart_token && typeof window !== 'undefined') localStorage.setItem('shop_cart_token', data.cart_token)
+    return data
   } catch (err) {
     console.error('addProjectToCart failed', err)
     return null
