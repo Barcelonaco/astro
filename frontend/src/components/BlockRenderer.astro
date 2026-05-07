@@ -59,6 +59,8 @@ import NicklProduct from './blocks/NicklProduct.astro';
 
 // Plugins
 import BeforeAfter from './blocks/BeforeAfter.astro';
+import PoolpBoxHero from '@plugins/poolp-box-hero/templates/PoolpBoxHero.astro';
+import PoolpBoxFinitions from '@plugins/poolp-box-finitions/templates/PoolpBoxFinitions.astro';
 import ParallaxInit from './ParallaxInit.astro';
 import ModuleAnimations from './ModuleAnimations.astro';
 
@@ -209,6 +211,10 @@ const blocks = rawBlocks.filter(b => !inactiveSet.has(b.type));
       // Plugins
       case 'before-after':
         return <BeforeAfter data={data} />;
+      case 'poolp-box-hero':
+        return <PoolpBoxHero data={data} />;
+      case 'poolp-box-finitions':
+        return <PoolpBoxFinitions data={data} />;
 
       default:
         // Plugin blocks: rendered server-side via API

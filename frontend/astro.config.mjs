@@ -2,9 +2,12 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 import { defineConfig } from 'astro/config';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const SITE_URL = process.env.BUILD_SITE_URL
 	|| process.env.BUILD_MEDIA_ORIGIN
@@ -50,5 +53,19 @@ export default defineConfig({
 	build: {
 		// 'auto' inlines small sheets, externalizes large ones (cacheable + smaller HTML)
 		inlineStylesheets: 'auto',
+	},
+	vite: {
+		server: {
+			// Allow Vite to read files outside frontend/, in particular astro/plugins/<name>/templates/*.astro
+			fs: {
+				allow: [path.resolve(__dirname, '..')],
+			},
+		},
+		resolve: {
+			alias: {
+				'@plugins': path.resolve(__dirname, '../plugins'),
+				'@frontend': path.resolve(__dirname, 'src'),
+			},
+		},
 	},
 });
