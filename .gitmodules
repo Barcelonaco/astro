@@ -1,3 +1,6 @@
 [submodule "plugins/poolp-configurator"]
 	path = plugins/poolp-configurator
 	url = https://github.com/Barcelonaco/plugin-configurateur-poolp.git
+[submodule "plugins/poolp-box-finitions"]
+	path = plugins/poolp-box-finitions
+	url = https://github.com/Barcelonaco/poolp-box-finitions.git
