@@ -26,7 +26,7 @@ const archiveTitle = cptOptions.archive_title || 'Références';
 const showTitle = cptOptions.title_in_header !== 'hideTitle';
 const useH1 = cptOptions.h1_in_header !== 'no';
 const archiveOrder = cptOptions.randomise_refs === 'random' ? 'random' : undefined;
-const archiveDisplay = cptOptions.archive_display || 'column-1'; // 'column-1' or 'columns-2'
+const archiveDisplay = cptOptions.archive_display || 'columns-3'; // 'columns-3', 'columns-2', or 'column-1'
 const refDisplay = cptOptions.ref_display || 'popup'; // 'page', 'popup', or 'both'
 const usePopup = refDisplay === 'popup' || refDisplay === 'both';
 const usePageLink = refDisplay === 'page' || refDisplay === 'both';
@@ -71,8 +71,7 @@ function getCategoryNames(ref: ReferenceItem): string {
 <html lang="fr">
   <head>
     <BaseHead title={`${archiveTitle} | ${siteName}`} description={siteDescription} styleSettings={styleSettings} siteSettings={siteSettings} />
-    <ModuleStyles blocks={null} />
-    <!-- NB: references.css removed — NicklBlocReferences.astro provides all module styles -->
+    <ModuleStyles blocks={[{ type: 'bloc-references' }]} />
     <style is:inline>
       .page-archive-references { padding-top: 60px; padding-bottom: 60px; }
       .page-archive-references .archive-top .title { padding-bottom: 2.5rem; }
@@ -384,7 +383,7 @@ function getCategoryNames(ref: ReferenceItem): string {
             )}
 
             {/* References grid */}
-            <ul class={`list js_list-refs ${archiveDisplay === 'columns-2' ? 'list-2-cols' : 'list-1-col'}`} data-display={refDisplay}>
+            <ul class={`list js_list-refs ${archiveDisplay === 'columns-2' ? 'list-2-cols' : archiveDisplay === 'column-1' ? 'list-1-col' : ''}`} data-display={refDisplay}>
               {initialRefs.map((ref) => {
                 const photos = getPhotos(ref);
                 const mainImage = getMainImage(ref);
