@@ -1,0 +1,38 @@
+/* Tax page — extracted from inline styles. */
+
+.rates-table { width: 100%; border-collapse: collapse; }
+.rates-table th, .rates-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--gray-200); }
+.rates-table th { font-size: 12px; text-transform: uppercase; color: var(--gray-500); letter-spacing: 0.05em; font-weight: 500; }
+.rates-table tbody tr:hover { background: var(--gray-50); }
+
+.rate-code { font-family: SFMono-Regular, ui-monospace, Menlo, monospace; font-size: 13px; background: var(--gray-100); padding: 3px 8px; border-radius: 4px; }
+.rate-pct { font-weight: 600; color: var(--gray-900); }
+
+.badge-default { background: var(--primary); color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+
+.row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+.icon-btn {
+  background: transparent; border: 1px solid var(--gray-300);
+  width: 32px; height: 32px; border-radius: 4px;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--gray-700);
+}
+.icon-btn:hover { background: var(--gray-100); }
+.icon-btn.danger:hover { background: #fee; color: #c00; border-color: #fcc; }
+
+/* Modal — partagé entre toutes les pages MVP, à terme à déplacer dans ecommerce.css. */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+  opacity: 0; pointer-events: none; transition: opacity 120ms ease-out;
+}
+.modal-backdrop.open { opacity: 1; pointer-events: auto; }
+.modal { background: white; border-radius: 8px; padding: 24px; width: 90%; max-width: 560px; }
+.modal-sm { max-width: 480px; }
+.modal-md { max-width: 640px; }
+.modal-lg { max-width: 880px; }
+.modal-title { font-size: 18px; font-weight: 600; margin: 0 0 16px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 24px; }
+
+.empty { padding: 32px; text-align: center; color: var(--gray-500); }

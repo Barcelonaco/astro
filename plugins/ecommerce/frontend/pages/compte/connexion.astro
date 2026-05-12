@@ -1,0 +1,382 @@
+---
+/**
+ * /compte/connexion — login + register tabs.
+ * Redirect to /compte if already logged in (client-side check).
+ */
+// Static page — auth + data fetched client-side
+import BaseHead from '@frontend/components/BaseHead.astro'
+import Header from '@frontend/components/Header.astro'
+import Footer from '@frontend/components/Footer.astro'
+import SiteOverlays from '@frontend/components/SiteOverlays.astro'
+import DeferredLoader from '@frontend/components/DeferredLoader.astro'
+import { SITE_TITLE } from '@frontend/consts'
+import { getFrontendBootstrap } from '@frontend/lib/api'
+import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`Connexion — ${siteName}`} description="Connectez-vous ou creez votre compte" styleSettings={styleSettings} siteSettings={siteSettings} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page auth-wrap">
+      <div class="auth-container">
+
+        <!-- Tabs -->
+        <div class="auth-tabs">
+          <button class="auth-tab active" data-tab="login">Se connecter</button>
+          <button class="auth-tab" data-tab="register">Creer un compte</button>
+        </div>
+
+        <!-- Login form -->
+        <form id="login-form" class="auth-form" novalidate>
+          <div class="auth-field">
+            <label class="auth-label">Email</label>
+            <input class="auth-input" type="email" name="email" required autocomplete="email" placeholder="votre@email.fr" />
+          </div>
+          <div class="auth-field">
+            <label class="auth-label">Mot de passe</label>
+            <input class="auth-input" type="password" name="password" required autocomplete="current-password" placeholder="••••••••" />
+          </div>
+          <div class="auth-status" id="login-status" role="status" aria-live="polite"></div>
+          <button class="auth-submit" type="submit">Se connecter</button>
+          <a href="/compte/mot-de-passe-oublie" class="auth-link">Mot de passe oublie ?</a>
+          <div class="auth-alt">
+            Vous etes professionnel ? <a href="/inscription-pro">Creer un compte pro</a>
+          </div>
+        </form>
+
+        <!-- Register form -->
+        <form id="register-form" class="auth-form" style="display:none" novalidate>
+          <div class="auth-row">
+            <div class="auth-field">
+              <label class="auth-label">Prenom <em>*</em></label>
+              <input class="auth-input" type="text" name="first_name" required autocomplete="given-name" />
+            </div>
+            <div class="auth-field">
+              <label class="auth-label">Nom <em>*</em></label>
+              <input class="auth-input" type="text" name="last_name" required autocomplete="family-name" />
+            </div>
+          </div>
+          <div class="auth-field">
+            <label class="auth-label">Email <em>*</em></label>
+            <input class="auth-input" type="email" name="email" required autocomplete="email" placeholder="votre@email.fr" />
+          </div>
+          <div class="auth-field">
+            <label class="auth-label">Telephone</label>
+            <input class="auth-input" type="tel" name="phone" autocomplete="tel" />
+          </div>
+          <div class="auth-row">
+            <div class="auth-field">
+              <label class="auth-label">Mot de passe <em>*</em></label>
+              <input class="auth-input" type="password" name="password" minlength="8" required autocomplete="new-password" />
+              <span class="auth-hint">8 caracteres minimum</span>
+            </div>
+            <div class="auth-field">
+              <label class="auth-label">Confirmer <em>*</em></label>
+              <input class="auth-input" type="password" name="password_confirm" minlength="8" required autocomplete="new-password" />
+            </div>
+          </div>
+          <label class="auth-check">
+            <input type="checkbox" name="accepts_marketing" />
+            <span>Recevoir les actualites et offres</span>
+          </label>
+          <div class="auth-status" id="register-status" role="status" aria-live="polite"></div>
+          <button class="auth-submit" type="submit">Creer mon compte</button>
+          <div class="auth-alt">
+            Vous etes professionnel ? <a href="/inscription-pro">Creer un compte pro</a>
+          </div>
+        </form>
+
+        <!-- Separator -->
+        <div class="auth-separator">
+          <span>ou</span>
+        </div>
+
+        <!-- Order tracking (guest) -->
+        <div class="auth-tracking">
+          <h3 class="auth-tracking-title">Suivi de commande</h3>
+          <p class="auth-tracking-desc">Vous avez passe une commande sans creer de compte ? Retrouvez-la ici.</p>
+          <div id="tracking-result" style="display:none"></div>
+          <form id="tracking-form" class="auth-form" novalidate>
+            <div class="auth-row">
+              <div class="auth-field">
+                <label class="auth-label">N° de commande</label>
+                <input class="auth-input" type="text" name="number" required placeholder="CMD-250511-A1B2C3" />
+              </div>
+              <div class="auth-field">
+                <label class="auth-label">Email utilise lors de la commande</label>
+                <input class="auth-input" type="email" name="email" required placeholder="votre@email.fr" />
+              </div>
+            </div>
+            <div class="auth-status" id="tracking-status" role="status" aria-live="polite"></div>
+            <button class="auth-submit auth-submit-outline" type="submit">Rechercher ma commande</button>
+          </form>
+        </div>
+
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+
+    <script>
+      import { login, register, trackOrder, isLoggedIn, formatPrice, formatDate, formatDateTime, STATUS_LABELS, PAYMENT_STATUS_LABELS, type ApiError } from '@plugins/ecommerce/frontend/lib/customer-api'
+
+      // Redirect if already logged in
+      if (isLoggedIn()) window.location.href = '/compte'
+
+      // Tab switching
+      const tabs = document.querySelectorAll<HTMLButtonElement>('.auth-tab')
+      const loginForm = document.getElementById('login-form') as HTMLFormElement
+      const registerForm = document.getElementById('register-form') as HTMLFormElement
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          tabs.forEach(t => t.classList.remove('active'))
+          tab.classList.add('active')
+          loginForm.style.display = tab.dataset.tab === 'login' ? '' : 'none'
+          registerForm.style.display = tab.dataset.tab === 'register' ? '' : 'none'
+        })
+      })
+
+      // Check URL params for tab
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('tab') === 'register') {
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === 'register'))
+        loginForm.style.display = 'none'
+        registerForm.style.display = ''
+      }
+
+      function setStatus(id: string, msg: string, kind: 'error' | 'success' | '' = '') {
+        const el = document.getElementById(id)
+        if (!el) return
+        el.textContent = msg
+        el.dataset.kind = kind
+      }
+
+      // Login
+      loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault()
+        const fd = new FormData(loginForm)
+        const btn = loginForm.querySelector('button[type=submit]') as HTMLButtonElement
+        btn.disabled = true
+        setStatus('login-status', '')
+        try {
+          await login(String(fd.get('email')), String(fd.get('password')))
+          setStatus('login-status', 'Connexion reussie. Redirection...', 'success')
+          const redirect = params.get('redirect') || '/compte'
+          setTimeout(() => { window.location.href = redirect }, 500)
+        } catch (err: any) {
+          setStatus('login-status', err?.message || 'Erreur de connexion', 'error')
+          btn.disabled = false
+        }
+      })
+
+      // Register
+      registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault()
+        const fd = new FormData(registerForm)
+        const pw = String(fd.get('password'))
+        if (pw !== String(fd.get('password_confirm'))) {
+          setStatus('register-status', 'Les mots de passe ne correspondent pas.', 'error')
+          return
+        }
+        if (pw.length < 8) {
+          setStatus('register-status', 'Le mot de passe doit contenir au moins 8 caracteres.', 'error')
+          return
+        }
+        const btn = registerForm.querySelector('button[type=submit]') as HTMLButtonElement
+        btn.disabled = true
+        setStatus('register-status', '')
+        try {
+          await register({
+            email: String(fd.get('email')).trim(),
+            password: pw,
+            first_name: String(fd.get('first_name')).trim(),
+            last_name: String(fd.get('last_name')).trim(),
+            phone: String(fd.get('phone')).trim(),
+            accepts_marketing: !!fd.get('accepts_marketing'),
+          })
+          setStatus('register-status', 'Compte cree. Redirection...', 'success')
+          const redirect = params.get('redirect') || '/compte'
+          setTimeout(() => { window.location.href = redirect }, 500)
+        } catch (err: any) {
+          if (err?.status === 409) {
+            setStatus('register-status', '')
+            const statusEl = document.getElementById('register-status')!
+            statusEl.innerHTML = 'Un compte existe deja avec cet email. <a href="#" id="switch-to-login" style="color:inherit;font-weight:600;text-decoration:underline">Se connecter</a>'
+            statusEl.dataset.kind = 'error'
+            document.getElementById('switch-to-login')?.addEventListener('click', (e) => {
+              e.preventDefault()
+              // Switch to login tab and prefill email
+              tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === 'login'))
+              loginForm.style.display = ''
+              registerForm.style.display = 'none'
+              const loginEmail = loginForm.querySelector('input[name="email"]') as HTMLInputElement
+              if (loginEmail) loginEmail.value = String(fd.get('email') || '')
+              loginEmail?.focus()
+            })
+          } else {
+            setStatus('register-status', err?.message || 'Erreur lors de la creation', 'error')
+          }
+          btn.disabled = false
+        }
+      })
+
+      // Order tracking
+      const trackingForm = document.getElementById('tracking-form') as HTMLFormElement
+      trackingForm.addEventListener('submit', async (e) => {
+        e.preventDefault()
+        const fd = new FormData(trackingForm)
+        const number = String(fd.get('number') || '').trim()
+        const email = String(fd.get('email') || '').trim()
+        if (!number || !email) {
+          setStatus('tracking-status', 'Veuillez remplir les deux champs.', 'error')
+          return
+        }
+        const btn = trackingForm.querySelector('button[type=submit]') as HTMLButtonElement
+        btn.disabled = true
+        setStatus('tracking-status', '')
+        try {
+          const o = await trackOrder(number, email)
+          setStatus('tracking-status', '', '')
+          // Render order detail inline
+          const payLabels: Record<string, string> = { stripe: 'Carte bancaire', bank_transfer: 'Virement', on_invoice: 'Sur facture', paypal: 'PayPal' }
+          function fmtAddr(a: any): string {
+            if (!a) return '-'
+            return [
+              `${a.first_name || ''} ${a.last_name || ''}`.trim(), a.company,
+              a.address_line1, a.address_line2,
+              `${a.postcode || ''} ${a.city || ''}`.trim(), a.country_code,
+            ].filter(Boolean).join(', ')
+          }
+          const trackResult = document.getElementById('tracking-result')!
+          trackResult.style.display = ''
+          trackResult.innerHTML = `
+            <div class="track-order">
+              <div class="track-header">
+                <strong style="font-family:monospace;font-size:16px">${o.order_number}</strong>
+                <span class="badge badge-${o.status}">${STATUS_LABELS[o.status] || o.status}</span>
+                <span class="badge badge-${o.payment_status}">${PAYMENT_STATUS_LABELS[o.payment_status] || o.payment_status}</span>
+                <span style="color:var(--color-text-muted,#6b6b67);font-size:12px;margin-left:auto">${formatDateTime(o.placed_at)}</span>
+              </div>
+              <table class="track-table">
+                <thead><tr><th>Article</th><th>Qte</th><th>Total</th></tr></thead>
+                <tbody>${(o.items || []).map((i: any) => `<tr><td>${i.product_title}</td><td>${i.quantity}</td><td>${formatPrice(i.line_total_cents)}</td></tr>`).join('')}</tbody>
+              </table>
+              <div class="track-totals">
+                <div><span>Sous-total</span><span>${formatPrice(o.subtotal_cents)}</span></div>
+                <div><span>Livraison</span><span>${formatPrice(o.shipping_cents)}</span></div>
+                <div><span>TVA</span><span>${formatPrice(o.tax_cents)}</span></div>
+                <div class="track-total-main"><span>Total TTC</span><span>${formatPrice(o.total_cents, o.currency)}</span></div>
+              </div>
+              <div style="font-size:13px;margin-top:12px;color:var(--color-text-muted,#6b6b67)">
+                <div><strong>Paiement :</strong> ${payLabels[o.payment_method] || o.payment_method}</div>
+                <div><strong>Livraison :</strong> ${fmtAddr(o.shipping_address)}</div>
+              </div>
+            </div>
+          `
+          trackingForm.style.display = 'none'
+        } catch (err: any) {
+          setStatus('tracking-status', err?.message || 'Aucune commande trouvee avec ces informations.', 'error')
+          btn.disabled = false
+        }
+      })
+    </script>
+
+    <style is:global>
+      .auth-wrap { width: 100%; padding: 40px 0 60px; }
+      .auth-container { max-width: 520px; margin: 0 auto; padding: 0 20px; }
+
+      .auth-tabs { display: flex; gap: 0; margin-bottom: 28px; border-bottom: 2px solid rgba(0,0,0,0.1); }
+      .auth-tab {
+        flex: 1; padding: 12px 0; background: none; border: none; font-size: 14px; font-weight: 600;
+        cursor: pointer; color: var(--color-text-muted, #6b6b67); border-bottom: 2px solid transparent;
+        margin-bottom: -2px; font-family: inherit;
+      }
+      .auth-tab.active { color: inherit; border-bottom-color: var(--accent, #1a1a18); }
+
+      .auth-form { }
+      .auth-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      @media (max-width: 500px) { .auth-row { grid-template-columns: 1fr; } }
+
+      .auth-field { margin-bottom: 16px; }
+      .auth-label { display: block; font-size: 12px; color: var(--color-text-muted, #6b6b67); margin-bottom: 5px; }
+      .auth-label em { color: #a0a09c; font-style: normal; }
+      .auth-input {
+        width: 100%; padding: 10px 12px; border: 1px solid rgba(0,0,0,0.18); border-radius: 8px;
+        font-size: 13px; background: #f5f5f3; font-family: inherit;
+      }
+      .auth-input:focus { outline: none; border-color: var(--accent, #1a1a18); background: #fff; }
+      .auth-hint { display: block; font-size: 11px; color: #a0a09c; margin-top: 4px; }
+
+      .auth-check {
+        display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+        font-size: 13px; color: var(--color-text-muted, #6b6b67); cursor: pointer;
+      }
+      .auth-check input { width: 15px; height: 15px; flex-shrink: 0; }
+
+      .auth-status { margin: 12px 0; font-size: 13px; min-height: 18px; }
+      .auth-status[data-kind="error"] { color: #b91c1c; }
+      .auth-status[data-kind="success"] { color: #276022; }
+
+      .auth-submit {
+        width: 100%; padding: 13px; background: var(--accent, #1a1a18); color: #fff;
+        border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; font-family: inherit;
+      }
+      .auth-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+      .auth-link { display: block; text-align: center; margin-top: 12px; font-size: 13px; color: var(--color-text-muted, #6b6b67); }
+      .auth-alt { text-align: center; margin-top: 16px; font-size: 13px; color: var(--color-text-muted, #6b6b67); }
+      .auth-alt a { color: inherit; font-weight: 500; text-decoration: underline; }
+
+      .auth-separator {
+        display: flex; align-items: center; gap: 16px;
+        margin: 32px 0; color: var(--color-text-muted, #6b6b67); font-size: 13px;
+      }
+      .auth-separator::before, .auth-separator::after {
+        content: ''; flex: 1; height: 1px; background: rgba(0,0,0,0.12);
+      }
+
+      .auth-tracking { margin-top: 0; }
+      .auth-tracking-title { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+      .auth-tracking-desc { font-size: 13px; color: var(--color-text-muted, #6b6b67); margin: 0 0 16px; line-height: 1.5; }
+
+      .auth-submit-outline {
+        background: transparent; color: var(--accent, #1a1a18);
+        border: 1px solid rgba(0,0,0,0.18);
+      }
+      .auth-submit-outline:hover { background: rgba(0,0,0,0.04); }
+
+      .track-order { border: 1px solid rgba(0,0,0,0.1); border-radius: 10px; padding: 20px; background: #fafaf9; }
+      .track-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+      .badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+      .badge-paid, .badge-delivered { background: #d4edda; color: #155724; }
+      .badge-awaiting_payment, .badge-pending { background: #fff3cd; color: #856404; }
+      .badge-shipped { background: #e2d5f1; color: #4a2080; }
+      .badge-processing { background: #cfe2ff; color: #084298; }
+      .badge-cancelled, .badge-refunded, .badge-failed { background: #f8d7da; color: #721c24; }
+      .badge-unpaid { background: #f0f0f0; color: #666; }
+      .track-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+      .track-table th { text-align: left; font-size: 11px; text-transform: uppercase; color: var(--color-text-muted, #6b6b67); padding: 8px 6px; border-bottom: 2px solid rgba(0,0,0,0.1); }
+      .track-table td { padding: 8px 6px; border-bottom: 1px solid rgba(0,0,0,0.06); }
+      .track-totals { text-align: right; font-size: 13px; }
+      .track-totals > div { display: flex; justify-content: flex-end; gap: 20px; padding: 3px 0; }
+      .track-totals > div span:first-child { color: var(--color-text-muted, #6b6b67); }
+      .track-total-main { font-weight: 700; font-size: 15px; margin-top: 4px; padding-top: 6px; border-top: 2px solid rgba(0,0,0,0.1); }
+    </style>
+  </body>
+</html>

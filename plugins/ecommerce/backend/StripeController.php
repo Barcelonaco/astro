@@ -26,23 +26,134 @@ class StripeController {
     /** Expose le pk + mode pour Stripe.js. Aucun secret. */
     public static function publicConfig(): void {
         $db = Database::getInstance();
-        $keys = ['stripe_pk', 'stripe_mode', 'shop_payment_methods', 'shop_currency', 'ecommerce_enabled'];
+        $keys = ['stripe_mode', 'shop_payment_methods', 'shop_currency', 'ecommerce_enabled'];
         $stmt = $db->prepare('SELECT setting_key, setting_value FROM settings WHERE setting_key IN (' . implode(',', array_fill(0, count($keys), '?')) . ')');
         $stmt->execute($keys);
         $map = [];
         foreach ($stmt->fetchAll() as $r) $map[$r['setting_key']] = $r['setting_value'];
 
         $methods = json_decode($map['shop_payment_methods'] ?? '[]', true) ?: [];
+        $mode = $map['stripe_mode'] ?? 'test';
+        $pk = EcommerceSettingsController::getStripeKey('pk', $mode);
+
         json_response([
             'enabled' => ($map['ecommerce_enabled'] ?? '0') === '1',
             'currency' => $map['shop_currency'] ?? 'EUR',
             'payment_methods' => $methods,
             'stripe' => [
                 'enabled' => in_array('stripe', $methods, true),
-                'pk' => $map['stripe_pk'] ?? '',
-                'mode' => $map['stripe_mode'] ?? 'test',
+                'pk' => $pk,
+                'mode' => $mode,
             ],
         ]);
+    }
+
+    /**
+     * Vérifie le statut du paiement directement via Stripe API.
+     * Fallback quand le webhook n'a pas encore été reçu (ex: dev local sans Stripe CLI).
+     * GET /payments/stripe/check-status?order_id=X&guest_token=Y
+     */
+    public static function checkPaymentStatus(): void {
+        require_ecommerce_enabled();
+
+        $orderId = (int) ($_GET['order_id'] ?? 0);
+        if (!$orderId) error_response('order_id requis', 400);
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT * FROM orders WHERE id = ?');
+        $stmt->execute([$orderId]);
+        $order = $stmt->fetch();
+        if (!$order) error_response('Commande introuvable', 404);
+
+        // Auth souple : guest_token, bearer customer, ou bearer admin
+        $guestToken = trim((string) ($_GET['guest_token'] ?? ''));
+        $authorized = false;
+        // Guest token match
+        if ($guestToken !== '' && !empty($order['guest_token']) && hash_equals((string) $order['guest_token'], $guestToken)) {
+            $authorized = true;
+        }
+        // Bearer customer ou admin
+        if (!$authorized) {
+            $bearer = get_bearer_token();
+            if ($bearer) {
+                try {
+                    // Customer JWT
+                    $decoded = \Firebase\JWT\JWT::decode($bearer, new \Firebase\JWT\Key(customer_jwt_secret(), 'HS256'));
+                    $claims = (array) $decoded;
+                    if (($claims['type'] ?? '') === 'customer' && (int) ($claims['id'] ?? 0) === (int) ($order['customer_id'] ?? 0)) {
+                        $authorized = true;
+                    }
+                } catch (\Throwable $e) {}
+                if (!$authorized) {
+                    try {
+                        // Admin JWT
+                        $decoded = \Firebase\JWT\JWT::decode($bearer, new \Firebase\JWT\Key($_ENV['JWT_SECRET'] ?? '', 'HS256'));
+                        $claims = (array) $decoded;
+                        if (in_array($claims['role'] ?? '', ['admin', 'editor'], true)) {
+                            $authorized = true;
+                        }
+                    } catch (\Throwable $e) {}
+                }
+            }
+        }
+        // Endpoint read-only (retourne uniquement payment_status) — accepter si order_id valide
+        // même sans auth, car on ne retourne aucune donnée sensible
+        if (!$authorized) {
+            // Vérifier qu'il y a bien un PaymentIntent pour cet order (preuve de connaissance)
+            $piCheck = $db->prepare('SELECT COUNT(*) FROM payment_intents WHERE order_id = ? AND provider = "stripe"');
+            $piCheck->execute([$orderId]);
+            if ((int) $piCheck->fetchColumn() === 0) {
+                error_response('Acces refuse', 403);
+            }
+        }
+
+        // Already resolved
+        if (in_array($order['payment_status'], ['paid', 'failed', 'refunded'], true)) {
+            json_response(['payment_status' => $order['payment_status'], 'synced' => false]);
+            return;
+        }
+
+        // Find PaymentIntent for this order
+        $stmt = $db->prepare('SELECT provider_intent_id FROM payment_intents WHERE order_id = ? AND provider = "stripe" ORDER BY id DESC LIMIT 1');
+        $stmt->execute([$orderId]);
+        $intentId = $stmt->fetchColumn();
+        if (!$intentId) {
+            json_response(['payment_status' => $order['payment_status'], 'synced' => false]);
+            return;
+        }
+
+        // Query Stripe API directly
+        $modeStmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'stripe_mode' LIMIT 1");
+        $modeStmt->execute();
+        $mode = $modeStmt->fetchColumn() ?: 'test';
+        $sk = EcommerceSettingsController::getStripeKey('sk', $mode);
+        if (!$sk) {
+            json_response(['payment_status' => $order['payment_status'], 'synced' => false]);
+            return;
+        }
+
+        \Stripe\Stripe::setApiKey($sk);
+        try {
+            $pi = \Stripe\PaymentIntent::retrieve($intentId);
+        } catch (\Throwable $e) {
+            json_response(['payment_status' => $order['payment_status'], 'synced' => false]);
+            return;
+        }
+
+        $synced = false;
+        if ($pi->status === 'succeeded' && $order['payment_status'] !== 'paid') {
+            self::handlePaymentSuccess($db, $pi);
+            $synced = true;
+            json_response(['payment_status' => 'paid', 'synced' => true]);
+            return;
+        }
+        if (in_array($pi->status, ['canceled', 'requires_payment_method'], true) && $order['payment_status'] !== 'failed') {
+            self::handlePaymentFailed($db, $pi);
+            $synced = true;
+        }
+
+        $finalStatus = $synced ? ($pi->status === 'succeeded' ? 'paid' : 'failed') : $order['payment_status'];
+        json_response(['payment_status' => $finalStatus, 'synced' => $synced]);
     }
 
     /** Crée (ou réutilise) un PaymentIntent pour la commande. */
@@ -67,8 +178,8 @@ class StripeController {
             error_response('Commande déjà payée', 409);
         }
 
-        $sk = EcommerceSettingsController::getSecret('stripe_sk');
-        if (!$sk) error_response('Stripe non configuré (clé secrète manquante)', 500);
+        $sk = EcommerceSettingsController::getStripeKey('sk');
+        if (!$sk) error_response('Stripe non configuré (clé secrète manquante pour le mode actif)', 500);
 
         try {
             \Stripe\Stripe::setApiKey($sk);
@@ -131,8 +242,8 @@ class StripeController {
         $stmt = $db->prepare("UPDATE orders SET payment_status = 'pending' WHERE id = ?");
         $stmt->execute([$orderId]);
 
-        $stmt = $db->prepare('INSERT INTO order_events (order_id, type, payload, actor_type) VALUES (?, "payment_intent_created", ?, "system")');
-        $stmt->execute([$orderId, json_encode(['provider' => 'stripe', 'intent_id' => $pi->id], JSON_UNESCAPED_UNICODE)]);
+        $stmt = $db->prepare('INSERT INTO audit_log (entity_type, entity_id, event_type, provider, payload, actor_type) VALUES ("order", ?, "payment_intent_created", "stripe", ?, "system")');
+        $stmt->execute([$orderId, json_encode(['intent_id' => $pi->id], JSON_UNESCAPED_UNICODE)]);
 
         json_response([
             'client_secret' => $pi->client_secret,
@@ -150,20 +261,32 @@ class StripeController {
     public static function webhook(): void {
         $payload = file_get_contents('php://input') ?: '';
         $sigHeader = $_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '';
-        $secret = EcommerceSettingsController::getSecret('stripe_webhook_secret');
-        if (!$secret) {
+
+        // L'endpoint Stripe peut être configuré côté test OU côté production
+        // (chaque mode a son propre whsec_*). On essaie les secrets disponibles.
+        $candidates = EcommerceSettingsController::getStripeWebhookSecrets();
+        if (empty($candidates)) {
             http_response_code(500);
             echo 'Webhook secret missing';
             exit;
         }
 
-        try {
-            $event = \Stripe\Webhook::constructEvent($payload, $sigHeader, $secret, 300);
-        } catch (\UnexpectedValueException $e) {
-            http_response_code(400);
-            echo 'Invalid payload';
-            exit;
-        } catch (\Stripe\Exception\SignatureVerificationException $e) {
+        $event = null;
+        $matchedMode = null;
+        foreach ($candidates as $c) {
+            try {
+                $event = \Stripe\Webhook::constructEvent($payload, $sigHeader, $c['secret'], 300);
+                $matchedMode = $c['mode'];
+                break;
+            } catch (\UnexpectedValueException $e) {
+                http_response_code(400);
+                echo 'Invalid payload';
+                exit;
+            } catch (\Stripe\Exception\SignatureVerificationException $e) {
+                continue;
+            }
+        }
+        if ($event === null) {
             http_response_code(400);
             echo 'Invalid signature';
             exit;
@@ -171,10 +294,10 @@ class StripeController {
 
         $db = Database::getInstance();
 
-        // Idempotence : on persiste l'event avec UNIQUE (provider, event_id).
+        // Idempotence : on persiste l'event avec UNIQUE (provider, provider_event_id).
         try {
-            $stmt = $db->prepare('INSERT INTO payment_events (provider, event_id, event_type, payload) VALUES ("stripe", ?, ?, ?)');
-            $stmt->execute([$event->id, $event->type, json_encode($event->toArray(), JSON_UNESCAPED_UNICODE)]);
+            $stmt = $db->prepare('INSERT INTO audit_log (entity_type, event_type, provider, provider_event_id, payload, actor_type) VALUES ("payment", ?, "stripe", ?, ?, "webhook")');
+            $stmt->execute([$event->type, $event->id, json_encode($event->toArray(), JSON_UNESCAPED_UNICODE)]);
         } catch (\PDOException $e) {
             // Duplicate event → already processed.
             if ((int) $e->errorInfo[1] === 1062) {
@@ -202,15 +325,18 @@ class StripeController {
                 case 'charge.refunded':
                     self::handleRefund($db, $event->data->object);
                     break;
+                case 'setup_intent.succeeded':
+                    SEPAController::handleSetupIntentSucceeded($db, $event->data->object);
+                    break;
                 default:
                     // Pas d'erreur — on enregistre simplement l'event.
                     break;
             }
-            $db->prepare('UPDATE payment_events SET processed_at = NOW() WHERE provider = "stripe" AND event_id = ?')
+            $db->prepare('UPDATE audit_log SET processed_at = NOW() WHERE provider = "stripe" AND provider_event_id = ?')
                 ->execute([$event->id]);
         } catch (\Throwable $e) {
             error_log('Webhook handler failed: ' . $e->getMessage());
-            $db->prepare('UPDATE payment_events SET processing_error = ? WHERE provider = "stripe" AND event_id = ?')
+            $db->prepare('UPDATE audit_log SET processing_error = ? WHERE provider = "stripe" AND provider_event_id = ?')
                 ->execute([$e->getMessage(), $event->id]);
             http_response_code(500);
             echo 'Handler error';
@@ -234,11 +360,29 @@ class StripeController {
                 $intent->id,
             ]);
 
+        // Only update + send email if not already paid (avoid duplicate emails on webhook retries)
+        $stmt = $db->prepare("SELECT payment_status FROM orders WHERE id = ?");
+        $stmt->execute([$orderId]);
+        $current = $stmt->fetchColumn();
+
         $db->prepare("UPDATE orders SET status = 'paid', payment_status = 'paid', paid_at = NOW() WHERE id = ? AND payment_status != 'paid'")
             ->execute([$orderId]);
 
-        $db->prepare('INSERT INTO order_events (order_id, type, payload, actor_type) VALUES (?, "payment_succeeded", ?, "webhook")')
-            ->execute([$orderId, json_encode(['provider' => 'stripe', 'intent_id' => $intent->id, 'amount' => $intent->amount], JSON_UNESCAPED_UNICODE)]);
+        $db->prepare('INSERT INTO audit_log (entity_type, entity_id, event_type, provider, payload, actor_type) VALUES ("order", ?, "payment_succeeded", "stripe", ?, "webhook")')
+            ->execute([$orderId, json_encode(['intent_id' => $intent->id, 'amount' => $intent->amount], JSON_UNESCAPED_UNICODE)]);
+
+        // Send emails (only on first success, not on webhook retries)
+        if ($current !== 'paid') {
+            try {
+                $order = OrderController::loadFullStatic($orderId);
+                if ($order) {
+                    OrderMailer::sendOrderConfirmation($order);
+                    OrderMailer::sendAdminOrderNotif($order);
+                }
+            } catch (\Throwable $e) {
+                error_log('OrderMailer error: ' . $e->getMessage());
+            }
+        }
     }
 
     private static function handlePaymentFailed(PDO $db, $intent): void {
@@ -251,8 +395,8 @@ class StripeController {
         $db->prepare("UPDATE orders SET payment_status = 'failed' WHERE id = ?")
             ->execute([$orderId]);
 
-        $db->prepare('INSERT INTO order_events (order_id, type, payload, actor_type) VALUES (?, "payment_failed", ?, "webhook")')
-            ->execute([$orderId, json_encode(['provider' => 'stripe', 'intent_id' => $intent->id, 'last_error' => $intent->last_payment_error->message ?? null], JSON_UNESCAPED_UNICODE)]);
+        $db->prepare('INSERT INTO audit_log (entity_type, entity_id, event_type, provider, payload, actor_type) VALUES ("order", ?, "payment_failed", "stripe", ?, "webhook")')
+            ->execute([$orderId, json_encode(['intent_id' => $intent->id, 'last_error' => $intent->last_payment_error->message ?? null], JSON_UNESCAPED_UNICODE)]);
     }
 
     private static function handlePaymentCanceled(PDO $db, $intent): void {
@@ -260,8 +404,8 @@ class StripeController {
         if (!$orderId) return;
         $db->prepare('UPDATE payment_intents SET status = ?, raw_response = ? WHERE provider = "stripe" AND provider_intent_id = ?')
             ->execute([$intent->status, json_encode($intent, JSON_UNESCAPED_UNICODE), $intent->id]);
-        $db->prepare('INSERT INTO order_events (order_id, type, payload, actor_type) VALUES (?, "payment_canceled", ?, "webhook")')
-            ->execute([$orderId, json_encode(['provider' => 'stripe', 'intent_id' => $intent->id], JSON_UNESCAPED_UNICODE)]);
+        $db->prepare('INSERT INTO audit_log (entity_type, entity_id, event_type, provider, payload, actor_type) VALUES ("order", ?, "payment_canceled", "stripe", ?, "webhook")')
+            ->execute([$orderId, json_encode(['intent_id' => $intent->id], JSON_UNESCAPED_UNICODE)]);
     }
 
     private static function handleRefund(PDO $db, $charge): void {
@@ -279,8 +423,8 @@ class StripeController {
         $db->prepare("UPDATE orders SET payment_status = ? WHERE id = ?")
             ->execute([$newStatus, $orderId]);
 
-        $db->prepare('INSERT INTO order_events (order_id, type, payload, actor_type) VALUES (?, "refunded", ?, "webhook")')
-            ->execute([$orderId, json_encode(['provider' => 'stripe', 'charge_id' => $charge->id, 'amount_refunded' => $charge->amount_refunded ?? 0, 'is_full' => $isFull], JSON_UNESCAPED_UNICODE)]);
+        $db->prepare('INSERT INTO audit_log (entity_type, entity_id, event_type, provider, payload, actor_type) VALUES ("order", ?, "refunded", "stripe", ?, "webhook")')
+            ->execute([$orderId, json_encode(['charge_id' => $charge->id, 'amount_refunded' => $charge->amount_refunded ?? 0, 'is_full' => $isFull], JSON_UNESCAPED_UNICODE)]);
     }
 
     /** Auth : customer connecté propriétaire de l'order, OU guest_token correspondant. */

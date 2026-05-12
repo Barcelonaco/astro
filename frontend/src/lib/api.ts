@@ -165,6 +165,7 @@ export interface FrontendBootstrap {
   siteSettings: Record<string, string>
   navigation: NavigationItem[]
   secondaryNavigation: NavigationItem[]
+  creditNavigation: NavigationItem[]
   frontPage: Page | null
 }
 
@@ -177,6 +178,7 @@ export async function getFrontendBootstrap(): Promise<FrontendBootstrap> {
       siteSettings: data.siteSettings || {},
       navigation: data.navigation || [],
       secondaryNavigation: data.secondaryNavigation || [],
+      creditNavigation: data.creditNavigation || [],
       frontPage: data.frontPage || null,
     }
   } catch {
@@ -186,6 +188,7 @@ export async function getFrontendBootstrap(): Promise<FrontendBootstrap> {
       siteSettings: {},
       navigation: [],
       secondaryNavigation: [],
+      creditNavigation: [],
       frontPage: null,
     }
   }

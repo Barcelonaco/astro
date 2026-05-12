@@ -1,0 +1,720 @@
+---
+/**
+ * /checkout — tunnel de commande multi-étapes.
+ *
+ * Étapes :
+ *   1. Coordonnées + adresse de livraison
+ *   2. Adresse de facturation (par défaut = livraison)
+ *   3. Mode de livraison (rates depuis backend)
+ *   4. Paiement + récapitulatif
+ *
+ * Création de commande : POST /orders → redirige vers /commande/[id]?guest=token
+ *
+ * Note : intégration Stripe Elements à brancher dans la step 4 (placeholder
+ * 'awaiting_payment' actuellement, le statut paiement sera mis à jour après
+ * confirmation Stripe). Voir TODO §2.
+ */
+import BaseHead from '@frontend/components/BaseHead.astro'
+import Header from '@frontend/components/Header.astro'
+import Footer from '@frontend/components/Footer.astro'
+import SiteOverlays from '@frontend/components/SiteOverlays.astro'
+import DeferredLoader from '@frontend/components/DeferredLoader.astro'
+import { SITE_TITLE } from '@frontend/consts'
+import { getFrontendBootstrap } from '@frontend/lib/api'
+import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`Commande — ${siteName}`} description="Finalisez votre commande" styleSettings={styleSettings} siteSettings={siteSettings} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page checkout-wrap">
+      <div class="checkout-container">
+        <h1 class="checkout-title">Finaliser ma commande</h1>
+        <div id="checkout-stepper" class="checkout-stepper"></div>
+        <div class="checkout-grid">
+          <section id="checkout-form" class="checkout-form">
+            <div class="checkout-loading">Chargement…</div>
+          </section>
+          <aside id="checkout-summary" class="checkout-summary"></aside>
+        </div>
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+
+    <script>
+      import {
+        getCart,
+        getShippingRates,
+        createOrder,
+        formatPrice,
+        type Cart,
+        type ShippingRate,
+        type CheckoutPayload,
+        type Order,
+      } from '@plugins/ecommerce/frontend/lib/shop-api'
+      import {
+        getPaymentConfig,
+        createPaymentIntent,
+        loadStripe,
+        type PaymentConfig,
+      } from '@plugins/ecommerce/frontend/lib/stripe-api'
+      import {
+        isLoggedIn,
+        getMe,
+        getAddresses,
+        type Customer,
+        type CustomerAddress,
+      } from '@plugins/ecommerce/frontend/lib/customer-api'
+
+      type Step = 1 | 2 | 3 | 4
+      const STEPS: Array<[Step, string]> = [[1, 'Livraison'], [2, 'Facturation'], [3, 'Transport'], [4, 'Paiement']]
+
+      type Address = {
+        first_name: string; last_name: string; company: string;
+        address_line1: string; address_line2: string;
+        postcode: string; city: string; country_code: string;
+        phone: string; email: string; vat_number: string;
+      }
+      const emptyAddr = (): Address => ({
+        first_name: '', last_name: '', company: '',
+        address_line1: '', address_line2: '',
+        postcode: '', city: '', country_code: 'FR',
+        phone: '', email: '', vat_number: '',
+      })
+
+      const state = {
+        step: 1 as Step,
+        cart: null as Cart | null,
+        customer: null as Customer | null,
+        savedAddresses: [] as CustomerAddress[],
+        shipping: emptyAddr(),
+        billing: emptyAddr(),
+        billingDifferent: false,
+        rates: [] as ShippingRate[],
+        ratesPostcode: '',
+        selectedRateId: 0,
+        paymentMethod: 'stripe' as 'stripe' | 'bank_transfer' | 'on_invoice',
+        notes: '',
+        submitting: false,
+        error: '',
+        paymentConfig: null as PaymentConfig | null,
+        // Stripe Elements
+        stripePhase: 'choose' as 'choose' | 'pay',
+        order: null as Order | null,
+        clientSecret: '',
+        stripeInstance: null as any,
+        stripeElements: null as any,
+        stripeReady: false,
+      }
+
+      const formRoot = document.getElementById('checkout-form')!
+      const summaryRoot = document.getElementById('checkout-summary')!
+      const stepperRoot = document.getElementById('checkout-stepper')!
+
+      function escape(s: unknown): string {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+      }
+
+      function renderStepper(): void {
+        stepperRoot.innerHTML = STEPS.map(([n, label]) => {
+          const cls = state.step === n ? 'active' : state.step > n ? 'done' : ''
+          return `<div class="checkout-step-pill ${cls}" data-jump="${n}">
+            <span class="checkout-step-num">${state.step > n ? '✓' : n}</span> ${escape(label)}
+          </div>`
+        }).join('<span class="checkout-step-sep"></span>')
+        stepperRoot.querySelectorAll<HTMLElement>('[data-jump]').forEach(el => {
+          el.addEventListener('click', () => {
+            const n = Number(el.dataset.jump) as Step
+            if (n < state.step) goto(n)
+          })
+        })
+      }
+
+      function renderSummary(): void {
+        const c = state.cart
+        if (!c) { summaryRoot.innerHTML = ''; return }
+        const lines: string[] = []
+        for (const i of c.items) {
+          lines.push(`<div class="checkout-sum-line"><span>${escape(i.product_title)} × ${i.quantity}</span><strong>${formatPrice(i.line_total_cents)}</strong></div>`)
+        }
+        for (const i of c.custom_items) {
+          lines.push(`<div class="checkout-sum-line"><span>${escape(i.title)} × ${i.quantity}</span><strong>${formatPrice(i.line_total_cents)}</strong></div>`)
+        }
+        const rate = state.rates.find(r => r.method_id === state.selectedRateId)
+        const shipping = rate ? rate.price_cents : 0
+        const total = c.subtotal_cents + c.tax_cents + shipping
+        summaryRoot.innerHTML = `
+          <h2>Votre commande</h2>
+          <div class="checkout-sum-list">${lines.join('')}</div>
+          <div class="checkout-sum-row"><span>Sous-total HT</span><strong>${formatPrice(c.subtotal_cents)}</strong></div>
+          <div class="checkout-sum-row"><span>Livraison</span><strong>${shipping ? formatPrice(shipping) : '—'}</strong></div>
+          <div class="checkout-sum-row"><span>TVA</span><strong>${c.tax_exempt ? '0,00 €' : formatPrice(c.tax_cents)}</strong></div>
+          ${c.tax_mention ? `<div class="checkout-sum-mention">${escape(c.tax_mention)}</div>` : ''}
+          <div class="checkout-sum-row total"><span>Total${c.tax_exempt ? '' : ' TTC'}</span><strong>${formatPrice(total)}</strong></div>
+        `
+      }
+
+      function addressFields(prefix: 'shipping' | 'billing', addr: Address): string {
+        const f = (name: keyof Address, label: string, type = 'text', required = false, half = false) => `
+          <div class="checkout-field ${half ? 'half' : ''}">
+            <label>${escape(label)}${required ? ' *' : ''}</label>
+            <input type="${type}" name="${prefix}.${name}" value="${escape(addr[name])}" ${required ? 'required' : ''} />
+          </div>`
+        const emailField = prefix === 'shipping'
+          ? f('email', 'Email', 'email', true)
+          : ''
+        return `
+          <div class="checkout-fields">
+            ${emailField}
+            ${f('first_name', 'Prénom', 'text', true, true)}
+            ${f('last_name', 'Nom', 'text', true, true)}
+            ${f('company', 'Société (optionnel)')}
+            ${f('vat_number', 'N° TVA / SIRET (optionnel)')}
+            ${f('address_line1', 'Adresse', 'text', true)}
+            ${f('address_line2', 'Complément')}
+            ${f('postcode', 'Code postal', 'text', true, true)}
+            ${f('city', 'Ville', 'text', true, true)}
+            <div class="checkout-field half">
+              <label>Pays *</label>
+              <select name="${prefix}.country_code" required>
+                <option value="FR" ${addr.country_code === 'FR' ? 'selected' : ''}>France</option>
+                <option value="BE" ${addr.country_code === 'BE' ? 'selected' : ''}>Belgique</option>
+                <option value="LU" ${addr.country_code === 'LU' ? 'selected' : ''}>Luxembourg</option>
+                <option value="CH" ${addr.country_code === 'CH' ? 'selected' : ''}>Suisse</option>
+                <option value="ES" ${addr.country_code === 'ES' ? 'selected' : ''}>Espagne</option>
+                <option value="IT" ${addr.country_code === 'IT' ? 'selected' : ''}>Italie</option>
+              </select>
+            </div>
+            ${f('phone', 'Téléphone', 'tel', false, true)}
+          </div>
+        `
+      }
+
+      function bindAddressInputs(prefix: 'shipping' | 'billing', target: Address): void {
+        formRoot.querySelectorAll<HTMLInputElement | HTMLSelectElement>(`[name^="${prefix}."]`).forEach(input => {
+          input.addEventListener('input', () => {
+            const key = input.name.split('.')[1] as keyof Address
+            ;(target as any)[key] = input.value
+          })
+        })
+      }
+
+      function validateAddress(a: Address, requireEmail: boolean): string | null {
+        if (!a.first_name) return 'Prénom requis'
+        if (!a.last_name) return 'Nom requis'
+        if (!a.address_line1) return 'Adresse requise'
+        if (!a.postcode) return 'Code postal requis'
+        if (!a.city) return 'Ville requise'
+        if (!a.country_code) return 'Pays requis'
+        if (requireEmail && (!a.email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a.email))) return 'Email invalide'
+        return null
+      }
+
+      function applySavedAddress(sa: CustomerAddress, target: Address): void {
+        target.first_name = sa.first_name || ''
+        target.last_name = sa.last_name || ''
+        target.company = sa.company || ''
+        target.address_line1 = sa.address_line1 || ''
+        target.address_line2 = sa.address_line2 || ''
+        target.postcode = sa.postcode || ''
+        target.city = sa.city || ''
+        target.country_code = sa.country_code || 'FR'
+        target.phone = sa.phone || ''
+      }
+
+      function savedAddressPicker(prefix: 'shipping' | 'billing'): string {
+        const addrs = state.savedAddresses.filter(a => a.type === prefix || a.type === 'shipping')
+        if (!addrs.length) return ''
+        const options = addrs.map(a =>
+          `<div class="checkout-saved-addr" data-addr-id="${a.id}">
+            <strong>${escape(a.first_name)} ${escape(a.last_name)}</strong>
+            ${a.company ? `<span> — ${escape(a.company)}</span>` : ''}
+            <div>${escape(a.address_line1)}${a.address_line2 ? `, ${escape(a.address_line2)}` : ''}</div>
+            <div>${escape(a.postcode)} ${escape(a.city)} (${escape(a.country_code)})</div>
+            ${a.is_default ? '<span class="checkout-saved-default">Par défaut</span>' : ''}
+          </div>`
+        ).join('')
+        return `
+          <div class="checkout-saved-block">
+            <h3>Vos adresses enregistrées</h3>
+            <div class="checkout-saved-list">${options}</div>
+          </div>
+        `
+      }
+
+      function bindSavedAddressPicker(prefix: 'shipping' | 'billing', target: Address): void {
+        formRoot.querySelectorAll<HTMLElement>('.checkout-saved-addr').forEach(el => {
+          el.addEventListener('click', () => {
+            const id = Number(el.dataset.addrId)
+            const sa = state.savedAddresses.find(a => a.id === id)
+            if (!sa) return
+            applySavedAddress(sa, target)
+            if (prefix === 'shipping') renderStep1()
+            else renderStep2()
+          })
+        })
+      }
+
+      function renderStep1(): void {
+        formRoot.innerHTML = `
+          <h2>Adresse de livraison</h2>
+          <p class="checkout-step-desc">Renseignez vos coordonnées et l'adresse à laquelle vous souhaitez être livré.</p>
+          ${savedAddressPicker('shipping')}
+          ${addressFields('shipping', state.shipping)}
+          ${state.error ? `<div class="checkout-error">${escape(state.error)}</div>` : ''}
+          <div class="checkout-nav">
+            <a class="btn btn-secondary" href="/panier">← Retour au panier</a>
+            <button type="button" class="btn btn-primary" id="checkout-next">Continuer →</button>
+          </div>
+        `
+        bindAddressInputs('shipping', state.shipping)
+        bindSavedAddressPicker('shipping', state.shipping)
+        document.getElementById('checkout-next')?.addEventListener('click', () => {
+          const err = validateAddress(state.shipping, true)
+          if (err) { state.error = err; renderStep1(); return }
+          state.error = ''
+          if (!state.billingDifferent) {
+            state.billing = { ...state.shipping }
+          }
+          goto(2)
+        })
+      }
+
+      function renderStep2(): void {
+        formRoot.innerHTML = `
+          <h2>Adresse de facturation</h2>
+          <label class="checkout-toggle">
+            <input type="checkbox" id="billingSameToggle" ${state.billingDifferent ? '' : 'checked'} />
+            Identique à l'adresse de livraison
+          </label>
+          <div id="billing-form" style="${state.billingDifferent ? '' : 'display:none'}">
+            ${addressFields('billing', state.billing)}
+          </div>
+          ${state.error ? `<div class="checkout-error">${escape(state.error)}</div>` : ''}
+          <div class="checkout-nav">
+            <button type="button" class="btn btn-secondary" data-back="1">← Précédent</button>
+            <button type="button" class="btn btn-primary" id="checkout-next">Continuer →</button>
+          </div>
+        `
+        const toggle = document.getElementById('billingSameToggle') as HTMLInputElement
+        toggle.addEventListener('change', () => {
+          state.billingDifferent = !toggle.checked
+          if (!state.billingDifferent) state.billing = { ...state.shipping }
+          renderStep2()
+        })
+        bindAddressInputs('billing', state.billing)
+        document.querySelector<HTMLButtonElement>('[data-back]')?.addEventListener('click', () => goto(1))
+        document.getElementById('checkout-next')?.addEventListener('click', async () => {
+          if (state.billingDifferent) {
+            const err = validateAddress(state.billing, false)
+            if (err) { state.error = err; renderStep2(); return }
+            // Email facturation = email livraison
+            state.billing.email = state.shipping.email
+          }
+          state.error = ''
+          // Refresh cart totals with billing country for proper tax calculation
+          const billingCountry = state.billingDifferent ? state.billing.country_code : state.shipping.country_code
+          try {
+            state.cart = await getCart(billingCountry)
+          } catch {}
+          await loadShippingRates()
+          renderSummary()
+          goto(3)
+        })
+      }
+
+      async function loadShippingRates(): Promise<void> {
+        try {
+          state.rates = await getShippingRates(state.shipping.postcode, state.shipping.country_code)
+          state.ratesPostcode = state.shipping.postcode
+          if (state.rates.length && !state.rates.find(r => r.method_id === state.selectedRateId)) {
+            state.selectedRateId = state.rates[0].method_id
+          }
+        } catch (err) {
+          state.rates = []
+        }
+      }
+
+      function renderStep3(): void {
+        const list = state.rates.length
+          ? state.rates.map(r => `
+            <label class="checkout-rate ${state.selectedRateId === r.method_id ? 'sel' : ''}">
+              <input type="radio" name="rate" value="${r.method_id}" ${state.selectedRateId === r.method_id ? 'checked' : ''} />
+              <div class="checkout-rate-body">
+                <div class="checkout-rate-name">${escape(r.name)}</div>
+                ${r.description ? `<div class="checkout-rate-desc">${escape(r.description)}</div>` : ''}
+                ${r.delivery_min_days || r.delivery_max_days ? `<div class="checkout-rate-delay">Délai : ${r.delivery_min_days || '?'}–${r.delivery_max_days || '?'} jours</div>` : ''}
+              </div>
+              <div class="checkout-rate-price">${r.price_cents === 0 ? 'Offert' : formatPrice(r.price_cents)}</div>
+            </label>
+          `).join('')
+          : `<div class="checkout-empty">Aucun mode de livraison disponible pour <strong>${escape(state.shipping.postcode)}</strong> (${escape(state.shipping.country_code)}). <button type="button" class="btn-link" data-back="1">Modifier l'adresse</button></div>`
+
+        formRoot.innerHTML = `
+          <h2>Mode de livraison</h2>
+          <p class="checkout-step-desc">Livraison à <strong>${escape(state.shipping.postcode)} ${escape(state.shipping.city)}</strong>.</p>
+          <div class="checkout-rates">${list}</div>
+          ${state.error ? `<div class="checkout-error">${escape(state.error)}</div>` : ''}
+          <div class="checkout-nav">
+            <button type="button" class="btn btn-secondary" data-back="2">← Précédent</button>
+            <button type="button" class="btn btn-primary" id="checkout-next" ${state.rates.length ? '' : 'disabled'}>Continuer →</button>
+          </div>
+        `
+        formRoot.querySelectorAll<HTMLInputElement>('[name="rate"]').forEach(r => {
+          r.addEventListener('change', () => {
+            state.selectedRateId = Number(r.value)
+            renderSummary()
+            renderStep3()
+          })
+        })
+        formRoot.querySelectorAll<HTMLElement>('[data-back]').forEach(b => b.addEventListener('click', () => goto(Number(b.dataset.back) as Step)))
+        document.getElementById('checkout-next')?.addEventListener('click', () => {
+          if (!state.selectedRateId) { state.error = 'Choisissez un mode de livraison'; renderStep3(); return }
+          state.error = ''
+          goto(4)
+        })
+      }
+
+      function renderStep4(): void {
+        if (state.stripePhase === 'pay') {
+          renderStripePayment()
+          return
+        }
+        const rate = state.rates.find(r => r.method_id === state.selectedRateId)
+        const stripeAvailable = state.paymentConfig?.stripe?.enabled && !!state.paymentConfig.stripe.pk
+        const methodsAvailable = state.paymentConfig?.payment_methods || ['stripe', 'bank_transfer']
+
+        const stripeOption = stripeAvailable && methodsAvailable.includes('stripe')
+          ? `<label class="checkout-payment ${state.paymentMethod === 'stripe' ? 'sel' : ''}">
+              <input type="radio" name="pm" value="stripe" ${state.paymentMethod === 'stripe' ? 'checked' : ''} />
+              <div>
+                <strong>Carte bancaire</strong>
+                <div class="checkout-payment-desc">Paiement sécurisé via Stripe (CB / Visa / Mastercard).</div>
+              </div>
+            </label>`
+          : ''
+        const bankOption = methodsAvailable.includes('bank_transfer')
+          ? `<label class="checkout-payment ${state.paymentMethod === 'bank_transfer' ? 'sel' : ''}">
+              <input type="radio" name="pm" value="bank_transfer" ${state.paymentMethod === 'bank_transfer' ? 'checked' : ''} />
+              <div>
+                <strong>Virement bancaire</strong>
+                <div class="checkout-payment-desc">RIB envoyé par email après validation. Commande traitée à réception du virement.</div>
+              </div>
+            </label>`
+          : ''
+
+        formRoot.innerHTML = `
+          <h2>Paiement</h2>
+          <p class="checkout-step-desc">Sélectionnez votre mode de paiement.</p>
+
+          <div class="checkout-payment-list">
+            ${stripeOption}
+            ${bankOption}
+            ${!stripeOption && !bankOption ? '<div class="checkout-empty">Aucun mode de paiement disponible. Contactez l\'administrateur.</div>' : ''}
+          </div>
+
+          <div class="checkout-field" style="margin-top:24px">
+            <label>Note pour la commande (optionnel)</label>
+            <textarea id="checkout-notes" rows="3" placeholder="Précisions de livraison, contraintes d'accès…">${escape(state.notes)}</textarea>
+          </div>
+
+          <div class="checkout-recap">
+            <h3>Vérifiez votre commande</h3>
+            <div><strong>Livraison :</strong> ${escape(state.shipping.first_name)} ${escape(state.shipping.last_name)}, ${escape(state.shipping.address_line1)}, ${escape(state.shipping.postcode)} ${escape(state.shipping.city)} (${escape(state.shipping.country_code)})</div>
+            <div><strong>Email :</strong> ${escape(state.shipping.email)}</div>
+            <div><strong>Transport :</strong> ${escape(rate?.name || '')} — ${rate ? formatPrice(rate.price_cents) : '—'}</div>
+          </div>
+
+          <div class="checkout-cgv">
+            <label><input type="checkbox" id="cgv-check" /> J'ai lu et j'accepte les <a href="/cgv" target="_blank">conditions générales de vente</a></label>
+          </div>
+
+          ${state.error ? `<div class="checkout-error">${escape(state.error)}</div>` : ''}
+
+          <div class="checkout-nav">
+            <button type="button" class="btn btn-secondary" data-back="3">← Précédent</button>
+            <button type="button" class="btn btn-primary" id="checkout-submit" ${state.submitting || (!stripeOption && !bankOption) ? 'disabled' : ''}>${state.submitting ? 'Traitement…' : (state.paymentMethod === 'stripe' ? 'Continuer vers le paiement →' : 'Confirmer la commande')}</button>
+          </div>
+        `
+        formRoot.querySelectorAll<HTMLInputElement>('[name="pm"]').forEach(r => {
+          r.addEventListener('change', () => { state.paymentMethod = r.value as any; renderStep4() })
+        })
+        document.getElementById('checkout-notes')?.addEventListener('input', e => {
+          state.notes = (e.target as HTMLTextAreaElement).value
+        })
+        formRoot.querySelectorAll<HTMLElement>('[data-back]').forEach(b => b.addEventListener('click', () => goto(Number(b.dataset.back) as Step)))
+        document.getElementById('checkout-submit')?.addEventListener('click', submitOrder)
+      }
+
+      async function submitOrder(): Promise<void> {
+        const cgv = (document.getElementById('cgv-check') as HTMLInputElement | null)?.checked
+        if (!cgv) { state.error = 'Vous devez accepter les CGV.'; renderStep4(); return }
+        state.error = ''
+        state.submitting = true
+        renderStep4()
+
+        try {
+          const payload: CheckoutPayload = {
+            billing: state.billing,
+            shipping: state.shipping,
+            shipping_method_id: state.selectedRateId,
+            payment_method: state.paymentMethod,
+            notes: state.notes,
+          }
+          const order = await createOrder(payload)
+          state.order = order
+          window.dispatchEvent(new CustomEvent('cart:updated', { detail: { items_count: 0 } }))
+
+          if (state.paymentMethod === 'stripe') {
+            await initStripePayment(order)
+          } else {
+            // Virement / on_invoice → confirmation directe
+            const guest = order.guest_token ? `&guest_token=${encodeURIComponent(order.guest_token)}` : ''
+            window.location.href = `/commande/confirmation?order=${order.id}${guest}`
+          }
+        } catch (err) {
+          state.error = err instanceof Error ? err.message : 'Erreur lors de la création de la commande.'
+          state.submitting = false
+          renderStep4()
+        }
+      }
+
+      async function initStripePayment(order: Order): Promise<void> {
+        try {
+          const intent = await createPaymentIntent(order.id, order.guest_token || undefined)
+          state.clientSecret = intent.client_secret
+          const cfg = state.paymentConfig!
+          state.stripeInstance = await loadStripe(cfg.stripe.pk)
+          state.stripeElements = state.stripeInstance.elements({
+            clientSecret: intent.client_secret,
+            appearance: { theme: 'stripe', variables: { colorPrimary: '#1a1a18' } },
+          })
+          state.stripePhase = 'pay'
+          state.submitting = false
+          renderStripePayment()
+        } catch (err) {
+          state.error = err instanceof Error ? err.message : 'Initialisation Stripe échouée.'
+          state.submitting = false
+          renderStep4()
+        }
+      }
+
+      function renderStripePayment(): void {
+        const order = state.order
+        if (!order) return
+        formRoot.innerHTML = `
+          <h2>Paiement par carte</h2>
+          <p class="checkout-step-desc">Commande <strong>${escape(order.order_number)}</strong> · Montant <strong>${formatPrice(order.total_cents)}</strong></p>
+
+          <div id="stripe-payment-element" class="checkout-stripe-element"></div>
+          <div id="stripe-error" class="checkout-error" style="display:none"></div>
+
+          <div class="checkout-nav">
+            <button type="button" class="btn btn-secondary" id="stripe-cancel">← Modifier le paiement</button>
+            <button type="button" class="btn btn-primary" id="stripe-pay" disabled>Chargement…</button>
+          </div>
+
+          <p class="checkout-payment-secured">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Paiement sécurisé via Stripe — vos données bancaires ne transitent jamais par notre serveur.
+          </p>
+        `
+
+        const mount = document.getElementById('stripe-payment-element')!
+        const payBtn = document.getElementById('stripe-pay') as HTMLButtonElement
+        const errEl = document.getElementById('stripe-error')!
+        const cancelBtn = document.getElementById('stripe-cancel') as HTMLButtonElement
+
+        const paymentElement = state.stripeElements.create('payment', { layout: 'tabs' })
+        paymentElement.mount(mount)
+        paymentElement.on('ready', () => {
+          payBtn.disabled = false
+          payBtn.textContent = `Payer ${formatPrice(order.total_cents)}`
+        })
+        paymentElement.on('change', (ev: any) => {
+          if (ev.error) {
+            errEl.style.display = 'block'
+            errEl.textContent = ev.error.message
+          } else {
+            errEl.style.display = 'none'
+            errEl.textContent = ''
+          }
+        })
+
+        cancelBtn.addEventListener('click', () => {
+          // L'order existe déjà. On laisse l'option de revenir au choix de paiement
+          // (le client peut tenter à nouveau via /commande/confirmation puis "Payer").
+          state.stripePhase = 'choose'
+          renderStep4()
+        })
+
+        payBtn.addEventListener('click', async () => {
+          payBtn.disabled = true
+          payBtn.textContent = 'Traitement…'
+          errEl.style.display = 'none'
+
+          const guest = order.guest_token ? `&guest_token=${encodeURIComponent(order.guest_token)}` : ''
+          const returnUrl = `${window.location.origin}/commande/confirmation?order=${order.id}${guest}`
+
+          const { error } = await state.stripeInstance.confirmPayment({
+            elements: state.stripeElements,
+            confirmParams: { return_url: returnUrl },
+          })
+
+          // confirmPayment ne resolve qu'en cas d'erreur (sinon redirect).
+          if (error) {
+            errEl.style.display = 'block'
+            errEl.textContent = error.message || 'Paiement refusé.'
+            payBtn.disabled = false
+            payBtn.textContent = `Réessayer · ${formatPrice(order.total_cents)}`
+          }
+        })
+      }
+
+      function goto(n: Step): void {
+        state.step = n
+        renderStepper()
+        if (n === 1) renderStep1()
+        else if (n === 2) renderStep2()
+        else if (n === 3) renderStep3()
+        else if (n === 4) renderStep4()
+        renderSummary()
+      }
+
+      ;(async () => {
+        try {
+          const promises: [Promise<Cart>, Promise<PaymentConfig>] = [getCart(), getPaymentConfig()]
+          const [cart, paymentConfig] = await Promise.all(promises)
+          state.cart = cart
+          state.paymentConfig = paymentConfig
+          if (!state.cart.items.length && !state.cart.custom_items.length) {
+            window.location.href = '/panier'
+            return
+          }
+          // Default payment method = first available
+          const methods = paymentConfig.payment_methods || []
+          if (paymentConfig.stripe.enabled && methods.includes('stripe')) state.paymentMethod = 'stripe'
+          else if (methods.includes('bank_transfer')) state.paymentMethod = 'bank_transfer'
+
+          // Pre-fill from customer account if logged in
+          if (isLoggedIn()) {
+            try {
+              const [customer, addresses] = await Promise.all([getMe(), getAddresses()])
+              state.customer = customer
+              state.savedAddresses = addresses
+              // Pre-fill email from customer
+              state.shipping.email = customer.email || ''
+              // Pre-fill from default shipping address (or first shipping, or first any)
+              const defaultShipping = addresses.find(a => a.type === 'shipping' && a.is_default)
+                || addresses.find(a => a.type === 'shipping')
+                || addresses.find(a => a.is_default)
+                || addresses[0]
+              if (defaultShipping) {
+                applySavedAddress(defaultShipping, state.shipping)
+              } else {
+                // No saved address — prefill name from customer profile
+                state.shipping.first_name = customer.first_name || ''
+                state.shipping.last_name = customer.last_name || ''
+                state.shipping.company = customer.company || ''
+                state.shipping.phone = customer.phone || ''
+                if (customer.vat_number) state.shipping.vat_number = customer.vat_number
+              }
+              // Pre-fill billing from default billing address
+              const defaultBilling = addresses.find(a => a.type === 'billing' && a.is_default)
+                || addresses.find(a => a.type === 'billing')
+              if (defaultBilling) {
+                applySavedAddress(defaultBilling, state.billing)
+                state.billing.email = customer.email || ''
+              }
+            } catch {}
+          }
+
+          renderStepper()
+          renderSummary()
+          renderStep1()
+        } catch (err) {
+          formRoot.innerHTML = `<div class="checkout-empty">Impossible de charger votre panier. <a href="/panier">Retour</a></div>`
+        }
+      })()
+    </script>
+
+    <style is:global>
+      .checkout-wrap { min-height: 60vh; padding: 40px 0 80px; }
+      .checkout-container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+      .checkout-title { font-size: 28px; margin-bottom: 24px; }
+      .checkout-stepper { display: flex; align-items: center; gap: 8px; margin-bottom: 32px; flex-wrap: wrap; }
+      .checkout-step-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid #ddd; border-radius: 999px; font-size: 13px; cursor: default; color: #888; }
+      .checkout-step-pill.active { border-color: #1a1a18; color: #1a1a18; font-weight: 600; }
+      .checkout-step-pill.done { border-color: #1a1a18; color: #1a1a18; cursor: pointer; }
+      .checkout-step-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #f0f0f0; font-size: 12px; font-weight: 700; }
+      .checkout-step-pill.active .checkout-step-num, .checkout-step-pill.done .checkout-step-num { background: #1a1a18; color: #fff; }
+      .checkout-step-sep { flex: 0 0 16px; height: 1px; background: #ddd; }
+      .checkout-grid { display: grid; grid-template-columns: 1fr 320px; gap: 32px; align-items: start; }
+      @media (max-width: 900px) { .checkout-grid { grid-template-columns: 1fr; } }
+      .checkout-form h2 { font-size: 20px; margin-bottom: 8px; }
+      .checkout-step-desc { color: #666; font-size: 14px; margin-bottom: 20px; }
+      .checkout-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-bottom: 24px; }
+      .checkout-field { display: flex; flex-direction: column; grid-column: 1 / -1; }
+      .checkout-field.half { grid-column: span 1; }
+      .checkout-field label { font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #333; }
+      .checkout-field input, .checkout-field select, .checkout-field textarea { padding: 10px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; font-family: inherit; }
+      .checkout-field input:focus, .checkout-field select:focus, .checkout-field textarea:focus { outline: none; border-color: #1a1a18; }
+      .checkout-toggle { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 14px; cursor: pointer; }
+      .checkout-rates { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+      .checkout-rate { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; }
+      .checkout-rate.sel { border-color: #1a1a18; background: #fafaf8; }
+      .checkout-rate-body { flex: 1; }
+      .checkout-rate-name { font-weight: 600; }
+      .checkout-rate-desc { color: #666; font-size: 13px; }
+      .checkout-rate-delay { color: #888; font-size: 12px; margin-top: 2px; }
+      .checkout-rate-price { font-weight: 600; }
+      .checkout-payment-list { display: flex; flex-direction: column; gap: 10px; }
+      .checkout-payment { display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; }
+      .checkout-payment.sel { border-color: #1a1a18; background: #fafaf8; }
+      .checkout-payment-desc { color: #666; font-size: 13px; margin-top: 2px; }
+      .checkout-stripe-element { padding: 16px; border: 1px solid #ddd; border-radius: 6px; background: #fff; margin-bottom: 20px; min-height: 100px; }
+      .checkout-payment-secured { display: flex; align-items: center; gap: 6px; margin-top: 16px; font-size: 12px; color: #888; }
+      .checkout-recap { margin-top: 24px; padding: 16px 20px; background: #fafaf8; border-radius: 6px; font-size: 14px; }
+      .checkout-recap h3 { font-size: 14px; margin: 0 0 8px; }
+      .checkout-recap div { margin-bottom: 6px; }
+      .checkout-cgv { margin-top: 16px; font-size: 13px; }
+      .checkout-cgv label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+      .checkout-error { margin: 16px 0; padding: 10px 14px; background: #fee; color: #d33; border: 1px solid #fcc; border-radius: 4px; font-size: 14px; }
+      .checkout-empty { padding: 24px; text-align: center; color: #666; background: #fafaf8; border-radius: 6px; }
+      .checkout-nav { display: flex; justify-content: space-between; margin-top: 28px; gap: 12px; flex-wrap: wrap; }
+      .btn-link { background: none; border: none; color: #1a1a18; text-decoration: underline; cursor: pointer; padding: 0; font: inherit; }
+      .checkout-summary { background: #fafaf8; padding: 24px; border: 1px solid #eee; border-radius: 6px; position: sticky; top: 24px; }
+      .checkout-summary h2 { font-size: 18px; margin: 0 0 16px; }
+      .checkout-sum-list { margin-bottom: 16px; }
+      .checkout-sum-line { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 4px 0; }
+      .checkout-sum-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+      .checkout-sum-row.total { border-top: 1px solid #ddd; padding-top: 12px; margin-top: 8px; font-size: 16px; font-weight: 600; }
+      .checkout-sum-mention { font-size: 11px; color: #856404; background: #fff3cd; padding: 6px 10px; border-radius: 4px; margin: 6px 0; }
+      .checkout-loading { padding: 40px 0; text-align: center; color: #666; }
+      .checkout-saved-block { margin-bottom: 24px; }
+      .checkout-saved-block h3 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
+      .checkout-saved-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      @media (max-width: 600px) { .checkout-saved-list { grid-template-columns: 1fr; } }
+      .checkout-saved-addr { padding: 12px 16px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; font-size: 13px; line-height: 1.5; transition: border-color .15s; }
+      .checkout-saved-addr:hover { border-color: #1a1a18; background: #fafaf8; }
+      .checkout-saved-default { display: inline-block; margin-top: 4px; font-size: 11px; color: #1a1a18; font-weight: 600; }
+    </style>
+  </body>
+</html>

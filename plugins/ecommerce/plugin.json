@@ -1,7 +1,7 @@
 {
   "name": "ecommerce",
   "label": "E-commerce",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Système e-commerce complet : produits, variants, panier, checkout, commandes, factures, devis.",
 
   "requires_ecommerce_enabled": true,
@@ -21,38 +21,71 @@
   "postTypes": [
     {
       "slug": "products",
+      "archivePath": "/boutique",
       "label": "Produit",
       "labelPlural": "Produits",
       "isFemale": false,
       "icon": "📦",
       "supports": ["title", "slug", "featured_image", "content", "status"],
+      "editor": { "url": "/plugin-assets/ecommerce/admin/product-editor.html" },
+      "hasCategories": true,
+      "categoryLabel": "Catégories produits",
       "fields": [
-        { "name": "sku", "label": "SKU (référence)", "type": "Text" },
-        { "name": "type", "label": "Type de produit", "type": "Select", "options": {"physical": "Physique", "digital": "Digital (téléchargement)", "service": "Service / prestation"}, "default": "physical" },
-        { "name": "base_price", "label": "Prix de base (€)", "type": "Number" },
-        { "name": "compare_at_price", "label": "Prix barré (€)", "type": "Number" },
-        { "name": "tax_code", "label": "Taux de TVA", "type": "Text", "default": "FR_STANDARD" },
-        { "name": "weight_grams", "label": "Poids (g)", "type": "Number" },
-        { "name": "dimensions_length", "label": "Longueur (cm)", "type": "Number" },
-        { "name": "dimensions_width", "label": "Largeur (cm)", "type": "Number" },
-        { "name": "dimensions_height", "label": "Hauteur (cm)", "type": "Number" },
-        { "name": "requires_shipping", "label": "Nécessite une livraison", "type": "TrueFalse", "default": true },
-        { "name": "download_file", "label": "Fichier à télécharger", "type": "File" },
-        { "name": "download_limit", "label": "Limite de téléchargements", "type": "Number" },
-        { "name": "gallery", "label": "Galerie d'images", "type": "Photos" },
-        { "name": "short_features", "label": "Caractéristiques courtes", "type": "Repeater", "subFields": [
+        { "name": "product_type", "label": "Type de produit", "type": "Select", "options": {"simple": "Produit simple", "variable": "Produit variable", "external": "Externe / Affilié", "grouped": "Groupé"}, "default": "simple", "group": "header" },
+        { "name": "is_virtual", "label": "Virtuel", "type": "TrueFalse", "group": "header" },
+        { "name": "is_downloadable", "label": "Téléchargeable", "type": "TrueFalse", "group": "header" },
+
+        { "name": "header_config", "label": "Header de page", "type": "Json", "group": "page_header" },
+        { "name": "layout_config", "label": "Paramètres de page", "type": "Json", "group": "page_settings" },
+        { "name": "seo_meta",      "label": "Méta SEO",         "type": "Json", "group": "seo" },
+
+        { "name": "sku", "label": "SKU (référence)", "type": "Text", "group": "inventory" },
+        { "name": "stock_managed", "label": "Suivre le stock", "type": "TrueFalse", "default": true, "conditional": { "field": "product_type", "operator": "!=", "value": "variable" }, "group": "inventory" },
+        { "name": "stock_quantity", "label": "Quantité en stock", "type": "Number", "default": 0, "conditional": { "field": "product_type", "operator": "!=", "value": "variable" }, "group": "inventory" },
+        { "name": "low_stock_threshold", "label": "Seuil alerte stock bas", "type": "Number", "default": 5, "conditional": { "field": "product_type", "operator": "!=", "value": "variable" }, "group": "inventory" },
+        { "name": "sold_individually", "label": "Vendu individuellement (1 max par commande)", "type": "TrueFalse", "group": "inventory" },
+
+        { "name": "base_price", "label": "Prix de base (€)", "type": "Number", "group": "general" },
+        { "name": "compare_at_price", "label": "Prix promo (€)", "type": "Number", "group": "general" },
+        { "name": "tax_code", "label": "Taux de TVA", "type": "Select", "default": "FR_STANDARD", "dynamicSource": { "endpoint": "/shop/tax-rates", "dataPath": "rates", "valueKey": "code", "labelKey": "label", "placeholder": "Taux par défaut du pays" }, "group": "general" },
+
+        { "name": "weight_grams", "label": "Poids (g)", "type": "Number", "conditional": { "field": "is_virtual", "operator": "!=", "value": "1" }, "group": "shipping" },
+        { "name": "dimensions_length", "label": "Longueur (cm)", "type": "Number", "conditional": { "field": "is_virtual", "operator": "!=", "value": "1" }, "group": "shipping" },
+        { "name": "dimensions_width",  "label": "Largeur (cm)",  "type": "Number", "conditional": { "field": "is_virtual", "operator": "!=", "value": "1" }, "group": "shipping" },
+        { "name": "dimensions_height", "label": "Hauteur (cm)",  "type": "Number", "conditional": { "field": "is_virtual", "operator": "!=", "value": "1" }, "group": "shipping" },
+        { "name": "shipping_class", "label": "Classe d'expédition", "type": "Text", "conditional": { "field": "is_virtual", "operator": "!=", "value": "1" }, "group": "shipping" },
+        { "name": "requires_shipping", "label": "Nécessite une livraison", "type": "TrueFalse", "default": true, "group": "shipping" },
+
+        { "name": "upsell_ids", "label": "Produits suggérés (upsells)", "type": "Repeater", "group": "linked", "subFields": [{ "name": "id", "type": "Number" }] },
+        { "name": "cross_sell_ids", "label": "Produits complémentaires (panier)", "type": "Repeater", "group": "linked", "subFields": [{ "name": "id", "type": "Number" }] },
+        { "name": "grouped_ids", "label": "Produits groupés", "type": "Repeater", "conditional": { "field": "product_type", "operator": "==", "value": "grouped" }, "group": "linked", "subFields": [{ "name": "id", "type": "Number" }] },
+
+        { "name": "attributes", "label": "Attributs", "type": "Json", "group": "attributes" },
+
+        { "name": "download_file", "label": "Fichier à télécharger", "type": "File", "conditional": { "field": "is_downloadable", "operator": "==", "value": "1" }, "group": "downloads" },
+        { "name": "download_limit", "label": "Limite de téléchargements", "type": "Number", "conditional": { "field": "is_downloadable", "operator": "==", "value": "1" }, "group": "downloads" },
+
+        { "name": "purchase_note", "label": "Note d'achat (visible client après paiement)", "type": "Textarea", "group": "advanced" },
+        { "name": "menu_order", "label": "Ordre d'affichage", "type": "Number", "default": 0, "group": "advanced" },
+        { "name": "reviews_enabled", "label": "Activer les avis", "type": "TrueFalse", "default": true, "group": "advanced" },
+        { "name": "visibility_catalog", "label": "Visibilité catalogue", "type": "Select", "options": {"visible":"Catalogue et recherche","catalog":"Catalogue uniquement","search":"Recherche uniquement","hidden":"Caché"}, "default": "visible", "group": "advanced" },
+
+        { "name": "is_featured", "label": "Mis en avant (homepage)", "type": "TrueFalse", "group": "advanced" },
+        { "name": "short_features", "label": "Caractéristiques courtes (fiche produit)", "type": "Repeater", "group": "advanced", "subFields": [
           { "name": "label", "label": "Libellé", "type": "Text" },
           { "name": "value", "label": "Valeur", "type": "Text" }
         ]},
-        { "name": "is_featured", "label": "Mis en avant", "type": "TrueFalse" },
-        { "name": "variants_enabled", "label": "Activer les variants", "type": "TrueFalse" },
-        { "name": "variant_attributes", "label": "Attributs de variants", "type": "Repeater", "subFields": [
-          { "name": "name", "label": "Nom (ex: Taille)", "type": "Text" },
-          { "name": "options", "label": "Options (une par ligne)", "type": "Textarea" }
-        ]}
-      ],
-      "hasCategories": true,
-      "categoryLabel": "Catégories produits"
+        { "name": "gallery", "label": "Galerie d'images (sidebar)", "type": "Photos", "group": "sidebar" }
+      ]
     }
+  ],
+
+  "admin_pages": [
+    { "slug": "orders",    "label": "Commandes",              "url": "/plugin-assets/ecommerce/admin/orders.html",    "min_role": "editor" },
+    { "slug": "customers", "label": "Clients",                "url": "/plugin-assets/ecommerce/admin/customers.html", "min_role": "editor" },
+    { "slug": "settings",  "label": "Paramètres e-commerce",  "url": "/plugin-assets/ecommerce/admin/settings.html",  "min_role": "super_admin" },
+    { "slug": "shipping",  "label": "Zones de livraison",     "url": "/plugin-assets/ecommerce/admin/shipping.html",  "min_role": "editor" },
+    { "slug": "tax",       "label": "Taux de TVA",            "url": "/plugin-assets/ecommerce/admin/tax.html",       "min_role": "editor" },
+    { "slug": "coupons",   "label": "Coupons de réduction",   "url": "/plugin-assets/ecommerce/admin/coupons.html",   "min_role": "editor" }
   ]
 }

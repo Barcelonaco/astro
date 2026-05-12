@@ -10627,6 +10627,619 @@
                     "subFields": null
                 }
             ]
+        },
+        "LegalNotice": {
+            "layout": "legal-notice",
+            "fields": [
+                {
+                    "name": "title",
+                    "label": "Titre du bloc",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "id_bloc",
+                    "label": "ID du bloc",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "title_align",
+                    "label": "Alignement du titre",
+                    "type": "ButtonGroup",
+                    "choices": [
+                        {
+                            "value": "left",
+                            "label": "Gauche"
+                        },
+                        {
+                            "value": "center",
+                            "label": "Centre"
+                        },
+                        {
+                            "value": "right",
+                            "label": "Droit"
+                        }
+                    ],
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": {
+                        "field": "title",
+                        "operator": "!=",
+                        "value": "null"
+                    },
+                    "defaultValue": "center",
+                    "isBlockParam": true
+                },
+                {
+                    "name": "title_style",
+                    "label": "Balise du titre",
+                    "type": "ButtonGroup",
+                    "choices": [
+                        {
+                            "value": "2",
+                            "label": "h2"
+                        },
+                        {
+                            "value": "3",
+                            "label": "h3"
+                        },
+                        {
+                            "value": "4",
+                            "label": "h4"
+                        }
+                    ],
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": {
+                        "field": "title",
+                        "operator": "!=",
+                        "value": "null"
+                    },
+                    "defaultValue": "4",
+                    "isBlockParam": true
+                },
+                {
+                    "name": "bloc_color",
+                    "label": "Couleur de fond du bloc",
+                    "type": "ButtonGroup",
+                    "choices": [
+                        {
+                            "value": "no-background-color",
+                            "label": "Aucune"
+                        },
+                        {
+                            "value": "has-background-primary",
+                            "label": "Primaire"
+                        },
+                        {
+                            "value": "has-background-secondary",
+                            "label": "Secondaire"
+                        },
+                        {
+                            "value": "has-background-tertiary",
+                            "label": "Tertiaire"
+                        }
+                    ],
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "padding_top",
+                    "label": "Espace en haut du bloc",
+                    "type": "ButtonGroup",
+                    "choices": [
+                        {
+                            "value": "padding-top-small",
+                            "label": "Petit"
+                        },
+                        {
+                            "value": "no-padding-top",
+                            "label": "Aucun"
+                        }
+                    ],
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "defaultValue": false,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "padding_bottom",
+                    "label": "Espace en bas du bloc",
+                    "type": "ButtonGroup",
+                    "choices": [
+                        {
+                            "value": "padding-bottom-small",
+                            "label": "Petit"
+                        },
+                        {
+                            "value": "no-padding-bottom",
+                            "label": "Aucun"
+                        }
+                    ],
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "defaultValue": false,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "bg_img",
+                    "label": "Image de fond",
+                    "type": "Image",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "bg_opacity",
+                    "label": "Opacite",
+                    "type": "Range",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": {
+                        "field": "bg_img",
+                        "operator": "!=empty",
+                        "value": null
+                    },
+                    "defaultValue": 10,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "bg_parallax",
+                    "label": "Mettre un effet de parallax ?",
+                    "type": "TrueFalse",
+                    "choices": null,
+                    "onLabel": "Oui",
+                    "offLabel": "Non",
+                    "conditional": {
+                        "field": "bg_img",
+                        "operator": "!=empty",
+                        "value": null
+                    },
+                    "defaultValue": false,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "is_visible",
+                    "label": "Afficher le bloc",
+                    "type": "ButtonGroup",
+                    "choices": [
+                        {
+                            "value": "yes",
+                            "label": "Oui"
+                        },
+                        {
+                            "value": "no",
+                            "label": "Non"
+                        }
+                    ],
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "defaultValue": "yes",
+                    "isBlockParam": true
+                },
+                {
+                    "name": "site_name",
+                    "label": "Nom du site",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null,
+                    "helperText": "Ex: nickl.fr"
+                },
+                {
+                    "name": "site_url",
+                    "label": "URL du site",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null,
+                    "helperText": "Ex: https://nickl.fr"
+                },
+                {
+                    "name": "owner_name",
+                    "label": "Proprietaire (raison sociale)",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null
+                },
+                {
+                    "name": "owner_capital",
+                    "label": "Capital social",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null,
+                    "helperText": "Ex: 10000 euros"
+                },
+                {
+                    "name": "owner_vat",
+                    "label": "Numero de TVA",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null
+                },
+                {
+                    "name": "owner_address",
+                    "label": "Adresse du proprietaire",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null
+                },
+                {
+                    "name": "publication_manager",
+                    "label": "Responsable publication",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null
+                },
+                {
+                    "name": "publication_email",
+                    "label": "Email responsable publication",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null
+                },
+                {
+                    "name": "webmaster_name",
+                    "label": "Webmaster",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null
+                },
+                {
+                    "name": "webmaster_email",
+                    "label": "Email webmaster",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null
+                },
+                {
+                    "name": "host_name",
+                    "label": "Hebergeur",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null
+                },
+                {
+                    "name": "host_address",
+                    "label": "Adresse hebergeur",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null
+                },
+                {
+                    "name": "dpo_name",
+                    "label": "Delegue protection des donnees (DPO)",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null
+                },
+                {
+                    "name": "dpo_email",
+                    "label": "Email DPO",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null
+                },
+                {
+                    "name": "jurisdiction",
+                    "label": "Tribunal competent (ville)",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null,
+                    "helperText": "Ex: Nimes"
+                }
+            ]
+        },
+        "PrivacyPolicy": {
+            "layout": "privacy-policy",
+            "fields": [
+                {
+                    "name": "title",
+                    "label": "Titre du bloc",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "id_bloc",
+                    "label": "ID du bloc",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "title_align",
+                    "label": "Alignement du titre",
+                    "type": "ButtonGroup",
+                    "choices": [
+                        {
+                            "value": "left",
+                            "label": "Gauche"
+                        },
+                        {
+                            "value": "center",
+                            "label": "Centre"
+                        },
+                        {
+                            "value": "right",
+                            "label": "Droit"
+                        }
+                    ],
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": {
+                        "field": "title",
+                        "operator": "!=",
+                        "value": "null"
+                    },
+                    "defaultValue": "center",
+                    "isBlockParam": true
+                },
+                {
+                    "name": "title_style",
+                    "label": "Balise du titre",
+                    "type": "ButtonGroup",
+                    "choices": [
+                        {
+                            "value": "2",
+                            "label": "h2"
+                        },
+                        {
+                            "value": "3",
+                            "label": "h3"
+                        },
+                        {
+                            "value": "4",
+                            "label": "h4"
+                        }
+                    ],
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": {
+                        "field": "title",
+                        "operator": "!=",
+                        "value": "null"
+                    },
+                    "defaultValue": "4",
+                    "isBlockParam": true
+                },
+                {
+                    "name": "bloc_color",
+                    "label": "Couleur de fond du bloc",
+                    "type": "ButtonGroup",
+                    "choices": [
+                        {
+                            "value": "no-background-color",
+                            "label": "Aucune"
+                        },
+                        {
+                            "value": "has-background-primary",
+                            "label": "Primaire"
+                        },
+                        {
+                            "value": "has-background-secondary",
+                            "label": "Secondaire"
+                        },
+                        {
+                            "value": "has-background-tertiary",
+                            "label": "Tertiaire"
+                        }
+                    ],
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "padding_top",
+                    "label": "Espace en haut du bloc",
+                    "type": "ButtonGroup",
+                    "choices": [
+                        {
+                            "value": "padding-top-small",
+                            "label": "Petit"
+                        },
+                        {
+                            "value": "no-padding-top",
+                            "label": "Aucun"
+                        }
+                    ],
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "defaultValue": false,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "padding_bottom",
+                    "label": "Espace en bas du bloc",
+                    "type": "ButtonGroup",
+                    "choices": [
+                        {
+                            "value": "padding-bottom-small",
+                            "label": "Petit"
+                        },
+                        {
+                            "value": "no-padding-bottom",
+                            "label": "Aucun"
+                        }
+                    ],
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "defaultValue": false,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "bg_img",
+                    "label": "Image de fond",
+                    "type": "Image",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "bg_opacity",
+                    "label": "Opacite",
+                    "type": "Range",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": {
+                        "field": "bg_img",
+                        "operator": "!=empty",
+                        "value": null
+                    },
+                    "defaultValue": 10,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "bg_parallax",
+                    "label": "Mettre un effet de parallax ?",
+                    "type": "TrueFalse",
+                    "choices": null,
+                    "onLabel": "Oui",
+                    "offLabel": "Non",
+                    "conditional": {
+                        "field": "bg_img",
+                        "operator": "!=empty",
+                        "value": null
+                    },
+                    "defaultValue": false,
+                    "isBlockParam": true
+                },
+                {
+                    "name": "is_visible",
+                    "label": "Afficher le bloc",
+                    "type": "ButtonGroup",
+                    "choices": [
+                        {
+                            "value": "yes",
+                            "label": "Oui"
+                        },
+                        {
+                            "value": "no",
+                            "label": "Non"
+                        }
+                    ],
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "defaultValue": "yes",
+                    "isBlockParam": true
+                },
+                {
+                    "name": "site_name",
+                    "label": "Nom du site",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null,
+                    "helperText": "Ex: nickl.fr"
+                },
+                {
+                    "name": "site_url",
+                    "label": "URL du site",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null,
+                    "helperText": "Ex: https://nickl.fr"
+                },
+                {
+                    "name": "owner_name",
+                    "label": "Nom de la société",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null
+                },
+                {
+                    "name": "contact_email",
+                    "label": "Email de contact",
+                    "type": "Text",
+                    "choices": null,
+                    "onLabel": null,
+                    "offLabel": null,
+                    "conditional": null,
+                    "subFields": null,
+                    "helperText": "Ex: contact@nickl.fr"
+                }
+            ]
         }
     },
     "blockParams": {

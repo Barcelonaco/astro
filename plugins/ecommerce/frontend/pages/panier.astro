@@ -1,0 +1,242 @@
+---
+/**
+ * /panier — affichage et édition du panier client.
+ *
+ * Lecture/écriture côté client uniquement (le panier est attaché au token cart
+ * dans localStorage). Pas de SSR pour éviter les fuites cross-user.
+ */
+import BaseHead from '@frontend/components/BaseHead.astro'
+import Header from '@frontend/components/Header.astro'
+import Footer from '@frontend/components/Footer.astro'
+import SiteOverlays from '@frontend/components/SiteOverlays.astro'
+import DeferredLoader from '@frontend/components/DeferredLoader.astro'
+import { SITE_TITLE } from '@frontend/consts'
+import { getFrontendBootstrap } from '@frontend/lib/api'
+import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`Panier — ${siteName}`} description="Votre panier" styleSettings={styleSettings} siteSettings={siteSettings} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page cart-wrap">
+      <div class="cart-container">
+        <h1 class="cart-title">Votre panier</h1>
+        <div id="cart-root" class="cart-root">
+          <div class="cart-loading">Chargement…</div>
+        </div>
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+
+    <script>
+      import {
+        getCart,
+        updateCartItem,
+        removeCartItem,
+        removeCustomCartItem,
+        clearCart,
+        formatPrice,
+        type Cart,
+        type CartItem,
+      } from '@plugins/ecommerce/frontend/lib/shop-api'
+
+      const root = document.getElementById('cart-root')
+      if (!root) throw new Error('cart-root missing')
+
+      function escape(s: unknown): string {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+      }
+
+      function imageUrl(img: any): string | null {
+        if (!img) return null
+        if (typeof img === 'string') {
+          try { img = JSON.parse(img) } catch { return img }
+        }
+        if (img && typeof img === 'object') {
+          return img.url || img.sizes?.thumbnail || img.sizes?.banner || null
+        }
+        return null
+      }
+
+      function lineRow(item: CartItem, kind: 'product' | 'custom'): string {
+        const title = kind === 'product' ? (item.product_title || '') : (item.title || '')
+        const sku = kind === 'product' ? item.sku : null
+        const url = kind === 'product' && item.product_slug ? `/produits/${escape(item.product_slug)}` : null
+        const img = imageUrl(item.featured_image)
+        const dataAttr = kind === 'product' ? `data-item-id="${item.id}"` : `data-custom-id="${item.id}"`
+        return `
+          <tr class="cart-row" ${dataAttr}>
+            <td class="cart-cell-img">
+              ${img ? `<img src="${escape(img)}" alt="${escape(title)}" />` : '<div class="cart-img-placeholder"></div>'}
+            </td>
+            <td class="cart-cell-name">
+              ${url ? `<a href="${url}">${escape(title)}</a>` : `<span>${escape(title)}</span>`}
+              ${sku ? `<div class="cart-sku">Réf. ${escape(sku)}</div>` : ''}
+              ${kind === 'custom' ? '<div class="cart-tag">Configuration POOLP</div>' : ''}
+            </td>
+            <td class="cart-cell-qty">
+              ${kind === 'product'
+                ? `<input type="number" min="0" step="1" value="${item.quantity}" class="cart-qty-input" data-update="${item.id}" />`
+                : `<span>${item.quantity}</span>`}
+            </td>
+            <td class="cart-cell-unit">${formatPrice(item.unit_price_cents)}</td>
+            <td class="cart-cell-total">${formatPrice(item.line_total_cents)}</td>
+            <td class="cart-cell-actions">
+              <button type="button" class="cart-remove" data-remove-${kind}="${item.id}" aria-label="Retirer">×</button>
+            </td>
+          </tr>
+        `
+      }
+
+      function render(cart: Cart): void {
+        if (!cart.items.length && !cart.custom_items.length) {
+          root.innerHTML = `
+            <div class="cart-empty">
+              <p>Votre panier est vide.</p>
+              <a class="btn btn-primary" href="/boutique">Découvrir la boutique</a>
+              <a class="btn btn-secondary" href="/configurateur">Configurer une box</a>
+            </div>
+          `
+          return
+        }
+
+        const productRows = cart.items.map(i => lineRow(i, 'product')).join('')
+        const customRows = cart.custom_items.map(i => lineRow(i, 'custom')).join('')
+
+        root.innerHTML = `
+          <div class="cart-grid">
+            <div class="cart-table-wrap">
+              <table class="cart-table">
+                <thead>
+                  <tr>
+                    <th></th><th>Produit</th><th>Quantité</th><th>Prix unitaire</th><th>Total</th><th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${productRows}
+                  ${customRows}
+                </tbody>
+              </table>
+              <div class="cart-actions">
+                <button type="button" class="cart-clear" id="cart-clear">Vider le panier</button>
+                <a class="btn btn-secondary" href="/boutique">← Continuer mes achats</a>
+              </div>
+            </div>
+
+            <aside class="cart-summary">
+              <h2>Récapitulatif</h2>
+              <div class="cart-summary-row"><span>Sous-total HT</span><strong>${formatPrice(cart.subtotal_cents)}</strong></div>
+              <div class="cart-summary-row"><span>TVA</span><strong>${formatPrice(cart.tax_cents)}</strong></div>
+              <div class="cart-summary-row total"><span>Total TTC</span><strong>${formatPrice(cart.total_cents)}</strong></div>
+              <p class="cart-summary-note">Frais de livraison calculés à l'étape suivante.</p>
+              <a class="btn btn-primary cart-checkout-btn" href="/checkout">Passer commande →</a>
+            </aside>
+          </div>
+        `
+
+        bindEvents()
+      }
+
+      function bindEvents(): void {
+        document.querySelectorAll<HTMLInputElement>('.cart-qty-input').forEach(input => {
+          input.addEventListener('change', async () => {
+            const id = Number(input.dataset.update)
+            const qty = Math.max(0, parseInt(input.value, 10) || 0)
+            try {
+              const cart = await updateCartItem(id, qty)
+              window.dispatchEvent(new CustomEvent('cart:updated', { detail: cart }))
+              render(cart)
+            } catch (err) {
+              alert(err instanceof Error ? err.message : 'Erreur')
+            }
+          })
+        })
+
+        document.querySelectorAll<HTMLButtonElement>('[data-remove-product]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = Number(btn.dataset.removeProduct)
+            const cart = await removeCartItem(id)
+            window.dispatchEvent(new CustomEvent('cart:updated', { detail: cart }))
+            render(cart)
+          })
+        })
+
+        document.querySelectorAll<HTMLButtonElement>('[data-remove-custom]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = Number(btn.dataset.removeCustom)
+            const cart = await removeCustomCartItem(id)
+            window.dispatchEvent(new CustomEvent('cart:updated', { detail: cart }))
+            render(cart)
+          })
+        })
+
+        document.getElementById('cart-clear')?.addEventListener('click', async () => {
+          if (!confirm('Vider le panier ?')) return
+          const cart = await clearCart()
+          window.dispatchEvent(new CustomEvent('cart:updated', { detail: cart }))
+          render(cart)
+        })
+      }
+
+      ;(async () => {
+        try {
+          const cart = await getCart()
+          render(cart)
+        } catch (err) {
+          root.innerHTML = `<div class="cart-empty"><p>Erreur de chargement du panier.</p><a class="btn" href="/boutique">Retour boutique</a></div>`
+        }
+      })()
+    </script>
+
+    <style is:global>
+      .cart-wrap { min-height: 60vh; padding: 40px 0 80px; }
+      .cart-container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+      .cart-title { font-size: 32px; margin-bottom: 24px; }
+      .cart-loading, .cart-empty { padding: 40px 0; text-align: center; color: #666; }
+      .cart-empty .btn { margin: 0 6px; }
+      .cart-grid { display: grid; grid-template-columns: 1fr 320px; gap: 32px; align-items: start; }
+      @media (max-width: 900px) { .cart-grid { grid-template-columns: 1fr; } }
+      .cart-table { width: 100%; border-collapse: collapse; }
+      .cart-table th, .cart-table td { padding: 12px 8px; text-align: left; border-bottom: 1px solid #eee; vertical-align: middle; font-size: 14px; }
+      .cart-table th { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #666; }
+      .cart-cell-img { width: 80px; }
+      .cart-cell-img img { width: 64px; height: 64px; object-fit: cover; border-radius: 4px; }
+      .cart-img-placeholder { width: 64px; height: 64px; background: #f0f0f0; border-radius: 4px; }
+      .cart-cell-name a { color: inherit; font-weight: 600; text-decoration: none; }
+      .cart-cell-name a:hover { text-decoration: underline; }
+      .cart-sku { color: #888; font-size: 12px; margin-top: 2px; }
+      .cart-tag { display: inline-block; margin-top: 4px; padding: 2px 8px; background: #1a1a18; color: #fff; font-size: 11px; border-radius: 3px; letter-spacing: 0.04em; }
+      .cart-qty-input { width: 60px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; text-align: center; }
+      .cart-cell-actions { width: 40px; text-align: right; }
+      .cart-remove { background: none; border: none; cursor: pointer; font-size: 22px; color: #aaa; padding: 0 8px; }
+      .cart-remove:hover { color: #d33; }
+      .cart-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; gap: 12px; flex-wrap: wrap; }
+      .cart-actions .btn-secondary { color: var(--color-primary, #0f62fe); border-color: var(--color-primary, #0f62fe); }
+      .cart-actions .btn-secondary:hover:not(:active), .cart-actions .btn-secondary:focus:not(:active) { color: #fff; }
+      .cart-clear { background: none; border: none; color: #d33; cursor: pointer; font-size: 13px; text-decoration: underline; }
+      .cart-summary { background: #fafaf8; padding: 24px; border: 1px solid #eee; border-radius: 6px; position: sticky; top: 24px; }
+      .cart-summary h2 { font-size: 18px; margin: 0 0 16px; }
+      .cart-summary-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+      .cart-summary-row.total { border-top: 1px solid #ddd; padding-top: 14px; margin-top: 8px; font-size: 16px; }
+      .cart-summary-note { font-size: 12px; color: #888; margin: 12px 0 16px; }
+      .cart-checkout-btn { display: block; text-align: center; }
+    </style>
+  </body>
+</html>

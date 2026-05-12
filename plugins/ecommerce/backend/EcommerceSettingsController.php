@@ -9,8 +9,8 @@ class EcommerceSettingsController {
 
     /** Clés stockées en clair dans settings */
     private static array $plainKeys = [
-        // Feature flag
-        'ecommerce_enabled',
+        // (L'activation du module est dérivée de l'état du plugin dans
+        //  settings.active_plugins, plus de toggle dédié.)
 
         // Identité boutique
         'shop_legal_name',
@@ -27,19 +27,20 @@ class EcommerceSettingsController {
         // Paiement - moyens actifs (JSON array : ["stripe","paypal","bank_transfer","on_invoice"])
         'shop_payment_methods',
 
-        // Stripe (clés publiques OK en clair)
-        'stripe_pk',                // Public key
-        'stripe_mode',              // 'test' | 'live'
-        'stripe_webhook_id',        // id endpoint (pas le secret)
+        // Stripe — mode actif (test|live) + clés publiques par environnement
+        'stripe_mode',              // 'test' | 'live' — détermine le couple actif
+        'stripe_pk_test',           // pk_test_… (clé publique)
+        'stripe_pk_live',           // pk_live_…
+        'stripe_webhook_id_test',   // id endpoint test (pas le secret)
+        'stripe_webhook_id_live',   // id endpoint production
 
         // PayPal (client_id OK en clair)
         'paypal_client_id',
         'paypal_mode',              // 'sandbox' | 'live'
         'paypal_webhook_id',
 
-        // Virement
-        'bank_iban',
-        'bank_bic',
+        // Virement — uniquement le titulaire (nom commercial, non sensible).
+        // L'IBAN et le BIC sont chiffrés (cf. $secretKeys).
         'bank_holder',
 
         // Numérotation légale
@@ -50,6 +51,10 @@ class EcommerceSettingsController {
 
         // Emails
         'ecommerce_emails_from',    // email expéditeur
+        'ecommerce_notif_recipients', // destinataires admin (JSON array ou CSV)
+
+        // Fiscalite
+        'shop_franchise_tva',       // '1' si micro-entreprise franchise de base (art. 293 B CGI)
 
         // Checkout
         'checkout_guest_enabled',   // '1' par défaut
@@ -64,12 +69,18 @@ class EcommerceSettingsController {
         'gdpr_inactivity_notify_days_before',
     ];
 
-    /** Clés chiffrées (jamais retournées en clair par défaut) */
+    /** Clés chiffrées (AES-256-CBC, jamais retournées en clair par défaut) */
     private static array $secretKeys = [
-        'stripe_sk',                // Secret key (sk_live_... ou sk_test_...)
-        'stripe_webhook_secret',    // whsec_...
+        // Stripe — sk_* + whsec_* par environnement (les 4 stockées en parallèle
+        // pour pouvoir basculer test ↔ production sans ressaisir les clés).
+        'stripe_sk_test',
+        'stripe_sk_live',
+        'stripe_webhook_secret_test',
+        'stripe_webhook_secret_live',
         'paypal_secret',            // client secret
         'paypal_webhook_secret',
+        'bank_iban',                // IBAN du compte de la boutique
+        'bank_bic',                 // BIC associé
     ];
 
     /** Retourne tous les settings e-commerce. Secrets masqués. */
@@ -83,7 +94,6 @@ class EcommerceSettingsController {
         $out = [];
         // Défauts raisonnables
         $defaults = [
-            'ecommerce_enabled' => '0',
             'shop_currency' => 'EUR',
             'shop_country' => 'FR',
             'shop_payment_methods' => '["bank_transfer"]',
@@ -171,6 +181,67 @@ class EcommerceSettingsController {
         } catch (\Exception $e) {
             return '';
         }
+    }
+
+    /** Récupère une valeur en clair (settings non chiffrés). */
+    public static function getPlain(string $key): string {
+        $stmt = Database::getInstance()->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
+        $stmt->execute([$key]);
+        return (string) ($stmt->fetchColumn() ?: '');
+    }
+
+    /**
+     * Résout la clé Stripe active selon stripe_mode.
+     *   $type ∈ ['pk', 'sk', 'webhook_id', 'webhook_secret']
+     * Fallback rétrocompat sur l'ancienne clé unique (stripe_sk, stripe_pk, …)
+     * pour ne pas casser les installs migrant depuis le schéma single-env.
+     */
+    public static function getStripeKey(string $type, ?string $modeOverride = null): string {
+        $mode = $modeOverride ?? (self::getPlain('stripe_mode') ?: 'test');
+        if (!in_array($mode, ['test', 'live'], true)) $mode = 'test';
+        $key = "stripe_{$type}_{$mode}";
+        $value = in_array($key, self::$secretKeys, true) ? self::getSecret($key) : self::getPlain($key);
+        if ($value !== '') return $value;
+
+        // Rétrocompat : ancienne clé unique stripe_{type}
+        $legacy = "stripe_{$type}";
+        if (in_array($legacy, ['stripe_sk', 'stripe_webhook_secret'], true)) {
+            // Lire depuis settings sans passer par self::$secretKeys (qui ne le contient plus)
+            $stmt = Database::getInstance()->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
+            $stmt->execute([$legacy]);
+            $enc = $stmt->fetchColumn();
+            if ($enc) {
+                try { return decrypt_value($enc); } catch (\Throwable $e) { return ''; }
+            }
+            return '';
+        }
+        return self::getPlain($legacy);
+    }
+
+    /**
+     * Renvoie la liste des secrets webhook disponibles (test + live + legacy)
+     * pour valider la signature d'un event entrant. L'endpoint Stripe peut être
+     * configuré dans l'env test ou live ; on essaie les deux.
+     *
+     * @return array<int, array{mode: string, secret: string}>
+     */
+    public static function getStripeWebhookSecrets(): array {
+        $out = [];
+        foreach (['test', 'live'] as $mode) {
+            $s = self::getSecret("stripe_webhook_secret_{$mode}");
+            if ($s) $out[] = ['mode' => $mode, 'secret' => $s];
+        }
+        // Legacy single-env
+        $stmt = Database::getInstance()->prepare("SELECT setting_value FROM settings WHERE setting_key = 'stripe_webhook_secret'");
+        $stmt->execute();
+        $enc = $stmt->fetchColumn();
+        if ($enc) {
+            try {
+                $plain = decrypt_value($enc);
+                if ($plain) $out[] = ['mode' => 'legacy', 'secret' => $plain];
+            } catch (\Throwable $e) {}
+        }
+        return $out;
     }
 
     /** Masque un secret chiffré pour affichage. */

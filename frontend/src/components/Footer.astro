@@ -92,6 +92,19 @@ if (footerCustomBloc && footerCustomBlocLocation !== 'none') {
   } catch {}
 }
 
+// Credit menu (fetched from menu system)
+let creditLinks: { url: string; title: string }[] = [];
+try {
+  const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
+  const res = await fetch(`${API_URL}/menus/navigation/credit`);
+  if (res.ok) {
+    const items = await res.json();
+    if (Array.isArray(items)) {
+      creditLinks = items.map((item: any) => ({ url: item.url || `/${item.slug}/`, title: item.title }));
+    }
+  }
+} catch {}
+
 const hasCol1 = logoUrl || phone || phone2 || link1Url || link2Url;
 const hasCol3 = footerText || schedule || socialNetworks.length > 0;
 
@@ -201,6 +214,15 @@ const today = new Date();
           </button>
         </li>
       </ul>
+      {creditLinks.length > 0 && (
+        <ul class="nav nav-credit">
+          {creditLinks.map(link => (
+            <li class="item">
+              <a href={link.url} class="link">{link.title}</a>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   </div>
 </footer>

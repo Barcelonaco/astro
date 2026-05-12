@@ -1,0 +1,55 @@
+---
+/**
+ * /compte/telechargements — digital downloads (placeholder).
+ */
+import BaseHead from '@frontend/components/BaseHead.astro'
+import Header from '@frontend/components/Header.astro'
+import Footer from '@frontend/components/Footer.astro'
+import SiteOverlays from '@frontend/components/SiteOverlays.astro'
+import DeferredLoader from '@frontend/components/DeferredLoader.astro'
+import AccountNav from '@plugins/ecommerce/frontend/components/AccountNav.astro'
+import { SITE_TITLE } from '@frontend/consts'
+import { getFrontendBootstrap } from '@frontend/lib/api'
+import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+import '@plugins/ecommerce/frontend/styles/account.css'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`Telechargements — ${siteName}`} description="Vos telechargements" styleSettings={styleSettings} siteSettings={siteSettings} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page account-wrap">
+      <div class="account-container">
+        <div class="account-layout">
+          <AccountNav active="downloads" />
+          <div class="account-content">
+            <h1 class="account-section-title">Telechargements</h1>
+            <p class="account-empty">Aucun telechargement disponible.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+
+    <script>
+      import { isLoggedIn } from '@plugins/ecommerce/frontend/lib/customer-api'
+      if (!isLoggedIn()) window.location.href = '/compte/connexion?redirect=/compte/telechargements'
+    </script>
+  </body>
+</html>

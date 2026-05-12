@@ -97,3 +97,9 @@ SYSTEM_PROMPT_CLAUDE.md
 
 
 /backend-php/uploads/
+
+/woocommerce-gateway-stripe
+/woocommerce-payments
+/woocommerce-pdf-invoices-packing-slips
+/woocommerce-products-filter
+/woocommerce

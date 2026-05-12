@@ -16,13 +16,14 @@ class CustomerModel {
 
     public static function findById(int $id, bool $includeSensitive = false): ?array {
         $db = Database::getInstance();
-        $cols = $includeSensitive
-            ? '*'
-            : 'id, email, first_name, last_name, phone, company, vat_number, siret, activity, is_pro, pro_status, accepts_marketing, email_verified_at, locale, last_login_at, created_at, updated_at, anonymized_at';
-        $stmt = $db->prepare("SELECT {$cols} FROM customers WHERE id = ?");
+        $stmt = $db->prepare("SELECT * FROM customers WHERE id = ?");
         $stmt->execute([$id]);
         $row = $stmt->fetch();
-        return $row ?: null;
+        if (!$row) return null;
+        if (!$includeSensitive) {
+            unset($row['password_hash'], $row['verification_token']);
+        }
+        return $row;
     }
 
     public static function create(array $data): int {
@@ -110,13 +111,11 @@ class CustomerModel {
     /** Créé un token de reset et invalide les précédents non-utilisés. Retourne le token. */
     public static function createPasswordResetToken(int $customerId): string {
         $db = Database::getInstance();
-        // Invalider les tokens précédents non-utilisés
-        $inv = $db->prepare('UPDATE customer_password_resets SET used_at = NOW() WHERE customer_id = ? AND used_at IS NULL');
+        $inv = $db->prepare('UPDATE tokens SET used_at = NOW() WHERE type = "password_reset" AND customer_id = ? AND used_at IS NULL');
         $inv->execute([$customerId]);
 
         $token = bin2hex(random_bytes(32));
-        // Utilise NOW() de MySQL pour éviter les décalages de timezone entre PHP et DB
-        $ins = $db->prepare('INSERT INTO customer_password_resets (token, customer_id, expires_at) VALUES (?, ?, NOW() + INTERVAL 1 HOUR)');
+        $ins = $db->prepare('INSERT INTO tokens (token, type, customer_id, expires_at) VALUES (?, "password_reset", ?, NOW() + INTERVAL 1 HOUR)');
         $ins->execute([$token, $customerId]);
         return $token;
     }
@@ -126,9 +125,9 @@ class CustomerModel {
         $db = Database::getInstance();
         $stmt = $db->prepare('
             SELECT r.*, c.email, c.first_name, c.last_name
-            FROM customer_password_resets r
+            FROM tokens r
             JOIN customers c ON c.id = r.customer_id
-            WHERE r.token = ? AND r.used_at IS NULL AND r.expires_at > NOW()
+            WHERE r.token = ? AND r.type = "password_reset" AND r.used_at IS NULL AND r.expires_at > NOW()
             LIMIT 1
         ');
         $stmt->execute([$token]);
@@ -137,13 +136,13 @@ class CustomerModel {
 
     public static function markResetUsed(string $token): void {
         $db = Database::getInstance();
-        $stmt = $db->prepare('UPDATE customer_password_resets SET used_at = NOW() WHERE token = ?');
+        $stmt = $db->prepare('UPDATE tokens SET used_at = NOW() WHERE type = "password_reset" AND token = ?');
         $stmt->execute([$token]);
     }
 
     /** Purge les tokens expirés (cron léger au login admin). */
     public static function purgeExpiredResets(): int {
         $db = Database::getInstance();
-        return $db->exec('DELETE FROM customer_password_resets WHERE expires_at < NOW() - INTERVAL 7 DAY');
+        return $db->exec('DELETE FROM tokens WHERE type = "password_reset" AND expires_at < NOW() - INTERVAL 7 DAY');
     }
 }

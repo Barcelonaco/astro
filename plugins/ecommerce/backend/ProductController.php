@@ -133,12 +133,137 @@ class ProductController {
     }
 
     // ────────────────────────────────────────────────────────────────
+    // ADMIN : Stock summary (dynamic, order-aware)
+    // ────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns stock info per product: total stock, ordered qty, available qty.
+     * available = stock_quantity - SUM(order_items.quantity) for active orders.
+     * Active = NOT cancelled/refunded/failed.
+     */
+    public static function stockSummary(): void {
+        require_ecommerce_enabled();
+        $db = Database::getInstance();
+
+        // Aggregate variant stock per product
+        $stmt = $db->query("
+            SELECT pv.product_id,
+                   SUM(pv.stock_quantity) AS stock_total,
+                   MAX(pv.stock_managed)  AS stock_managed,
+                   MIN(pv.low_stock_threshold) AS low_stock_threshold
+            FROM product_variants pv
+            GROUP BY pv.product_id
+        ");
+        $stockRows = $stmt->fetchAll();
+
+        // Aggregate ordered quantities per product (active orders only)
+        $stmt = $db->query("
+            SELECT oi.product_id,
+                   SUM(oi.quantity) AS ordered_qty
+            FROM order_items oi
+            JOIN orders o ON o.id = oi.order_id
+            WHERE o.status NOT IN ('cancelled', 'refunded', 'failed')
+              AND oi.product_id > 0
+            GROUP BY oi.product_id
+        ");
+        $orderedRows = $stmt->fetchAll();
+        $orderedMap = [];
+        foreach ($orderedRows as $r) {
+            $orderedMap[(int) $r['product_id']] = (int) $r['ordered_qty'];
+        }
+
+        $result = [];
+        foreach ($stockRows as $r) {
+            $pid = (int) $r['product_id'];
+            $managed = (int) $r['stock_managed'];
+            $total = (int) $r['stock_total'];
+            $ordered = $orderedMap[$pid] ?? 0;
+            $available = $managed ? max(0, $total - $ordered) : null;
+            $threshold = (int) ($r['low_stock_threshold'] ?? 5);
+
+            $result[$pid] = [
+                'stock_managed' => (bool) $managed,
+                'stock_total'   => $total,
+                'ordered_qty'   => $ordered,
+                'available'     => $available,
+                'low_stock'     => $managed && $available !== null && $available <= $threshold,
+            ];
+        }
+
+        json_response($result);
+    }
+
+    /**
+     * Returns stock detail for a single product (per-variant breakdown).
+     */
+    public static function stockDetail(int $productId): void {
+        require_ecommerce_enabled();
+        $db = Database::getInstance();
+
+        $stmt = $db->prepare("
+            SELECT pv.id AS variant_id, pv.sku, pv.attributes,
+                   pv.stock_quantity, pv.stock_managed, pv.low_stock_threshold
+            FROM product_variants pv
+            WHERE pv.product_id = ?
+        ");
+        $stmt->execute([$productId]);
+        $variants = $stmt->fetchAll();
+
+        // Ordered qty per variant
+        $stmt = $db->prepare("
+            SELECT oi.variant_id, SUM(oi.quantity) AS ordered_qty
+            FROM order_items oi
+            JOIN orders o ON o.id = oi.order_id
+            WHERE o.status NOT IN ('cancelled', 'refunded', 'failed')
+              AND oi.product_id = ?
+              AND oi.variant_id > 0
+            GROUP BY oi.variant_id
+        ");
+        $stmt->execute([$productId]);
+        $orderedMap = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $orderedMap[(int) $r['variant_id']] = (int) $r['ordered_qty'];
+        }
+
+        $totalStock = 0;
+        $totalOrdered = 0;
+        $managed = false;
+
+        foreach ($variants as &$v) {
+            $v['stock_quantity'] = (int) $v['stock_quantity'];
+            $v['stock_managed'] = (bool) $v['stock_managed'];
+            $v['low_stock_threshold'] = (int) ($v['low_stock_threshold'] ?? 5);
+            $ordered = $orderedMap[(int) $v['variant_id']] ?? 0;
+            $v['ordered_qty'] = $ordered;
+            $v['available'] = $v['stock_managed'] ? max(0, $v['stock_quantity'] - $ordered) : null;
+            if ($v['stock_managed']) {
+                $managed = true;
+                $totalStock += $v['stock_quantity'];
+                $totalOrdered += $ordered;
+            }
+            if (is_string($v['attributes'])) {
+                $v['attributes'] = json_decode($v['attributes'], true) ?: [];
+            }
+        }
+        unset($v);
+
+        json_response([
+            'product_id'   => $productId,
+            'stock_managed' => $managed,
+            'stock_total'   => $totalStock,
+            'ordered_qty'   => $totalOrdered,
+            'available'     => $managed ? max(0, $totalStock - $totalOrdered) : null,
+            'variants'      => $variants,
+        ]);
+    }
+
+    // ────────────────────────────────────────────────────────────────
     // ADMIN : Variants (CRUD + matrix)
     // ────────────────────────────────────────────────────────────────
 
     public static function listVariants(int $productId): void {
         require_ecommerce_enabled();
-        json_response(ProductVariantModel::findByProduct($productId));
+        json_response(['variants' => ProductVariantModel::findByProduct($productId)]);
     }
 
     /** Upsert bulk : remplace les variants du produit avec la liste fournie. */
@@ -203,20 +328,32 @@ class ProductController {
         $prod = $stmt->fetch();
         if (!$prod) error_response('Produit introuvable', 404);
 
-        $body = get_json_body();
+        $body = get_json_body() ?: [];
         $cf = is_string($prod['custom_fields']) ? json_decode($prod['custom_fields'], true) : ($prod['custom_fields'] ?? []);
-        $attributes = $body['attributes'] ?? $cf['variant_attributes'] ?? [];
         $basePrice = (int) round(((float) ($body['base_price'] ?? $cf['base_price'] ?? 0)) * 100);
         $initialStock = (int) ($body['initial_stock'] ?? 0);
 
-        if (!is_array($attributes) || empty($attributes)) {
-            error_response('Aucun attribut de variant fourni', 400);
+        // Resolve attributes: from body, or from custom_fields.attributes (used_for_variations only)
+        $attributes = $body['attributes'] ?? null;
+        if (!$attributes) {
+            // Read from stored attributes, filter for variation-enabled ones
+            $storedAttrs = $cf['attributes'] ?? $cf['variant_attributes'] ?? [];
+            $attributes = [];
+            foreach ($storedAttrs as $attr) {
+                if (!empty($attr['used_for_variations'])) {
+                    $attributes[] = $attr;
+                }
+            }
         }
 
-        // Normalize attributes : options peut venir en string (lignes) ou array
+        if (!is_array($attributes) || empty($attributes)) {
+            error_response('Aucun attribut marqué "Utilisé pour les variations"', 400);
+        }
+
+        // Normalize attributes : values/options peut venir en string (lignes) ou array
         $normalized = [];
         foreach ($attributes as $attr) {
-            $opts = $attr['options'] ?? [];
+            $opts = $attr['options'] ?? $attr['values'] ?? [];
             if (is_string($opts)) {
                 $opts = array_filter(array_map('trim', preg_split('/[\r\n]+/', $opts)));
             }
@@ -349,6 +486,16 @@ class ProductController {
             }
         }
 
+        // Visibilité catalogue
+        $isSearch = $search !== '';
+        if ($isSearch) {
+            // Exclure hidden + catalog (catalog = pas visible en recherche)
+            $conditions[] = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.custom_fields, '$.visibility_catalog')), 'visible') IN ('visible', 'search')";
+        } else {
+            // Exclure hidden + search (search = pas visible en catalogue)
+            $conditions[] = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.custom_fields, '$.visibility_catalog')), 'visible') IN ('visible', 'catalog')";
+        }
+
         // Tri
         $sort = $_GET['sort'] ?? 'newest';
         $orderClause = match ($sort) {
@@ -364,7 +511,7 @@ class ProductController {
         $joinClause = implode(' ', $joins);
         $whereClause = implode(' AND ', $conditions);
 
-        $sql = "SELECT DISTINCT p.* FROM cpt_products p {$joinClause} WHERE {$whereClause} ORDER BY {$orderClause}";
+        $sql = "SELECT DISTINCT p.*, vagg.min_price AS _sort_price FROM cpt_products p {$joinClause} WHERE {$whereClause} ORDER BY {$orderClause}";
         $countSql = "SELECT COUNT(DISTINCT p.id) FROM cpt_products p {$joinClause} WHERE {$whereClause}";
 
         return [$sql, $params, $countSql, $params];
@@ -386,6 +533,59 @@ class ProductController {
             $variants = ProductVariantModel::findByProduct($id);
         }
 
+        // Sync default variant from CPT custom_fields for non-variant products
+        // (admin CPT save updates custom_fields but not product_variants — keep them aligned).
+        // Inclut prix, compare_at, poids, stock_quantity, stock_managed, low_stock_threshold.
+        $variantsEnabled = !empty($cf['variants_enabled']);
+        if (!$variantsEnabled && count($variants) === 1) {
+            $variant = $variants[0];
+            $patch = [];
+
+            if (isset($cf['base_price'])) {
+                $expectedPriceCents = (int) round(((float) $cf['base_price']) * 100);
+                if ((int) $variant['price_cents'] !== $expectedPriceCents) {
+                    $patch['price_cents'] = $expectedPriceCents;
+                }
+            }
+            if (array_key_exists('compare_at_price', $cf)) {
+                $expectedCompareCents = !empty($cf['compare_at_price'])
+                    ? (int) round(((float) $cf['compare_at_price']) * 100)
+                    : 0;
+                if ((int) ($variant['compare_at_price_cents'] ?? 0) !== $expectedCompareCents) {
+                    $patch['compare_at_price_cents'] = $expectedCompareCents ?: null;
+                }
+            }
+            if (isset($cf['weight_grams'])) {
+                $expectedWeight = (int) $cf['weight_grams'];
+                if ((int) ($variant['weight_grams'] ?? 0) !== $expectedWeight) {
+                    $patch['weight_grams'] = $expectedWeight;
+                }
+            }
+            if (array_key_exists('stock_managed', $cf)) {
+                $expectedManaged = !empty($cf['stock_managed']) ? 1 : 0;
+                if ((int) ($variant['stock_managed'] ?? 1) !== $expectedManaged) {
+                    $patch['stock_managed'] = $expectedManaged;
+                }
+            }
+            if (isset($cf['stock_quantity'])) {
+                $expectedStock = (int) $cf['stock_quantity'];
+                if ((int) ($variant['stock_quantity'] ?? 0) !== $expectedStock) {
+                    $patch['stock_quantity'] = $expectedStock;
+                }
+            }
+            if (isset($cf['low_stock_threshold'])) {
+                $expectedThreshold = (int) $cf['low_stock_threshold'];
+                if ((int) ($variant['low_stock_threshold'] ?? 5) !== $expectedThreshold) {
+                    $patch['low_stock_threshold'] = $expectedThreshold;
+                }
+            }
+
+            if (!empty($patch)) {
+                ProductVariantModel::update((int) $variant['id'], $patch);
+                $variants = ProductVariantModel::findByProduct($id);
+            }
+        }
+
         $minPrice = min(array_map(fn($v) => $v['price_cents'], $variants));
         $maxPrice = max(array_map(fn($v) => $v['price_cents'], $variants));
         $compareMin = null;
@@ -396,12 +596,25 @@ class ProductController {
         }
         $inStock = false;
         $stockTracked = false;
+        $stockTotal = 0;
+        $lowStock = false;
         foreach ($variants as $v) {
-            if ($v['stock_managed']) $stockTracked = true;
-            if (!$v['stock_managed'] || $v['stock_quantity'] > 0) { $inStock = true; break; }
+            if ($v['stock_managed']) {
+                $stockTracked = true;
+                $stockTotal += (int) ($v['stock_quantity'] ?? 0);
+                $threshold = $v['low_stock_threshold'] !== null ? (int) $v['low_stock_threshold'] : 5;
+                if ((int) ($v['stock_quantity'] ?? 0) <= $threshold) $lowStock = true;
+            }
+            if (!$v['stock_managed'] || $v['stock_quantity'] > 0) $inStock = true;
         }
         // Un produit est "configuré" dès qu'il a un prix ou qu'il a été explicitement mis en stock
         $isConfigured = $minPrice > 0 || (!empty($variants) && count($variants) > 1);
+
+        // HT prices (TTC ÷ (1 + taux TVA))
+        $taxCode = $cf['tax_code'] ?? 'FR_STANDARD';
+        $taxRate = self::getTaxRate($taxCode);
+        $htMin = (int) round($minPrice / (1 + $taxRate / 100));
+        $htMax = (int) round($maxPrice / (1 + $taxRate / 100));
 
         $out = [
             'id' => $id,
@@ -412,16 +625,21 @@ class ProductController {
             'status' => $row['status'],
             'published_date' => $row['published_date'] ?? null,
             'type' => $cf['type'] ?? 'physical',
-            'tax_code' => $cf['tax_code'] ?? 'FR_STANDARD',
+            'tax_code' => $taxCode,
+            'tax_rate' => $taxRate,
             'is_featured' => !empty($cf['is_featured']),
             'requires_shipping' => $cf['type'] === 'physical' ? true : !empty($cf['requires_shipping']),
             'short_features' => $cf['short_features'] ?? [],
             'price_cents_min' => $minPrice,
             'price_cents_max' => $maxPrice,
+            'price_ht_cents_min' => $htMin,
+            'price_ht_cents_max' => $htMax,
             'compare_at_price_cents' => $compareMin,
             'has_variants' => count($variants) > 1,
             'in_stock' => $inStock,
             'stock_tracked' => $stockTracked,
+            'stock_total' => $stockTracked ? $stockTotal : null,
+            'low_stock' => $stockTracked && $lowStock,
             'is_configured' => $isConfigured,
             'currency' => 'EUR',
         ];
@@ -429,6 +647,28 @@ class ProductController {
         // Détails complets pour la fiche produit
         if (!$summaryOnly) {
             $images = ProductImageModel::findByProduct($id);
+            // Fallback : si aucune image dans product_variants.images, utiliser custom_fields.gallery
+            if (empty($images) && !empty($cf['gallery'])) {
+                $cfGallery = is_string($cf['gallery']) ? json_decode($cf['gallery'], true) : $cf['gallery'];
+                if (is_array($cfGallery)) {
+                    foreach ($cfGallery as $g) {
+                        $url = is_string($g) ? $g : ($g['url'] ?? null);
+                        if ($url) {
+                            $images[] = [
+                                'product_id' => $id,
+                                'variant_id' => null,
+                                'media_id'   => $g['id'] ?? null,
+                                'position'   => count($images),
+                                'alt'        => is_array($g) ? ($g['alt'] ?? '') : '',
+                                'url'        => $url,
+                                'width'      => $g['width'] ?? null,
+                                'height'     => $g['height'] ?? null,
+                                'mime_type'  => null,
+                            ];
+                        }
+                    }
+                }
+            }
             $out['content'] = $row['content'] ?? null;
             $out['custom_fields'] = $cf;
             $out['seo_meta'] = $seoMeta;
@@ -486,6 +726,34 @@ class ProductController {
             LIMIT ?
         ');
         $stmt->execute([$productId, $productId, $limit]);
-        return array_map(fn($r) => self::enrich($r, true), $stmt->fetchAll());
+        $results = $stmt->fetchAll();
+
+        // Fallback : si aucun produit lié via catégorie, prendre des produits récents
+        if (empty($results)) {
+            $stmt = $db->prepare('
+                SELECT * FROM cpt_products
+                WHERE id != ? AND status = "published"
+                ORDER BY published_date DESC
+                LIMIT ?
+            ');
+            $stmt->execute([$productId, $limit]);
+            $results = $stmt->fetchAll();
+        }
+
+        return array_map(fn($r) => self::enrich($r, true), $results);
+    }
+
+    /** Tax rate from code — cached. */
+    private static function getTaxRate(string $code): float {
+        static $cache = null;
+        if ($cache === null) {
+            $cache = [];
+            try {
+                $rows = Database::getInstance()->query('SELECT code, rate FROM tax_rates')->fetchAll();
+                foreach ($rows as $r) $cache[$r['code']] = (float) $r['rate'];
+            } catch (\Throwable $e) {}
+            if (!isset($cache['FR_STANDARD'])) $cache['FR_STANDARD'] = 20.0;
+        }
+        return $cache[$code] ?? $cache['FR_STANDARD'];
     }
 }
