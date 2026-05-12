@@ -56,6 +56,8 @@ import NicklBlocReferences from './blocks/NicklBlocReferences.astro';
 import NicklInstaFeed from './blocks/NicklInstaFeed.astro';
 import NicklThreadsFeed from './blocks/NicklThreadsFeed.astro';
 import NicklProduct from './blocks/NicklProduct.astro';
+import NicklLegalNotice from './blocks/NicklLegalNotice.astro';
+import NicklPrivacyPolicy from './blocks/NicklPrivacyPolicy.astro';
 
 // Plugins
 import BeforeAfter from './blocks/BeforeAfter.astro';
@@ -207,6 +209,10 @@ const blocks = rawBlocks.filter(b => !inactiveSet.has(b.type));
         return <NicklThreadsFeed data={data} />;
       case 'featured_products':
         return <NicklProduct data={data} />;
+      case 'legal-notice':
+        return <NicklLegalNotice data={data} />;
+      case 'privacy-policy':
+        return <NicklPrivacyPolicy data={data} />;
 
       // Plugins
       case 'before-after':
