@@ -1,0 +1,158 @@
+---
+/**
+ * /compte/profil — edit profile + change password.
+ */
+import BaseHead from '@frontend/components/BaseHead.astro'
+import Header from '@frontend/components/Header.astro'
+import Footer from '@frontend/components/Footer.astro'
+import SiteOverlays from '@frontend/components/SiteOverlays.astro'
+import DeferredLoader from '@frontend/components/DeferredLoader.astro'
+import AccountNav from '@plugins/ecommerce/frontend/components/AccountNav.astro'
+import { SITE_TITLE } from '@frontend/consts'
+import { getFrontendBootstrap } from '@frontend/lib/api'
+import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+import '@plugins/ecommerce/frontend/styles/account.css'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`Details du compte — ${siteName}`} description="Modifiez vos informations" styleSettings={styleSettings} siteSettings={siteSettings} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page account-wrap">
+      <div class="account-container">
+        <div class="account-layout">
+          <AccountNav active="profile" />
+          <div class="account-content">
+            <h1 class="account-section-title">Details du compte</h1>
+
+            <div id="profile-loading" class="account-loading">Chargement...</div>
+
+            <form id="profile-form" style="display:none;max-width:520px" novalidate>
+              <div class="account-form-row">
+                <div class="account-form-field"><label class="account-form-label">Prenom</label><input class="account-form-input" type="text" name="first_name" /></div>
+                <div class="account-form-field"><label class="account-form-label">Nom</label><input class="account-form-input" type="text" name="last_name" /></div>
+              </div>
+              <div class="account-form-field"><label class="account-form-label">Email</label><input class="account-form-input" type="email" name="email" disabled /></div>
+              <div class="account-form-field"><label class="account-form-label">Telephone</label><input class="account-form-input" type="tel" name="phone" /></div>
+              <div class="account-form-field"><label class="account-form-label">Entreprise</label><input class="account-form-input" type="text" name="company" /></div>
+              <div class="account-form-field"><label class="account-form-label">N° TVA</label><input class="account-form-input" type="text" name="vat_number" /></div>
+
+              <fieldset style="border:none;padding:0;margin:28px 0 0">
+                <legend style="font-size:13px;font-weight:600;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid rgba(0,0,0,0.1);width:100%">Changer le mot de passe</legend>
+                <div class="account-form-field"><label class="account-form-label">Mot de passe actuel</label><input class="account-form-input" type="password" name="current_password" autocomplete="current-password" /></div>
+                <div class="account-form-row">
+                  <div class="account-form-field"><label class="account-form-label">Nouveau mot de passe</label><input class="account-form-input" type="password" name="new_password" autocomplete="new-password" minlength="8" /></div>
+                  <div class="account-form-field"><label class="account-form-label">Confirmer</label><input class="account-form-input" type="password" name="new_password_confirm" autocomplete="new-password" minlength="8" /></div>
+                </div>
+                <span class="account-form-hint">Laissez vide pour ne pas changer.</span>
+              </fieldset>
+
+              <label class="account-form-check" style="margin-top:16px">
+                <input type="checkbox" name="accepts_marketing" />
+                <span>Recevoir les actualites et offres</span>
+              </label>
+
+              <div class="account-form-status" id="profile-status" role="status"></div>
+              <button class="account-btn" type="submit" style="margin-top:16px;width:100%">Enregistrer les modifications</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+
+    <script>
+      import { getMe, updateProfile, isLoggedIn } from '@plugins/ecommerce/frontend/lib/customer-api'
+
+      if (!isLoggedIn()) window.location.href = '/compte/connexion?redirect=/compte/profil'
+
+      const form = document.getElementById('profile-form') as HTMLFormElement
+      const statusEl = document.getElementById('profile-status')!
+
+      async function init() {
+        try {
+          const c = await getMe()
+          const el = form.elements as any
+          el.first_name.value = c.first_name || ''
+          el.last_name.value = c.last_name || ''
+          el.email.value = c.email || ''
+          el.phone.value = c.phone || ''
+          el.company.value = c.company || ''
+          el.vat_number.value = c.vat_number || ''
+          el.accepts_marketing.checked = !!c.accepts_marketing
+
+          document.getElementById('profile-loading')!.style.display = 'none'
+          form.style.display = ''
+        } catch (err: any) {
+          if (err?.status === 401) { window.location.href = '/compte/connexion'; return }
+          document.getElementById('profile-loading')!.textContent = 'Erreur de chargement.'
+        }
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault()
+        const fd = new FormData(form)
+        const body: any = {
+          first_name: fd.get('first_name'), last_name: fd.get('last_name'),
+          phone: fd.get('phone'), company: fd.get('company'),
+          vat_number: fd.get('vat_number'), accepts_marketing: !!fd.get('accepts_marketing'),
+        }
+
+        const newPw = String(fd.get('new_password') || '')
+        if (newPw) {
+          if (newPw !== String(fd.get('new_password_confirm'))) {
+            statusEl.textContent = 'Les mots de passe ne correspondent pas.'
+            statusEl.dataset.kind = 'error'
+            return
+          }
+          if (newPw.length < 8) {
+            statusEl.textContent = 'Minimum 8 caracteres.'
+            statusEl.dataset.kind = 'error'
+            return
+          }
+          if (!fd.get('current_password')) {
+            statusEl.textContent = 'Mot de passe actuel requis.'
+            statusEl.dataset.kind = 'error'
+            return
+          }
+          body.current_password = fd.get('current_password')
+          body.new_password = newPw
+        }
+
+        const btn = form.querySelector('button[type=submit]') as HTMLButtonElement
+        btn.disabled = true
+        statusEl.textContent = ''
+        try {
+          await updateProfile(body)
+          statusEl.textContent = 'Modifications enregistrees.'
+          statusEl.dataset.kind = 'success'
+          ;(form.elements as any).current_password.value = ''
+          ;(form.elements as any).new_password.value = ''
+          ;(form.elements as any).new_password_confirm.value = ''
+        } catch (err: any) {
+          statusEl.textContent = err?.message || 'Erreur'
+          statusEl.dataset.kind = 'error'
+        }
+        btn.disabled = false
+      })
+
+      init()
+    </script>
+  </body>
+</html>

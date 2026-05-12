@@ -3543,6 +3543,177 @@ body.sidebar-collapsed .builder-settings {
   background: #fff;
 }
 
+/* ── Nested density (rows inside rows) ────────────────────────────────────── */
+/* Replace heavy nested borders with a left stripe + flat bg.
+   Header sticks to top while body scrolls — gives auto-breadcrumb. */
+.repeater-row-body .repeater-row,
+.repeater-row-body .group-field {
+  border: none;
+  border-left: 3px solid var(--gray-200);
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+.repeater-row-body .repeater-row.is-open,
+.repeater-row-body .group-field.is-open {
+  border-left-color: var(--primary);
+  box-shadow: none;
+}
+.repeater-row-body .repeater-row .repeater-row-header,
+.repeater-row-body .repeater-row.is-open .repeater-row-header,
+.repeater-row-body .group-field-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: 0 1px 0 var(--gray-100);
+}
+.repeater-row-body .repeater-row .repeater-row-body {
+  padding: 12px 14px 12px 14px;
+  border-top: none;
+  background: transparent;
+}
+/* Flatten flexible-content containers when nested */
+.repeater-row-body .flexible-content-items > .repeater-row,
+.flexible-content-items > .repeater-row {
+  background: #fff;
+}
+.flexible-content-items > .repeater-row .repeater-row-header {
+  background: #fff;
+}
+.flexible-content-items > .repeater-row .repeater-row-number {
+  background: var(--gray-50);
+}
+/* Stack-aware z-index so deeper sticky headers don't fight outer ones */
+.repeater-row-body .repeater-row-body .repeater-row .repeater-row-header { top: 44px; z-index: 1; }
+.repeater-row-body .repeater-row-body .repeater-row-body .repeater-row .repeater-row-header { top: 88px; }
+
+/* ── Columns repeater as vertical tabs (left rail) ────────────────────────── */
+.cols-vtabs-wrapper {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto 1fr;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.cols-vtabs-rail {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
+}
+.cols-vtab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--gray-500);
+  font-weight: 600;
+  font-size: 13px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.cols-vtab:hover {
+  background: #fff;
+  color: var(--gray-800);
+}
+.cols-vtab.is-active {
+  background: #fff;
+  color: var(--primary);
+  border-color: var(--gray-200);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.cols-vtab-num { line-height: 1; }
+.cols-vtab-add {
+  color: var(--gray-400);
+}
+.cols-vtab-add:hover { color: var(--primary); background: #fff; }
+
+.cols-vtabs-actions {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--gray-200);
+  border-left: 1px solid var(--gray-100);
+  background: var(--gray-50);
+}
+.cols-vtabs-content {
+  grid-column: 1 / 3;
+  grid-row: 2;
+  min-width: 0;
+  padding: 10px;
+  overflow: auto;
+}
+/* Tighter density inside the active column — rail already provides context */
+.cols-vtabs-content .repeater-row-body { padding: 10px; }
+.cols-vtabs-content .form-group { margin-bottom: 14px; }
+.cols-vtabs-content .repeater-row-body .repeater-row .repeater-row-body { padding: 8px 10px 8px 8px; }
+/* Hide the redundant "Colonne" FlexibleContent field label — rail already says which column */
+.cols-vtabs-content .form-group:has(> .flexible-content-field) > .form-label {
+  display: none;
+}
+.cols-vtabs-content .form-group:has(> .flexible-content-field) { margin-bottom: 4px; }
+/* Hide the row chrome — only the active row body shows */
+.cols-vtabs-content > .repeater-row {
+  border: none;
+  background: transparent;
+  display: none;
+}
+.cols-vtabs-content > .repeater-row > .repeater-row-header { display: none; }
+.cols-vtabs-content > .repeater-row > .repeater-row-body {
+  display: block !important;
+  padding: 0;
+  background: transparent;
+  border-top: none;
+}
+.cols-vtabs-wrapper[data-active-tab="0"] .cols-vtabs-content > .repeater-row[data-row-index="0"],
+.cols-vtabs-wrapper[data-active-tab="1"] .cols-vtabs-content > .repeater-row[data-row-index="1"],
+.cols-vtabs-wrapper[data-active-tab="2"] .cols-vtabs-content > .repeater-row[data-row-index="2"],
+.cols-vtabs-wrapper[data-active-tab="3"] .cols-vtabs-content > .repeater-row[data-row-index="3"] {
+  display: block;
+}
+
+/* ── Settings header breadcrumb ───────────────────────────────────────────── */
+.builder-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-top: 4px;
+  min-height: 18px;
+}
+.builder-breadcrumb-item {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--gray-50);
+  color: var(--gray-700);
+  border: 1px solid var(--gray-200);
+  transition: background 0.15s, color 0.15s;
+}
+.builder-breadcrumb-item:hover { background: var(--gray-100); color: var(--primary); }
+.builder-breadcrumb-sep {
+  color: var(--gray-300);
+  font-size: 10px;
+}
+
 /* ── Hero banner preview ──────────────────────────────────────────────────── */
 .preview-hero-banner {
   position: relative;
@@ -3837,6 +4008,15 @@ body.sidebar-collapsed .builder-settings {
   border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
+}
+
+.page-item__stock {
+  width: 110px;
+  flex-shrink: 0;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .page-item__meta {

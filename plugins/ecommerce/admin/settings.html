@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Paramètres e-commerce</title>
+  <link rel="stylesheet" href="/admin/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="/plugin-assets/ecommerce/admin-css/ecommerce.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1>Paramètres e-commerce</h1>
+      <p class="page-subtitle">Identité boutique, paiements, virements bancaires, numérotation. Les clés secrètes sont chiffrées en base.</p>
+    </div>
+  </div>
+
+  <div id="settings-loading" class="card" style="text-align:center;color:var(--gray-500)">Chargement…</div>
+
+  <form id="settings-form" style="display:none">
+
+    <!-- Identité boutique -->
+    <div class="card">
+      <h2 class="card-title">Identité de la boutique</h2>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Raison sociale</label><input class="form-input" type="text" name="shop_legal_name"></div>
+        <div class="form-group"><label class="form-label">SIRET</label><input class="form-input" type="text" name="shop_siret"></div>
+        <div class="form-group"><label class="form-label">N° TVA intracommunautaire</label><input class="form-input" type="text" name="shop_vat_number"></div>
+        <div class="form-group"><label class="form-label">Email contact</label><input class="form-input" type="email" name="shop_email"></div>
+        <div class="form-group"><label class="form-label">Téléphone</label><input class="form-input" type="text" name="shop_phone"></div>
+        <div class="form-group"><label class="form-label">Pays (code ISO)</label><input class="form-input" type="text" name="shop_country" maxlength="2" placeholder="FR"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Adresse</label><input class="form-input" type="text" name="shop_address"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Code postal</label><input class="form-input" type="text" name="shop_postcode"></div>
+        <div class="form-group"><label class="form-label">Ville</label><input class="form-input" type="text" name="shop_city"></div>
+        <div class="form-group">
+          <label class="form-label">Devise</label>
+          <select class="form-select" name="shop_currency">
+            <option value="EUR">EUR (€)</option>
+            <option value="USD">USD ($)</option>
+            <option value="GBP">GBP (£)</option>
+            <option value="CHF">CHF</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Email expediteur (notifications)</label><input class="form-input" type="email" name="ecommerce_emails_from"></div>
+      </div>
+    </div>
+
+    <!-- Notifications email -->
+    <div class="card">
+      <h2 class="card-title">Notifications email</h2>
+      <p class="card-hint">Destinataires des emails internes (nouvelle commande, remboursement, changement de statut). Separez les adresses par une virgule.</p>
+      <div class="form-group">
+        <label class="form-label">Destinataires admin (notifications commandes)</label>
+        <input class="form-input" type="text" name="ecommerce_notif_recipients" placeholder="admin@example.com, comptabilite@example.com">
+        <span class="form-hint">Chaque commande Payée, remboursement ou changement de statut enverra un email a ces adresses.</span>
+      </div>
+    </div>
+
+    <!-- Fiscalite -->
+    <div class="card">
+      <h2 class="card-title">Fiscalite</h2>
+      <label class="check-row">
+        <input type="checkbox" name="shop_franchise_tva">
+        <span>Franchise en base de TVA (micro-entreprise)</span>
+      </label>
+      <span class="form-hint">Si coche, aucune TVA ne sera facturee. Mention « TVA non applicable, article 293 B du CGI » ajoutee automatiquement sur les commandes.</span>
+    </div>
+
+    <!-- Moyens de paiement actifs -->
+    <div class="card">
+      <h2 class="card-title">Moyens de paiement actifs</h2>
+      <p class="card-hint">Cochez ceux qui apparaîtront au checkout.</p>
+      <div class="pill-toggle-group" id="payment-methods">
+        <label class="pill-toggle"><input type="checkbox" value="stripe"><span>Carte bancaire (Stripe)</span></label>
+        <label class="pill-toggle"><input type="checkbox" value="bank_transfer"><span>Virement bancaire</span></label>
+        <label class="pill-toggle"><input type="checkbox" value="on_invoice"><span>Sur facture (SEPA — pros uniquement)</span></label>
+        <label class="pill-toggle"><input type="checkbox" value="paypal"><span>PayPal</span></label>
+      </div>
+    </div>
+
+    <!-- Stripe -->
+    <div class="card">
+      <h2 class="card-title">Stripe — Carte bancaire</h2>
+      <p class="card-hint">Saisissez vos clés <strong>Test</strong> et <strong>Production</strong> une seule fois. Le sélecteur « Mode actif » détermine lesquelles sont utilisées au checkout.</p>
+
+      <div class="form-group">
+        <label class="form-label">Mode actif</label>
+        <select class="form-select" name="stripe_mode" style="max-width:340px">
+          <option value="test">Test (sandbox)</option>
+          <option value="live">Production</option>
+        </select>
+      </div>
+
+      <div class="env-grid">
+        <div class="env-block env-test">
+          <div class="env-header"><span class="env-tag tag-test">TEST</span><span class="env-title">Sandbox</span></div>
+          <div class="form-group">
+            <label class="form-label">Clé publique <code>pk_test_*</code></label>
+            <input class="form-input" type="text" name="stripe_pk_test" placeholder="pk_test_…">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Clé secrète <code>sk_test_*</code> <span id="stripe-sk-test-badge" class="badge unset">non définie</span></label>
+            <div class="secret-row">
+              <input class="form-input" type="password" name="stripe_sk_test" placeholder="sk_test_… (vide = conserver)" autocomplete="new-password">
+              <button type="button" class="btn btn-outline" data-reveal="stripe_sk_test"><i class="fa-solid fa-eye"></i></button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">ID endpoint webhook test</label>
+            <input class="form-input" type="text" name="stripe_webhook_id_test" placeholder="we_…">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Secret webhook test <code>whsec_*</code> <span id="stripe-whs-test-badge" class="badge unset">non défini</span></label>
+            <div class="secret-row">
+              <input class="form-input" type="password" name="stripe_webhook_secret_test" placeholder="whsec_… (vide = conserver)" autocomplete="new-password">
+              <button type="button" class="btn btn-outline" data-reveal="stripe_webhook_secret_test"><i class="fa-solid fa-eye"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="env-block env-live">
+          <div class="env-header"><span class="env-tag tag-live">LIVE</span><span class="env-title">Production</span></div>
+          <div class="form-group">
+            <label class="form-label">Clé publique <code>pk_live_*</code></label>
+            <input class="form-input" type="text" name="stripe_pk_live" placeholder="pk_live_…">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Clé secrète <code>sk_live_*</code> <span id="stripe-sk-live-badge" class="badge unset">non définie</span></label>
+            <div class="secret-row">
+              <input class="form-input" type="password" name="stripe_sk_live" placeholder="sk_live_… (vide = conserver)" autocomplete="new-password">
+              <button type="button" class="btn btn-outline" data-reveal="stripe_sk_live"><i class="fa-solid fa-eye"></i></button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">ID endpoint webhook live</label>
+            <input class="form-input" type="text" name="stripe_webhook_id_live" placeholder="we_…">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Secret webhook live <code>whsec_*</code> <span id="stripe-whs-live-badge" class="badge unset">non défini</span></label>
+            <div class="secret-row">
+              <input class="form-input" type="password" name="stripe_webhook_secret_live" placeholder="whsec_… (vide = conserver)" autocomplete="new-password">
+              <button type="button" class="btn btn-outline" data-reveal="stripe_webhook_secret_live"><i class="fa-solid fa-eye"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <strong>URL de l'endpoint webhook (à configurer dans Stripe) :</strong>
+        <code id="webhook-url">https://&lt;votre-domaine&gt;/api/payments/stripe/webhook</code>
+        <div style="flex-basis:100%;height:0"></div>
+        <strong>Events à activer :</strong>
+        <code>payment_intent.succeeded</code>
+        <code>payment_intent.payment_failed</code>
+        <code>payment_intent.canceled</code>
+        <code>charge.refunded</code>
+      </div>
+    </div>
+
+    <!-- Virement bancaire -->
+    <div class="card">
+      <h2 class="card-title">Virement bancaire (RIB envoyé au client)</h2>
+      <div class="form-group">
+        <label class="form-label">Titulaire (raison sociale du compte)</label>
+        <input class="form-input" type="text" name="bank_holder">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">IBAN <span id="bank-iban-badge" class="badge unset">non défini</span></label>
+          <div class="secret-row">
+            <input class="form-input" type="password" name="bank_iban" placeholder="FR76 … (laisser vide pour conserver)" autocomplete="new-password">
+            <button type="button" class="btn btn-outline" data-reveal="bank_iban"><i class="fa-solid fa-eye"></i> Voir</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">BIC <span id="bank-bic-badge" class="badge unset">non défini</span></label>
+          <div class="secret-row">
+            <input class="form-input" type="password" name="bank_bic" placeholder="(laisser vide pour conserver)" autocomplete="new-password">
+            <button type="button" class="btn btn-outline" data-reveal="bank_bic"><i class="fa-solid fa-eye"></i> Voir</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Numérotation légale -->
+    <div class="card">
+      <h2 class="card-title">Numérotation des factures et devis</h2>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Préfixe facture</label><input class="form-input" type="text" name="invoice_prefix" placeholder="FR-"></div>
+        <div class="form-group"><label class="form-label">Prochaine facture #</label><input class="form-input" type="text" name="invoice_next_number"></div>
+        <div class="form-group"><label class="form-label">Préfixe devis</label><input class="form-input" type="text" name="quote_prefix" placeholder="D-"></div>
+        <div class="form-group"><label class="form-label">Prochain devis #</label><input class="form-input" type="text" name="quote_next_number"></div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
+    </div>
+  </form>
+</div>
+
+<script type="module" src="./settings/main.js"></script>
+</body>
+</html>

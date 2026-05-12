@@ -1,0 +1,116 @@
+---
+interface Props { productSlug: string; disabled?: boolean; }
+const { productSlug, disabled = false } = Astro.props;
+---
+<div class="shop-add-to-cart" data-product-slug={productSlug}>
+  <div class="shop-add-to-cart__row">
+    <label for="addToCartQty" class="shop-add-to-cart__label">Quantité</label>
+    <input type="number" id="addToCartQty" min="1" step="1" value="1" class="shop-add-to-cart__qty" />
+    <button type="button" id="shopAddToCartBtn" class="btn btn-primary shop-add-to-cart__btn" disabled={disabled}>
+      Ajouter au panier
+    </button>
+  </div>
+  <div id="shopAddToCartFeedback" class="shop-add-to-cart__feedback" role="status" aria-live="polite"></div>
+</div>
+
+<script is:inline src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  import { addCartItem } from '@plugins/ecommerce/frontend/lib/shop-api'
+
+  declare const Swal: any
+
+  const btn = document.getElementById('shopAddToCartBtn') as HTMLButtonElement | null
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      const variantInput = document.getElementById('selectedVariantId') as HTMLInputElement | null
+      const qtyInput = document.getElementById('addToCartQty') as HTMLInputElement | null
+      const variantId = Number(variantInput?.value || 0)
+      const qty = Math.max(1, parseInt(qtyInput?.value || '1', 10))
+
+      if (!variantId) {
+        Swal.fire({ icon: 'warning', title: 'Variante requise', text: 'Veuillez sélectionner une variante.', confirmButtonColor: 'var(--color-primary, #0f62fe)' })
+        return
+      }
+
+      btn.disabled = true
+
+      try {
+        const cart = await addCartItem(variantId, qty)
+        window.dispatchEvent(new CustomEvent('cart:updated', { detail: cart }))
+        Swal.fire({
+          icon: 'success',
+          title: 'Ajout\u00e9 au panier',
+          html: '<p>Votre article a bien \u00e9t\u00e9 ajout\u00e9 au panier.</p>',
+          showCancelButton: true,
+          confirmButtonText: 'Voir le panier',
+          cancelButtonText: 'Continuer mes achats',
+          confirmButtonColor: 'var(--color-primary, #0f62fe)',
+        }).then((result: any) => {
+          if (result.isConfirmed) window.location.href = '/panier'
+        })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Erreur lors de l'ajout."
+        Swal.fire({ icon: 'error', title: 'Erreur', text: msg, confirmButtonColor: 'var(--color-primary, #0f62fe)' })
+      } finally {
+        btn.disabled = false
+      }
+    })
+  }
+</script>
+
+<style>
+  .shop-add-to-cart {
+    margin-top: 1.5rem;
+  }
+  .shop-add-to-cart__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .shop-add-to-cart__label {
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .shop-add-to-cart__qty {
+    width: 70px;
+    padding: 8px 10px;
+    border: 1px solid var(--gray-300, #d1d5db);
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .shop-add-to-cart__btn {
+    padding: 10px 24px;
+  }
+  .shop-add-to-cart__feedback {
+    margin-top: 10px;
+    font-size: 14px;
+    min-height: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border-radius: 8px;
+    transition: all .3s ease;
+  }
+  .shop-add-to-cart__feedback:empty { padding: 0; background: none; }
+  .shop-add-to-cart__feedback svg { flex-shrink: 0; }
+  .shop-add-to-cart__feedback a {
+    margin-left: auto;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .shop-add-to-cart__feedback a:hover { text-decoration: underline; }
+  .shop-add-to-cart__feedback.error {
+    color: var(--danger, #dc2626);
+    background: color-mix(in srgb, var(--danger, #dc2626) 8%, transparent);
+    padding: 10px 14px;
+  }
+  .shop-add-to-cart__feedback.pending { color: var(--gray-600, #4b5563); }
+  .shop-add-to-cart__feedback.success {
+    color: var(--success, #059669);
+    background: color-mix(in srgb, var(--success, #059669) 8%, transparent);
+    padding: 10px 14px;
+  }
+  .shop-add-to-cart__feedback.success a { color: var(--success, #059669); }
+</style>

@@ -50,6 +50,8 @@ class EcommerceMigrationController {
             if (self::ensureColumn($db, 'customers', 'siret', "VARCHAR(20) DEFAULT NULL", 'vat_number', $log)) $changes++;
             if (self::ensureColumn($db, 'customers', 'activity', "VARCHAR(40) DEFAULT NULL", 'siret', $log)) $changes++;
             if (self::ensureColumn($db, 'customers', 'pro_status', "ENUM('none','pending','approved','rejected') NOT NULL DEFAULT 'none'", 'is_pro', $log)) $changes++;
+            if (self::ensureColumn($db, 'customers', 'discount_rate', "DECIMAL(5,2) DEFAULT NULL", 'pro_status', $log)) $changes++;
+            if (self::ensureColumn($db, 'customers', 'discount_override', "TINYINT(1) NOT NULL DEFAULT 0", 'discount_rate', $log)) $changes++;
         }
 
         $changes += self::createTable($db, 'customer_addresses', "
@@ -493,11 +495,315 @@ class EcommerceMigrationController {
             CONSTRAINT fk_gdpr_req_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
         ", $log) ? 1 : 0;
 
+        // ── PHASE 15 : Consolidation (tables fusionnées) ────────────────────
+        // Étape additive : crée les nouvelles tables + colonnes JSON cibles.
+        // Les data migrations + DROP des anciennes tables sont gérés par
+        // self::consolidateLegacyTables() une fois les controllers à jour.
+        self::consolidateAdditive($db, $log, $changes);
+
+        // ── PHASE 16 : Cart items custom (POOLP configurator) ───────────────
+        // Référencée par CartController/OrderController, jamais créée jusqu'ici.
+        $changes += self::createTable($db, 'cart_items_custom', "
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            cart_id INT NOT NULL,
+            source_type VARCHAR(50) NOT NULL,
+            source_id INT DEFAULT NULL,
+            title VARCHAR(255) NOT NULL,
+            config_snapshot JSON DEFAULT NULL,
+            quantity INT NOT NULL DEFAULT 1,
+            unit_price_ttc_cents INT NOT NULL,
+            unit_price_pro_ht_cents INT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_cart (cart_id),
+            CONSTRAINT fk_cart_items_custom_cart FOREIGN KEY (cart_id) REFERENCES carts(id) ON DELETE CASCADE
+        ", $log) ? 1 : 0;
+
         // ── Default data : TVA FR ───────────────────────────────────────────
         self::seedDefaultTaxRates($db, $log, $changes);
 
         // ── Default settings e-commerce ─────────────────────────────────────
         self::seedDefaultSettings($db, $log, $changes);
+
+        return $changes;
+    }
+
+    /**
+     * Consolidation additive : nouvelles tables + colonnes JSON cibles.
+     * Idempotent. Aucune perte de donnée, aucun DROP.
+     *
+     * Tables cibles :
+     *   - tokens          (absorbera customer_password_resets + download_tokens)
+     *   - audit_log       (absorbera order_events + payment_events)
+     *   - shipping_classes (utilisée par éditeur produit, onglet Expédition)
+     *
+     * Colonnes ajoutées :
+     *   - product_variants.images          JSON (absorbera product_images)
+     *   - orders.billing_address           JSON (absorbera order_addresses billing)
+     *   - orders.shipping_address          JSON (absorbera order_addresses shipping)
+     *   - order_items.download_meta        JSON (absorbera digital_downloads)
+     *   - invoices.type                    ENUM (absorbera credit_notes)
+     *   - customers.stripe_customer_id     VARCHAR (Stripe saved payment methods)
+     */
+    private static function consolidateAdditive(PDO $db, callable $log, int &$changes): void {
+        // Nouvelles tables unifiées
+        $changes += self::createTable($db, 'tokens', "
+            token VARCHAR(64) PRIMARY KEY,
+            type ENUM('password_reset','download','email_verification') NOT NULL,
+            customer_id INT DEFAULT NULL,
+            related_id INT DEFAULT NULL,
+            payload JSON DEFAULT NULL,
+            expires_at DATETIME NOT NULL,
+            used_at DATETIME DEFAULT NULL,
+            used_count INT NOT NULL DEFAULT 0,
+            last_ip VARCHAR(45) DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_type_expires (type, expires_at),
+            INDEX idx_customer (customer_id),
+            INDEX idx_related (related_id),
+            CONSTRAINT fk_tokens_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+        ", $log) ? 1 : 0;
+
+        $changes += self::createTable($db, 'audit_log', "
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            entity_type ENUM('order','payment','customer','product','quote') NOT NULL,
+            entity_id INT DEFAULT NULL,
+            event_type VARCHAR(100) NOT NULL,
+            provider VARCHAR(30) DEFAULT NULL,
+            provider_event_id VARCHAR(191) DEFAULT NULL,
+            actor_type ENUM('system','customer','admin','webhook') NOT NULL DEFAULT 'system',
+            actor_id INT DEFAULT NULL,
+            payload JSON DEFAULT NULL,
+            processed_at DATETIME DEFAULT NULL,
+            processing_error TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_provider_event (provider, provider_event_id),
+            INDEX idx_entity (entity_type, entity_id),
+            INDEX idx_created (created_at)
+        ", $log) ? 1 : 0;
+
+        // SEPA Direct Debit mandates
+        $changes += self::createTable($db, 'sepa_mandates', "
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            customer_id INT NOT NULL,
+            stripe_customer_id VARCHAR(100) DEFAULT NULL,
+            stripe_payment_method_id VARCHAR(100) DEFAULT NULL,
+            stripe_setup_intent_id VARCHAR(100) DEFAULT NULL,
+            iban_last4 VARCHAR(4) DEFAULT NULL,
+            bank_name VARCHAR(100) DEFAULT NULL,
+            mandate_reference VARCHAR(191) DEFAULT NULL,
+            status ENUM('pending_validation','active','revoked','failed') NOT NULL DEFAULT 'pending_validation',
+            validated_at DATETIME DEFAULT NULL,
+            revoked_at DATETIME DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            CONSTRAINT fk_sepa_mandates_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+            INDEX idx_customer (customer_id),
+            INDEX idx_status (status)
+        ", $log) ? 1 : 0;
+
+        $changes += self::createTable($db, 'shipping_classes', "
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            slug VARCHAR(50) NOT NULL UNIQUE,
+            label VARCHAR(100) NOT NULL,
+            description VARCHAR(255) DEFAULT NULL,
+            position INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ", $log) ? 1 : 0;
+
+        // Colonnes JSON ajoutées sur tables existantes
+        if (self::tableExists($db, 'product_variants')) {
+            if (self::ensureColumn($db, 'product_variants', 'images', 'JSON DEFAULT NULL', 'barcode', $log)) $changes++;
+        }
+        if (self::tableExists($db, 'orders')) {
+            if (self::ensureColumn($db, 'orders', 'billing_address',  'JSON DEFAULT NULL', 'tracking_url', $log)) $changes++;
+            if (self::ensureColumn($db, 'orders', 'shipping_address', 'JSON DEFAULT NULL', 'billing_address', $log)) $changes++;
+        }
+        if (self::tableExists($db, 'order_items')) {
+            if (self::ensureColumn($db, 'order_items', 'download_meta', 'JSON DEFAULT NULL', 'requires_shipping', $log)) $changes++;
+        }
+        if (self::tableExists($db, 'invoices')) {
+            if (self::ensureColumn($db, 'invoices', 'type', "ENUM('invoice','credit_note','packing_slip','proforma') NOT NULL DEFAULT 'invoice'", 'order_id', $log)) $changes++;
+            // pdf_path doit pouvoir être NULL pour packing_slip généré tardivement
+            try {
+                $db->exec("ALTER TABLE `invoices` MODIFY COLUMN `pdf_path` VARCHAR(500) DEFAULT NULL");
+            } catch (\Throwable $e) { /* idempotent */ }
+        }
+        if (self::tableExists($db, 'customers')) {
+            if (self::ensureColumn($db, 'customers', 'stripe_customer_id', 'VARCHAR(191) DEFAULT NULL', 'pro_status', $log)) $changes++;
+        }
+    }
+
+    /**
+     * Migration des données legacy + DROP des anciennes tables.
+     * À appeler UNE FOIS après mise à jour des controllers (pour qu'ils
+     * lisent/écrivent uniquement le nouveau schéma).
+     *
+     * Idempotent : skip silencieusement si l'ancienne table n'existe plus.
+     * Exécuté via setting `ecommerce_legacy_consolidated` = 1 (one-shot).
+     */
+    public static function consolidateLegacyTables(?callable $log = null): int {
+        $db = Database::getInstance();
+        $log = $log ?? fn(string $msg) => print($msg . "\n");
+        $changes = 0;
+
+        // Garde-fou : flag dans settings
+        $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'ecommerce_legacy_consolidated'");
+        $stmt->execute();
+        if ($stmt->fetchColumn() === '1') {
+            $log('  Legacy consolidation already done.');
+            return 0;
+        }
+
+        $log('  Consolidating legacy tables → new schema:');
+
+        // 1. product_images → product_variants.images JSON
+        if (self::tableExists($db, 'product_images')) {
+            $rows = $db->query("SELECT product_id, variant_id, media_id, position, alt FROM product_images ORDER BY position ASC")->fetchAll();
+            $byVariant = [];
+            $byProduct = [];
+            foreach ($rows as $r) {
+                $img = ['media_id' => (int) $r['media_id'], 'position' => (int) $r['position'], 'alt' => $r['alt']];
+                if (!empty($r['variant_id'])) $byVariant[(int) $r['variant_id']][] = $img;
+                else $byProduct[(int) $r['product_id']][] = $img;
+            }
+            $upd = $db->prepare("UPDATE product_variants SET images = ? WHERE id = ?");
+            foreach ($byVariant as $vid => $imgs) {
+                $upd->execute([json_encode($imgs, JSON_UNESCAPED_UNICODE), $vid]);
+            }
+            // Images sans variant : on les attache au 1er variant du produit
+            if (!empty($byProduct)) {
+                $first = $db->prepare("SELECT id FROM product_variants WHERE product_id = ? ORDER BY position ASC, id ASC LIMIT 1");
+                foreach ($byProduct as $pid => $imgs) {
+                    $first->execute([$pid]);
+                    if ($vid = $first->fetchColumn()) {
+                        $upd->execute([json_encode($imgs, JSON_UNESCAPED_UNICODE), (int) $vid]);
+                    }
+                }
+            }
+            $db->exec("DROP TABLE `product_images`");
+            $log("    + Migrated " . count($rows) . " product_images → product_variants.images, dropped table");
+            $changes++;
+        }
+
+        // 2. order_addresses → orders.billing_address / shipping_address JSON
+        if (self::tableExists($db, 'order_addresses')) {
+            $rows = $db->query("SELECT * FROM order_addresses")->fetchAll();
+            $byOrder = [];
+            foreach ($rows as $r) {
+                $byOrder[(int) $r['order_id']][$r['type']] = [
+                    'first_name' => $r['first_name'], 'last_name' => $r['last_name'], 'company' => $r['company'],
+                    'address_line1' => $r['address_line1'], 'address_line2' => $r['address_line2'],
+                    'postcode' => $r['postcode'], 'city' => $r['city'], 'region' => $r['region'],
+                    'country_code' => $r['country_code'], 'phone' => $r['phone'], 'email' => $r['email'],
+                    'vat_number' => $r['vat_number'],
+                ];
+            }
+            $upd = $db->prepare("UPDATE orders SET billing_address = ?, shipping_address = ? WHERE id = ?");
+            foreach ($byOrder as $oid => $addrs) {
+                $upd->execute([
+                    isset($addrs['billing']) ? json_encode($addrs['billing'], JSON_UNESCAPED_UNICODE) : null,
+                    isset($addrs['shipping']) ? json_encode($addrs['shipping'], JSON_UNESCAPED_UNICODE) : null,
+                    $oid,
+                ]);
+            }
+            $db->exec("DROP TABLE `order_addresses`");
+            $log("    + Migrated " . count($byOrder) . " order_addresses → orders JSON, dropped table");
+            $changes++;
+        }
+
+        // 3. credit_notes → invoices (type='credit_note')
+        if (self::tableExists($db, 'credit_notes')) {
+            $rows = $db->query("SELECT cn.*, i.order_id, i.year FROM credit_notes cn LEFT JOIN invoices i ON i.id = cn.invoice_id")->fetchAll();
+            $ins = $db->prepare("INSERT INTO invoices (order_id, invoice_number, year, total_cents, tax_cents, pdf_path, issued_at, type) VALUES (?, ?, ?, ?, 0, ?, ?, 'credit_note')");
+            foreach ($rows as $r) {
+                if (!$r['order_id']) continue;
+                $ins->execute([
+                    (int) $r['order_id'],
+                    $r['credit_number'],
+                    (int) ($r['year'] ?? date('Y')),
+                    (int) $r['amount_cents'],
+                    $r['pdf_path'],
+                    $r['issued_at'],
+                ]);
+            }
+            $db->exec("DROP TABLE `credit_notes`");
+            $log("    + Migrated " . count($rows) . " credit_notes → invoices, dropped table");
+            $changes++;
+        }
+
+        // 4. customer_password_resets + download_tokens → tokens
+        if (self::tableExists($db, 'customer_password_resets')) {
+            $rows = $db->query("SELECT token, customer_id, expires_at, used_at, created_at FROM customer_password_resets")->fetchAll();
+            $ins = $db->prepare("INSERT INTO tokens (token, type, customer_id, expires_at, used_at, created_at) VALUES (?, 'password_reset', ?, ?, ?, ?)");
+            foreach ($rows as $r) {
+                try { $ins->execute([$r['token'], $r['customer_id'], $r['expires_at'], $r['used_at'], $r['created_at']]); } catch (\Throwable $e) {}
+            }
+            $db->exec("DROP TABLE `customer_password_resets`");
+            $log("    + Migrated " . count($rows) . " password_resets → tokens, dropped table");
+            $changes++;
+        }
+        if (self::tableExists($db, 'download_tokens')) {
+            $rows = $db->query("SELECT token, download_id, customer_id, expires_at, used_count, last_ip, created_at FROM download_tokens")->fetchAll();
+            $ins = $db->prepare("INSERT INTO tokens (token, type, customer_id, related_id, expires_at, used_count, last_ip, created_at) VALUES (?, 'download', ?, ?, ?, ?, ?, ?)");
+            foreach ($rows as $r) {
+                try { $ins->execute([$r['token'], $r['customer_id'], $r['download_id'], $r['expires_at'], $r['used_count'], $r['last_ip'], $r['created_at']]); } catch (\Throwable $e) {}
+            }
+            $db->exec("DROP TABLE `download_tokens`");
+            $log("    + Migrated " . count($rows) . " download_tokens → tokens, dropped table");
+            $changes++;
+        }
+
+        // 5. order_events + payment_events → audit_log
+        if (self::tableExists($db, 'order_events')) {
+            $rows = $db->query("SELECT order_id, type, payload, actor_type, actor_id, created_at FROM order_events")->fetchAll();
+            $ins = $db->prepare("INSERT INTO audit_log (entity_type, entity_id, event_type, payload, actor_type, actor_id, created_at) VALUES ('order', ?, ?, ?, ?, ?, ?)");
+            foreach ($rows as $r) {
+                $ins->execute([(int) $r['order_id'], $r['type'], $r['payload'], $r['actor_type'], $r['actor_id'], $r['created_at']]);
+            }
+            $db->exec("DROP TABLE `order_events`");
+            $log("    + Migrated " . count($rows) . " order_events → audit_log, dropped table");
+            $changes++;
+        }
+        if (self::tableExists($db, 'payment_events')) {
+            $rows = $db->query("SELECT provider, event_id, event_type, payload, processed_at, processing_error, received_at FROM payment_events")->fetchAll();
+            $ins = $db->prepare("INSERT INTO audit_log (entity_type, event_type, provider, provider_event_id, payload, actor_type, processed_at, processing_error, created_at) VALUES ('payment', ?, ?, ?, ?, 'webhook', ?, ?, ?)");
+            foreach ($rows as $r) {
+                try { $ins->execute([$r['event_type'], $r['provider'], $r['event_id'], $r['payload'], $r['processed_at'], $r['processing_error'], $r['received_at']]); } catch (\Throwable $e) {}
+            }
+            $db->exec("DROP TABLE `payment_events`");
+            $log("    + Migrated " . count($rows) . " payment_events → audit_log, dropped table");
+            $changes++;
+        }
+
+        // 6. digital_downloads → order_items.download_meta JSON
+        if (self::tableExists($db, 'digital_downloads')) {
+            $rows = $db->query("SELECT order_item_id, file_path, file_name, download_limit, download_count, expires_at FROM digital_downloads")->fetchAll();
+            $upd = $db->prepare("UPDATE order_items SET download_meta = ? WHERE id = ?");
+            foreach ($rows as $r) {
+                $meta = [
+                    'file_path' => $r['file_path'],
+                    'file_name' => $r['file_name'],
+                    'download_limit' => $r['download_limit'] !== null ? (int) $r['download_limit'] : null,
+                    'download_count' => (int) $r['download_count'],
+                    'expires_at' => $r['expires_at'],
+                ];
+                $upd->execute([json_encode($meta, JSON_UNESCAPED_UNICODE), (int) $r['order_item_id']]);
+            }
+            $db->exec("DROP TABLE `digital_downloads`");
+            $log("    + Migrated " . count($rows) . " digital_downloads → order_items.download_meta, dropped table");
+            $changes++;
+        }
+
+        // 7. stats_cache → drop (recompute à la volée)
+        if (self::tableExists($db, 'stats_cache')) {
+            $db->exec("DROP TABLE `stats_cache`");
+            $log("    + Dropped stats_cache (recompute on demand)");
+            $changes++;
+        }
+
+        // Garde-fou : flag posé une fois la consolidation réussie
+        $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('ecommerce_legacy_consolidated', '1') ON DUPLICATE KEY UPDATE setting_value = '1'")->execute();
+        $log('  Legacy consolidation done.');
 
         return $changes;
     }
@@ -570,6 +876,8 @@ class EcommerceMigrationController {
             'order_customer_cancel_window_hours' => '24',
             'order_customer_cancel_allowed_statuses' => 'pending,awaiting_payment,paid,processing',
             'order_customer_cancel_reason_required' => '1',
+            'ecommerce_notif_recipients' => '[]',
+            'shop_franchise_tva' => '0',         // 1 si micro-entreprise franchise de base (pas de TVA)
             'gdpr_auto_erase_enabled' => '0',
             'gdpr_inactivity_years' => '3',
             'gdpr_inactivity_notify_days_before' => '30',

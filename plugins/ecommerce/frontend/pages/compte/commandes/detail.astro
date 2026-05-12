@@ -1,0 +1,134 @@
+---
+/**
+ * /compte/commandes/detail?n=CMD-XXXXXX — order detail page.
+ */
+import BaseHead from '@frontend/components/BaseHead.astro'
+import Header from '@frontend/components/Header.astro'
+import Footer from '@frontend/components/Footer.astro'
+import SiteOverlays from '@frontend/components/SiteOverlays.astro'
+import DeferredLoader from '@frontend/components/DeferredLoader.astro'
+import AccountNav from '@plugins/ecommerce/frontend/components/AccountNav.astro'
+import { SITE_TITLE } from '@frontend/consts'
+import { getFrontendBootstrap } from '@frontend/lib/api'
+import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+import '@plugins/ecommerce/frontend/styles/account.css'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`Commande — ${siteName}`} description="Detail de votre commande" styleSettings={styleSettings} siteSettings={siteSettings} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page account-wrap">
+      <div class="account-container">
+        <div class="account-layout">
+          <AccountNav active="orders" />
+          <div class="account-content">
+            <div id="order-loading" class="account-loading">Chargement...</div>
+            <div id="order-content" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+
+    <script>
+      import { getOrderByNumber, isLoggedIn, formatPrice, formatDate, formatDateTime, STATUS_LABELS, PAYMENT_STATUS_LABELS } from '@plugins/ecommerce/frontend/lib/customer-api'
+
+      if (!isLoggedIn()) window.location.href = '/compte/connexion?redirect=' + encodeURIComponent(window.location.href)
+
+      const orderNumber = new URLSearchParams(window.location.search).get('n') || ''
+      if (!orderNumber) document.getElementById('order-loading')!.textContent = 'Numero de commande manquant.'
+      document.title = orderNumber ? `Commande ${orderNumber}` : document.title
+
+      function fmtAddr(a: any): string {
+        if (!a) return '-'
+        return [
+          `${a.first_name || ''} ${a.last_name || ''}`.trim(),
+          a.company, a.address_line1, a.address_line2,
+          `${a.postcode || ''} ${a.city || ''}`.trim(),
+          a.country_code, a.phone,
+        ].filter(Boolean).map(l => `<div>${l}</div>`).join('')
+      }
+
+      async function init() {
+        if (!orderNumber) return
+        try {
+          const o = await getOrderByNumber(orderNumber)
+          const content = document.getElementById('order-content')!
+          content.style.display = ''
+          document.getElementById('order-loading')!.style.display = 'none'
+
+          const paymentLabels: Record<string, string> = {
+            stripe: 'Carte bancaire', bank_transfer: 'Virement', on_invoice: 'Sur facture', paypal: 'PayPal',
+          }
+
+          content.innerHTML = `
+            <div class="od-header">
+              <div>
+                <h1 class="od-number">${o.order_number}</h1>
+                <span class="badge badge-${o.status}">${STATUS_LABELS[o.status] || o.status}</span>
+                <span class="badge badge-${o.payment_status}">${PAYMENT_STATUS_LABELS[o.payment_status] || o.payment_status}</span>
+              </div>
+              <div class="od-date">${formatDateTime(o.placed_at)}</div>
+            </div>
+
+            <div class="od-grid">
+              <div class="od-section"><h3>Adresse de livraison</h3><div class="od-addr">${fmtAddr(o.shipping_address)}</div>
+                ${o.shipping_method_label ? `<div class="od-ship-method">${o.shipping_method_label}</div>` : ''}
+              </div>
+              <div class="od-section"><h3>Adresse de facturation</h3><div class="od-addr">${fmtAddr(o.billing_address)}</div></div>
+            </div>
+
+            <div class="od-section">
+              <h3>Articles</h3>
+              <table class="account-table">
+                <thead><tr><th>Produit</th><th>Qte</th><th>PU HT</th><th>TVA</th><th>Total</th></tr></thead>
+                <tbody>
+                  ${o.items.map(it => `<tr>
+                    <td>${it.product_title}${Object.keys(it.variant_attributes || {}).length ? '<div class="od-attrs">' + Object.entries(it.variant_attributes).map(([k, v]) => `${k}: ${v}`).join(' / ') + '</div>' : ''}</td>
+                    <td>${it.quantity}</td><td>${formatPrice(it.unit_price_cents)}</td><td>${it.tax_rate}%</td><td>${formatPrice(it.line_total_cents)}</td>
+                  </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="od-totals">
+              <div class="od-total-line"><span>Sous-total HT</span><span>${formatPrice(o.subtotal_cents)}</span></div>
+              ${o.discount_cents > 0 ? `<div class="od-total-line"><span>Remise</span><span>-${formatPrice(o.discount_cents)}</span></div>` : ''}
+              <div class="od-total-line"><span>Livraison</span><span>${formatPrice(o.shipping_cents)}</span></div>
+              <div class="od-total-line"><span>TVA</span><span>${formatPrice(o.tax_cents)}</span></div>
+              <div class="od-total-line od-total-main"><span>Total TTC</span><span>${formatPrice(o.total_cents, o.currency)}</span></div>
+              ${o.coupon_code ? `<div class="od-total-line"><span>Coupon</span><span>${o.coupon_code}</span></div>` : ''}
+              <div class="od-total-line"><span>Paiement</span><span>${paymentLabels[o.payment_method] || o.payment_method}</span></div>
+            </div>
+
+            <div style="margin-top:28px">
+              <a href="/compte/commandes" class="account-btn-outline">Retour aux commandes</a>
+            </div>
+          `
+        } catch (err: any) {
+          if (err?.status === 401) { window.location.href = '/compte/connexion'; return }
+          document.getElementById('order-loading')!.textContent = err?.status === 404 ? 'Commande introuvable.' : 'Erreur de chargement.'
+        }
+      }
+
+      init()
+    </script>
+  </body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Éditeur produit</title>
+  <link rel="stylesheet" href="/admin/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="/plugin-assets/ecommerce/admin-css/ecommerce.css">
+  <link rel="stylesheet" href="/plugin-assets/ecommerce/admin-css/product-editor.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+<div class="content">
+  <div id="pe-loading" class="card" style="text-align:center;color:var(--gray-500);margin:24px">Chargement…</div>
+
+  <div id="pe-app" class="pe-layout" style="display:none">
+    <!-- Zone principale -->
+    <div class="pe-main">
+      <input id="pe-title" class="pe-title-input" type="text" placeholder="Nom du produit" autocomplete="off" />
+
+      <!-- Metabox 1 : Contenu du produit (Header / Contenu / Paramètre) -->
+      <div class="pe-metabox" data-metabox="page-content">
+        <div class="pe-metabox-header">Contenu du produit</div>
+        <div class="pe-metabox-body">
+          <nav class="pe-tabs-sidebar" data-tabs-nav="page-content">
+            <button class="pe-tab-btn active" data-tab="header">
+              <svg class="pe-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="6" rx="1"/><rect x="3" y="13" width="11" height="8" rx="1"/></svg>
+              Header
+            </button>
+            <button class="pe-tab-btn" data-tab="content">
+              <svg class="pe-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
+              Contenu
+            </button>
+            <button class="pe-tab-btn" data-tab="settings">
+              <svg class="pe-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              Paramètre
+            </button>
+          </nav>
+          <div class="pe-tabs-panel" data-tabs-panel="page-content">
+            <div data-panel="header" class="active" id="pe-page-header"></div>
+            <div data-panel="content" id="pe-page-content"></div>
+            <div data-panel="settings" id="pe-page-settings"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metabox 2 : SEO -->
+      <div class="pe-metabox" data-metabox="seo">
+        <div class="pe-metabox-header">SEO</div>
+        <div class="pe-metabox-body">
+          <nav class="pe-tabs-sidebar" data-tabs-nav="seo">
+            <button class="pe-tab-btn active" data-tab="seo">SEO</button>
+            <button class="pe-tab-btn" data-tab="schema">Schema</button>
+          </nav>
+          <div class="pe-tabs-panel" data-tabs-panel="seo">
+            <div data-panel="seo" class="active" id="pe-seo-main"></div>
+            <div data-panel="schema" id="pe-seo-schema"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metabox 3 : Données produit -->
+      <div class="pe-metabox" data-metabox="data">
+        <div class="pe-metabox-header">Données produit</div>
+        <div class="pe-data-header" id="pe-data-header"></div>
+        <div class="pe-metabox-body">
+          <nav class="pe-tabs-sidebar" data-tabs-nav="data">
+            <button class="pe-tab-btn active" data-tab="general">Général</button>
+            <button class="pe-tab-btn"        data-tab="inventory">Inventaire</button>
+            <button class="pe-tab-btn"        data-tab="shipping">Expédition</button>
+            <button class="pe-tab-btn"        data-tab="linked">Produits liés</button>
+            <button class="pe-tab-btn"        data-tab="attributes">Attributs</button>
+            <button class="pe-tab-btn" hidden data-tab="variations">Variations</button>
+            <button class="pe-tab-btn" hidden data-tab="downloads">Téléchargement</button>
+            <button class="pe-tab-btn"        data-tab="advanced">Avancé</button>
+          </nav>
+          <div class="pe-tabs-panel" data-tabs-panel="data">
+            <div data-panel="general"    class="active" id="pe-data-general"></div>
+            <div data-panel="inventory"  id="pe-data-inventory"></div>
+            <div data-panel="shipping"   id="pe-data-shipping"></div>
+            <div data-panel="linked"     id="pe-data-linked"></div>
+            <div data-panel="attributes" id="pe-data-attributes"></div>
+            <div data-panel="variations" id="pe-data-variations"></div>
+            <div data-panel="downloads"  id="pe-data-downloads"></div>
+            <div data-panel="advanced"   id="pe-data-advanced"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="pe-sidebar">
+      <div class="pe-widget" id="pe-widget-publish">
+        <div class="pe-widget-header">Publier</div>
+        <div class="pe-widget-body" id="pe-publish-body"></div>
+      </div>
+      <div class="pe-widget" id="pe-widget-image">
+        <div class="pe-widget-header">Image du produit</div>
+        <div class="pe-widget-body" id="pe-image-body"></div>
+      </div>
+      <div class="pe-widget" id="pe-widget-gallery">
+        <div class="pe-widget-header">Galerie produit</div>
+        <div class="pe-widget-body" id="pe-gallery-body"></div>
+      </div>
+      <div class="pe-widget" id="pe-widget-categories">
+        <div class="pe-widget-header">Catégories de produits</div>
+        <div class="pe-widget-body" id="pe-categories-body"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+document.addEventListener('click', (e) => {
+  const header = e.target.closest('.pe-metabox-header, .pe-widget-header');
+  if (!header) return;
+  header.closest('.pe-metabox, .pe-widget').classList.toggle('is-collapsed');
+});
+</script>
+<script type="module" src="./product-editor/main.js"></script>
+</body>
+</html>

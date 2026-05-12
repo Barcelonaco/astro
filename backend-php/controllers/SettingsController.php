@@ -71,6 +71,7 @@ class SettingsController {
             $navigation = PageModel::findNavigation();
         }
         $secondaryNav = MenuModel::getNavigationByLocation('secondary');
+        $creditNav = MenuModel::getNavigationByLocation('credit');
 
         // Style settings
         $styleKeys = [
@@ -143,6 +144,7 @@ class SettingsController {
             'siteSettings' => $siteSettings,
             'navigation' => $navigation ?: [],
             'secondaryNavigation' => $secondaryNav ?: [],
+            'creditNavigation' => $creditNav ?: [],
             'frontPage' => $frontPage,
         ];
 

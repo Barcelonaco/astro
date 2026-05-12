@@ -1,0 +1,354 @@
+---
+/**
+ * /commande/confirmation?order=<id>&guest_token=<token> — confirmation après commande.
+ *
+ * Page statique : l'ID de commande est lu côté client depuis la query string.
+ * L'auth se fait via Bearer token (customer connecté) ou guest_token URL param.
+ */
+import BaseHead from '@frontend/components/BaseHead.astro'
+import Header from '@frontend/components/Header.astro'
+import Footer from '@frontend/components/Footer.astro'
+import SiteOverlays from '@frontend/components/SiteOverlays.astro'
+import DeferredLoader from '@frontend/components/DeferredLoader.astro'
+import { SITE_TITLE } from '@frontend/consts'
+import { getFrontendBootstrap } from '@frontend/lib/api'
+import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`Commande confirmée — ${siteName}`} description="Confirmation de votre commande" styleSettings={styleSettings} siteSettings={siteSettings} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page conf-wrap">
+      <div class="conf-container">
+        <div id="conf-root" class="conf-root">
+          <div class="conf-loading">Chargement…</div>
+        </div>
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+
+    <script>
+      import { getOrder, formatPrice, type Order } from '@plugins/ecommerce/frontend/lib/shop-api'
+
+      const root = document.getElementById('conf-root')!
+
+      function escape(s: unknown): string {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+      }
+
+      function fmtAddr(a: any): string {
+        if (!a) return ''
+        return [
+          [a.first_name, a.last_name].filter(Boolean).join(' '),
+          a.company,
+          a.address_line1,
+          a.address_line2,
+          [a.postcode, a.city].filter(Boolean).join(' '),
+          a.country_code,
+          a.phone,
+        ].filter(Boolean).map(l => `<div>${escape(l)}</div>`).join('')
+      }
+
+      function paymentLabel(method: string, status: string): string {
+        const m = ({ stripe: 'Carte bancaire', bank_transfer: 'Virement bancaire', on_invoice: 'Sur facture (SEPA)', paypal: 'PayPal' } as Record<string, string>)[method] || method
+        const s = ({ unpaid: 'En attente', pending: 'En cours', paid: 'Payé', failed: 'Échoué' } as Record<string, string>)[status] || status
+        return `${m} — <em>${s}</em>`
+      }
+
+      function render(order: Order): void {
+        const items = order.items.map(i => `
+          <tr>
+            <td>${escape(i.product_title)}${i.variant_attributes && Object.keys(i.variant_attributes).length ? '<div class="conf-attrs">' + Object.entries(i.variant_attributes).map(([k, v]) => `${escape(k)} : ${escape(v)}`).join(' · ') + '</div>' : ''}</td>
+            <td>${i.quantity}</td>
+            <td>${formatPrice(Number(i.line_total_cents))}</td>
+          </tr>
+        `).join('')
+
+        const guestNote = order.guest_token
+          ? `<p class="conf-note">Conservez ce lien pour suivre votre commande : <code>${escape(window.location.href)}</code></p>`
+          : ''
+
+        const bankInstructions = order.payment_method === 'bank_transfer' && order.payment_status === 'unpaid'
+          ? `<div class="conf-bank">
+              <h3>Instructions de virement</h3>
+              <p>Effectuez le virement de <strong>${formatPrice(order.total_cents)}</strong> en mentionnant la référence <strong>${escape(order.order_number)}</strong>.</p>
+              <p>Le RIB vous est envoyé par email à ${escape(order.email)}. Votre commande sera traitée à réception du paiement.</p>
+            </div>`
+          : ''
+
+        const stripeFailed = order.payment_method === 'stripe' && order.payment_status === 'failed'
+          ? `<div class="conf-bank conf-bank-error">
+              <h3>Paiement refusé</h3>
+              <p>Votre paiement n'a pas pu être validé. Vous pouvez réessayer ci-dessous.</p>
+              <button type="button" class="btn btn-primary" id="retry-payment">Réessayer le paiement</button>
+            </div>`
+          : ''
+
+        const stripePending = order.payment_method === 'stripe' && order.payment_status === 'pending'
+          ? `<div class="conf-bank conf-bank-pending">
+              <div class="conf-bank-pending__row">
+                <div class="conf-spinner conf-spinner--sm"></div>
+                <div>
+                  <h3>Paiement en cours de validation</h3>
+                  <p>Votre paiement est en cours de traitement par votre banque. Vous recevrez un email de confirmation des validation (generalement &lt; 1 minute).</p>
+                </div>
+              </div>
+            </div>`
+          : ''
+
+        const isPaid = order.payment_status === 'paid'
+        const heroCheck = isPaid
+          ? `<div class="conf-check">✓</div><h1>Commande confirmée</h1><p>Merci pour votre commande. Un email de confirmation a été envoyé à <strong>${escape(order.email)}</strong>.</p>`
+          : order.payment_status === 'failed'
+            ? `<div class="conf-check conf-check-error">!</div><h1>Paiement à finaliser</h1><p>Votre commande a été enregistrée mais le paiement n'a pas abouti.</p>`
+            : `<div class="conf-check conf-check-pending"><div class="conf-spinner conf-spinner--hero"></div></div><h1>Commande enregistrée</h1><p>Un email de confirmation sera envoyé à <strong>${escape(order.email)}</strong> des validation du paiement.</p>`
+
+        root.innerHTML = `
+          <div class="conf-hero">
+            ${heroCheck}
+            <div class="conf-num">Référence : <strong>${escape(order.order_number)}</strong></div>
+          </div>
+
+          ${stripeFailed}
+          ${stripePending}
+          ${bankInstructions}
+
+          <div class="conf-grid">
+            <section>
+              <h2>Articles</h2>
+              <table class="conf-table">
+                <thead><tr><th>Article</th><th>Qté</th><th>Total</th></tr></thead>
+                <tbody>${items}</tbody>
+              </table>
+              <div class="conf-totals">
+                <div><span>Sous-total HT</span><strong>${formatPrice(order.subtotal_cents)}</strong></div>
+                <div><span>Livraison</span><strong>${formatPrice(order.shipping_cents)}</strong></div>
+                <div><span>TVA</span><strong>${formatPrice(order.tax_cents)}</strong></div>
+                <div class="total"><span>Total TTC</span><strong>${formatPrice(order.total_cents)}</strong></div>
+              </div>
+              <div class="conf-payment">
+                <strong>Paiement :</strong> ${paymentLabel(order.payment_method, order.payment_status)}
+              </div>
+            </section>
+
+            <aside>
+              <h2>Livraison</h2>
+              <div class="conf-addr">${fmtAddr(order.shipping_address)}</div>
+              <div class="conf-method">${escape(order.shipping_method_label || '')}</div>
+
+              <h2 style="margin-top:24px">Facturation</h2>
+              <div class="conf-addr">${fmtAddr(order.billing_address)}</div>
+            </aside>
+          </div>
+
+          ${guestNote}
+
+          <div class="conf-actions">
+            <a class="btn btn-primary" href="/boutique">Continuer mes achats</a>
+            <a class="btn btn-secondary" href="/compte/commandes">Mes commandes</a>
+          </div>
+        `
+
+        // Auto-poll si paiement encore pending → re-render quand confirmé
+        if (order.payment_method === 'stripe' && order.payment_status === 'pending') {
+          const guest = new URLSearchParams(window.location.search).get('guest_token') || undefined
+          ;(async () => {
+            const updated = await pollUntilPaid(order.id, guest)
+            if (updated.payment_status !== order.payment_status) render(updated)
+          })()
+        }
+
+        // Retry Stripe payment : remonte le PaymentIntent et l'Elements directement ici.
+        document.getElementById('retry-payment')?.addEventListener('click', async () => {
+          try {
+            const [{ getPaymentConfig, createPaymentIntent, loadStripe }] = await Promise.all([
+              import('../../lib/stripe-api'),
+            ])
+            const cfg = await getPaymentConfig()
+            if (!cfg.stripe.enabled || !cfg.stripe.pk) {
+              alert('Stripe non configuré')
+              return
+            }
+            const intent = await createPaymentIntent(order.id, order.guest_token || undefined)
+            const stripe = await loadStripe(cfg.stripe.pk)
+            const elements = stripe.elements({ clientSecret: intent.client_secret, appearance: { theme: 'stripe' } })
+
+            // Remplace le contenu par le formulaire Stripe
+            root.innerHTML = `
+              <div class="conf-hero"><h1>Réessayer le paiement</h1><p>Commande <strong>${escape(order.order_number)}</strong> · ${formatPrice(order.total_cents)}</p></div>
+              <div id="retry-payment-element" class="checkout-stripe-element"></div>
+              <div id="retry-error" class="checkout-error" style="display:none"></div>
+              <div class="conf-actions">
+                <button type="button" class="btn btn-primary" id="retry-pay-btn" disabled>Chargement…</button>
+                <a class="btn btn-secondary" href="/">Annuler</a>
+              </div>
+            `
+
+            const paymentElement = elements.create('payment', { layout: 'tabs' })
+            paymentElement.mount('#retry-payment-element')
+            const btn = document.getElementById('retry-pay-btn') as HTMLButtonElement
+            const errEl = document.getElementById('retry-error')!
+            paymentElement.on('ready', () => { btn.disabled = false; btn.textContent = `Payer ${formatPrice(order.total_cents)}` })
+
+            btn.addEventListener('click', async () => {
+              btn.disabled = true
+              btn.textContent = 'Traitement…'
+              errEl.style.display = 'none'
+              const guest = order.guest_token ? `&guest_token=${encodeURIComponent(order.guest_token)}` : ''
+              const returnUrl = `${window.location.origin}/commande/confirmation?order=${order.id}${guest}`
+              const { error } = await stripe.confirmPayment({ elements, confirmParams: { return_url: returnUrl } })
+              if (error) {
+                errEl.style.display = 'block'
+                errEl.textContent = error.message || 'Paiement refusé.'
+                btn.disabled = false
+                btn.textContent = `Réessayer · ${formatPrice(order.total_cents)}`
+              }
+            })
+          } catch (err) {
+            alert(err instanceof Error ? err.message : 'Erreur')
+          }
+        })
+      }
+
+      // Vérifie le statut directement via Stripe API (fallback si webhook pas reçu)
+      const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api'
+      async function stripeCheckStatus(id: number, guest: string | undefined): Promise<string | null> {
+        try {
+          const q = new URLSearchParams({ order_id: String(id) })
+          if (guest) q.set('guest_token', guest)
+          const res = await fetch(`${API_URL}/payments/stripe/check-status?${q}`)
+          if (!res.ok) return null
+          const data = await res.json()
+          return data.payment_status || null
+        } catch { return null }
+      }
+
+      // Poll l'order : d'abord via getOrder (webhook), puis fallback Stripe API directe.
+      async function pollUntilPaid(id: number, guest: string | undefined): Promise<Order> {
+        // Phase 1 : 5 tentatives rapides via webhook (10s)
+        for (let i = 0; i < 5; i++) {
+          const order = await getOrder(id, guest)
+          if (order.payment_status === 'paid' || order.payment_status === 'failed') return order
+          await new Promise(r => setTimeout(r, 2000))
+        }
+        // Phase 2 : fallback Stripe API directe (si webhook absent, ex: dev local)
+        const status = await stripeCheckStatus(id, guest)
+        if (status === 'paid' || status === 'failed') {
+          return await getOrder(id, guest)
+        }
+        // Phase 3 : encore quelques polls au cas où
+        for (let i = 0; i < 5; i++) {
+          const order = await getOrder(id, guest)
+          if (order.payment_status === 'paid' || order.payment_status === 'failed') return order
+          await new Promise(r => setTimeout(r, 2000))
+        }
+        return await getOrder(id, guest)
+      }
+
+      ;(async () => {
+        const params = new URLSearchParams(window.location.search)
+        const id = Number(params.get('order') || params.get('id') || 0)
+        const guest = params.get('guest_token') || undefined
+        // Stripe redirect → ?payment_intent=pi_xxx&redirect_status=succeeded|requires_payment_method
+        const redirectStatus = params.get('redirect_status')
+        if (!id) {
+          root.innerHTML = `<div class="conf-loading"><p>Aucune commande spécifiée.</p><a class="btn" href="/">Retour à l'accueil</a></div>`
+          return
+        }
+        try {
+          let order: Order
+          if (redirectStatus === 'succeeded' || redirectStatus === 'processing') {
+            root.innerHTML = `<div class="conf-loading"><div class="conf-spinner"></div><p>Validation du paiement en cours…</p><p class="conf-loading-sub">Merci de patienter quelques instants.</p></div>`
+            order = await pollUntilPaid(id, guest)
+          } else if (redirectStatus === 'requires_payment_method' || redirectStatus === 'failed') {
+            order = await getOrder(id, guest)
+            // On affiche l'état (failed) — l'utilisateur peut retenter via /commande/:id (lien Réessayer dans render)
+          } else {
+            order = await getOrder(id, guest)
+          }
+          render(order)
+        } catch (err) {
+          root.innerHTML = `<div class="conf-loading"><p>Commande introuvable ou accès refusé.</p><a class="btn" href="/">Retour à l'accueil</a></div>`
+        }
+      })()
+    </script>
+
+    <style is:global>
+      .conf-wrap { min-height: 60vh; padding: 40px 0 80px; }
+      .conf-container { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+      .conf-loading { padding: 60px 0; text-align: center; color: #666; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+      .conf-loading-sub { font-size: 14px; color: #999; margin: 0; }
+      .conf-hero { text-align: center; padding: 32px 0 24px; border-bottom: 1px solid #eee; margin-bottom: 32px; }
+      .conf-check { width: 64px; height: 64px; border-radius: 50%; background: #e8f5e9; color: #2e7d32; display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 16px; }
+      .conf-hero h1 { font-size: 28px; margin: 0 0 8px; }
+      .conf-hero p { color: #666; margin: 0 0 12px; }
+      .conf-num { display: inline-block; padding: 6px 14px; background: #fafaf8; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 14px; }
+      .conf-check-pending { background: #fff8e1; color: #b28900; }
+      .conf-check-error { background: #fee; color: #c33; }
+      .conf-bank { padding: 16px 20px; background: #fff8e1; border: 1px solid #ffe082; border-radius: 6px; margin-bottom: 32px; }
+
+      /* Spinner */
+      @keyframes conf-spin { to { transform: rotate(360deg); } }
+      .conf-spinner {
+        width: 40px; height: 40px; border-radius: 50%;
+        border: 3px solid #e5e7eb; border-top-color: var(--color-primary, #0f62fe);
+        animation: conf-spin .7s linear infinite;
+        flex-shrink: 0;
+      }
+      .conf-spinner--sm { width: 28px; height: 28px; border-width: 3px; }
+      .conf-spinner--hero { width: 32px; height: 32px; border-width: 3px; border-color: rgba(178,137,0,.25); border-top-color: #b28900; }
+
+      /* Pending banner */
+      .conf-bank-pending__row { display: flex; align-items: flex-start; gap: 16px; }
+      .conf-bank-pending__row h3 { margin: 0 0 6px; }
+      .conf-bank-pending__row p { margin: 0; }
+      .conf-bank-error { background: #fee; border-color: #fcc; }
+      .checkout-stripe-element { padding: 16px; border: 1px solid #ddd; border-radius: 6px; background: #fff; margin: 16px 0; min-height: 100px; }
+      .checkout-error { margin: 12px 0; padding: 10px 14px; background: #fee; color: #d33; border: 1px solid #fcc; border-radius: 4px; font-size: 14px; }
+      .conf-bank h3 { margin: 0 0 8px; font-size: 16px; }
+      .conf-bank p { margin: 4px 0; font-size: 14px; }
+      .conf-grid { display: grid; grid-template-columns: 1fr 320px; gap: 32px; align-items: start; margin-bottom: 32px; }
+      @media (max-width: 900px) { .conf-grid { grid-template-columns: 1fr; } }
+      .conf-grid h2 { font-size: 18px; margin: 0 0 12px; }
+      .conf-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      .conf-table th, .conf-table td { padding: 10px 8px; border-bottom: 1px solid #eee; text-align: left; }
+      .conf-table th { font-size: 12px; text-transform: uppercase; color: #666; }
+      .conf-attrs { color: #888; font-size: 12px; margin-top: 2px; }
+      .conf-totals { margin-top: 14px; }
+      .conf-totals div { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+      .conf-totals .total { border-top: 1px solid #ddd; padding-top: 10px; margin-top: 6px; font-size: 16px; font-weight: 600; }
+      .conf-payment { margin-top: 16px; font-size: 14px; padding: 10px 14px; background: #fafaf8; border-radius: 4px; }
+      .conf-addr { font-size: 14px; line-height: 1.6; padding: 14px 16px; background: #fafaf8; border-radius: 4px; }
+      .conf-method { margin-top: 8px; font-size: 13px; color: #666; }
+      .conf-note { margin-top: 24px; padding: 12px 16px; background: #f0f4f8; font-size: 13px; border-radius: 4px; }
+      .conf-note code { background: #fff; padding: 2px 6px; border-radius: 3px; font-size: 12px; word-break: break-all; }
+      .conf-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+      .conf-actions .btn-secondary {
+        background: transparent;
+        color: var(--color-primary, #0f62fe);
+        border: 2px solid var(--color-primary, #0f62fe);
+      }
+      .conf-actions .btn-secondary:hover {
+        background: var(--color-primary, #0f62fe);
+        color: #fff;
+      }
+    </style>
+  </body>
+</html>

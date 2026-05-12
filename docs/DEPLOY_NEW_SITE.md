@@ -83,3 +83,5 @@ gzip_min_length 256;
 11. Lancer le workflow : `gh workflow run deploy-server[NUMERO_SERVER].yml site=[URLSITE]`
 
 12. Vérifier que le workflow s'est bien déroulé : `gh run list`
+
+13. Modifier le fichier .env du dossier frontend.

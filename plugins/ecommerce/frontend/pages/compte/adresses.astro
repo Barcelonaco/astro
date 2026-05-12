@@ -1,0 +1,208 @@
+---
+/**
+ * /compte/adresses — CRUD addresses.
+ */
+import BaseHead from '@frontend/components/BaseHead.astro'
+import Header from '@frontend/components/Header.astro'
+import Footer from '@frontend/components/Footer.astro'
+import SiteOverlays from '@frontend/components/SiteOverlays.astro'
+import DeferredLoader from '@frontend/components/DeferredLoader.astro'
+import AccountNav from '@plugins/ecommerce/frontend/components/AccountNav.astro'
+import { SITE_TITLE } from '@frontend/consts'
+import { getFrontendBootstrap } from '@frontend/lib/api'
+import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+import '@plugins/ecommerce/frontend/styles/account.css'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`Mes adresses — ${siteName}`} description="Gerez vos adresses" styleSettings={styleSettings} siteSettings={siteSettings} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page account-wrap">
+      <div class="account-container">
+        <div class="account-layout">
+          <AccountNav active="addresses" />
+          <div class="account-content">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+              <h1 class="account-section-title" style="margin:0">Adresses</h1>
+              <button class="account-btn" id="add-addr-btn">Ajouter</button>
+            </div>
+
+            <div id="addr-loading" class="account-loading">Chargement...</div>
+            <div id="addr-list" style="display:none"></div>
+
+            <!-- Modal form -->
+            <div id="addr-modal" class="addr-modal" style="display:none">
+              <div class="addr-modal-backdrop"></div>
+              <div class="addr-modal-content">
+                <h2 id="addr-modal-title">Ajouter une adresse</h2>
+                <form id="addr-form" novalidate>
+                  <input type="hidden" name="id" />
+                  <div class="account-form-row">
+                    <div class="account-form-field"><label class="account-form-label">Prenom *</label><input class="account-form-input" type="text" name="first_name" required /></div>
+                    <div class="account-form-field"><label class="account-form-label">Nom *</label><input class="account-form-input" type="text" name="last_name" required /></div>
+                  </div>
+                  <div class="account-form-field"><label class="account-form-label">Entreprise</label><input class="account-form-input" type="text" name="company" /></div>
+                  <div class="account-form-field"><label class="account-form-label">Adresse *</label><input class="account-form-input" type="text" name="address_line1" required /></div>
+                  <div class="account-form-field"><label class="account-form-label">Complement</label><input class="account-form-input" type="text" name="address_line2" /></div>
+                  <div class="account-form-row">
+                    <div class="account-form-field"><label class="account-form-label">Code postal *</label><input class="account-form-input" type="text" name="postcode" required /></div>
+                    <div class="account-form-field"><label class="account-form-label">Ville *</label><input class="account-form-input" type="text" name="city" required /></div>
+                  </div>
+                  <div class="account-form-row">
+                    <div class="account-form-field"><label class="account-form-label">Pays</label><input class="account-form-input" type="text" name="country_code" value="FR" maxlength="2" /></div>
+                    <div class="account-form-field"><label class="account-form-label">Telephone</label><input class="account-form-input" type="tel" name="phone" /></div>
+                  </div>
+                  <div class="account-form-row">
+                    <div class="account-form-field">
+                      <label class="account-form-label">Type</label>
+                      <select class="account-form-input" name="type"><option value="billing">Facturation</option><option value="shipping">Livraison</option></select>
+                    </div>
+                    <div class="account-form-field" style="display:flex;align-items:flex-end;padding-bottom:16px">
+                      <label class="account-form-check"><input type="checkbox" name="is_default" /><span>Par defaut</span></label>
+                    </div>
+                  </div>
+                  <div class="account-form-status" id="addr-status" role="status"></div>
+                  <div class="addr-modal-actions">
+                    <button type="button" class="account-btn-outline" id="addr-cancel">Annuler</button>
+                    <button type="submit" class="account-btn" id="addr-save">Enregistrer</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+
+    <script>
+      import { getAddresses, createAddress, updateAddress, deleteAddress, isLoggedIn, type CustomerAddress } from '@plugins/ecommerce/frontend/lib/customer-api'
+
+      if (!isLoggedIn()) window.location.href = '/compte/connexion?redirect=/compte/adresses'
+
+      const modal = document.getElementById('addr-modal')!
+      const form = document.getElementById('addr-form') as HTMLFormElement
+      const statusEl = document.getElementById('addr-status')!
+      const listEl = document.getElementById('addr-list')!
+
+      function openModal(addr?: CustomerAddress) {
+        form.reset()
+        statusEl.textContent = ''
+        statusEl.dataset.kind = ''
+        document.getElementById('addr-modal-title')!.textContent = addr ? 'Modifier l\'adresse' : 'Ajouter une adresse'
+        if (addr) {
+          const el = form.elements as any
+          el.id.value = addr.id
+          el.first_name.value = addr.first_name || ''
+          el.last_name.value = addr.last_name || ''
+          el.company.value = addr.company || ''
+          el.address_line1.value = addr.address_line1 || ''
+          el.address_line2.value = addr.address_line2 || ''
+          el.postcode.value = addr.postcode || ''
+          el.city.value = addr.city || ''
+          el.country_code.value = addr.country_code || 'FR'
+          el.phone.value = addr.phone || ''
+          el.type.value = addr.type || 'billing'
+          el.is_default.checked = !!addr.is_default
+        }
+        modal.style.display = ''
+      }
+
+      function closeModal() { modal.style.display = 'none' }
+
+      document.getElementById('add-addr-btn')!.addEventListener('click', () => openModal())
+      document.getElementById('addr-cancel')!.addEventListener('click', closeModal)
+      document.querySelector('.addr-modal-backdrop')!.addEventListener('click', closeModal)
+
+      async function loadList() {
+        try {
+          const addresses = await getAddresses()
+          document.getElementById('addr-loading')!.style.display = 'none'
+          listEl.style.display = ''
+
+          if (addresses.length === 0) {
+            listEl.innerHTML = '<p class="account-empty">Aucune adresse enregistree.</p>'
+            return
+          }
+
+          listEl.innerHTML = '<div class="addr-grid">' + addresses.map((a: CustomerAddress) => `
+            <div class="account-card" data-id="${a.id}">
+              <div class="account-card-title">${a.type === 'billing' ? 'Facturation' : 'Livraison'}${a.is_default ? ' (par defaut)' : ''}</div>
+              <div style="font-size:14px;font-weight:600;margin-bottom:4px">${a.first_name} ${a.last_name}</div>
+              ${a.company ? `<div style="font-size:13px">${a.company}</div>` : ''}
+              <div style="font-size:13px">${a.address_line1}${a.address_line2 ? ', ' + a.address_line2 : ''}</div>
+              <div style="font-size:13px">${a.postcode} ${a.city} ${a.country_code}</div>
+              ${a.phone ? `<div style="font-size:13px">${a.phone}</div>` : ''}
+              <div class="addr-card-actions">
+                <button class="account-btn-link addr-edit" data-id="${a.id}">Modifier</button>
+                <button class="account-btn-link addr-delete" data-id="${a.id}" style="color:#b91c1c">Supprimer</button>
+              </div>
+            </div>
+          `).join('') + '</div>'
+
+          listEl.querySelectorAll('.addr-edit').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const id = Number((btn as HTMLElement).dataset.id)
+              const addr = addresses.find((a: CustomerAddress) => a.id === id)
+              if (addr) openModal(addr)
+            })
+          })
+          listEl.querySelectorAll('.addr-delete').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              if (!confirm('Supprimer cette adresse ?')) return
+              await deleteAddress(Number((btn as HTMLElement).dataset.id))
+              await loadList()
+            })
+          })
+        } catch (err: any) {
+          if (err?.status === 401) { window.location.href = '/compte/connexion'; return }
+          document.getElementById('addr-loading')!.textContent = 'Erreur de chargement.'
+        }
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault()
+        const fd = new FormData(form)
+        const id = Number(fd.get('id'))
+        const body: any = {
+          first_name: fd.get('first_name'), last_name: fd.get('last_name'),
+          company: fd.get('company') || null, address_line1: fd.get('address_line1'),
+          address_line2: fd.get('address_line2') || null, postcode: fd.get('postcode'),
+          city: fd.get('city'), country_code: fd.get('country_code') || 'FR',
+          phone: fd.get('phone') || null, type: fd.get('type'), is_default: !!fd.get('is_default'),
+        }
+        const btn = document.getElementById('addr-save') as HTMLButtonElement
+        btn.disabled = true
+        try {
+          if (id) await updateAddress(id, body)
+          else await createAddress(body)
+          closeModal()
+          await loadList()
+        } catch (err: any) {
+          statusEl.textContent = err?.message || 'Erreur'
+          statusEl.dataset.kind = 'error'
+        }
+        btn.disabled = false
+      })
+
+      loadList()
+    </script>
+  </body>
+</html>

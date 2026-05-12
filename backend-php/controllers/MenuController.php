@@ -93,12 +93,16 @@ class MenuController {
                     $items = [];
                 }
 
-                $result[] = [
+                $section = [
                     'slug' => $slug,
                     'label' => $pt['labelPlural'] ?? $pt['label'] ?? $slug,
                     'icon' => $pt['icon'] ?? '',
                     'items' => $items,
                 ];
+                if (!empty($pt['archivePath'])) {
+                    $section['archivePath'] = $pt['archivePath'];
+                }
+                $result[] = $section;
             }
         }
 

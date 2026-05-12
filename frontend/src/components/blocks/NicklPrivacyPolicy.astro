@@ -1,0 +1,110 @@
+---
+import NicklModuleWrapper from './NicklModuleWrapper.astro';
+
+interface Props {
+  data: Record<string, any>;
+}
+
+const { data } = Astro.props;
+
+const siteName = (data.site_name as string) || '';
+const siteUrl = (data.site_url as string) || '';
+const ownerName = (data.owner_name as string) || '';
+const contactEmail = (data.contact_email as string) || '';
+
+const siteLink = siteUrl ? `<a href="${siteUrl}">${siteUrl}</a>` : siteName;
+---
+
+<NicklModuleWrapper data={data} moduleName="privacy-policy">
+  <div class="privacy-policy-content editor">
+    <h2>Politique de confidentialit&eacute;</h2>
+
+    <p>Le site web <Fragment set:html={siteLink} /> est d&eacute;tenu par {ownerName}, qui est un contr&ocirc;leur de donn&eacute;es de vos donn&eacute;es personnelles.</p>
+    <p>Nous avons adopt&eacute; cette politique de confidentialit&eacute;, qui d&eacute;termine la mani&egrave;re dont nous traitons les informations collect&eacute;es par <Fragment set:html={siteLink} />, qui fournit &eacute;galement les raisons pour lesquelles nous devons collecter certaines donn&eacute;es personnelles vous concernant. Par cons&eacute;quent, vous devez lire cette politique de confidentialit&eacute; avant d'utiliser le site web de <Fragment set:html={siteLink} />.</p>
+    <p>Nous prenons soin de vos donn&eacute;es personnelles et nous nous engageons &agrave; en garantir la confidentialit&eacute; et la s&eacute;curit&eacute;.</p>
+
+    <h3>Les informations personnelles que nous collectons</h3>
+    <p>Lorsque vous visitez le <Fragment set:html={siteLink} />, nous recueillons automatiquement certaines informations sur votre appareil, notamment des informations sur votre navigateur web, votre adresse IP, votre fuseau horaire et certains des cookies install&eacute;s sur votre appareil. En outre, lorsque vous naviguez sur le site, nous recueillons des informations sur les pages web ou les produits individuels que vous consultez, sur les sites web ou les termes de recherche qui vous ont renvoy&eacute; au site et sur la mani&egrave;re dont vous interagissez avec le site. Nous d&eacute;signons ces informations collect&eacute;es automatiquement par le terme &laquo; informations sur les appareils &raquo;. En outre, nous pourrions collecter les donn&eacute;es personnelles que vous nous fournissez (y compris, mais sans s'y limiter, le nom, le pr&eacute;nom, l'adresse, les informations de paiement, etc.) lors de l'inscription afin de pouvoir ex&eacute;cuter le contrat.</p>
+
+    <h3>Pourquoi traitons-nous vos donn&eacute;es ?</h3>
+    <p>Notre priorit&eacute; absolue est la s&eacute;curit&eacute; des donn&eacute;es des clients et, &agrave; ce titre, nous ne pouvons traiter que des donn&eacute;es minimales sur les utilisateurs, uniquement dans la mesure o&ugrave; cela est absolument n&eacute;cessaire pour maintenir le site web. Les informations collect&eacute;es automatiquement sont utilis&eacute;es uniquement pour identifier les cas potentiels d'abus et &eacute;tablir des informations statistiques concernant l'utilisation du site web. Ces informations statistiques ne sont pas autrement agr&eacute;g&eacute;es de mani&egrave;re &agrave; identifier un utilisateur particulier du syst&egrave;me.</p>
+    <p>Vous pouvez visiter le site web sans nous dire qui vous &ecirc;tes ni r&eacute;v&eacute;ler d'informations, par lesquelles quelqu'un pourrait vous identifier comme un individu sp&eacute;cifique et identifiable. Toutefois, si vous souhaitez utiliser certaines fonctionnalit&eacute;s du site web, ou si vous souhaitez recevoir notre lettre d'information ou fournir d'autres d&eacute;tails en remplissant un formulaire, vous pouvez nous fournir des donn&eacute;es personnelles, telles que votre e-mail, votre pr&eacute;nom, votre nom, votre ville de r&eacute;sidence, votre organisation, votre num&eacute;ro de t&eacute;l&eacute;phone. Vous pouvez choisir de ne pas nous fournir vos donn&eacute;es personnelles, mais il se peut alors que vous ne puissiez pas profiter de certaines fonctionnalit&eacute;s du site web. Par exemple, vous ne pourrez pas recevoir notre bulletin d'information ou nous contacter directement &agrave; partir du site web.{contactEmail && ` Les utilisateurs qui ne savent pas quelles informations sont obligatoires sont invit\u00E9s \u00E0 nous contacter via `}<Fragment set:html={contactEmail ? `<a href="mailto:${contactEmail}">${contactEmail}</a>.` : ''} /></p>
+
+    <h3>Vos droits</h3>
+    <p>Si vous &ecirc;tes un r&eacute;sident europ&eacute;en, vous disposez des droits suivants li&eacute;s &agrave; vos donn&eacute;es personnelles :</p>
+    <ul>
+      <li>Le droit d'&ecirc;tre inform&eacute;.</li>
+      <li>Le droit d'acc&egrave;s.</li>
+      <li>Le droit de rectification.</li>
+      <li>Le droit &agrave; l'effacement.</li>
+      <li>Le droit de restreindre le traitement.</li>
+      <li>Le droit &agrave; la portabilit&eacute; des donn&eacute;es.</li>
+      <li>Le droit d'opposition.</li>
+      <li>Les droits relatifs &agrave; la prise de d&eacute;cision automatis&eacute;e et au profilage.</li>
+    </ul>
+    <p>Si vous souhaitez exercer ce droit, veuillez nous contacter via les coordonn&eacute;es ci-dessous.</p>
+    <p>En outre, si vous &ecirc;tes un r&eacute;sident europ&eacute;en, nous notons que nous traitons vos informations afin d'ex&eacute;cuter les contrats que nous pourrions avoir avec vous (par exemple, si vous passez une commande par le biais du site), ou autrement pour poursuivre nos int&eacute;r&ecirc;ts commerciaux l&eacute;gitimes &eacute;num&eacute;r&eacute;s ci-dessus. En outre, veuillez noter que vos informations pourraient &ecirc;tre transf&eacute;r&eacute;es en dehors de l'Europe, y compris au Canada et aux &Eacute;tats-Unis.</p>
+
+    <h3>Liens vers d'autres sites web</h3>
+    <p>Notre site web peut contenir des liens vers d'autres sites web qui ne sont pas d&eacute;tenus ou contr&ocirc;l&eacute;s par nous. Sachez que nous ne sommes pas responsables de ces autres sites web ou des pratiques de confidentialit&eacute; des tiers. Nous vous encourageons &agrave; &ecirc;tre attentif lorsque vous quittez notre site web et &agrave; lire les d&eacute;clarations de confidentialit&eacute; de chaque site web susceptible de collecter des informations personnelles.</p>
+
+    <h3>Liens hypertextes &laquo; cookies &raquo; et balises (&laquo; tags &raquo;) internet</h3>
+    <p>Le site <Fragment set:html={siteLink} /> contient un certain nombre de liens hypertextes vers d'autres sites, mis en place avec l'autorisation de <Fragment set:html={siteLink} />. Cependant, <Fragment set:html={siteLink} /> n'a pas la possibilit&eacute; de v&eacute;rifier le contenu des sites ainsi visit&eacute;s, et n'assumera en cons&eacute;quence aucune responsabilit&eacute; de ce fait.</p>
+    <p>Sauf si vous d&eacute;cidez de d&eacute;sactiver les cookies, vous acceptez que le site puisse les utiliser. Vous pouvez &agrave; tout moment d&eacute;sactiver ces cookies et ce gratuitement &agrave; partir des possibilit&eacute;s de d&eacute;sactivation qui vous sont offertes et rappel&eacute;es ci-apr&egrave;s, sachant que cela peut r&eacute;duire ou emp&ecirc;cher l'accessibilit&eacute; &agrave; tout ou partie des Services propos&eacute;s par le site.</p>
+
+    <h4>&laquo; COOKIES &raquo;</h4>
+    <p>Un &laquo; cookie &raquo; est un petit fichier d'information envoy&eacute; sur le navigateur de l'Utilisateur et enregistr&eacute; au sein du terminal de l'Utilisateur (ex : ordinateur, smartphone), (ci-apr&egrave;s &laquo; Cookies &raquo;). Ce fichier comprend des informations telles que le nom de domaine de l'Utilisateur, le fournisseur d'acc&egrave;s Internet de l'Utilisateur, le syst&egrave;me d'exploitation de l'Utilisateur, ainsi que la date et l'heure d'acc&egrave;s. Les Cookies ne risquent en aucun cas d'endommager le terminal de l'Utilisateur.</p>
+    <p><Fragment set:html={siteLink} /> est susceptible de traiter les informations de l'Utilisateur concernant sa visite du Site, telles que les pages consult&eacute;es, les recherches effectu&eacute;es. Ces informations permettent &agrave; <Fragment set:html={siteLink} /> d'am&eacute;liorer le contenu du Site, de la navigation de l'Utilisateur.</p>
+    <p>Les Cookies facilitant la navigation et/ou la fourniture des services propos&eacute;s par le Site, l'Utilisateur peut configurer son navigateur pour qu'il lui permette de d&eacute;cider s'il souhaite ou non les accepter de mani&egrave;re &agrave; ce que des Cookies soient enregistr&eacute;s dans le terminal ou, au contraire, qu'ils soient rejet&eacute;s, soit syst&eacute;matiquement, soit selon leur &eacute;metteur. L'Utilisateur peut &eacute;galement configurer son logiciel de navigation de mani&egrave;re &agrave; ce que l'acceptation ou le refus des Cookies lui soient propos&eacute;s ponctuellement, avant qu'un Cookie soit susceptible d'&ecirc;tre enregistr&eacute; dans son terminal. <Fragment set:html={siteLink} /> informe l'Utilisateur que, dans ce cas, il se peut que les fonctionnalit&eacute;s de son logiciel de navigation ne soient pas toutes disponibles.</p>
+    <p>Si l'Utilisateur refuse l'enregistrement de Cookies dans son terminal ou son navigateur, ou si l'Utilisateur supprime ceux qui y sont enregistr&eacute;s, l'Utilisateur est inform&eacute; que sa navigation et son exp&eacute;rience sur le Site peuvent &ecirc;tre limit&eacute;es. Cela pourrait &eacute;galement &ecirc;tre le cas lorsque <Fragment set:html={siteLink} /> ou l'un de ses prestataires ne peut pas reconna&icirc;tre, &agrave; des fins de compatibilit&eacute; technique, le type de navigateur utilis&eacute; par le terminal, les param&egrave;tres de langue et d'affichage ou le pays depuis lequel le terminal semble connect&eacute; &agrave; Internet.</p>
+    <p>Le cas &eacute;ch&eacute;ant, <Fragment set:html={siteLink} /> d&eacute;cline toute responsabilit&eacute; pour les cons&eacute;quences li&eacute;es au fonctionnement d&eacute;grad&eacute; du Site et des services &eacute;ventuellement propos&eacute;s par <Fragment set:html={siteLink} />, r&eacute;sultant (i) du refus de Cookies par l'Utilisateur (ii) de l'impossibilit&eacute; pour <Fragment set:html={siteLink} /> d'enregistrer ou de consulter les Cookies n&eacute;cessaires &agrave; leur fonctionnement du fait du choix de l'Utilisateur. Pour la gestion des Cookies et des choix de l'Utilisateur, la configuration de chaque navigateur est diff&eacute;rente. Elle est d&eacute;crite dans le menu d'aide du navigateur, qui permettra de savoir de quelle mani&egrave;re l'Utilisateur peut modifier ses souhaits en mati&egrave;re de Cookies.</p>
+    <p>&Agrave; tout moment, l'Utilisateur peut faire le choix d'exprimer et de modifier ses souhaits en mati&egrave;re de Cookies. <Fragment set:html={siteLink} /> pourra en outre faire appel aux services de prestataires externes pour l'aider &agrave; recueillir et traiter les informations d&eacute;crites dans cette section.</p>
+    <p>Enfin, en cliquant sur les ic&ocirc;nes d&eacute;di&eacute;es aux r&eacute;seaux sociaux Twitter, Facebook, Linkedin et Google Plus figurant sur le Site de <Fragment set:html={siteLink} /> ou dans son application mobile et si l'Utilisateur a accept&eacute; le d&eacute;p&ocirc;t de cookies en poursuivant sa navigation sur le Site Internet ou l'application mobile de <Fragment set:html={siteLink} />, Twitter, Facebook, Linkedin et Google Plus peuvent &eacute;galement d&eacute;poser des cookies sur vos terminaux (ordinateur, tablette, t&eacute;l&eacute;phone portable).</p>
+    <p>Ces types de cookies ne sont d&eacute;pos&eacute;s sur vos terminaux qu'&agrave; condition que vous y consentiez, en continuant votre navigation sur le Site Internet ou l'application mobile de <Fragment set:html={siteLink} />. &Agrave; tout moment, l'Utilisateur peut n&eacute;anmoins revenir sur son consentement &agrave; ce que <Fragment set:html={siteLink} /> d&eacute;pose ce type de cookies.</p>
+
+    <h4>Balises (&laquo; TAGS &raquo;) internet.</h4>
+    <p><Fragment set:html={siteLink} /> peut employer occasionnellement des balises Internet (&eacute;galement appel&eacute;es &laquo; tags &raquo;, ou balises d'action, GIF &agrave; un pixel, GIF transparents, GIF invisibles et GIF un &agrave; un) et les d&eacute;ployer par l'interm&eacute;diaire d'un partenaire sp&eacute;cialiste d'analyses Web (Google / Facebook) susceptible de se trouver (et donc de stocker les informations correspondantes, y compris l'adresse IP de l'Utilisateur) dans un pays &eacute;tranger.</p>
+    <p>Ces balises sont plac&eacute;es &agrave; la fois dans les publicit&eacute;s en ligne permettant aux internautes d'acc&eacute;der au Site, et sur les diff&eacute;rentes pages de celui-ci.</p>
+    <p>Cette technologie permet &agrave; <Fragment set:html={siteLink} /> d'&eacute;valuer les r&eacute;ponses des visiteurs face au Site et l'efficacit&eacute; de ses actions (par exemple, le nombre de fois o&ugrave; une page est ouverte et les informations consult&eacute;es), ainsi que l'utilisation de ce Site par l'Utilisateur.</p>
+    <p>Le prestataire externe pourra &eacute;ventuellement recueillir des informations sur les visiteurs du Site et d'autres sites Internet gr&acirc;ce &agrave; ces balises, constituer des rapports sur l'activit&eacute; du Site &agrave; l'attention de <Fragment set:html={siteLink} />, et fournir d'autres services relatifs &agrave; l'utilisation de celui-ci et d'Internet.</p>
+
+    <h3>S&eacute;curit&eacute; de l'information</h3>
+    <p>Nous s&eacute;curisons les informations que vous fournissez sur des serveurs informatiques dans un environnement contr&ocirc;l&eacute; et s&eacute;curis&eacute;, prot&eacute;g&eacute; contre tout acc&egrave;s, utilisation ou divulgation non autoris&eacute;s. Nous conservons des garanties administratives, techniques et physiques raisonnables pour nous prot&eacute;ger contre tout acc&egrave;s, utilisation, modification et divulgation non autoris&eacute;s des donn&eacute;es personnelles sous son contr&ocirc;le et sa garde. Toutefois, aucune transmission de donn&eacute;es sur Internet ou sur un r&eacute;seau sans fil ne peut &ecirc;tre garantie.</p>
+
+    <h3>Divulgation l&eacute;gale</h3>
+    <p>Nous divulguerons toute information que nous collectons, utilisons ou recevons si la loi l'exige ou l'autorise, par exemple pour nous conformer &agrave; une citation &agrave; compara&icirc;tre ou &agrave; une proc&eacute;dure judiciaire similaire, et lorsque nous pensons de bonne foi que la divulgation est n&eacute;cessaire pour prot&eacute;ger nos droits, votre s&eacute;curit&eacute; ou celle d'autrui, enqu&ecirc;ter sur une fraude ou r&eacute;pondre &agrave; une demande du gouvernement.</p>
+
+    <h3>Informations de contact</h3>
+    <p>Si vous souhaitez nous contacter pour comprendre davantage la pr&eacute;sente politique ou si vous souhaitez nous contacter concernant toute question relative aux droits individuels et &agrave; vos informations personnelles, vous pouvez envoyer un courriel &agrave; <Fragment set:html={contactEmail ? `<a href="mailto:${contactEmail}">${contactEmail}</a>` : ''} />.</p>
+  </div>
+</NicklModuleWrapper>
+
+<style is:global>
+  .module-privacy-policy .privacy-policy-content {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .module-privacy-policy .privacy-policy-content h2 {
+    margin-bottom: 1.5rem;
+  }
+  .module-privacy-policy .privacy-policy-content h3 {
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+  }
+  .module-privacy-policy .privacy-policy-content h4 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .module-privacy-policy .privacy-policy-content p {
+    margin-bottom: 0.75rem;
+    line-height: 1.7;
+  }
+  .module-privacy-policy .privacy-policy-content ul {
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+  }
+  .module-privacy-policy .privacy-policy-content li {
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+  }
+</style>

@@ -32,6 +32,7 @@ const MENU_LOCATIONS = [
   { value: 'primary', label: 'Menu principal' },
   { value: 'secondary', label: 'Menu secondaire (top)' },
   { value: 'footer', label: 'Menu footer' },
+  { value: 'credit', label: 'Menu crédits' },
 ];
 
 // --- Inactivity auto-logout (1h) ---
@@ -370,7 +371,13 @@ async function loadSection(section) {
         const slug = section.split(':')[1];
         const ptDef = findPostTypeDef(slug);
         if (ptDef) {
-          if (ptDef.supports?.includes('content')) {
+          const editorUrl = ptDef.editor && typeof ptDef.editor.url === 'string' ? ptDef.editor.url.trim() : '';
+          if (editorUrl && editorUrl.startsWith('/plugin-assets/')) {
+            const sep = editorUrl.includes('?') ? '&' : '?';
+            const params = `id=&v=${Date.now()}`;
+            const safeUrl = (editorUrl + sep + params).replace(/"/g, '&quot;');
+            content.innerHTML = `<iframe src="${safeUrl}" style="width:100%;height:calc(100vh - 80px);border:0;" title="${escapeHtml(ptDef.label || slug)}"></iframe>`;
+          } else if (ptDef.supports?.includes('content')) {
             await openCPTBuilder(ptDef, null);
           } else {
             content.innerHTML = await renderCPTEditPage(ptDef, null); attachCPTFormEvents(ptDef);
@@ -381,11 +388,35 @@ async function loadSection(section) {
         const slug = parts[1]; const itemId = parseInt(parts[2]);
         const ptDef = findPostTypeDef(slug);
         if (ptDef) {
-          if (ptDef.supports?.includes('content')) {
+          // Override : si la CPT déclare `editor: { url: "/plugin-assets/..." }`,
+          // on charge l'éditeur custom du plugin dans une iframe au lieu du
+          // formulaire générique. Mécanisme générique (réutilisable par tout plugin).
+          const editorUrl = ptDef.editor && typeof ptDef.editor.url === 'string' ? ptDef.editor.url.trim() : '';
+          if (editorUrl && editorUrl.startsWith('/plugin-assets/')) {
+            const sep = editorUrl.includes('?') ? '&' : '?';
+            const params = `id=${itemId || ''}&v=${Date.now()}`;
+            const safeUrl = (editorUrl + sep + params).replace(/"/g, '&quot;');
+            content.innerHTML = `<iframe src="${safeUrl}" style="width:100%;height:calc(100vh - 80px);border:0;" title="${escapeHtml(ptDef.label || slug)}"></iframe>`;
+          } else if (ptDef.supports?.includes('content')) {
             await openCPTBuilder(ptDef, itemId);
           } else {
             content.innerHTML = await renderCPTEditPage(ptDef, itemId); attachCPTFormEvents(ptDef);
           }
+        }
+      } else if (section.startsWith('cpt-content:')) {
+        // Force le block builder Nickl en mode "Modules uniquement", en bypassant
+        // un éventuel editor.url override. Utilisé par les éditeurs custom (ex:
+        // product-editor) qui veulent déléguer l'édition du contenu visuel au
+        // builder natif. Le bouton "← Retour" renvoie vers `cpt-edit:slug:id`,
+        // ce qui déclenche l'editor.url override et ouvre l'éditeur custom.
+        const parts = section.split(':');
+        const slug = parts[1]; const itemId = parseInt(parts[2]);
+        const ptDef = findPostTypeDef(slug);
+        if (ptDef) {
+          await openCPTBuilder(ptDef, itemId || null, {
+            blocksOnly: true,
+            backSection: `cpt-edit:${slug}:${itemId}`,
+          });
         }
       } else if (section.startsWith('cpt-categories:')) {
         const slug = section.split(':')[1];
@@ -548,7 +579,9 @@ const MODULE_LABELS = {
   PlanSite: 'Plan du site',
   InstaFeed: 'Feed Instagram',
   ThreadsFeed: 'Feed Threads',
-  Product: 'Produits à la une'
+  Product: 'Produits à la une',
+  LegalNotice: 'Mentions légales',
+  PrivacyPolicy: 'Politique de confidentialité'
 };
 
 const MODULE_CATEGORIES = [
@@ -574,7 +607,7 @@ const MODULE_CATEGORIES = [
     id: 'tools',
     label: 'Fonctionnels & outils',
     icon: '🧰',
-    modules: ['Team', 'Contact', 'Map', 'Summary', 'Form', 'ReusableBloc', 'ColumnsTab', 'Separator', 'Widget', 'PlanSite']
+    modules: ['Team', 'Contact', 'Map', 'Summary', 'Form', 'ReusableBloc', 'ColumnsTab', 'Separator', 'Widget', 'PlanSite', 'LegalNotice', 'PrivacyPolicy']
   },
 ];
 
@@ -949,6 +982,8 @@ let _cptListItems = [];
 let _cptListPtDef = null;
 let _cptListSort = { field: 'date', dir: 'desc' };
 let _cptListSearch = '';
+let _cptListStockMap = {};
+let _cptEditExistingCF = {}; // preserve existing custom_fields when editing a CPT item
 
 async function renderCPTList(ptDef) {
   showLoading();
@@ -957,6 +992,11 @@ async function renderCPTList(ptDef) {
     _cptListPtDef = ptDef;
     _cptListSort = { field: 'date', dir: 'desc' };
     _cptListSearch = '';
+    _cptListStockMap = {};
+    // Fetch stock summary for products CPT
+    if (ptDef.slug === 'products') {
+      try { _cptListStockMap = await apiFetch('/admin/products/stock-summary'); } catch {}
+    }
     hideLoading();
 
     return `
@@ -1026,6 +1066,10 @@ function renderCPTListRows() {
       va = (a.title || '').toLowerCase(); vb = (b.title || '').toLowerCase();
     } else if (s.field === 'category') {
       va = (a.categories || [])[0]?.name?.toLowerCase() || ''; vb = (b.categories || [])[0]?.name?.toLowerCase() || '';
+    } else if (s.field === 'stock') {
+      const sa = _cptListStockMap[a.id]; const sb = _cptListStockMap[b.id];
+      va = sa?.stock_managed ? (sa.available ?? 0) : -1;
+      vb = sb?.stock_managed ? (sb.available ?? 0) : -1;
     } else {
       va = a.created_at || ''; vb = b.created_at || '';
     }
@@ -1077,6 +1121,25 @@ function renderCPTListRows() {
         + '</div>';
     }
 
+    // Stock cell (products only)
+    let stockHtml = '';
+    if (ptDef.slug === 'products') {
+      const si = _cptListStockMap[item.id];
+      if (!si || !si.stock_managed) {
+        stockHtml = '<div class="page-item__stock"><span style="color:var(--gray-400);">—</span></div>';
+      } else {
+        const avail = si.available;
+        const ordered = si.ordered_qty || 0;
+        const total = si.stock_total || 0;
+        let color = 'var(--success, #16a34a)';
+        let label = avail;
+        if (avail <= 0) { color = 'var(--danger, #dc2626)'; label = '0'; }
+        else if (si.low_stock) { color = 'var(--warning, #d97706)'; }
+        const detail = ordered > 0 ? ' <span style="color:var(--gray-400);font-size:11px;" title="' + total + ' en stock, ' + ordered + ' commandé(s)">(' + total + ' - ' + ordered + ')</span>' : '';
+        stockHtml = '<div class="page-item__stock"><span style="font-weight:600;color:' + color + ';">' + label + '</span>' + detail + '</div>';
+      }
+    }
+
     return '<div class="page-item">'
       + '<div class="page-item__info" style="cursor:pointer" onclick="loadSection(\'cpt-edit:' + escapeHtml(ptDef.slug) + ':' + item.id + '\')">'
       +   '<div style="display:flex;align-items:center;gap:12px;min-width:0;">'
@@ -1090,6 +1153,7 @@ function renderCPTListRows() {
       +   '</div>'
       + '</div>'
       + '<div class="page-item__parent">' + (cats || '<span style="color:var(--gray-400);">—</span>') + '</div>'
+      + stockHtml
       + '<div class="page-item__meta"><span class="page-item__date">' + dateStr + '</span></div>'
       + '<div class="page-item__badges">'
       +   '<span class="badge ' + (item.status === 'published' ? 'badge-success' : 'badge-warning') + '">'
@@ -1109,6 +1173,7 @@ function renderCPTListRows() {
       <div class="pages-list-header">
         <span class="page-item__info cpt-sort-header" onclick="cptListSortBy('title')" style="cursor:pointer;user-select:none;">${escapeHtml(ptDef.label)} ${sortIcon('title')}</span>
         <span class="page-item__parent cpt-sort-header" onclick="cptListSortBy('category')" style="cursor:pointer;user-select:none;">Catégories ${sortIcon('category')}</span>
+        ${ptDef.slug === 'products' ? '<span class="page-item__stock cpt-sort-header" onclick="cptListSortBy(\'stock\')" style="cursor:pointer;user-select:none;">Stock ' + sortIcon('stock') + '</span>' : ''}
         <span class="page-item__meta cpt-sort-header" onclick="cptListSortBy('date')" style="cursor:pointer;user-select:none;">Date ${sortIcon('date')}</span>
         <span class="page-item__badges">Statut</span>
         <span class="page-item__actions" style="opacity:1">Actions</span>
@@ -1145,6 +1210,7 @@ async function renderCPTEditPage(ptDef, itemId) {
   hideLoading();
 
   const cf = item ? (typeof item.custom_fields === 'string' ? JSON.parse(item.custom_fields) : (item.custom_fields || {})) : {};
+  _cptEditExistingCF = { ...cf }; // preserve for save — avoid losing plugin-managed fields
   const fi = item?.featured_image || null;
   const itemCategories = item?.categories || [];
   const supports = ptDef.supports || ['title', 'slug', 'featured_image', 'content', 'status'];
@@ -1887,6 +1953,69 @@ function clearCPTCfImage(fieldName) {
   if (preview) preview.innerHTML = '';
 }
 
+/**
+ * Picker média générique pour les éditeurs custom (ex: product-editor en iframe).
+ * Ouvre la médiathèque CMS native avec navigation par dossier + filtre type, et
+ * appelle `callback(item)` à la sélection. `item` = { id, url, alt, title, width, height, mime_type, ... }.
+ *
+ * Exposé sur `window` pour être appelable depuis un iframe via `parent.openExternalMediaPicker(...)`.
+ */
+window.openExternalMediaPicker = function(callback, type) {
+  const pickerType = type === 'video' ? 'video' : type === 'all' || type === 'any' ? 'all' : 'image';
+  mediaPickerState = {
+    isOpen: true,
+    blockId: '__external_callback__',
+    fieldName: 'external',
+    type: pickerType,
+    folderId: null,
+    folders: [],
+    items: [],
+    multiple: false,
+    selectedIds: [],
+    onSelect: typeof callback === 'function' ? callback : null,
+  };
+  ensureMediaPickerModal();
+  showLoading();
+  Promise.all([apiFetch('/media/folders'), apiFetch('/media?all=1')])
+    .then(([res, items]) => {
+      mediaPickerState.folders = res.folders || [];
+      mediaPickerState.totalCount = res.total || 0;
+      mediaPickerState.items = items;
+      hideLoading();
+      document.getElementById('mediaPickerModal').classList.add('is-open');
+      updateMediaPickerContent();
+    })
+    .catch(() => hideLoading());
+};
+
+window.openExternalMediaPickerMultiple = function(callback, type) {
+  const pickerType = type === 'video' ? 'video' : type === 'all' || type === 'any' ? 'all' : 'image';
+  mediaPickerState = {
+    isOpen: true,
+    blockId: '__external_callback_multi__',
+    fieldName: 'external',
+    type: pickerType,
+    folderId: null,
+    folders: [],
+    items: [],
+    multiple: true,
+    selectedIds: [],
+    onSelectMulti: typeof callback === 'function' ? callback : null,
+  };
+  ensureMediaPickerModal();
+  showLoading();
+  Promise.all([apiFetch('/media/folders'), apiFetch('/media?all=1')])
+    .then(([res, items]) => {
+      mediaPickerState.folders = res.folders || [];
+      mediaPickerState.totalCount = res.total || 0;
+      mediaPickerState.items = items;
+      hideLoading();
+      document.getElementById('mediaPickerModal').classList.add('is-open');
+      updateMediaPickerContent();
+    })
+    .catch(() => hideLoading());
+};
+
 // CPT Builder featured image picker (for page builder CPT mode)
 function openCPTBuilderFeaturedPicker() {
   mediaPickerState = {
@@ -2039,8 +2168,8 @@ async function saveCPTItemFromForm(ptDef) {
     if (inp && q) inp.value = q.root.innerHTML;
   }
 
-  // Build custom_fields dynamically from ptDef.fields
-  const custom_fields = {};
+  // Build custom_fields dynamically from ptDef.fields — merge with existing to preserve plugin-managed fields
+  const custom_fields = { ..._cptEditExistingCF };
   if (hasCustomFields) {
     for (const field of ptDef.fields) {
       const ftype = (field.type || 'Text').toLowerCase();
@@ -2076,6 +2205,10 @@ async function saveCPTItemFromForm(ptDef) {
         // Convert YYYY-MM-DD back to YYYY/MM/DD for consistency with ACF
         const dateVal = formData.get(`cf_${field.name}`) || '';
         custom_fields[field.name] = dateVal.replace(/-/g, '/');
+      } else if (ftype === 'json') {
+        // Json fields managed by plugin editors — only overwrite if form has a value
+        const val = formData.get(`cf_${field.name}`);
+        if (val) custom_fields[field.name] = val;
       } else {
         custom_fields[field.name] = formData.get(`cf_${field.name}`) || '';
       }
@@ -2353,9 +2486,9 @@ async function renderPluginOptionsPage(pluginDef) {
   let settings = {};
   try {
     const allSettings = await apiFetch('/settings');
-    for (const s of allSettings) {
-      if (s.setting_key.startsWith(prefix)) {
-        settings[s.setting_key.replace(prefix, '')] = s.setting_value;
+    for (const [key, value] of Object.entries(allSettings)) {
+      if (key.startsWith(prefix)) {
+        settings[key.replace(prefix, '')] = value;
       }
     }
   } catch { /* ignore */ }
@@ -2463,9 +2596,9 @@ async function renderCPTOptionsPage(ptDef) {
   let settings = {};
   try {
     const allSettings = await apiFetch('/settings');
-    for (const s of allSettings) {
-      if (s.setting_key.startsWith(`cpt_${ptDef.slug}_`)) {
-        settings[s.setting_key.replace(`cpt_${ptDef.slug}_`, '')] = s.setting_value;
+    for (const [key, value] of Object.entries(allSettings)) {
+      if (key.startsWith(`cpt_${ptDef.slug}_`)) {
+        settings[key.replace(`cpt_${ptDef.slug}_`, '')] = value;
       }
     }
   } catch { /* ignore */ }
@@ -2849,13 +2982,18 @@ function blockId() {
 // ========== CPT BUILDER MODE ==========
 // Reuses the page builder for CPTs that have content support and no custom fields
 
-async function openCPTBuilder(ptDef, itemId) {
+async function openCPTBuilder(ptDef, itemId, opts = {}) {
   clearBuilderDirty();
   pageBuilderState.editingPageId = itemId;
   pageBuilderState.blocks = [];
   pageBuilderState.meta = { title: '', slug: '', status: 'draft', show_in_menu: false, menu_order: 0, parent_id: null };
   pageBuilderState.colorOverrides = { enabled: false, primary_color: '', secondary_color: '', tertiary_color: '', text_color: '', background_color: '', bg_form_field: '' };
   pageBuilderState.seoMeta = { enabled: true, meta_title: '', meta_description: '' };
+  // Reset puis applique le mode "blocks-only" si demandé (ex: depuis product-editor).
+  // Dans ce mode, seul l'onglet Modules est affiché et le bouton ← Retour pointe
+  // vers la section custom indiquée (typiquement cpt-edit:slug:id pour rouvrir l'editor.url override).
+  pageBuilderState.blocksOnlyMode = !!opts.blocksOnly;
+  pageBuilderState.blocksOnlyBackSection = opts.backSection || null;
   pageBuilderState.cptMode = ptDef;
   pageBuilderState.cptExcerpt = '';
   pageBuilderState.cptFeaturedImage = null;
@@ -2915,6 +3053,43 @@ async function openCPTBuilder(ptDef, itemId) {
     const canvas = document.getElementById('builderCanvas');
     if (canvas) canvas.classList.toggle('border-rounded', siteSettingsCache.rounded === '1');
   }
+  applyBlocksOnlyMode();
+}
+
+/**
+ * Post-render hook : si blocksOnlyMode actif (ex: depuis product-editor),
+ * ne montre que l'onglet "Modules" dans la sidebar du builder + masque
+ * les autres tabs (Header / SEO Meta / Contenu) et l'image à la une (gérée
+ * par l'éditeur custom).
+ */
+function applyBlocksOnlyMode() {
+  if (!pageBuilderState.blocksOnlyMode) return;
+  const sidebar = document.querySelector('.builder-modules-panel') || document.getElementById('content');
+  if (!sidebar) return;
+
+  // Masque tous les onglets sauf "cpt-modules" et "page-modules", auto-active Modules.
+  sidebar.querySelectorAll('.cpt-builder-tab').forEach(tab => {
+    const t = tab.dataset.tab || '';
+    const isModules = t === 'cpt-modules' || t === 'page-modules';
+    tab.style.display = isModules ? '' : 'none';
+    if (isModules) {
+      tab.classList.add('active');
+      tab.style.borderBottomColor = 'var(--primary,#224f5a)';
+      tab.style.color = 'var(--primary,#224f5a)';
+    } else {
+      tab.classList.remove('active');
+    }
+  });
+  sidebar.querySelectorAll('.cpt-builder-tab-content').forEach(panel => {
+    const t = panel.dataset.tab || '';
+    panel.style.display = (t === 'cpt-modules' || t === 'page-modules') ? '' : 'none';
+  });
+
+  // Masque featured image / excerpt / cats / custom fields (gérés par l'editor custom).
+  document.querySelectorAll('[data-builder-cpt-sidebar]').forEach(el => el.style.display = 'none');
+  // Heuristique : la sidebar gauche peut contenir un bloc "IMAGE À LA UNE" identifiable
+  // par son data-attr ou par sa structure. Si ton thème expose une classe spécifique,
+  // ajuste le sélecteur ici.
 }
 
 async function saveCPTBuilder() {
@@ -2960,8 +3135,8 @@ async function saveCPTBuilder() {
     categories.push(parseInt(cb.value));
   });
 
-  // Read custom fields from sidebar
-  const custom_fields = {};
+  // Read custom fields from sidebar — start from existing to preserve plugin-managed fields
+  const custom_fields = { ...(pageBuilderState.cptCustomFields || {}) };
   if (ptDef.fields && ptDef.fields.length > 0) {
     for (const field of ptDef.fields) {
       const ftype = (field.type || 'Text').toLowerCase();
@@ -2988,10 +3163,14 @@ async function saveCPTBuilder() {
         custom_fields[fn] = hasAny ? JSON.stringify(addr) : '';
       } else if (ftype === 'truefalse') {
         const cb = document.querySelector(`.cpt-builder-cf-toggle[data-cf="${field.name}"]`);
-        custom_fields[field.name] = cb?.checked ? '1' : '0';
+        if (cb) custom_fields[field.name] = cb.checked ? '1' : '0';
+      } else if (ftype === 'json') {
+        // Json fields managed by plugin editors — preserve existing value, don't overwrite from DOM
+        const el = document.querySelector(`.cpt-builder-cf[data-cf="${field.name}"]`);
+        if (el && el.value) custom_fields[field.name] = el.value;
       } else {
         const el = document.querySelector(`.cpt-builder-cf[data-cf="${field.name}"]`);
-        custom_fields[field.name] = el?.value || '';
+        if (el) custom_fields[field.name] = el.value || '';
       }
     }
   }
@@ -3095,6 +3274,7 @@ async function openPageBuilder(pageId) {
     const canvas = document.getElementById('builderCanvas');
     if (canvas) canvas.classList.toggle('border-rounded', siteSettingsCache.rounded === '1');
   }
+  applyBlocksOnlyMode();
 }
 
 // Legacy buildMenuPositions/updatePagePositionOptions removed — now per-menu via renderPageMenuToggles
@@ -3106,7 +3286,11 @@ async function renderPageBuilder() {
   const pages = await apiFetch('/pages').catch(() => []);
   pageBuilderState._allPages = pages || [];
 
-  const backSection = isCPT ? `cpt:${cptDef.slug}` : 'pages';
+  // Mode "blocks-only" (ex: depuis product-editor) → bouton Retour pointé vers
+  // l'editor custom au lieu de la liste CPT.
+  const backSection = pageBuilderState.blocksOnlyMode && pageBuilderState.blocksOnlyBackSection
+    ? pageBuilderState.blocksOnlyBackSection
+    : (isCPT ? `cpt:${cptDef.slug}` : 'pages');
   const saveFunc = isCPT ? 'saveCPTBuilder()' : 'savePageBuilder()';
   const viewUrl = isCPT
     ? `${siteSettingsCache?.frontend_url || window.location.origin}/${cptDef.slug}/${encodeURIComponent(m.slug)}`
@@ -4849,10 +5033,18 @@ function buildTemplateContext(block) {
       const imgUrl = typeof img === 'string' ? img : (img.url || '');
       const imgAlt = typeof img === 'object' ? (img.alt || '') : '';
       const link1 = slide.link || {};
+      const link1Url = typeof link1 === 'string' ? link1 : (link1.url || '');
+      const link1Title = typeof link1 === 'string' ? link1 : (link1.title || 'En savoir plus');
+      const link1Target = typeof link1 === 'object' ? (link1.target || '_self') : '_self';
       const link2Raw = slide.link_2;
       const link2Url = typeof link2Raw === 'string' ? link2Raw : ((link2Raw && link2Raw.url) || '');
-      const link2 = link2Url ? link2Raw : null;
-      const link1Url = typeof link1 === 'string' ? link1 : (link1.url || '');
+      const link2 = link2Url
+        ? {
+            url: link2Url,
+            title: (typeof link2Raw === 'object' && link2Raw && link2Raw.title) || 'En savoir plus',
+            target: (typeof link2Raw === 'object' && link2Raw && link2Raw.target) || '_self',
+          }
+        : null;
       return {
         image_url: imgUrl,
         image_alt: imgAlt,
@@ -4860,8 +5052,8 @@ function buildTemplateContext(block) {
         text: slide.text || '',
         has_desc: !!(slide.legend || slide.text || link1Url),
         link_url: link1Url,
-        link_title: typeof link1 === 'string' ? link1 : (link1.title || ''),
-        link_target: typeof link1 === 'object' ? (link1.target || '_self') : '_self',
+        link_title: link1Title,
+        link_target: link1Target,
         link2: link2
       };
     });
@@ -7891,6 +8083,7 @@ function renderBuilderSettingsPanel() {
       <div>
         <div class="builder-settings-title">${escapeHtml(def.label)}</div>
         <div class="builder-settings-subtitle">${escapeHtml(block.type)}</div>
+        <div class="builder-breadcrumb" id="builderBreadcrumb"></div>
       </div>
     </div>
     ${LEGACY_BLOCK_TYPES[block.type]
@@ -7980,6 +8173,12 @@ const BLOCK_PARAMS_FIELDS = new Set([
   'is_fullscreen', 'is_small_marged'
 ]);
 
+// Per-module overrides: extra field names that should appear in the Paramètres tab
+// even though they are not declared via BlockParams (and thus not flagged isBlockParam).
+const EXTRA_PARAM_FIELDS_BY_MODULE = {
+  ColumnsTab: new Set(['container_width', 'cols_justify_items', 'columns_background', 'columns_display']),
+};
+
 function renderSchemaForm(block, schemaFields) {
   const data = block.data && typeof block.data === 'object' ? { ...block.data } : {};
   // Seed missing fields with their schema defaults so conditionals evaluate correctly on new blocks
@@ -8018,12 +8217,15 @@ function renderSchemaForm(block, schemaFields) {
   };
 
   // Split fields into content vs params tabs
-  // Use the isBlockParam flag from the PHP parser when available; fall back to static set
+  // Use the isBlockParam flag from the PHP parser when available; fall back to static set.
+  // Per-module overrides (EXTRA_PARAM_FIELDS_BY_MODULE) push extra layout-style fields to Paramètres.
   const hasBlockParamFlag = schemaFields.some(f => f.isBlockParam === true);
+  const extraParamSet = EXTRA_PARAM_FIELDS_BY_MODULE[moduleName] || null;
   const contentFields = [];
   const paramFields = [];
   schemaFields.forEach(field => {
-    const isParam = hasBlockParamFlag ? (field.isBlockParam === true) : BLOCK_PARAMS_FIELDS.has(field.name);
+    const baseIsParam = hasBlockParamFlag ? (field.isBlockParam === true) : BLOCK_PARAMS_FIELDS.has(field.name);
+    const isParam = baseIsParam || (extraParamSet && extraParamSet.has(field.name));
     if (isParam) {
       paramFields.push(field);
     } else {
@@ -8111,6 +8313,34 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
   const rfieldAttr = rowCtx ? ` data-rfield="${escapeHtml(name)}"` : '';
   // Suffix DOM ids with hash of inputName so multiple instances on same page (e.g. inside columns) stay unique
   const idSuffix = rowCtx ? `-${inputName.replace(/[^a-zA-Z0-9_-]/g, '_')}` : '';
+  // Generic dynamic select : field can declare `dynamicSource: { endpoint, valueKey, labelKey, dataPath?, placeholder? }`.
+  if (type === 'Select' && field.dynamicSource && field.dynamicSource.endpoint) {
+    const ds = field.dynamicSource;
+    const selectId = `dyn-select-${blockId}-${name}${idSuffix}`;
+    setTimeout(async () => {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      try {
+        const data = await apiFetch(ds.endpoint);
+        const list = ds.dataPath ? (data?.[ds.dataPath] || []) : (Array.isArray(data) ? data : (data?.data || []));
+        const placeholder = ds.placeholder !== undefined ? ds.placeholder : `— Sélectionner —`;
+        sel.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>` +
+          list.map(it => {
+            const v = it[ds.valueKey];
+            const l = it[ds.labelKey] || v;
+            return `<option value="${escapeHtml(String(v))}" ${String(value ?? '') === String(v) ? 'selected' : ''}>${escapeHtml(String(l))}</option>`;
+          }).join('');
+      } catch (e) {}
+    }, 0);
+    return `
+      <div class="form-group">
+        <label class="form-label">${escapeHtml(label)}</label>
+        <select class="form-select" name="${escapeHtml(inputName)}"${rfieldAttr} id="${selectId}">
+          <option value="">Chargement…</option>
+        </select>
+      </div>
+    `;
+  }
   // Dynamic select for form module: populate form_id from API
   if (name === 'form_id') {
     const selectId = `form-select-${blockId}${idSuffix}`;
@@ -8492,9 +8722,51 @@ function renderRepeaterFieldHTML(field, value, blockId, rowCtx) {
       ? `${rowCtx.parentName}::${rowCtx.rowIndex}::${field.name}`
       : `${rowCtx.parentName}::${field.name}`;
   }
+
+  // Columns repeater → vertical tabs rail on the left, active column content on the right
+  const isColumnsRepeater = field.name === 'columns_list';
+  const rowLabel = isColumnsRepeater ? 'Colonne' : 'Élément';
   const rowsHtml = rows.map((rowData, i) =>
-    renderRepeaterRowHTML(subFields, rowData, i, blockId, compoundName)
+    renderRepeaterRowHTML(subFields, rowData, i, blockId, compoundName, rowLabel)
   ).join('');
+
+  if (isColumnsRepeater) {
+    const tabsHtml = rows.map((_, i) => `
+      <button type="button" class="cols-vtab ${i === 0 ? 'is-active' : ''}" data-tab-index="${i}" title="Colonne ${i + 1}" onclick="switchColsTab(this)">
+        <span class="cols-vtab-num">${i + 1}</span>
+      </button>
+    `).join('');
+    return `
+      <div class="form-group">
+        <label class="form-label">${escapeHtml(field.label || field.name)}</label>
+        <div class="repeater-field cols-vtabs-wrapper" data-field-name="${escapeHtml(field.name)}" data-field-compound="${escapeHtml(compoundName)}" data-block-id="${escapeHtml(blockId)}" data-cols-mode="vtabs" data-active-tab="0">
+          <div class="cols-vtabs-rail">
+            ${tabsHtml}
+            <button type="button" class="cols-vtab cols-vtab-add" title="Ajouter une colonne"
+              onclick="addRepeaterRow(this, '${escapeHtml(blockId)}', '${escapeHtml(field.name)}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <div class="cols-vtabs-actions">
+            <button type="button" class="btn-icon-sm" title="Monter la colonne" onclick="colsVtabAction(this, 'up')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <button type="button" class="btn-icon-sm" title="Descendre la colonne" onclick="colsVtabAction(this, 'down')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <button type="button" class="btn-icon-sm" title="Dupliquer la colonne" onclick="colsVtabAction(this, 'dup')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+            <button type="button" class="btn-icon-sm btn-icon-sm--danger" title="Supprimer la colonne" onclick="colsVtabAction(this, 'del')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </button>
+          </div>
+          <div class="repeater-rows cols-vtabs-content">${rowsHtml}</div>
+        </div>
+      </div>
+    `;
+  }
+
   return `
     <div class="form-group">
       <label class="form-label">${escapeHtml(field.label || field.name)}</label>
@@ -8510,17 +8782,18 @@ function renderRepeaterFieldHTML(field, value, blockId, rowCtx) {
   `;
 }
 
-function renderRepeaterRowHTML(subFields, rowData, rowIndex, blockId, repeaterName) {
+
+function renderRepeaterRowHTML(subFields, rowData, rowIndex, blockId, repeaterName, rowLabel = 'Élément') {
   const rowCtx = { parentName: repeaterName, rowIndex };
   const bodyHtml = subFields.map(f => {
     const val = rowData[f.name] !== undefined ? rowData[f.name] : f.defaultValue;
     return renderSchemaField(f, val, blockId, rowData, rowCtx);
   }).join('');
   return `
-    <div class="repeater-row" data-row-index="${rowIndex}">
+    <div class="repeater-row" data-row-index="${rowIndex}" data-row-label="${escapeHtml(rowLabel)}">
       <div class="repeater-row-header" onclick="toggleRepeaterRow(this)">
         <span class="repeater-row-number">${rowIndex + 1}</span>
-        <span class="repeater-row-title">Élément ${rowIndex + 1}</span>
+        <span class="repeater-row-title">${escapeHtml(rowLabel)} ${rowIndex + 1}</span>
         <div class="repeater-row-actions">
           <button type="button" class="btn-icon-sm" title="Monter"
             onclick="event.stopPropagation(); moveRepeaterRow(this, -1)">
@@ -8894,6 +9167,7 @@ function toggleRepeaterRow(header) {
   const open = body.style.display !== 'none';
   body.style.display = open ? 'none' : '';
   row.classList.toggle('is-open', !open);
+  if (typeof updateBuilderBreadcrumb === 'function') updateBuilderBreadcrumb();
 }
 
 function toggleGroupField(header) {
@@ -8904,6 +9178,46 @@ function toggleGroupField(header) {
   const open = body.style.display !== 'none';
   body.style.display = open ? 'none' : '';
   group.classList.toggle('is-open', !open);
+  if (typeof updateBuilderBreadcrumb === 'function') updateBuilderBreadcrumb();
+}
+
+// ── Settings breadcrumb ──────────────────────────────────────────────────────
+// Walks from the settings panel root, picking the active path through cols-tabs,
+// open repeater rows and open groups. Label = visible row title.
+function updateBuilderBreadcrumb() {
+  const bc = document.getElementById('builderBreadcrumb');
+  if (!bc) return;
+  const panel = document.getElementById('builderSettings');
+  if (!panel) { bc.innerHTML = ''; return; }
+  const segments = [];
+
+  function walk(scope) {
+    if (!scope) return;
+    // Open repeater row inside this scope (accordion mode)
+    const openRow = scope.querySelector(':scope .repeater-row.is-open');
+    if (!openRow) return;
+    const label = openRow.querySelector(':scope > .repeater-row-header > .repeater-row-title')?.textContent?.trim();
+    if (label) segments.push({ label, target: openRow });
+    walk(openRow.querySelector(':scope > .repeater-row-body'));
+  }
+
+  // Start at the form, skip the panel header
+  const form = panel.querySelector('.builder-block-form');
+  if (form) walk(form);
+
+  if (!segments.length) { bc.innerHTML = ''; return; }
+  bc.innerHTML = segments.map((s, i) => {
+    const sep = i > 0 ? '<span class="builder-breadcrumb-sep">›</span>' : '';
+    return `${sep}<span class="builder-breadcrumb-item" data-bc-index="${i}">${escapeHtml(s.label)}</span>`;
+  }).join('');
+  // Wire click handlers — scroll target into view + briefly highlight
+  bc.querySelectorAll('.builder-breadcrumb-item').forEach((el, i) => {
+    el.addEventListener('click', () => {
+      const target = segments[i]?.target;
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
 }
 
 function _getRepeaterSchema(blockId, fieldName, domContext) {
@@ -9042,12 +9356,58 @@ function collectRepeaterData(form, repeaterName, subFields) {
 function reRenderRepeaterRows(container, subFields, allData, blockId, repeaterName) {
   destroyWysiwygEditors(container);
   const rowsContainer = container.querySelector('.repeater-rows');
+  const isVtabs = container.dataset.colsMode === 'vtabs';
+  const rowLabel = container.dataset.fieldName === 'columns_list' ? 'Colonne' : 'Élément';
   rowsContainer.innerHTML = allData.map((rowData, i) =>
-    renderRepeaterRowHTML(subFields, rowData, i, blockId, repeaterName)
+    renderRepeaterRowHTML(subFields, rowData, i, blockId, repeaterName, rowLabel)
   ).join('');
+  if (isVtabs) _refreshColsVtabsRail(container);
   const form = container.closest('form');
   if (form) updateSchemaConditionals(form);
   initWysiwygEditors(container);
+}
+
+function switchColsTab(tabBtn) {
+  const wrapper = tabBtn.closest('.cols-vtabs-wrapper');
+  if (!wrapper) return;
+  const idx = tabBtn.dataset.tabIndex;
+  wrapper.dataset.activeTab = idx;
+  wrapper.querySelectorAll(':scope > .cols-vtabs-rail > .cols-vtab').forEach(b => b.classList.toggle('is-active', b.dataset.tabIndex === idx));
+  if (typeof updateBuilderBreadcrumb === 'function') updateBuilderBreadcrumb();
+}
+
+// Proxy actions on the active column to the (hidden) row's action buttons
+function colsVtabAction(button, action) {
+  const wrapper = button.closest('.cols-vtabs-wrapper');
+  if (!wrapper) return;
+  const active = wrapper.dataset.activeTab || '0';
+  const row = wrapper.querySelector(`.cols-vtabs-content > .repeater-row[data-row-index="${active}"]`);
+  if (!row) return;
+  const titleMap = { up: 'Monter', down: 'Descendre', dup: 'Dupliquer', del: 'Supprimer' };
+  const target = row.querySelector(`.repeater-row-actions [title="${titleMap[action]}"]`);
+  if (target) target.click();
+}
+
+function _refreshColsVtabsRail(wrapper) {
+  if (!wrapper || wrapper.dataset.colsMode !== 'vtabs') return;
+  const rows = wrapper.querySelectorAll('.cols-vtabs-content > .repeater-row');
+  const rail = wrapper.querySelector(':scope > .cols-vtabs-rail');
+  if (!rail) return;
+  const addBtn = rail.querySelector(':scope > .cols-vtab-add');
+  const total = rows.length;
+  let active = parseInt(wrapper.dataset.activeTab || '0', 10);
+  if (active >= total) active = Math.max(0, total - 1);
+  wrapper.dataset.activeTab = String(active);
+  const tabsHtml = Array.from(rows).map((_, i) => `
+    <button type="button" class="cols-vtab ${i === active ? 'is-active' : ''}" data-tab-index="${i}" title="Colonne ${i + 1}" onclick="switchColsTab(this)">
+      <span class="cols-vtab-num">${i + 1}</span>
+    </button>
+  `).join('');
+  const fragment = document.createElement('div');
+  fragment.innerHTML = tabsHtml;
+  const newBtns = Array.from(fragment.children);
+  rail.querySelectorAll(':scope > .cols-vtab:not(.cols-vtab-add)').forEach(b => b.remove());
+  newBtns.forEach(b => rail.insertBefore(b, addBtn));
 }
 
 function addRepeaterRow(button, blockId, fieldName) {
@@ -9065,13 +9425,18 @@ function addRepeaterRow(button, blockId, fieldName) {
   existingData.push(newRowDefaults);
   reRenderRepeaterRows(container, repeaterField.subFields, existingData, blockId, compound);
   _syncRepeaterToBlock(container, blockId);
-  // Expand the last row
+  // Expand the last row (or activate its tab in vtabs mode)
   const rows = container.querySelectorAll(':scope > .repeater-rows > .repeater-row');
   const lastRow = rows[rows.length - 1];
   if (lastRow) {
     const body = lastRow.querySelector('.repeater-row-body');
     if (body) body.style.display = '';
     lastRow.classList.add('is-open');
+  }
+  if (container.dataset.colsMode === 'vtabs') {
+    const lastIdx = String(rows.length - 1);
+    container.dataset.activeTab = lastIdx;
+    container.querySelectorAll(':scope > .cols-vtabs-rail > .cols-vtab').forEach(b => b.classList.toggle('is-active', b.dataset.tabIndex === lastIdx));
   }
   const form = container.closest('form');
   if (form) updateSchemaConditionals(form);
@@ -9315,6 +9680,7 @@ function renderBlockSettings() {
   panel.innerHTML = renderBuilderSettingsPanel();
   attachSettingsLivePreview();
   initWysiwygEditors(panel);
+  if (typeof updateBuilderBreadcrumb === 'function') updateBuilderBreadcrumb();
 }
 
 // ── WYSIWYG Editor (Quill) ──────────────────────────────────────────────────
@@ -12232,6 +12598,14 @@ function selectMediaFromPicker(id) {
     return;
   }
 
+  // External callback (ex: product-editor en iframe)
+  if (mediaPickerState.blockId === '__external_callback__') {
+    const cb = mediaPickerState.onSelect;
+    closeMediaPicker();
+    if (typeof cb === 'function') cb(item);
+    return;
+  }
+
   // CPT Options image picker (header_img)
   if (mediaPickerState.blockId === '__cpt_options_img__') {
     const input = document.getElementById('cptOptionsImgInput');
@@ -12353,6 +12727,14 @@ function clearMediaPickerSelection() {
 
 function confirmMediaPickerSelection() {
   const items = mediaPickerState.items.filter(item => (mediaPickerState.selectedIds || []).includes(String(item.id)));
+
+  // External multi callback (ex: product-editor gallery en iframe)
+  if (mediaPickerState.blockId === '__external_callback_multi__') {
+    const cb = mediaPickerState.onSelectMulti;
+    closeMediaPicker();
+    if (typeof cb === 'function') cb(items);
+    return;
+  }
 
   // CPT Photos gallery picker (classic form)
   if (mediaPickerState.blockId === '__cpt_photos__') {
@@ -15155,7 +15537,7 @@ function renderMenuEditor(menu) {
       <div class="menu-add-section">
         <h4>${section.icon ? section.icon + ' ' : ''}${escapeHtml(section.label)}</h4>
         <div style="margin-bottom:6px">
-          <button class="btn btn-sm btn-outline" onclick="addCptArchiveLink('${escapeHtml(section.slug)}', '${escapeHtml(section.label)}')">+ Archive « ${escapeHtml(section.label)} »</button>
+          <button class="btn btn-sm btn-outline" onclick="addCptArchiveLink('${escapeHtml(section.archivePath || '/' + section.slug)}', '${escapeHtml(section.label)}')">+ Archive « ${escapeHtml(section.label)} »</button>
         </div>
         ${section.items && section.items.length > 0 ? `
           <input type="text" class="form-input form-input-sm menu-search-input" placeholder="Rechercher…" oninput="filterMenuCptList(this, '${escapeHtml(section.slug)}')">
@@ -15424,14 +15806,14 @@ function filterMenuCptList(input, cptSlug) {
   });
 }
 
-function addCptArchiveLink(cptSlug, label) {
+function addCptArchiveLink(archivePath, label) {
   const maxOrder = _menuItems.length > 0 ? Math.max(..._menuItems.map(i => i.menu_order || 0)) : -1;
   const tempId = 'temp_' + (_menuTempIdCounter++);
   _menuItems.push({
     id: null,
     temp_id: tempId,
     title: label,
-    url: `/${cptSlug}`,
+    url: archivePath,
     type: 'custom',
     page_id: null,
     parent_id: null,

@@ -19,9 +19,7 @@ const titleBloc = (data.title_bloc as string) ?? (data.title as string) ?? '';
 const titleStyle = (data.title_style as number | string) ?? 2;
 const titleAlign = (data.title_align as string) ?? 'center';
 ---
-<script define:vars={{ data }}>
-  console.log('NicklAccordion data:', data);
-</script>
+
 <div id={id} class={`module module-accordion ${classes}`}>
   {backgroundImage && backgroundImage.url && (
     <div

@@ -1,0 +1,146 @@
+---
+import type { ProductVariant } from '@plugins/ecommerce/frontend/lib/shop-api';
+
+interface Props {
+  variants: ProductVariant[];
+  variantAttributes: Array<{ name: string; options: string[] | string }>;
+  currency?: string;
+}
+
+const { variants, variantAttributes, currency = 'EUR' } = Astro.props;
+
+// Normalize attribute options (can come as string with newlines or array)
+const attrs = variantAttributes.map((a) => {
+  const options = Array.isArray(a.options)
+    ? a.options
+    : String(a.options || '').split(/[\r\n]+/).map(s => s.trim()).filter(Boolean);
+  return { name: a.name, options };
+});
+
+const hasVariants = variants.length > 1 && attrs.length > 0;
+---
+{hasVariants ? (
+  <div class="shop-variant-selector" data-variants={JSON.stringify(variants)} data-currency={currency}>
+    {attrs.map((attr) => (
+      <div class="shop-variant-selector__group">
+        <label class="shop-variant-selector__label">{attr.name}</label>
+        <div class="shop-variant-selector__options">
+          {attr.options.map((opt) => (
+            <button type="button"
+              class="shop-variant-selector__option"
+              data-attr-name={attr.name}
+              data-attr-value={opt}
+            >{opt}</button>
+          ))}
+        </div>
+      </div>
+    ))}
+    <input type="hidden" id="selectedVariantId" name="variant_id" />
+  </div>
+) : (
+  <input type="hidden" id="selectedVariantId" name="variant_id" value={variants[0]?.id || ''} />
+)}
+
+<script is:inline>
+  (function () {
+    const root = document.querySelector('.shop-variant-selector');
+    if (!root) return;
+    const variants = JSON.parse(root.getAttribute('data-variants') || '[]');
+    const hiddenInput = document.getElementById('selectedVariantId');
+    const selection = {};
+
+    function updateSelected() {
+      const match = variants.find(v => {
+        for (const [k, val] of Object.entries(selection)) {
+          if ((v.attributes || {})[k] !== val) return false;
+        }
+        return Object.keys(selection).length === Object.keys(v.attributes || {}).length;
+      });
+
+      if (hiddenInput) hiddenInput.value = match ? String(match.id) : '';
+
+      // Update prix affiché + état stock
+      const priceEl = document.getElementById('shopCurrentVariantPrice');
+      const stockEl = document.getElementById('shopCurrentVariantStock');
+      if (match) {
+        if (priceEl) {
+          const fmt = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
+          priceEl.innerHTML = '<strong>' + fmt.format(match.price_cents / 100) + '</strong>';
+          if (match.compare_at_price_cents && match.compare_at_price_cents > match.price_cents) {
+            priceEl.innerHTML = '<span class="price-compare">' + fmt.format(match.compare_at_price_cents / 100) + '</span> ' + priceEl.innerHTML;
+          }
+        }
+        if (stockEl) {
+          const available = !match.stock_managed || match.stock_quantity > 0;
+          stockEl.textContent = available
+            ? (match.stock_managed && match.stock_quantity <= (match.low_stock_threshold || 5) ? `Plus que ${match.stock_quantity} en stock` : 'En stock')
+            : 'Rupture de stock';
+          stockEl.classList.toggle('out', !available);
+        }
+        const cartBtn = document.getElementById('shopAddToCartBtn');
+        if (cartBtn) {
+          const available = !match.stock_managed || match.stock_quantity > 0;
+          cartBtn.disabled = !available;
+        }
+      }
+
+      // Update visual state des options
+      root.querySelectorAll('.shop-variant-selector__option').forEach(btn => {
+        const n = btn.getAttribute('data-attr-name');
+        const v = btn.getAttribute('data-attr-value');
+        btn.classList.toggle('active', selection[n] === v);
+      });
+    }
+
+    root.querySelectorAll('.shop-variant-selector__option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = btn.getAttribute('data-attr-name');
+        const value = btn.getAttribute('data-attr-value');
+        selection[name] = value;
+        updateSelected();
+      });
+    });
+
+    // Sélection auto du premier variant disponible
+    const first = variants.find(v => !v.stock_managed || v.stock_quantity > 0) || variants[0];
+    if (first && first.attributes) {
+      Object.assign(selection, first.attributes);
+      updateSelected();
+    }
+  })();
+</script>
+
+<style>
+  .shop-variant-selector__group {
+    margin-bottom: 1rem;
+  }
+  .shop-variant-selector__label {
+    display: block;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 6px;
+    text-transform: capitalize;
+  }
+  .shop-variant-selector__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .shop-variant-selector__option {
+    padding: 8px 14px;
+    border: 1px solid var(--gray-300, #d1d5db);
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all .15s;
+  }
+  .shop-variant-selector__option:hover {
+    border-color: var(--color-primary, #0f62fe);
+  }
+  .shop-variant-selector__option.active {
+    background: var(--color-primary, #0f62fe);
+    color: #fff;
+    border-color: var(--color-primary, #0f62fe);
+  }
+</style>

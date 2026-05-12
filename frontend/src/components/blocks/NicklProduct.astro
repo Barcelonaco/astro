@@ -4,8 +4,8 @@
  * Accepte : products_id (array d'IDs) OU categories (slugs) OU is_featured (fallback).
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
-import ProductCard from '../shop/ProductCard.astro';
-import { listProducts, type ProductSummary } from '../../lib/shop-api';
+import ProductCard from '@plugins/ecommerce/frontend/components/ProductCard.astro';
+import { listProducts, type ProductSummary } from '@plugins/ecommerce/frontend/lib/shop-api';
 
 interface Props { data: Record<string, any>; }
 const { data } = Astro.props;

@@ -32,14 +32,28 @@ require_once __DIR__ . '/EcommerceMigrationController.php';
 require_once __DIR__ . '/CustomerAuthController.php';
 require_once __DIR__ . '/ProductController.php';
 require_once __DIR__ . '/ProductCategoryController.php';
+require_once __DIR__ . '/TaxResolver.php';
 require_once __DIR__ . '/CartController.php';
 require_once __DIR__ . '/ShippingController.php';
+require_once __DIR__ . '/ShippingAdminController.php';
+require_once __DIR__ . '/TaxAdminController.php';
+require_once __DIR__ . '/CouponsAdminController.php';
 require_once __DIR__ . '/OrderController.php';
+require_once __DIR__ . '/OrderAdminController.php';
+require_once __DIR__ . '/OrderMailer.php';
+require_once __DIR__ . '/CustomerAdminController.php';
 require_once __DIR__ . '/StripeController.php';
+require_once __DIR__ . '/SEPAController.php';
 
 // ── Migration ──────────────────────────────────────────────────────────────
 register_plugin_migration('ecommerce', function (callable $log): int {
-    return EcommerceMigrationController::migrate($log);
+    $changes = EcommerceMigrationController::migrate($log);
+    // One-shot legacy schema consolidation (gated par setting `ecommerce_legacy_consolidated`).
+    // Migre product_images / order_addresses / order_events / payment_events / credit_notes /
+    // customer_password_resets / download_tokens / digital_downloads / stats_cache vers
+    // les tables/colonnes consolidées, puis DROP des anciennes.
+    $changes += EcommerceMigrationController::consolidateLegacyTables($log);
+    return $changes;
 });
 
 // ── Helper local pour matcher les routes paramétrées ───────────────────────
@@ -117,6 +131,7 @@ register_plugin_route('ecommerce', function (string $method, string $path) use (
     }
     if ($method === 'GET' && $path === '/shop/shipping-rates')      { ShippingController::rates();              return true; }
     if ($method === 'GET' && $path === '/shop/payment-config')      { StripeController::publicConfig();         return true; }
+    if ($method === 'GET' && $path === '/shop/tax-rates')           { TaxAdminController::listPublic();         return true; }
 
     // ── Cart ──
     if ($method === 'GET'    && $path === '/cart')           { CartController::getCart();      return true; }
@@ -137,6 +152,7 @@ register_plugin_route('ecommerce', function (string $method, string $path) use (
     // ── Orders ──
     if ($method === 'POST' && $path === '/orders') { OrderController::create();    return true; }
     if ($method === 'GET'  && $path === '/orders') { OrderController::listMine();  return true; }
+    if ($method === 'GET'  && $path === '/orders/track') { OrderController::track(); return true; }
     if ($method === 'GET'  && $ecommerce_match('/orders/by-number/:number', $path, $params)) {
         OrderController::getByNumber($params['number']); return true;
     }
@@ -148,8 +164,48 @@ register_plugin_route('ecommerce', function (string $method, string $path) use (
     if ($method === 'POST' && $path === '/payments/stripe/create-payment-intent') {
         StripeController::createPaymentIntent(); return true;
     }
+    if ($method === 'GET' && $path === '/payments/stripe/check-status') {
+        StripeController::checkPaymentStatus(); return true;
+    }
     if ($method === 'POST' && $path === '/payments/stripe/webhook') {
         StripeController::webhook(); return true;
+    }
+
+    // ── Payments : SEPA ──
+    if ($method === 'POST' && $path === '/payments/sepa/setup-intent') {
+        SEPAController::createSetupIntent(); return true;
+    }
+    if ($method === 'GET' && $path === '/payments/sepa/mandates') {
+        SEPAController::listMandates(); return true;
+    }
+    if ($method === 'POST' && $path === '/payments/sepa/charge') {
+        SEPAController::charge(); return true;
+    }
+
+    // ── Admin SEPA mandates ──
+    if ($method === 'GET' && $path === '/admin/sepa/mandates') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        SEPAController::adminListMandates();
+        return true;
+    }
+    if ($method === 'PUT' && $ecommerce_match('/admin/sepa/mandates/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        SEPAController::adminUpdateMandate((int) $params['id']);
+        return true;
+    }
+
+    // ── Admin stock summary ──
+    if ($method === 'GET' && $path === '/admin/products/stock-summary') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        ProductController::stockSummary();
+        return true;
+    }
+    if ($method === 'GET' && $ecommerce_match('/admin/products/:id/stock', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        ProductController::stockDetail((int) $params['id']);
+        return true;
     }
 
     // ── Admin variants & categories ──
@@ -168,6 +224,166 @@ register_plugin_route('ecommerce', function (string $method, string $path) use (
         ProductController::generateMatrix((int) $params['id']);
         return true;
     }
+    // ── Admin Shipping Zones / Methods ──
+    if ($method === 'GET' && $path === '/admin/shipping-zones') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        ShippingAdminController::listZones();
+        return true;
+    }
+    if ($method === 'POST' && $path === '/admin/shipping-zones') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        ShippingAdminController::createZone();
+        return true;
+    }
+    if ($method === 'PUT' && $ecommerce_match('/admin/shipping-zones/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        ShippingAdminController::updateZone((int) $params['id']);
+        return true;
+    }
+    if ($method === 'DELETE' && $ecommerce_match('/admin/shipping-zones/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        ShippingAdminController::deleteZone((int) $params['id']);
+        return true;
+    }
+    if ($method === 'GET' && $ecommerce_match('/admin/shipping-zones/:id/methods', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        ShippingAdminController::listMethods((int) $params['id']);
+        return true;
+    }
+    if ($method === 'POST' && $ecommerce_match('/admin/shipping-zones/:id/methods', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        ShippingAdminController::createMethod((int) $params['id']);
+        return true;
+    }
+    if ($method === 'PUT' && $ecommerce_match('/admin/shipping-methods/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        ShippingAdminController::updateMethod((int) $params['id']);
+        return true;
+    }
+    if ($method === 'DELETE' && $ecommerce_match('/admin/shipping-methods/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        ShippingAdminController::deleteMethod((int) $params['id']);
+        return true;
+    }
+
+    // ── Admin Tax Rates ──
+    if ($method === 'GET' && $path === '/admin/tax-rates') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        TaxAdminController::listAdmin();
+        return true;
+    }
+    if ($method === 'POST' && $path === '/admin/tax-rates') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        TaxAdminController::create();
+        return true;
+    }
+    if ($method === 'PUT' && $ecommerce_match('/admin/tax-rates/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        TaxAdminController::update((int) $params['id']);
+        return true;
+    }
+    if ($method === 'DELETE' && $ecommerce_match('/admin/tax-rates/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        TaxAdminController::delete((int) $params['id']);
+        return true;
+    }
+
+    // ── Admin Coupons ──
+    if ($method === 'GET' && $path === '/admin/coupons') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        CouponsAdminController::listAll();
+        return true;
+    }
+    if ($method === 'POST' && $path === '/admin/coupons') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        CouponsAdminController::create();
+        return true;
+    }
+    if ($method === 'PUT' && $ecommerce_match('/admin/coupons/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        CouponsAdminController::update((int) $params['id']);
+        return true;
+    }
+    if ($method === 'DELETE' && $ecommerce_match('/admin/coupons/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        CouponsAdminController::delete((int) $params['id']);
+        return true;
+    }
+
+    // ── Admin Orders ──
+    if ($method === 'GET' && $path === '/admin/orders') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        OrderAdminController::listAll();
+        return true;
+    }
+    if ($method === 'GET' && $path === '/admin/orders/stats') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        OrderAdminController::stats();
+        return true;
+    }
+    if ($method === 'GET' && $ecommerce_match('/admin/orders/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        OrderAdminController::getById((int) $params['id']);
+        return true;
+    }
+    if ($method === 'PUT' && $ecommerce_match('/admin/orders/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        OrderAdminController::update((int) $params['id']);
+        return true;
+    }
+    if ($method === 'POST' && $ecommerce_match('/admin/orders/:id/refund', $path, $params)) {
+        $u = authenticate_token(); require_admin($u);
+        require_ecommerce_enabled();
+        OrderAdminController::refund((int) $params['id']);
+        return true;
+    }
+
+    // ── Admin Customers ──
+    if ($method === 'GET' && $path === '/admin/customers') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        CustomerAdminController::listAll();
+        return true;
+    }
+    if ($method === 'GET' && $path === '/admin/customers/stats') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        CustomerAdminController::stats();
+        return true;
+    }
+    if ($method === 'GET' && $ecommerce_match('/admin/customers/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        CustomerAdminController::getById((int) $params['id']);
+        return true;
+    }
+    if ($method === 'PUT' && $ecommerce_match('/admin/customers/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        CustomerAdminController::update((int) $params['id']);
+        return true;
+    }
+
     if ($method === 'POST' && $path === '/admin/product-categories') {
         $u = authenticate_token(); require_min_role($u, 'editor');
         require_ecommerce_enabled();

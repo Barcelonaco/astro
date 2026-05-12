@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Clients</title>
+  <link rel="stylesheet" href="/admin/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="/plugin-assets/ecommerce/admin-css/ecommerce.css">
+  <link rel="stylesheet" href="/plugin-assets/ecommerce/admin-css/customers.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1>Clients</h1>
+      <p class="page-subtitle">Gestion des comptes clients, statut pro et remises.</p>
+    </div>
+    <div id="customers-stats" class="stats-bar"></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card filters-card" id="customers-filters">
+    <div class="filters-row">
+      <input type="text" class="form-input" id="filter-q" placeholder="Recherche (email, nom, entreprise, SIRET...)" style="max-width:300px">
+      <select class="form-select" id="filter-pro-status" style="max-width:180px">
+        <option value="">Tous les statuts</option>
+        <option value="none">Particulier</option>
+        <option value="pending">Pro en attente</option>
+        <option value="approved">Pro approuve</option>
+        <option value="rejected">Pro refuse</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="customers-loading" class="card" style="text-align:center;color:var(--gray-500)">Chargement...</div>
+
+  <div class="card" id="customers-table-card" style="display:none">
+    <table class="customers-table">
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Email</th>
+          <th>Entreprise</th>
+          <th>Statut pro</th>
+          <th>Remise</th>
+          <th>Commandes</th>
+          <th>CA Payé</th>
+          <th>Inscription</th>
+          <th style="text-align:right">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="customers-tbody"></tbody>
+    </table>
+    <div class="pagination" id="customers-pagination"></div>
+  </div>
+
+  <div id="customers-empty" class="card empty" style="display:none">
+    <p>Aucun client trouve.</p>
+  </div>
+</div>
+
+<template id="customer-row-tpl">
+  <tr>
+    <td class="cell-name"></td>
+    <td class="cell-email"></td>
+    <td class="cell-company"></td>
+    <td class="cell-pro-status"></td>
+    <td class="cell-discount"></td>
+    <td class="cell-orders"></td>
+    <td class="cell-revenue"></td>
+    <td class="cell-date"></td>
+    <td>
+      <div class="row-actions">
+        <button class="icon-btn" data-view title="Voir la fiche">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </td>
+  </tr>
+</template>
+
+<script type="module" src="./customers/main.js"></script>
+</body>
+</html>

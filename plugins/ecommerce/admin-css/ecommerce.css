@@ -1,0 +1,270 @@
+/* E-commerce — admin pages
+   Réutilise les classes natives de /admin/style.css (.card, .btn, .form-input, .form-row,
+   .form-group, .form-label, .page-header). Ce fichier ajoute uniquement ce qui n'existe
+   pas déjà côté core (titre de carte, badge, secret-row, pill-toggle, etc.).
+*/
+
+body {
+  background: white;
+  color: var(--gray-900);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  margin: 0;
+}
+
+/* Plugin admin pages : pas de padding du container, le contenu remplit la zone admin SPA. */
+.content {
+  padding: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+}
+
+.page-subtitle {
+  margin: 4px 0 0;
+  color: var(--gray-500);
+  font-size: 14px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0 0 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.card-hint {
+  color: var(--gray-500);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.form-hint {
+  display: block;
+  color: var(--gray-500);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Code inline (style cohérent avec l'admin) */
+.card code {
+  font-family: SFMono-Regular, ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  background: var(--gray-100);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--gray-700);
+}
+
+/* Checkbox-row utilisée pour l'activation */
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--gray-700);
+  cursor: pointer;
+}
+.check-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+/* Badge "définie / non définie" pour les secrets */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+.badge.set { background: #d4edda; color: #155724; }
+.badge.unset { background: var(--gray-100); color: var(--gray-500); }
+
+/* Champ secret + bouton Voir/Masquer côte à côte */
+.secret-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.secret-row .form-input {
+  flex: 1;
+}
+.secret-row .btn {
+  flex-shrink: 0;
+}
+
+/* Toggle "pilule" pour les moyens de paiement actifs */
+.pill-toggle-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pill-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-700);
+  background: white;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.pill-toggle:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.pill-toggle input { display: none; }
+.pill-toggle:has(input:checked) {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+/* Grille test/live côte à côte */
+.env-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+@media (max-width: 900px) { .env-grid { grid-template-columns: 1fr; } }
+
+.env-block {
+  padding: 16px 18px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--gray-50);
+}
+.env-block.env-live { border-color: #fca5a5; background: #fef2f2; }
+.env-block.env-test { border-color: #fcd34d; background: #fffbeb; }
+
+.env-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--gray-200);
+}
+.env-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.env-tag.tag-test { background: #f59e0b; color: white; }
+.env-tag.tag-live { background: #dc2626; color: white; }
+.env-title { font-weight: 600; color: var(--gray-700); font-size: 14px; }
+
+/* Inputs internes : fond blanc pour rester lisibles sur le fond coloré du bloc */
+.env-block .form-input { background: white; }
+
+/* Encadré informatif (events Stripe à activer) */
+.info-box {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #3730a3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.info-box strong {
+  margin-right: 4px;
+  color: #1e1b4b;
+}
+.info-box code {
+  background: white;
+  border: 1px solid #c7d2fe;
+}
+
+/* Barre d'actions en bas du formulaire */
+.form-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+  position: sticky;
+  bottom: 0;
+  background: var(--gray-50);
+  padding: 16px 0;
+  z-index: 10;
+}
+
+/* Status d'enregistrement */
+.status {
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+.status.pending { color: var(--gray-500); }
+.status.ok { background: #d4edda; color: #155724; }
+.status.err { background: #fecaca; color: #991b1b; }
+
+@media (max-width: 700px) {
+  .form-row { grid-template-columns: 1fr !important; }
+  .secret-row { flex-direction: column; }
+  .secret-row .btn { width: 100%; }
+}
+
+/* SweetAlert2 — version compacte cohérente avec l'admin. */
+.swal2-popup.ecommerce-swal {
+  padding: 24px !important;
+  border-radius: 12px;
+}
+.swal2-popup.ecommerce-swal:not(.swal2-toast) .swal2-icon {
+  margin: 0 auto 12px !important;
+  width: 56px;
+  height: 56px;
+  border-width: 3px;
+  font-size: 14px;
+}
+.swal2-popup.ecommerce-swal .swal2-title {
+  padding: 0 !important;
+  margin: 0 0 8px !important;
+  font-size: 18px;
+  font-weight: 600;
+}
+.swal2-popup.ecommerce-swal .swal2-html-container {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 14px;
+  color: var(--gray-600);
+}
+.swal2-popup.ecommerce-swal .swal2-actions {
+  margin: 20px 0 0 !important;
+  gap: 8px;
+}
+.swal2-popup.ecommerce-swal .swal2-actions button {
+  padding: 8px 18px !important;
+  font-size: 14px !important;
+  border-radius: 6px !important;
+  margin: 0 !important;
+}
+
+/* Toasts : compact + ombre douce. */
+.swal2-toast.ecommerce-swal,
+.swal2-toast {
+  padding: 12px 16px !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important;
+}
+.swal2-toast .swal2-title {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}

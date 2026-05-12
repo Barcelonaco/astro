@@ -1,0 +1,211 @@
+---
+/**
+ * /compte/paiement — SEPA mandate management.
+ * Pro customers can set up SEPA Direct Debit here.
+ */
+import BaseHead from '@frontend/components/BaseHead.astro'
+import Header from '@frontend/components/Header.astro'
+import Footer from '@frontend/components/Footer.astro'
+import SiteOverlays from '@frontend/components/SiteOverlays.astro'
+import DeferredLoader from '@frontend/components/DeferredLoader.astro'
+import AccountNav from '@plugins/ecommerce/frontend/components/AccountNav.astro'
+import { SITE_TITLE } from '@frontend/consts'
+import { getFrontendBootstrap } from '@frontend/lib/api'
+import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+import '@plugins/ecommerce/frontend/styles/account.css'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`Paiement — ${siteName}`} description="Gerez vos moyens de paiement" styleSettings={styleSettings} siteSettings={siteSettings} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page account-wrap">
+      <div class="account-container">
+        <div class="account-layout">
+          <AccountNav active="dashboard" />
+          <div class="account-content">
+            <h1 class="account-section-title">Paiement</h1>
+
+            <div id="sepa-loading" class="account-loading">Chargement...</div>
+            <div id="sepa-content" style="display:none">
+              <div id="sepa-not-pro" style="display:none" class="account-empty">
+                <p>Le prelevement SEPA est reserve aux comptes professionnels approuves.</p>
+                <a href="/inscription-pro" class="account-btn" style="margin-top:12px">Creer un compte pro</a>
+              </div>
+
+              <div id="sepa-no-orders" style="display:none" class="account-empty">
+                <p>Le prelevement SEPA est disponible a partir de votre 2e commande. Votre premiere commande doit etre reglee par carte bancaire.</p>
+              </div>
+
+              <div id="sepa-mandates" style="display:none">
+                <h2 style="font-size:16px;font-weight:600;margin:0 0 16px">Vos mandats SEPA</h2>
+                <div id="mandates-list"></div>
+                <button class="account-btn" id="setup-sepa-btn" style="margin-top:16px">Ajouter un mandat SEPA</button>
+              </div>
+
+              <div id="sepa-setup" style="display:none">
+                <h2 style="font-size:16px;font-weight:600;margin:0 0 16px">Configurer un prelevement SEPA</h2>
+                <p style="font-size:13px;color:var(--color-text-muted,#6b6b67);margin-bottom:16px">
+                  En autorisant ce mandat, vous autorisez notre societe a envoyer des instructions a votre banque pour debiter votre compte.
+                </p>
+                <div id="sepa-iban-element" style="padding:12px;border:1px solid rgba(0,0,0,0.18);border-radius:8px;background:#f5f5f3;min-height:44px"></div>
+                <div id="sepa-error" style="color:#b91c1c;font-size:13px;margin-top:8px;display:none"></div>
+                <div style="margin-top:16px;display:flex;gap:10px">
+                  <button class="account-btn" id="confirm-sepa-btn" disabled>Confirmer le mandat</button>
+                  <button class="account-btn-outline" id="cancel-sepa-btn">Annuler</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+
+    <script>
+      import { getMe, getSEPAMandates, createSEPASetupIntent, isLoggedIn, formatDate } from '@plugins/ecommerce/frontend/lib/customer-api'
+      import { getPaymentConfig, loadStripe } from '@plugins/ecommerce/frontend/lib/stripe-api'
+
+      if (!isLoggedIn()) window.location.href = '/compte/connexion?redirect=/compte/paiement'
+
+      const MANDATE_STATUS_LABELS: Record<string, string> = {
+        pending_validation: 'En attente de validation',
+        active: 'Actif',
+        revoked: 'Revoque',
+        failed: 'Echoue',
+      }
+
+      async function init() {
+        try {
+          const customer = await getMe()
+
+          document.getElementById('sepa-loading')!.style.display = 'none'
+          document.getElementById('sepa-content')!.style.display = ''
+
+          // Gate: pro approved only
+          if (!customer.is_pro || customer.pro_status !== 'approved') {
+            document.getElementById('sepa-not-pro')!.style.display = ''
+            return
+          }
+
+          // Load mandates
+          const { mandates } = await getSEPAMandates().catch(() => ({ mandates: [] }))
+
+          document.getElementById('sepa-mandates')!.style.display = ''
+          renderMandates(mandates)
+
+          // Setup SEPA button
+          document.getElementById('setup-sepa-btn')!.addEventListener('click', startSetup)
+
+        } catch (err: any) {
+          if (err?.status === 401) { window.location.href = '/compte/connexion'; return }
+          document.getElementById('sepa-loading')!.textContent = 'Erreur de chargement.'
+        }
+      }
+
+      function renderMandates(mandates: any[]) {
+        const list = document.getElementById('mandates-list')!
+        if (mandates.length === 0) {
+          list.innerHTML = '<p class="account-empty">Aucun mandat SEPA configure.</p>'
+          return
+        }
+        list.innerHTML = mandates.map(m => `
+          <div class="account-card" style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+              <div>
+                <span style="font-family:monospace;font-weight:600">**** ${m.iban_last4 || '????'}</span>
+                ${m.bank_name ? `<span style="color:var(--color-text-muted,#6b6b67);font-size:12px;margin-left:8px">${m.bank_name}</span>` : ''}
+              </div>
+              <span class="badge badge-${m.status}">${MANDATE_STATUS_LABELS[m.status] || m.status}</span>
+            </div>
+            <div style="font-size:12px;color:var(--color-text-muted,#6b6b67);margin-top:6px">
+              Cree le ${formatDate(m.created_at)}
+              ${m.mandate_reference ? ` — Ref: ${m.mandate_reference}` : ''}
+            </div>
+          </div>
+        `).join('')
+      }
+
+      async function startSetup() {
+        document.getElementById('sepa-mandates')!.style.display = 'none'
+        document.getElementById('sepa-setup')!.style.display = ''
+
+        try {
+          const [cfg, intent] = await Promise.all([
+            getPaymentConfig(),
+            createSEPASetupIntent(),
+          ])
+
+          if (!cfg.stripe.pk) {
+            document.getElementById('sepa-error')!.textContent = 'Stripe non configure.'
+            document.getElementById('sepa-error')!.style.display = ''
+            return
+          }
+
+          const stripe = await loadStripe(cfg.stripe.pk)
+          const elements = stripe.elements({ clientSecret: intent.client_secret })
+          const ibanElement = elements.create('payment', { layout: 'tabs' })
+          ibanElement.mount('#sepa-iban-element')
+
+          const confirmBtn = document.getElementById('confirm-sepa-btn') as HTMLButtonElement
+          ibanElement.on('ready', () => { confirmBtn.disabled = false })
+
+          confirmBtn.addEventListener('click', async () => {
+            confirmBtn.disabled = true
+            confirmBtn.textContent = 'Confirmation en cours...'
+            const errEl = document.getElementById('sepa-error')!
+
+            const { error } = await stripe.confirmSetup({
+              elements,
+              confirmParams: {
+                return_url: window.location.href,
+              },
+              redirect: 'if_required',
+            })
+
+            if (error) {
+              errEl.textContent = error.message || 'Erreur de confirmation'
+              errEl.style.display = ''
+              confirmBtn.disabled = false
+              confirmBtn.textContent = 'Confirmer le mandat'
+            } else {
+              // Success — reload mandates
+              document.getElementById('sepa-setup')!.style.display = 'none'
+              document.getElementById('sepa-mandates')!.style.display = ''
+              const { mandates } = await getSEPAMandates()
+              renderMandates(mandates)
+            }
+          })
+
+          document.getElementById('cancel-sepa-btn')!.addEventListener('click', () => {
+            document.getElementById('sepa-setup')!.style.display = 'none'
+            document.getElementById('sepa-mandates')!.style.display = ''
+          })
+
+        } catch (err: any) {
+          const errEl = document.getElementById('sepa-error')!
+          errEl.textContent = err?.message || 'Erreur lors de la configuration SEPA'
+          errEl.style.display = ''
+        }
+      }
+
+      init()
+    </script>
+  </body>
+</html>

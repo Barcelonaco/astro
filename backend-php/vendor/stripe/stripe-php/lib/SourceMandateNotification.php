@@ -6,7 +6,7 @@ namespace Stripe;
 
 /**
  * Source mandate notifications should be created when a notification related to
- * a source mandate must be sent to the payer. They will trigger a webhook or
+ * a source mandate must be sent to the Payer. They will trigger a webhook or
  * deliver an email to the customer.
  *
  * @property string $id Unique identifier for the object.

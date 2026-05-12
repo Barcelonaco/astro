@@ -10,7 +10,7 @@
  *
  * Création :
  *   - Snapshot complet du panier (items + custom_items) → order_items
- *   - Adresses billing + shipping → order_addresses
+ *   - Adresses billing + shipping → orders.billing_address + orders.shipping_address (JSON)
  *   - Calcule subtotal / shipping / tax / total
  *   - Vide le panier source (cart_items + cart_items_custom)
  *   - Status = 'awaiting_payment', payment_status = 'unpaid'
@@ -49,7 +49,19 @@ class OrderController {
             error_response('Le paiement différé n\'est disponible qu\'à partir de la 2e commande.', 403);
         }
 
-        $totals = CartController::computeTotals((int) $cart['id']);
+        // Resolve tax context based on billing country + customer pro status
+        $isPro = false;
+        $vatNumber = null;
+        if ($customerId) {
+            $customerData = CustomerModel::findById($customerId);
+            if ($customerData) {
+                $isPro = !empty($customerData['is_pro']) && ($customerData['pro_status'] ?? '') === 'approved';
+                $vatNumber = $customerData['vat_number'] ?? null;
+            }
+        }
+        $taxContext = TaxResolver::resolve($billing['country_code'] ?? 'FR', $isPro, $vatNumber);
+
+        $totals = CartController::computeTotals((int) $cart['id'], $taxContext);
         $shippingPrice = $shippingMethod ? self::resolveShippingPrice($shippingMethod, $totals['subtotal_cents'], $items, $custom) : 0;
 
         $db = Database::getInstance();
@@ -63,6 +75,12 @@ class OrderController {
                 VALUES (?, ?, ?, "awaiting_payment", "unpaid", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)');
             $guestToken = $customerId ? null : bin2hex(random_bytes(24));
             $totalCents = $totals['subtotal_cents'] + $shippingPrice + $totals['tax_cents'];
+            // Include tax mention in breakdown for invoicing
+            $taxBreakdownFull = $totals['tax_breakdown'];
+            if (!empty($taxContext['mention'])) {
+                $taxBreakdownFull['_mention'] = $taxContext['mention'];
+                $taxBreakdownFull['_reason'] = $taxContext['reason'];
+            }
             $stmt->execute([
                 $orderNumber,
                 $customerId,
@@ -74,7 +92,7 @@ class OrderController {
                 $shippingPrice,
                 $totals['tax_cents'],
                 $totalCents,
-                json_encode($totals['tax_breakdown'], JSON_UNESCAPED_UNICODE),
+                json_encode($taxBreakdownFull, JSON_UNESCAPED_UNICODE),
                 $cart['coupon_code'] ?? null,
                 $shippingMethodId ?: null,
                 $shippingMethod['name'] ?? null,
@@ -84,13 +102,20 @@ class OrderController {
             ]);
             $orderId = (int) $db->lastInsertId();
 
-            self::insertOrderAddress($db, $orderId, 'billing', $billing);
-            self::insertOrderAddress($db, $orderId, 'shipping', $shipping);
+            $db->prepare('UPDATE orders SET billing_address = ?, shipping_address = ? WHERE id = ?')->execute([
+                json_encode($billing, JSON_UNESCAPED_UNICODE),
+                json_encode($shipping, JSON_UNESCAPED_UNICODE),
+                $orderId,
+            ]);
 
+            // Regular shop items : prix TTC, on extrait la TVA contenue (même logique que custom items).
             foreach ($items as $line) {
                 $rate = self::taxRate($line['tax_code'] ?? 'FR_STANDARD');
-                $lineSubtotal = (int) $line['line_total_cents'];
-                $lineTax = (int) round($lineSubtotal * $rate / 100);
+                $lineTtc = (int) $line['line_total_cents'];
+                $lineHt = (int) round($lineTtc / (1 + $rate / 100));
+                $lineTax = $lineTtc - $lineHt;
+                $unitTtc = (int) $line['unit_price_cents'];
+                $unitHt = (int) round($unitTtc / (1 + $rate / 100));
                 $stmt = $db->prepare('INSERT INTO order_items
                     (order_id, product_id, variant_id, sku, product_title, variant_attributes, quantity,
                      unit_price_cents, tax_rate, line_subtotal_cents, line_tax_cents, line_total_cents,
@@ -104,11 +129,11 @@ class OrderController {
                     $line['product_title'],
                     json_encode($line['attributes'] ?? [], JSON_UNESCAPED_UNICODE),
                     $line['quantity'],
-                    $line['unit_price_cents'],
+                    $unitHt,
                     $rate,
-                    $lineSubtotal,
+                    $lineHt,
                     $lineTax,
-                    $lineSubtotal + $lineTax,
+                    $lineTtc,
                     $line['is_digital'] ? 1 : 0,
                     $line['requires_shipping'] ? 1 : 0,
                 ]);
@@ -140,12 +165,12 @@ class OrderController {
                 ]);
             }
 
-            $stmt = $db->prepare('INSERT INTO order_events (order_id, type, payload, actor_type) VALUES (?, "created", ?, "customer")');
+            $stmt = $db->prepare('INSERT INTO audit_log (entity_type, entity_id, event_type, payload, actor_type) VALUES ("order", ?, "created", ?, "customer")');
             $stmt->execute([$orderId, json_encode(['ip' => $_SERVER['REMOTE_ADDR'] ?? null], JSON_UNESCAPED_UNICODE)]);
 
             // Vide le panier
             $db->prepare('DELETE FROM cart_items WHERE cart_id = ?')->execute([$cart['id']]);
-            try { $db->prepare('DELETE FROM cart_items_custom WHERE cart_id = ?')->execute([$cart['id']]); } catch (\Throwable $e) {}
+            $db->prepare('DELETE FROM cart_items_custom WHERE cart_id = ?')->execute([$cart['id']]);
 
             $db->commit();
         } catch (\Throwable $e) {
@@ -182,7 +207,54 @@ class OrderController {
         json_response(['orders' => $stmt->fetchAll()]);
     }
 
+    /**
+     * GET /orders/track?number=CMD-xxx&email=xxx
+     * Public — lookup by order_number + email (no auth needed).
+     * Rate limited to prevent enumeration.
+     */
+    public static function track(): void {
+        // Rate limit par IP : 5 tentatives / 5min
+        check_rate_limit('order_track', 5, 300);
+
+        $number = trim((string) ($_GET['number'] ?? ''));
+        $email = trim(strtolower((string) ($_GET['email'] ?? '')));
+
+        if ($number === '' || $email === '') {
+            error_response('Numero de commande et email requis', 400);
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            error_response('Email invalide', 400);
+        }
+
+        // Rate limit par email : 5 tentatives / 15min (anti brute-force cible)
+        check_rate_limit('order_track_' . md5($email), 5, 900);
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT id, guest_token FROM orders WHERE order_number = ? AND LOWER(email) = ?');
+        $stmt->execute([$number, $email]);
+        $row = $stmt->fetch();
+
+        if (!$row) {
+            // Delay constant pour eviter le timing attack (reponse toujours ~500ms)
+            usleep(random_int(400000, 600000));
+            error_response('Aucune commande trouvee avec ces informations', 404);
+        }
+
+        $order = self::loadFull((int) $row['id']);
+        if (!$order) error_response('Commande introuvable', 404);
+
+        // Strip guest_token from response (no need to expose it)
+        unset($order['guest_token']);
+
+        json_response($order);
+    }
+
     // ── Internal ───────────────────────────────────────────────────────────
+
+    /** Accessible en interne (ex: OrderMailer). */
+    public static function loadFullStatic(int $id): ?array {
+        return self::loadFull($id);
+    }
 
     private static function loadFull(int $id): ?array {
         $db = Database::getInstance();
@@ -199,15 +271,10 @@ class OrderController {
         }
         unset($it);
 
-        $stmt = $db->prepare('SELECT * FROM order_addresses WHERE order_id = ?');
-        $stmt->execute([$id]);
-        $addresses = [];
-        foreach ($stmt->fetchAll() as $a) $addresses[$a['type']] = $a;
-
         $order['items'] = $items;
-        $order['billing_address'] = $addresses['billing'] ?? null;
-        $order['shipping_address'] = $addresses['shipping'] ?? null;
-        $order['tax_breakdown'] = $order['tax_breakdown'] ? (is_string($order['tax_breakdown']) ? json_decode($order['tax_breakdown'], true) : $order['tax_breakdown']) : [];
+        $order['billing_address']  = $order['billing_address']  ? (is_string($order['billing_address'])  ? json_decode($order['billing_address'],  true) : $order['billing_address'])  : null;
+        $order['shipping_address'] = $order['shipping_address'] ? (is_string($order['shipping_address']) ? json_decode($order['shipping_address'], true) : $order['shipping_address']) : null;
+        $order['tax_breakdown']    = $order['tax_breakdown']    ? (is_string($order['tax_breakdown'])    ? json_decode($order['tax_breakdown'],    true) : $order['tax_breakdown'])    : [];
         return $order;
     }
 
@@ -282,18 +349,6 @@ class OrderController {
         ];
     }
 
-    private static function insertOrderAddress(PDO $db, int $orderId, string $type, array $a): void {
-        $stmt = $db->prepare('INSERT INTO order_addresses
-            (order_id, type, first_name, last_name, company, address_line1, address_line2, postcode, city, region, country_code, phone, email, vat_number)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-        $stmt->execute([
-            $orderId, $type,
-            $a['first_name'], $a['last_name'], $a['company'],
-            $a['address_line1'], $a['address_line2'], $a['postcode'], $a['city'], $a['region'], $a['country_code'],
-            $a['phone'], $a['email'], $a['vat_number'],
-        ]);
-    }
-
     private static function loadShippingMethod(int $id): ?array {
         if ($id <= 0) return null;
         $db = Database::getInstance();
@@ -339,7 +394,8 @@ class OrderController {
     }
 
     private static function generateOrderNumber(): string {
-        return sprintf('CMD-%s-%s', date('ymd'), strtoupper(substr(bin2hex(random_bytes(3)), 0, 6)));
+        // 5 random bytes = 10 hex chars ≈ 1.1 trillion combinations per day
+        return sprintf('CMD-%s-%s', date('ymd'), strtoupper(bin2hex(random_bytes(5))));
     }
 
     private static function taxRate(string $code): float {

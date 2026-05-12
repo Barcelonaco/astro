@@ -29,7 +29,9 @@ class CartController {
             json_response(self::emptyCart());
             return;
         }
-        json_response(self::serialize($cart));
+        // Optional tax context from query params (used during checkout when billing address is known)
+        $taxContext = self::resolveTaxContextFromRequest();
+        json_response(self::serialize($cart, $taxContext));
     }
 
     public static function addItem(): void {
@@ -111,12 +113,8 @@ class CartController {
     public static function removeCustomItem(int $itemId): void {
         $cart = self::requireCart();
         $db = Database::getInstance();
-        try {
-            $stmt = $db->prepare('DELETE FROM cart_items_custom WHERE id = ? AND cart_id = ?');
-            $stmt->execute([$itemId, $cart['id']]);
-        } catch (\Throwable $e) {
-            error_response('Items custom non disponibles', 501);
-        }
+        $stmt = $db->prepare('DELETE FROM cart_items_custom WHERE id = ? AND cart_id = ?');
+        $stmt->execute([$itemId, $cart['id']]);
         self::touchCart($cart['id']);
         json_response(self::serialize(self::loadCart($cart['id'])));
     }
@@ -125,9 +123,7 @@ class CartController {
         $cart = self::requireCart();
         $db = Database::getInstance();
         $db->prepare('DELETE FROM cart_items WHERE cart_id = ?')->execute([$cart['id']]);
-        try {
-            $db->prepare('DELETE FROM cart_items_custom WHERE cart_id = ?')->execute([$cart['id']]);
-        } catch (\Throwable $e) { /* table absente */ }
+        $db->prepare('DELETE FROM cart_items_custom WHERE cart_id = ?')->execute([$cart['id']]);
         self::touchCart($cart['id']);
         json_response(self::serialize(self::loadCart($cart['id'])));
     }
@@ -211,13 +207,9 @@ class CartController {
 
     public static function getCustomItems(int $cartId): array {
         $db = Database::getInstance();
-        try {
-            $stmt = $db->prepare('SELECT * FROM cart_items_custom WHERE cart_id = ? ORDER BY created_at ASC');
-            $stmt->execute([$cartId]);
-            $rows = $stmt->fetchAll();
-        } catch (\Throwable $e) {
-            return [];
-        }
+        $stmt = $db->prepare('SELECT * FROM cart_items_custom WHERE cart_id = ? ORDER BY created_at ASC');
+        $stmt->execute([$cartId]);
+        $rows = $stmt->fetchAll();
         $items = [];
         foreach ($rows as $r) {
             $items[] = [
@@ -239,45 +231,46 @@ class CartController {
         return $items;
     }
 
-    public static function computeTotals(int $cartId): array {
+    /**
+     * Calcule les totaux du panier.
+     *
+     * @param int        $cartId
+     * @param array|null $taxContext  Resultat de TaxResolver::resolve() — si null, TVA FR standard.
+     */
+    public static function computeTotals(int $cartId, ?array $taxContext = null): array {
         $items = self::getItems($cartId);
         $custom = self::getCustomItems($cartId);
 
-        $subtotal = 0;
+        $subtotalTtc = 0;
         $taxBreakdown = [];
+        $taxMention = $taxContext['mention'] ?? '';
+
+        // Tous les prix (produits shop ET custom POOLP) sont stockés TTC.
         foreach (array_merge($items, $custom) as $line) {
-            $subtotal += $line['line_total_cents'];
-            $rate = self::taxRate($line['tax_code'] ?? 'FR_STANDARD');
-            $key = (string) $rate;
-            // Pour POOLP les prix sont déjà TTC. Détection : custom items sont TTC,
-            // physical items SKU shop sont HT et la TVA s'ajoute. Décision projet :
-            // toujours TTC affiché. On considère prix HT pour produits SKU et on
-            // calcule la TVA. Pour custom (POOLP), prix saisi = TTC, TVA implicite.
-            if ($line['kind'] === 'custom') {
-                // déjà TTC : on extrait la TVA contenue
-                $tax = (int) round($line['line_total_cents'] - $line['line_total_cents'] / (1 + $rate / 100));
+            $subtotalTtc += $line['line_total_cents'];
+            $nominalRate = self::taxRate($line['tax_code'] ?? 'FR_STANDARD');
+            $key = (string) $nominalRate;
+
+            if ($taxContext && $taxContext['exempt']) {
+                // Client exonere (pro UE/export/franchise) → 0% TVA
+                $tax = 0;
             } else {
-                $tax = (int) round($line['line_total_cents'] * $rate / 100);
+                // TVA normale : extraire du TTC
+                $tax = (int) round($line['line_total_cents'] - $line['line_total_cents'] / (1 + $nominalRate / 100));
             }
             $taxBreakdown[$key] = ($taxBreakdown[$key] ?? 0) + $tax;
         }
 
         $taxTotal = array_sum($taxBreakdown);
-
-        // Subtotal exposé en HT pour produits SKU + TTC pour custom : on harmonise
-        // sur le subtotal HT (subtotal - TVA contenue dans le custom) pour faciliter
-        // l'affichage TTC = subtotal_ht + tax_total.
-        $subtotalHt = $subtotal;
-        foreach ($custom as $line) {
-            $rate = self::taxRate($line['tax_code'] ?? 'FR_STANDARD');
-            $subtotalHt -= (int) round($line['line_total_cents'] - $line['line_total_cents'] / (1 + $rate / 100));
-        }
+        $subtotalHt = $subtotalTtc - $taxTotal;
 
         return [
             'subtotal_cents' => $subtotalHt,
             'tax_cents' => $taxTotal,
             'tax_breakdown' => $taxBreakdown,
-            'total_cents' => $subtotalHt + $taxTotal,
+            'total_cents' => $subtotalTtc,
+            'tax_mention' => $taxMention,
+            'tax_exempt' => !empty($taxContext['exempt']),
             'items_count' => array_sum(array_map(fn($i) => $i['quantity'], $items))
                 + array_sum(array_map(fn($i) => $i['quantity'], $custom)),
         ];
@@ -314,10 +307,40 @@ class CartController {
         return $cache[$code] ?? $cache['FR_STANDARD'];
     }
 
-    public static function serialize(array $cart): array {
+    /**
+     * Resolve tax context from request query params or customer auth.
+     * Used during checkout when billing address is known.
+     * Query params: ?billing_country=XX
+     * Customer pro status resolved from auth token.
+     */
+    private static function resolveTaxContextFromRequest(): ?array {
+        $billingCountry = trim((string) ($_GET['billing_country'] ?? ''));
+        if ($billingCountry === '') return null;
+
+        $isPro = false;
+        $vatNumber = null;
+        $token = get_bearer_token();
+        if ($token) {
+            try {
+                $decoded = \Firebase\JWT\JWT::decode($token, new \Firebase\JWT\Key(customer_jwt_secret(), 'HS256'));
+                $claims = (array) $decoded;
+                if (($claims['type'] ?? '') === 'customer') {
+                    $customer = CustomerModel::findById((int) $claims['id']);
+                    if ($customer) {
+                        $isPro = !empty($customer['is_pro']) && ($customer['pro_status'] ?? '') === 'approved';
+                        $vatNumber = $customer['vat_number'] ?? null;
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        return TaxResolver::resolve($billingCountry, $isPro, $vatNumber);
+    }
+
+    public static function serialize(array $cart, ?array $taxContext = null): array {
         $items = self::getItems((int) $cart['id']);
         $custom = self::getCustomItems((int) $cart['id']);
-        $totals = self::computeTotals((int) $cart['id']);
+        $totals = self::computeTotals((int) $cart['id'], $taxContext);
         return array_merge([
             'id' => (int) $cart['id'],
             'token' => $cart['token'],

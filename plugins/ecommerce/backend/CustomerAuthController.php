@@ -64,6 +64,12 @@ class CustomerAuthController {
         $customer = CustomerModel::findById($id);
         $token = encode_customer_token($customer);
 
+        // Rattache les commandes guest passees avec le meme email
+        self::claimGuestOrders((int) $id, $email);
+
+        // Email de bienvenue
+        self::sendWelcomeEmail($email, $firstName, $isProRequest);
+
         json_response([
             'token' => $token,
             'customer' => $customer,
@@ -95,6 +101,10 @@ class CustomerAuthController {
         }
 
         CustomerModel::touchActivity((int) $customer['id']);
+
+        // Rattache les commandes guest passees avec le meme email (a chaque login)
+        self::claimGuestOrders((int) $customer['id'], $email);
+
         $customer = CustomerModel::findById((int) $customer['id']); // refresh sans password_hash
         $token = encode_customer_token($customer);
 
@@ -313,5 +323,55 @@ class CustomerAuthController {
         if ($code >= 400) {
             error_log("Resend email failed ({$code}) — {$subject} to {$to}");
         }
+    }
+
+    // ── Rattachement commandes guest ───────────────────────────────────────
+
+    /**
+     * Rattache les commandes passees en guest (customer_id = NULL) au compte
+     * client si l'email correspond. Executee au register + login.
+     */
+    private static function claimGuestOrders(int $customerId, string $email): void {
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare('UPDATE orders SET customer_id = ? WHERE customer_id IS NULL AND LOWER(email) = ? AND email != ""');
+            $count = $stmt->execute([$customerId, strtolower($email)]);
+            $affected = $stmt->rowCount();
+            if ($affected > 0) {
+                $db->prepare('INSERT INTO audit_log (entity_type, entity_id, event_type, payload, actor_type) VALUES ("customer", ?, "guest_orders_claimed", ?, "system")')
+                    ->execute([$customerId, json_encode(['email' => $email, 'orders_claimed' => $affected])]);
+            }
+        } catch (\Throwable $e) {
+            error_log('claimGuestOrders failed: ' . $e->getMessage());
+        }
+    }
+
+    private static function sendWelcomeEmail(string $email, string $firstName, bool $isPro): void {
+        $name = htmlspecialchars($firstName ?: 'Bonjour');
+        $frontend = rtrim($_ENV['FRONTEND_URL'] ?? 'http://localhost:4321', '/');
+        $accountUrl = $frontend . '/compte';
+
+        $proNote = $isPro
+            ? "<p style='padding:12px 16px;background:#fff3cd;border-radius:6px;font-size:14px;color:#856404;margin:20px 0'>Votre demande de compte professionnel est en cours de verification. Vous recevrez un email des validation (sous 24h ouvrees).</p>"
+            : '';
+
+        $html = "
+            <div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px'>
+                <h2 style='color:#222;margin:0 0 16px'>Bienvenue {$name} !</h2>
+                <p>Votre compte a ete cree avec succes sur notre boutique.</p>
+                {$proNote}
+                <p>Depuis votre espace client, vous pouvez :</p>
+                <ul style='color:#555;font-size:14px;line-height:1.8'>
+                    <li>Suivre vos commandes</li>
+                    <li>Gerer vos adresses de livraison et facturation</li>
+                    <li>Modifier vos informations personnelles</li>
+                </ul>
+                <p style='margin-top:24px'>
+                    <a href='{$accountUrl}' style='display:inline-block;padding:12px 24px;background:#0f62fe;color:white;text-decoration:none;border-radius:6px;font-weight:600'>Acceder a mon compte</a>
+                </p>
+                <p style='color:#999;font-size:12px;margin-top:40px'>Si vous n'avez pas cree ce compte, vous pouvez ignorer ce message.</p>
+            </div>
+        ";
+        self::sendResendEmail($email, 'Bienvenue — votre compte a ete cree', $html);
     }
 }

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Coupons de réduction</title>
+  <link rel="stylesheet" href="/admin/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="/plugin-assets/ecommerce/admin-css/ecommerce.css">
+  <link rel="stylesheet" href="/plugin-assets/ecommerce/admin-css/coupons.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1>Coupons de réduction</h1>
+      <p class="page-subtitle">Codes promotionnels appliquables au panier (pourcentage, montant fixe, livraison gratuite).</p>
+    </div>
+    <div>
+      <button class="btn btn-primary" id="coupons-add-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        Nouveau coupon
+      </button>
+    </div>
+  </div>
+
+  <div id="coupons-loading" class="card" style="text-align:center;color:var(--gray-500)">Chargement…</div>
+
+  <div class="card" id="coupons-table-card" style="display:none">
+    <table class="coupons-table">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Type</th>
+          <th>Valeur</th>
+          <th>Min. panier</th>
+          <th>Utilisations</th>
+          <th>Validité</th>
+          <th>Statut</th>
+          <th style="text-align:right">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="coupons-tbody"></tbody>
+    </table>
+  </div>
+
+  <div id="coupons-empty" class="card empty" style="display:none">
+    <p>Aucun coupon créé pour le moment.</p>
+  </div>
+</div>
+
+<template id="coupons-row-tpl">
+  <tr>
+    <td><span class="coupon-code cell-code"></span></td>
+    <td><span class="cell-type"></span></td>
+    <td class="cell-value"></td>
+    <td class="cell-min"></td>
+    <td class="cell-usage"></td>
+    <td class="cell-period" style="font-size:12px"></td>
+    <td class="cell-status"></td>
+    <td>
+      <div class="row-actions">
+        <button class="icon-btn" data-edit title="Modifier">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="icon-btn danger" data-delete title="Supprimer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+        </button>
+      </div>
+    </td>
+  </tr>
+</template>
+
+<script type="module" src="./coupons/main.js"></script>
+</body>
+</html>

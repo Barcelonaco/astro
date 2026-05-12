@@ -1,0 +1,43 @@
+---
+/**
+ * AccountNav — sidebar navigation for /compte/* pages.
+ * Matches WooCommerce "My Account" layout.
+ */
+interface Props {
+  active?: 'dashboard' | 'orders' | 'downloads' | 'addresses' | 'payment' | 'profile' | 'logout'
+}
+
+const { active = 'dashboard' } = Astro.props
+
+const links = [
+  { key: 'dashboard', label: 'Tableau de bord', href: '/compte' },
+  { key: 'orders', label: 'Commandes', href: '/compte/commandes' },
+  { key: 'downloads', label: 'Telechargements', href: '/compte/telechargements' },
+  { key: 'addresses', label: 'Adresses', href: '/compte/adresses' },
+  { key: 'payment', label: 'Paiement', href: '/compte/paiement' },
+  { key: 'profile', label: 'Details du compte', href: '/compte/profil' },
+  { key: 'logout', label: 'Se deconnecter', href: '#logout' },
+]
+---
+
+<nav class="account-nav" aria-label="Mon compte">
+  {links.map(link => (
+    <a
+      href={link.href}
+      class:list={['account-nav-link', { active: active === link.key }]}
+      data-action={link.key === 'logout' ? 'logout' : undefined}
+    >
+      {link.label}
+    </a>
+  ))}
+</nav>
+
+<script>
+  document.querySelectorAll('[data-action="logout"]').forEach(el => {
+    el.addEventListener('click', async (e) => {
+      e.preventDefault()
+      try { localStorage.removeItem('customer_token') } catch {}
+      window.location.href = '/compte/connexion'
+    })
+  })
+</script>

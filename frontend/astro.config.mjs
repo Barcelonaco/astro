@@ -13,6 +13,24 @@ const SITE_URL = process.env.BUILD_SITE_URL
 	|| process.env.BUILD_MEDIA_ORIGIN
 	|| 'http://localhost:4321';
 
+// ── Plugin integrations auto-loader ────────────────────────────────────────
+// Charge tous les `plugins/*/frontend/astro-integration.mjs` présents.
+// Permet à un plugin (ex. ecommerce) d'embarquer ses pages/components/lib
+// dans son propre dossier — aucun code plugin-specific dans frontend/src/.
+async function loadPluginIntegrations() {
+	const pluginsDir = path.resolve(__dirname, '../plugins');
+	const out = [];
+	if (!fs.existsSync(pluginsDir)) return out;
+	for (const name of fs.readdirSync(pluginsDir)) {
+		const integ = path.join(pluginsDir, name, 'frontend/astro-integration.mjs');
+		if (!fs.existsSync(integ)) continue;
+		const mod = await import(`file://${integ}`);
+		if (typeof mod.default === 'function') out.push(mod.default());
+	}
+	return out;
+}
+const pluginIntegrations = await loadPluginIntegrations();
+
 function robotsTxtIntegration() {
 	return {
 		name: 'robots-txt',
@@ -43,7 +61,7 @@ function robotsTxtIntegration() {
 export default defineConfig({
 	site: SITE_URL,
 	output: 'static',
-	integrations: [mdx(), sitemap(), robotsTxtIntegration()],
+	integrations: [mdx(), sitemap(), robotsTxtIntegration(), ...pluginIntegrations],
 	scopedStyleStrategy: 'where',
 	redirects: {
 		// Le CPT produits s'appelle "products" côté backend (DB + admin).

@@ -1,0 +1,343 @@
+---
+import type { ProductCategoryNode, ProductFacets } from '@plugins/ecommerce/frontend/lib/shop-api';
+
+interface Props {
+  categories: ProductCategoryNode[];
+  facets: ProductFacets;
+  activeCategory?: string | null;
+  activeFilters?: Record<string, string>;
+  activePrice?: { min?: number; max?: number };
+  activeInStock?: boolean;
+  activeOnSale?: boolean;
+  baseUrl?: string; // /boutique ou /boutique/categorie/xxx
+}
+
+const {
+  categories,
+  facets,
+  activeCategory = null,
+  activeFilters = {},
+  activePrice = {},
+  activeInStock = false,
+  activeOnSale = false,
+  baseUrl = '/boutique',
+} = Astro.props;
+
+const minPriceEuros = facets.price.min / 100;
+const maxPriceEuros = facets.price.max / 100;
+---
+<aside class="shop-filter-sidebar" data-base-url={baseUrl}>
+  <form method="get" class="shop-filter-form" id="shopFilterForm">
+    <!-- Recherche -->
+    <div class="shop-filter-block">
+      <label for="search" class="shop-filter-label">Recherche</label>
+      <input type="search" id="search" name="search" class="shop-filter-input" placeholder="Nom, description, SKU" />
+    </div>
+
+    <!-- Catégories hiérarchiques -->
+    {categories.length > 0 && (
+      <div class="shop-filter-block">
+        <h4 class="shop-filter-label">Catégories</h4>
+        <ul class="shop-category-tree">
+          <li>
+            <a href="/boutique" class={!activeCategory ? 'active' : ''}>Toutes</a>
+          </li>
+          {categories.map((cat) => (
+            <li>
+              <a href={`/boutique/categorie/${cat.path}`} class={activeCategory === cat.slug ? 'active' : ''}>
+                {cat.name}
+                {cat.product_count !== undefined && <span class="count">({cat.product_count})</span>}
+              </a>
+              {cat.children && cat.children.length > 0 && (
+                <ul>
+                  {cat.children.map((child) => (
+                    <li>
+                      <a href={`/boutique/categorie/${child.path}`} class={activeCategory === child.slug ? 'active' : ''}>
+                        {child.name}
+                        {child.product_count !== undefined && <span class="count">({child.product_count})</span>}
+                      </a>
+                      {child.children && child.children.length > 0 && (
+                        <ul>
+                          {child.children.map((gchild) => (
+                            <li>
+                              <a href={`/boutique/categorie/${gchild.path}`} class={activeCategory === gchild.slug ? 'active' : ''}>
+                                {gchild.name}
+                                {gchild.product_count !== undefined && <span class="count">({gchild.product_count})</span>}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+
+    <!-- Fourchette de prix -->
+    {facets.price.max > 0 && (
+      <div class="shop-filter-block">
+        <h4 class="shop-filter-label">Prix</h4>
+        <div class="shop-filter-price-row">
+          <div class="shop-filter-price-field">
+            <input type="number" name="min_price" min="0" step="0.01"
+              placeholder={String(Math.floor(minPriceEuros))}
+              value={activePrice.min !== undefined ? String(activePrice.min / 100) : ''} />
+            <span class="shop-filter-price-unit">€</span>
+          </div>
+          <span class="shop-filter-price-sep" aria-hidden="true">–</span>
+          <div class="shop-filter-price-field">
+            <input type="number" name="max_price" min="0" step="0.01"
+              placeholder={String(Math.ceil(maxPriceEuros))}
+              value={activePrice.max !== undefined ? String(activePrice.max / 100) : ''} />
+            <span class="shop-filter-price-unit">€</span>
+          </div>
+        </div>
+      </div>
+    )}
+
+    <!-- Attributs dynamiques (couleur, taille, etc.) -->
+    {facets.attributes.map((attr) => (
+      <div class="shop-filter-block">
+        <h4 class="shop-filter-label">{attr.name}</h4>
+        <div class="shop-filter-options">
+          {attr.options.map((opt) => (
+            <label class="shop-filter-option">
+              <input
+                type="radio"
+                name={`attributes[${attr.name}]`}
+                value={opt.value}
+                checked={activeFilters[attr.name] === opt.value}
+              />
+              <span>{opt.value} <span class="count">({opt.count})</span></span>
+            </label>
+          ))}
+          <label class="shop-filter-option">
+            <input type="radio" name={`attributes[${attr.name}]`} value="" checked={!activeFilters[attr.name]} />
+            <span>Tous</span>
+          </label>
+        </div>
+      </div>
+    ))}
+
+    <!-- Toggles -->
+    <div class="shop-filter-block">
+      <label class="shop-filter-checkbox">
+        <input type="checkbox" name="in_stock" value="1" checked={activeInStock} />
+        <span>En stock uniquement</span>
+      </label>
+      <label class="shop-filter-checkbox">
+        <input type="checkbox" name="on_sale" value="1" checked={activeOnSale} />
+        <span>Promos uniquement</span>
+      </label>
+    </div>
+
+    <div class="shop-filter-actions">
+      <button type="submit" class="shop-filter-btn shop-filter-btn--primary">Appliquer</button>
+      <a href={baseUrl} class="shop-filter-btn shop-filter-btn--ghost">Effacer</a>
+    </div>
+  </form>
+</aside>
+
+<style>
+  .shop-filter-sidebar {
+    padding: 20px;
+    border: 1px solid var(--gray-200, #e5e7eb);
+    border-radius: 10px;
+    background: #fff;
+    position: sticky;
+    top: 20px;
+  }
+  .shop-filter-sidebar input:focus-visible,
+  .shop-filter-sidebar select:focus-visible,
+  .shop-filter-sidebar button:focus-visible,
+  .shop-filter-sidebar a:focus-visible {
+    outline: 2px solid var(--color-primary, #0f62fe);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  .shop-filter-block {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--gray-100, #f3f4f6);
+  }
+  .shop-filter-block:last-of-type {
+    border-bottom: 0;
+  }
+  .shop-filter-label {
+    display: block;
+    font-weight: 600;
+    margin: 0 0 .5rem;
+    font-size: 14px;
+  }
+  .shop-filter-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--gray-300, #d1d5db);
+    border-radius: 6px;
+    font-size: 14px;
+    background: var(--gray-50, #f9fafb);
+  }
+  .shop-filter-price-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--gray-50, #f9fafb);
+    border: 1px solid var(--gray-300, #d1d5db);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .shop-filter-price-field {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+  }
+  .shop-filter-price-field input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 10px 4px 10px 12px;
+    font-size: 14px;
+    color: var(--gray-800, #1f2937);
+    outline: none;
+    -moz-appearance: textfield;
+  }
+  .shop-filter-price-field input::-webkit-inner-spin-button,
+  .shop-filter-price-field input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .shop-filter-price-field input::placeholder {
+    color: var(--gray-400, #9ca3af);
+  }
+  .shop-filter-price-unit {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray-500, #6b7280);
+    padding-right: 10px;
+    flex-shrink: 0;
+  }
+  .shop-filter-price-sep {
+    color: var(--gray-300, #d1d5db);
+    font-size: 14px;
+    flex-shrink: 0;
+    padding: 0 2px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--gray-200, #e5e7eb);
+    border-right: 1px solid var(--gray-200, #e5e7eb);
+    padding: 0 10px;
+  }
+  .shop-category-tree {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 14px;
+  }
+  .shop-category-tree ul {
+    list-style: none;
+    padding-left: 14px;
+    margin: 4px 0 0;
+  }
+  .shop-category-tree a {
+    display: inline-block;
+    padding: 4px 0;
+    color: var(--gray-700, #374151);
+    text-decoration: none;
+  }
+  .shop-category-tree a:hover,
+  .shop-category-tree a.active {
+    color: var(--color-primary, #0f62fe);
+    font-weight: 600;
+  }
+  .shop-category-tree .count {
+    color: var(--gray-400, #9ca3af);
+    font-size: 12px;
+  }
+  .shop-filter-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .shop-filter-option .count {
+    color: var(--gray-400, #9ca3af);
+    font-size: 12px;
+  }
+  .shop-filter-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .shop-filter-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 1rem;
+  }
+  .shop-filter-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .shop-filter-btn--primary {
+    background: var(--color-primary, #0f62fe);
+    color: #fff;
+    border: 1px solid var(--color-primary, #0f62fe);
+  }
+  .shop-filter-btn--primary:hover { filter: brightness(1.08); }
+  .shop-filter-btn--ghost {
+    background: transparent;
+    color: var(--gray-700, #374151);
+    border: 1px solid var(--gray-300, #d1d5db);
+  }
+  .shop-filter-btn--ghost:hover {
+    border-color: var(--gray-500, #6b7280);
+    color: var(--color-default, #224f5a);
+  }
+  input{
+    outline: none;
+  }
+</style>
+
+<script is:inline define:vars={{ baseUrl }}>
+  // Preserve existing URL params on form load
+  (function() {
+    const form = document.getElementById('shopFilterForm');
+    if (!form) return;
+    const url = new URL(window.location.href);
+    // Pre-fill search from URL
+    const searchInput = form.querySelector('[name="search"]');
+    if (searchInput && url.searchParams.get('search')) searchInput.value = url.searchParams.get('search');
+
+    form.addEventListener('submit', function(e) {
+      // Keep empty values from being sent
+      const empty = [];
+      for (const input of form.elements) {
+        if (input.name && !input.value && !input.checked && input.type !== 'submit') {
+          empty.push(input);
+        }
+      }
+      empty.forEach(i => i.setAttribute('disabled', 'disabled'));
+      setTimeout(() => empty.forEach(i => i.removeAttribute('disabled')), 100);
+    });
+  })();
+</script>

@@ -1,399 +1,365 @@
-# Site Web Astro avec Payload CMS
+# CMS Astro
 
-Un site web de blog moderne construit avec [Astro](https://astro.build) et [Payload CMS](https://payloadcms.com), avec un thème entièrement personnalisable.
+Un système de gestion de contenu (CMS) sur mesure, qui permet de créer et publier plusieurs sites web rapides à partir d'un même back-office.
 
-## Structure du Projet
+> Ce README est volontairement accessible : un éditeur de contenu doit pouvoir comprendre ce que fait le projet, et un développeur doit pouvoir l'installer et y contribuer.
+
+---
+
+## Table des matières
+
+1. [En une phrase](#1-en-une-phrase)
+2. [Pour les non-développeurs](#2-pour-les-non-développeurs)
+3. [Pour les développeurs](#3-pour-les-développeurs)
+4. [Installation](#4-installation)
+5. [Démarrer le projet](#5-démarrer-le-projet)
+6. [Comment fonctionne une page ?](#6-comment-fonctionne-une-page-)
+7. [Personnaliser le site](#7-personnaliser-le-site)
+8. [Multi-sites](#8-multi-sites)
+9. [Déploiement](#9-déploiement)
+10. [Documents complémentaires](#10-documents-complémentaires)
+11. [Dépannage](#11-dépannage)
+
+---
+
+## 1. En une phrase
+
+> Un back-office en PHP où l'on compose des pages avec des **blocs** (héro, galerie, formulaire…), et un site public en **Astro** qui transforme ces blocs en pages HTML ultra-rapides.
+
+---
+
+## 2. Pour les non-développeurs
+
+### À quoi sert ce projet ?
+
+Le CMS permet à un éditeur de :
+
+- Créer et organiser des pages (accueil, contact, articles de blog, fiches produits…).
+- Composer chaque page comme un **Lego de blocs** : un héro avec une grande image, un texte avec illustration, une galerie, un formulaire, etc.
+- Gérer des actualités, événements, références, produits, formulaires de contact.
+- Personnaliser les couleurs, polices et le menu sans toucher au code.
+
+### Comment ça s'organise ?
+
+Le projet a deux faces :
+
+| Face | Qui l'utilise ? | Adresse type |
+|---|---|---|
+| **Le back-office** | L'éditeur (toi) | `monsite.fr/admin` |
+| **Le site public** | Les visiteurs | `monsite.fr` |
+
+Quand tu publies une modification dans le back-office, le site public est automatiquement reconstruit. Le visiteur voit toujours une version **pré-fabriquée** de la page : très rapide, peu coûteuse en serveur.
+
+### Le vocabulaire utile
+
+| Terme | Définition simple |
+|---|---|
+| **Bloc / module** | Une section de page (un héro, une galerie, un formulaire…). |
+| **Page** | Un assemblage de blocs publié sur le site. |
+| **Slug** | La fin de l'URL d'une page (`/contact` → slug = `contact`). |
+| **Build** | Étape automatique où le site reconstruit toutes ses pages. |
+| **Plugin** | Ajout optionnel qui apporte de nouveaux blocs (ex. : avant/après, configurateur). |
+
+---
+
+## 3. Pour les développeurs
+
+### Stack technique
+
+| Brique | Technologie |
+|---|---|
+| **Frontend** | [Astro 5](https://astro.build) (SSG), SCSS compilé via Sass |
+| **Backend** | PHP ≥ 8.1 (custom MVC), MySQL, JWT, Stripe SDK, templates Blade |
+| **Back-office** | HTML/CSS/JS vanilla (pas de framework) |
+| **Plugins** | PHP + Blade + CSS + manifeste `plugin.json` |
+| **Build** | Sass natif via `frontend/scripts/compile-nickl-css.js` |
+
+> ⚠️ Le projet utilisait initialement un backend Node/Payload avec MongoDB. **Cette stack est obsolète** — l'API est désormais en PHP avec MySQL. Le dossier `nickl/` (legacy SCSS/Bud) est en cours de retrait : ne plus y éditer de fichiers.
+
+### Architecture
 
 ```
-/
-├── frontend/          # Application Astro (frontend)
+astro/
+├── frontend/           # Site public (Astro)
 │   ├── src/
-│   │   ├── components/    # Composants Astro
-│   │   ├── layouts/       # Layouts
-│   │   ├── pages/         # Pages du site
-│   │   │   ├── blog/      # Pages des articles
-│   │   │   └── category/  # Pages des catégories
-│   │   ├── lib/           # Bibliothèques et utilitaires
-│   │   │   └── payload.ts # Client API Payload
-│   │   └── styles/        # Styles CSS
-│   │       ├── global.css # Styles globaux
-│   │       └── theme.css  # Configuration du thème
-│   └── theme-config.json  # Configuration des thèmes
+│   │   ├── pages/      # Routes du site
+│   │   ├── components/ # Composants réutilisables
+│   │   ├── layouts/    # Templates de page
+│   │   ├── lib/        # Helpers (api, images, schema-org)
+│   │   └── styles/     # SCSS + CSS
+│   ├── public/         # Assets statiques + CSS compilés
+│   └── theme-config.json
 │
-└── backend/           # Application Payload CMS (backend)
-    ├── src/
-    │   ├── payload.config.ts # Configuration Payload
-    │   └── server.ts         # Serveur Express
-    └── media/               # Fichiers uploadés
+├── backend-php/        # API + back-office (PHP)
+│   ├── index.php       # Front controller / router
+│   ├── controllers/    # Endpoints API (Posts, Pages, Auth…)
+│   ├── models/         # Accès DB
+│   ├── templates/      # Templates Blade pour rendu serveur
+│   ├── admin/          # Back-office statique (HTML/JS/CSS)
+│   ├── config/         # database.php, module-fields.json…
+│   ├── helpers/        # response, request, slug, sitemap…
+│   ├── middleware/     # auth, rate-limit
+│   └── uploads/        # Médias uploadés
+│
+├── plugins/            # Plugins partagés entre sites
+│   └── {plugin}/
+│       ├── plugin.json
+│       ├── modules/    # Définitions PHP
+│       ├── templates/  # Blade
+│       └── css/
+│
+└── docs/               # Guides de déploiement
 ```
 
-## Prérequis
+### Flux de données
 
-- Node.js 18 ou supérieur
-- MongoDB (local ou cloud)
-- npm ou yarn
+```
+Éditeur (back-office HTML)
+        │  POST /api/pages
+        ▼
+backend-php (PHP + MySQL)
+        │  GET /api/pages/{slug}
+        ▼
+frontend (Astro build)
+        │  HTML statique pré-généré
+        ▼
+Visiteur (navigateur)
+```
 
-## Installation
+Pour les blocs spéciaux non-implémentés en Astro, le frontend appelle `POST /api/render-block` qui rend un template Blade côté serveur — le HTML est ensuite injecté dans la page.
 
-### 1. Installer MongoDB
+---
 
-**Option A: MongoDB Local**
+## 4. Installation
+
+### Pré-requis
+
+- **PHP** ≥ 8.1 avec extensions `pdo_mysql`, `gd`, `zlib`
+- **MySQL** ≥ 5.7 ou MariaDB
+- **Node.js** ≥ 18
+- **Composer** (gestionnaire de paquets PHP)
+- **MAMP Pro** ou équivalent en local (recommandé sur macOS)
+
+### Étapes
+
 ```bash
-# macOS avec Homebrew
-brew tap mongodb/brew
-brew install mongodb-community
-brew services start mongodb-community
+# 1. Cloner le dépôt
+git clone <url> astro && cd astro
 
-# Linux
-sudo apt-get install mongodb
+# 2. Installer les dépendances PHP
+cd backend-php && composer install && cd ..
 
-# Windows
-# Téléchargez l'installateur depuis https://www.mongodb.com/try/download/community
+# 3. Installer les dépendances Node (frontend)
+cd frontend && npm install && cd ..
+
+# 4. Configurer la base de données
+#    Créer une base MySQL puis copier .env.example vers .env
+cd backend-php
+cp .env.example .env
+# Éditer .env : DB_HOST, DB_NAME, DB_USER, DB_PASS, JWT_SECRET, STRIPE_KEY…
+
+# 5. Initialiser la BDD
+php migrate.php
+
+# 6. Configurer l'URL de l'API côté frontend
+cd ../frontend
+cp .env.example .env
+# Éditer .env : PUBLIC_API_URL=http://localhost:8888
 ```
 
-**Option B: MongoDB Cloud (gratuit)**
-- Créez un compte sur [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
-- Créez un cluster gratuit
-- Récupérez la connection string
-- Mettez à jour `backend/.env` avec votre connection string
+---
 
-### 2. Installer les dépendances
+## 5. Démarrer le projet
 
-**Backend (Payload CMS):**
+Deux serveurs doivent tourner en parallèle.
+
+### Serveur PHP (back-office + API)
+
+Avec MAMP Pro, pointe un host vers `backend-php/` (port `8888` par défaut).
+
+Sans MAMP :
 ```bash
-cd backend
-npm install
+cd backend-php
+php -S localhost:8888 index.php
 ```
 
-**Frontend (Astro):**
+→ Back-office accessible sur `http://localhost:8888/admin`
+
+### Serveur Astro (site public)
+
 ```bash
 cd frontend
-npm install
-```
-
-## Configuration
-
-### Backend
-
-Le fichier `backend/.env` contient la configuration du backend :
-
-```env
-# Payload CMS
-PAYLOAD_SECRET=development-secret-key-change-in-production
-MONGODB_URI=mongodb://localhost:27017/astro-blog
-
-# Server
-PORT=3000
-```
-
-**Important:** Changez `PAYLOAD_SECRET` en production !
-
-### Frontend
-
-Le fichier `frontend/.env` contient la configuration du frontend :
-
-```env
-PUBLIC_PAYLOAD_URL=http://localhost:3000/api
-```
-
-## Démarrage
-
-### Démarrer le Backend (Payload CMS)
-
-```bash
-cd backend
 npm run dev
 ```
 
-Le CMS sera accessible sur [http://localhost:3000/admin](http://localhost:3000/admin)
+→ Site accessible sur `http://localhost:4321`
 
-### Démarrer le Frontend (Astro)
+### Compilation des styles
 
-Dans un nouveau terminal :
+Lors de la modification de SCSS dans `frontend/src/styles/nickl/` :
 
 ```bash
 cd frontend
-npm run dev
+npm run compile-css
 ```
 
-Le site sera accessible sur [http://localhost:4321](http://localhost:4321)
+Le script `compile-css` est aussi exécuté automatiquement avant `npm run dev` et `npm run build`.
 
-## Première Utilisation
+---
 
-### 1. Créer un compte administrateur
+## 6. Comment fonctionne une page ?
 
-1. Ouvrez [http://localhost:3000/admin](http://localhost:3000/admin)
-2. Créez votre premier compte utilisateur
-3. Vous serez redirigé vers le tableau de bord
+Une page existe à 3 niveaux :
 
-### 2. Configurer les paramètres du site
+| Niveau | Fichier | Rôle |
+|---|---|---|
+| **Modèle de données** | `backend-php/models/Page.php` | Stockage en BDD |
+| **API** | `backend-php/controllers/PageController.php` | Endpoints CRUD |
+| **Affichage** | `frontend/src/pages/[...slug].astro` | Rendu HTML public |
 
-1. Dans le menu, allez dans **Globals → Settings**
-2. Configurez :
-   - Nom du site
-   - Description
-   - Logo (optionnel)
-   - Footer
-   - Liens sociaux
+Pour comprendre en détail comment Astro fabrique une page (frontmatter, getStaticPaths, blocs, styles…), voir [ARCHITECTURE_PAGE_ASTRO.md](ARCHITECTURE_PAGE_ASTRO.md).
 
-### 3. Créer des catégories
+### Anatomie d'un bloc
 
-1. Allez dans **Collections → Categories**
-2. Créez vos catégories de blog (ex: Technologie, Design, etc.)
-3. Chaque catégorie nécessite :
-   - Nom
-   - Slug (URL-friendly)
-   - Description (optionnelle)
+Un bloc (ex. `text-image`) est défini en **3 endroits** :
 
-### 4. Créer votre premier article
+1. **Champs admin** — `backend-php/generate-module-fields.php` : décrit les champs éditables dans le back-office.
+2. **Rendu serveur** — `backend-php/templates/modules/text-image.blade.php` : utilisé en fallback ou via `POST /api/render-block`.
+3. **Rendu front** — `frontend/src/components/blocks/NicklTextImage.astro` + `frontend/src/styles/nickl/modules/_text-image.scss` : rendu côté Astro.
 
-1. Allez dans **Collections → Posts**
-2. Cliquez sur **Create New**
-3. Remplissez :
-   - Titre
-   - Slug
-   - Extrait (description courte)
-   - Contenu
-   - Image à la une (optionnelle)
-   - Auteur
-   - Catégories
-   - Tags
-   - Date de publication
-   - Status: **Published**
-4. Cliquez sur **Save**
+Pour modifier un bloc existant, suivre la procédure pas-à-pas dans [MODIFIER_MODULE.md](MODIFIER_MODULE.md).
 
-### 5. Voir votre article
+---
 
-Ouvrez [http://localhost:4321/blog](http://localhost:4321/blog) pour voir votre nouvel article !
+## 7. Personnaliser le site
 
-## Personnalisation du Thème
+### Le thème (couleurs, polices)
 
-### Méthode 1 : Modifier les variables CSS
+Trois niveaux de personnalisation :
 
-Éditez `frontend/src/styles/theme.css` :
+1. **Variables CSS globales** — [frontend/src/styles/theme.css](frontend/src/styles/theme.css) : couleurs, typographies, espacements.
+2. **Configuration multi-thèmes** — [frontend/theme-config.json](frontend/theme-config.json) : presets de thème activables.
+3. **Surcharge dynamique depuis le back-office** — [frontend/src/components/ThemeInjector.astro](frontend/src/components/ThemeInjector.astro) : variables CSS injectées en runtime depuis les paramètres de site.
 
-```css
-:root {
-  /* Changer la couleur principale */
-  --accent: #2337ff;
-  --accent-dark: #000d8a;
+Une page peut aussi avoir ses **propres couleurs** (champ `color_overrides` dans le back-office, lu par [...slug].astro](frontend/src/pages/[...slug].astro)).
 
-  /* Changer les couleurs de texte */
-  --black: 15, 18, 25;
-  --gray: 96, 115, 159;
+### Les styles d'un bloc
 
-  /* etc... */
-}
+Source : `frontend/src/styles/nickl/modules/_{slug}.scss` → recompiler avec `npm run compile-css`.
+
+Pour une retouche locale isolée, ajoute un bloc `<style>` directement dans le composant `.astro` du bloc.
+
+> **Ne jamais éditer** `frontend/public/nickl-assets/css/*.css` : ces fichiers sont générés.
+
+### Les styles du back-office
+
+Pas de build : édite directement [backend-php/admin/style.css](backend-php/admin/style.css) ou les fichiers par module dans [backend-php/admin/modules/](backend-php/admin/modules/).
+
+### Créer un plugin
+
+Voir le squelette [plugins/before-after/](plugins/before-after/) — minimal, complet, à recopier :
+
+```
+plugins/mon-plugin/
+├── plugin.json          # Manifeste : nom, modules exposés
+├── modules/MonBloc.php  # Logique
+├── templates/mon-bloc.blade.php
+└── css/mon-bloc.css
 ```
 
-### Méthode 2 : Utiliser un thème prédéfini
+⚠️ Plugin **mono-site** → ne pas le mettre dans `plugins/` (qui est partagé entre tous les sites). Utiliser plutôt la variable d'environnement `EXTERNAL_PLUGINS_DIR`, définie uniquement sur le site cible.
 
-Dans `frontend/src/styles/theme.css`, décommentez un des thèmes prédéfinis :
+---
 
-- **Thème sombre** : Design moderne avec fond sombre
-- **Thème minimaliste** : Noir et blanc épuré
-- **Thème coloré** : Couleurs vibrantes et joyeuses
-- **Thème nature** : Couleurs vertes et apaisantes
+## 8. Multi-sites
 
-### Méthode 3 : Configuration JSON
+Le projet héberge **plusieurs sites avec un seul code source**. Chaque site a sa propre BDD, ses propres médias, ses propres paramètres, mais partage la stack technique et les plugins communs.
 
-Éditez `frontend/theme-config.json` pour gérer plusieurs thèmes et basculer entre eux.
+Voir [MULTISITE.md](MULTISITE.md) pour le détail. En bref :
 
-## Structure des Collections Payload
+- Un seul dépôt Git, plusieurs sites en production.
+- Variable d'environnement `SITE_ID` ou similaire pour différencier.
+- Plugins mono-site stockés hors du dépôt (`EXTERNAL_PLUGINS_DIR`).
+- **Ne jamais hardcoder d'URL** dans le code (utiliser les helpers).
 
-### Posts (Articles)
-- **title**: Titre de l'article
-- **slug**: URL de l'article
-- **excerpt**: Description courte
-- **content**: Contenu riche (Rich Text)
-- **featuredImage**: Image principale
-- **author**: Relation avec Users
-- **categories**: Relations avec Categories
-- **tags**: Liste de tags
-- **publishedDate**: Date de publication
-- **status**: draft | published
-- **seo**: Métadonnées SEO
+---
 
-### Categories
-- **name**: Nom de la catégorie
-- **slug**: URL de la catégorie
-- **description**: Description de la catégorie
+## 9. Déploiement
 
-### Pages
-- **title**: Titre de la page
-- **slug**: URL de la page
-- **content**: Contenu riche
-- **status**: draft | published
-
-### Media
-- **alt**: Texte alternatif de l'image
-- Support des images uniquement
-
-### Settings (Global)
-- **siteName**: Nom du site
-- **siteDescription**: Description du site
-- **logo**: Logo du site
-- **footer**: Contenu du footer
-- **socialLinks**: Liens réseaux sociaux
-
-## API REST
-
-Payload CMS expose automatiquement une API REST complète :
-
-### Endpoints principaux
-
-```bash
-# Récupérer tous les articles publiés
-GET http://localhost:3000/api/posts?where[status][equals]=published
-
-# Récupérer un article par slug
-GET http://localhost:3000/api/posts?where[slug][equals]=mon-article
-
-# Récupérer toutes les catégories
-GET http://localhost:3000/api/categories
-
-# Récupérer les paramètres globaux
-GET http://localhost:3000/api/globals/settings
-```
-
-### Documentation complète
-
-La documentation API est accessible sur [http://localhost:3000/api-docs](http://localhost:3000/api-docs)
-
-## Déploiement
-
-### Backend (Payload CMS)
-
-**Option 1: Payload Cloud**
-```bash
-cd backend
-npm run deploy
-```
-
-**Option 2: Serveur classique (VPS, etc.)**
-```bash
-cd backend
-npm run build
-npm run serve
-```
-
-N'oubliez pas de :
-- Configurer MongoDB en production
-- Définir les variables d'environnement
-- Utiliser un gestionnaire de processus (PM2)
+Le déploiement se fait par **`git push`** vers la branche du site cible. Voir [docs/DEPLOY_NEW_SITE.md](docs/DEPLOY_NEW_SITE.md) pour ajouter un nouveau site.
 
 ### Frontend (Astro)
 
-**Option 1: Vercel/Netlify**
 ```bash
 cd frontend
 npm run build
-# Déployer le dossier dist/
+# → dist/ contient le site statique prêt à servir
 ```
 
-**Option 2: Serveur statique**
-```bash
-cd frontend
-npm run build
-# Copier le contenu de dist/ sur votre serveur
-```
+### Backend (PHP)
 
-**Configuration importante:** Mettez à jour `PUBLIC_PAYLOAD_URL` dans `.env` avec l'URL de production de votre API.
+Pas de build. Pousser le code et s'assurer que le serveur a :
+- PHP ≥ 8.1
+- BDD MySQL accessible
+- Dossier `uploads/` en écriture
+- Variables d'environnement configurées
 
-## Préparation pour le Multisite
+---
 
-Ce projet est conçu pour évoluer vers un système multisite. Voici comment procéder :
+## 10. Documents complémentaires
 
-### 1. Structure recommandée
+| Document | À quoi ça sert |
+|---|---|
+| [ARCHITECTURE_PAGE_ASTRO.md](ARCHITECTURE_PAGE_ASTRO.md) | Anatomie détaillée d'une page Astro (pour devs et non-devs) |
+| [MODIFIER_MODULE.md](MODIFIER_MODULE.md) | Procédure pas-à-pas pour modifier un bloc existant |
+| [MULTISITE.md](MULTISITE.md) | Architecture multi-sites |
+| [GUIDE_DEMARRAGE.md](GUIDE_DEMARRAGE.md) | Guide de démarrage rapide |
+| [COMMANDES.md](COMMANDES.md) | Liste des commandes utiles |
+| [docs/DEPLOY_NEW_SITE.md](docs/DEPLOY_NEW_SITE.md) | Mettre en ligne un nouveau site |
+| [CLAUDE.md](CLAUDE.md) | Instructions pour l'assistant IA Claude |
+| [TODO.md](TODO.md) | Roadmap et tâches en cours |
 
-```
-/
-├── frontend-site1/
-├── frontend-site2/
-├── frontend-site3/
-└── backend/  # CMS partagé
-```
+---
 
-### 2. Ajouter un champ "site" dans Payload
+## 11. Dépannage
 
-Modifiez `backend/src/payload.config.ts` pour ajouter :
+### Le back-office ne charge pas
 
-```typescript
-{
-  name: 'site',
-  type: 'select',
-  required: true,
-  options: [
-    { label: 'Site 1', value: 'site1' },
-    { label: 'Site 2', value: 'site2' },
-  ]
-}
-```
+- Vérifier que le serveur PHP tourne (`http://localhost:8888/admin`).
+- Vérifier les permissions du dossier `backend-php/uploads/` (en écriture).
+- Vérifier la connexion BDD dans `backend-php/.env`.
 
-### 3. Filtrer par site dans le frontend
+### Le frontend n'affiche pas les pages
 
-```typescript
-const posts = await fetchAPI('/posts?where[site][equals]=site1&where[status][equals]=published')
-```
-
-## Commandes Utiles
-
-### Frontend
-```bash
-npm run dev          # Démarrer le serveur de développement
-npm run build        # Build pour la production
-npm run preview      # Prévisualiser le build
-```
-
-### Backend
-```bash
-npm run dev          # Démarrer Payload en mode développement
-npm run build        # Compiler TypeScript
-npm run serve        # Démarrer en production
-npm run payload      # CLI Payload
-```
-
-## Résolution de Problèmes
-
-### Le CMS ne se connecte pas à MongoDB
-
-Vérifiez que :
-- MongoDB est démarré : `brew services list` (macOS)
-- La connection string dans `.env` est correcte
-- Votre adresse IP est autorisée (si MongoDB Atlas)
-
-### Les articles n'apparaissent pas
-
-Vérifiez que :
-- Le backend est démarré
-- Le status de l'article est "published"
-- La date de publication n'est pas dans le futur
-- L'URL de l'API est correcte dans `frontend/.env`
+- Vérifier que `PUBLIC_API_URL` dans `frontend/.env` pointe vers le backend.
+- Vérifier que la page est bien en statut **publié** (pas brouillon).
+- Vérifier la **date de publication** (pas dans le futur).
+- Relancer `npm run dev` après modification du `.env`.
 
 ### Erreur de CORS
 
-Vérifiez que l'origine du frontend est autorisée dans `backend/src/payload.config.ts` :
+Le backend doit autoriser l'origine du frontend (configuré dans `backend-php/middleware/` ou `index.php`).
 
-```typescript
-cors: [
-  'http://localhost:4321',  // Ajoutez votre URL
-]
-```
+### Les styles d'un bloc ne s'appliquent pas
 
-## Ressources
+- Lancer `npm run compile-css` dans `frontend/`.
+- Vérifier que le SCSS du bloc est bien déclaré dans [frontend/scripts/compile-nickl-css.js](frontend/scripts/compile-nickl-css.js).
+- Ne pas avoir édité `frontend/public/nickl-assets/css/*.css` à la main (écrasé au prochain build).
+
+### Une image ne s'affiche pas
+
+- Vérifier que le fichier existe dans `backend-php/uploads/`.
+- Vérifier la route d'optimisation `/uploads/media/_optimized/...` dans [backend-php/index.php](backend-php/index.php).
+- Forcer le rafraîchissement (les images optimisées sont mises en cache).
+
+---
+
+## Ressources externes
 
 - [Documentation Astro](https://docs.astro.build)
-- [Documentation Payload CMS](https://payloadcms.com/docs)
-- [Guide de déploiement Astro](https://docs.astro.build/en/guides/deploy/)
-- [Guide de déploiement Payload](https://payloadcms.com/docs/production/deployment)
+- [Documentation PHP](https://www.php.net/docs.php)
+- [Documentation Blade (Laravel)](https://laravel.com/docs/blade)
 
-## Support
-
-Pour toute question ou problème :
-1. Consultez la documentation
-2. Vérifiez les issues GitHub d'Astro et Payload
-3. Rejoignez les communautés Discord
-
-## License
+## Licence
 
 MIT
