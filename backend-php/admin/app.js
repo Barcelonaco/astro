@@ -2486,9 +2486,9 @@ async function renderPluginOptionsPage(pluginDef) {
   let settings = {};
   try {
     const allSettings = await apiFetch('/settings');
-    for (const s of allSettings) {
-      if (s.setting_key.startsWith(prefix)) {
-        settings[s.setting_key.replace(prefix, '')] = s.setting_value;
+    for (const [key, value] of Object.entries(allSettings)) {
+      if (key.startsWith(prefix)) {
+        settings[key.replace(prefix, '')] = value;
       }
     }
   } catch { /* ignore */ }
@@ -2596,9 +2596,9 @@ async function renderCPTOptionsPage(ptDef) {
   let settings = {};
   try {
     const allSettings = await apiFetch('/settings');
-    for (const s of allSettings) {
-      if (s.setting_key.startsWith(`cpt_${ptDef.slug}_`)) {
-        settings[s.setting_key.replace(`cpt_${ptDef.slug}_`, '')] = s.setting_value;
+    for (const [key, value] of Object.entries(allSettings)) {
+      if (key.startsWith(`cpt_${ptDef.slug}_`)) {
+        settings[key.replace(`cpt_${ptDef.slug}_`, '')] = value;
       }
     }
   } catch { /* ignore */ }
