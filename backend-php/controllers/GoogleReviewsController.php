@@ -117,6 +117,7 @@ class GoogleReviewsController {
             'rating' => $reviewsData['rating'],
             'total' => $reviewsData['user_ratings_total'],
             'reviews' => $reviews,
+            'place_id' => $placeId,
         ]);
     }
 }

@@ -51,7 +51,7 @@ class RenderBlockController {
         return null;
     }
 
-    private static function renderGoogleReviews(): string {
+    private static function renderGoogleReviews(array $blockData = []): string {
         // Read plugin settings
         $db = Database::getInstance();
         $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE 'plugin_google_reviews_%'");
@@ -157,6 +157,16 @@ class RenderBlockController {
             $html .= '</div>';
         }
         $html .= '</div>';
+
+        // Google Reviews link (place_id from block data or plugin settings)
+        $showLink = !empty($blockData['display_google_reviews_link']) && ($blockData['display_google_reviews_link'] === true || $blockData['display_google_reviews_link'] === 1 || $blockData['display_google_reviews_link'] === '1');
+        if ($showLink && $placeId) {
+            $btnText = htmlspecialchars($blockData['button_text'] ?? 'Voir tous les avis');
+            $btnLink = 'https://search.google.com/local/reviews?placeid=' . urlencode($placeId);
+            $html .= '<div style="text-align:center;margin-top:2rem;">';
+            $html .= '<a href="' . $btnLink . '" target="_blank" rel="noopener noreferrer" class="btn btn-tertiary">' . $btnText . '</a>';
+            $html .= '</div>';
+        }
 
         return $html;
     }
@@ -282,7 +292,7 @@ class RenderBlockController {
 
         // Special handling for google-reviews: fetch live data from plugin settings
         if ($type === 'google-reviews') {
-            $html = self::renderGoogleReviews();
+            $html = self::renderGoogleReviews($body['data'] ?? []);
             json_response(['html' => $html]);
             return;
         }
