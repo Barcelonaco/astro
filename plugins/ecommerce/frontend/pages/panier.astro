@@ -13,6 +13,7 @@ import DeferredLoader from '@frontend/components/DeferredLoader.astro'
 import { SITE_TITLE } from '@frontend/consts'
 import { getFrontendBootstrap } from '@frontend/lib/api'
 import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+import '@plugins/ecommerce/frontend/styles/shop-buttons.css'
 
 const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
 const siteName = siteInfo.siteName || SITE_TITLE
@@ -52,6 +53,8 @@ const bodyClasses = [
         removeCartItem,
         removeCustomCartItem,
         clearCart,
+        applyCoupon,
+        removeCoupon,
         formatPrice,
         type Cart,
         type CartItem,
@@ -89,7 +92,7 @@ const bodyClasses = [
             <td class="cart-cell-name">
               ${url ? `<a href="${url}">${escape(title)}</a>` : `<span>${escape(title)}</span>`}
               ${sku ? `<div class="cart-sku">Réf. ${escape(sku)}</div>` : ''}
-              ${kind === 'custom' ? '<div class="cart-tag">Configuration POOLP</div>' : ''}
+              ${kind === 'custom' && item.subtitle ? `<div class="cart-tag">${escape(item.subtitle)}</div>` : ''}
             </td>
             <td class="cart-cell-qty">
               ${kind === 'product'
@@ -143,8 +146,24 @@ const bodyClasses = [
             <aside class="cart-summary">
               <h2>Récapitulatif</h2>
               <div class="cart-summary-row"><span>Sous-total HT</span><strong>${formatPrice(cart.subtotal_cents)}</strong></div>
+              ${(cart as any).discount_cents > 0 ? `<div class="cart-summary-row discount"><span>Remise</span><strong>-${formatPrice((cart as any).discount_cents)}</strong></div>` : ''}
               <div class="cart-summary-row"><span>TVA</span><strong>${formatPrice(cart.tax_cents)}</strong></div>
               <div class="cart-summary-row total"><span>Total TTC</span><strong>${formatPrice(cart.total_cents)}</strong></div>
+
+              <div class="cart-coupon">
+                ${cart.coupon_code
+                  ? `<div class="cart-coupon-applied">
+                      <span>Code : <strong>${escape(cart.coupon_code)}</strong></span>
+                      <button type="button" class="cart-coupon-remove" id="coupon-remove">×</button>
+                    </div>`
+                  : `<div class="cart-coupon-form">
+                      <input type="text" class="cart-coupon-input" id="coupon-input" placeholder="Code promo" />
+                      <button type="button" class="btn btn-secondary cart-coupon-btn" id="coupon-apply">Appliquer</button>
+                    </div>
+                    <div class="cart-coupon-error" id="coupon-error" style="display:none"></div>`
+                }
+              </div>
+
               <p class="cart-summary-note">Frais de livraison calculés à l'étape suivante.</p>
               <a class="btn btn-primary cart-checkout-btn" href="/checkout">Passer commande →</a>
             </aside>
@@ -193,6 +212,28 @@ const bodyClasses = [
           window.dispatchEvent(new CustomEvent('cart:updated', { detail: cart }))
           render(cart)
         })
+
+        document.getElementById('coupon-apply')?.addEventListener('click', async () => {
+          const input = document.getElementById('coupon-input') as HTMLInputElement
+          const errEl = document.getElementById('coupon-error')!
+          const code = input.value.trim()
+          if (!code) return
+          errEl.style.display = 'none'
+          try {
+            const cart = await applyCoupon(code)
+            window.dispatchEvent(new CustomEvent('cart:updated', { detail: cart }))
+            render(cart)
+          } catch (err: any) {
+            errEl.textContent = err?.message || 'Code invalide'
+            errEl.style.display = ''
+          }
+        })
+
+        document.getElementById('coupon-remove')?.addEventListener('click', async () => {
+          const cart = await removeCoupon()
+          window.dispatchEvent(new CustomEvent('cart:updated', { detail: cart }))
+          render(cart)
+        })
       }
 
       ;(async () => {
@@ -228,15 +269,23 @@ const bodyClasses = [
       .cart-remove { background: none; border: none; cursor: pointer; font-size: 22px; color: #aaa; padding: 0 8px; }
       .cart-remove:hover { color: #d33; }
       .cart-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; gap: 12px; flex-wrap: wrap; }
-      .cart-actions .btn-secondary { color: var(--color-primary, #0f62fe); border-color: var(--color-primary, #0f62fe); }
-      .cart-actions .btn-secondary:hover:not(:active), .cart-actions .btn-secondary:focus:not(:active) { color: #fff; }
+      /* btn-secondary overrides now in account.css global shop rules */
       .cart-clear { background: none; border: none; color: #d33; cursor: pointer; font-size: 13px; text-decoration: underline; }
       .cart-summary { background: #fafaf8; padding: 24px; border: 1px solid #eee; border-radius: 6px; position: sticky; top: 24px; }
       .cart-summary h2 { font-size: 18px; margin: 0 0 16px; }
       .cart-summary-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
       .cart-summary-row.total { border-top: 1px solid #ddd; padding-top: 14px; margin-top: 8px; font-size: 16px; }
+      .cart-summary-row.discount strong { color: #16a34a; }
       .cart-summary-note { font-size: 12px; color: #888; margin: 12px 0 16px; }
       .cart-checkout-btn { display: block; text-align: center; }
+      .cart-coupon { margin: 16px 0 0; }
+      .cart-coupon-form { display: flex; gap: 8px; }
+      .cart-coupon-input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; text-transform: uppercase; }
+      .cart-coupon-btn { padding: 8px 14px; font-size: 13px; white-space: nowrap; }
+      .cart-coupon-error { font-size: 12px; color: #b91c1c; margin-top: 6px; }
+      .cart-coupon-applied { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; font-size: 13px; }
+      .cart-coupon-remove { background: none; border: none; cursor: pointer; font-size: 18px; color: #888; padding: 0 4px; }
+      .cart-coupon-remove:hover { color: #d33; }
     </style>
   </body>
 </html>

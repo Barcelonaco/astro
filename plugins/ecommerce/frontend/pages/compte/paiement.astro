@@ -39,6 +39,12 @@ const bodyClasses = [
           <div class="account-content">
             <h1 class="account-section-title">Paiement</h1>
 
+            <!-- Historique des paiements -->
+            <div id="payments-section" style="display:none;margin-bottom:32px">
+              <h2 style="font-size:16px;font-weight:600;margin:0 0 16px">Historique des paiements</h2>
+              <div id="payments-list"></div>
+            </div>
+
             <div id="sepa-loading" class="account-loading">Chargement...</div>
             <div id="sepa-content" style="display:none">
               <div id="sepa-not-pro" style="display:none" class="account-empty">
@@ -54,6 +60,32 @@ const bodyClasses = [
                 <h2 style="font-size:16px;font-weight:600;margin:0 0 16px">Vos mandats SEPA</h2>
                 <div id="mandates-list"></div>
                 <button class="account-btn" id="setup-sepa-btn" style="margin-top:16px">Ajouter un mandat SEPA</button>
+              </div>
+
+              <div id="sepa-documents" style="display:none;margin-top:24px">
+                <h2 style="font-size:16px;font-weight:600;margin:0 0 16px">Documents SEPA</h2>
+                <p style="font-size:13px;color:var(--color-text-muted,#6b6b67);margin-bottom:16px">
+                  Pour valider votre mandat de prelevement, veuillez fournir les documents suivants : RIB, Kbis et mandat signe.
+                </p>
+                <div id="docs-list" style="margin-bottom:16px"></div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+                  <div>
+                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Type de document</label>
+                    <select id="doc-type-select" style="padding:8px 12px;border:1px solid rgba(0,0,0,0.18);border-radius:6px;font-size:13px">
+                      <option value="rib">RIB</option>
+                      <option value="kbis">Kbis</option>
+                      <option value="mandate">Mandat signe</option>
+                      <option value="other">Autre</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Fichier (PDF, JPG, PNG — 10 Mo max)</label>
+                    <input type="file" id="doc-file-input" accept=".pdf,.jpg,.jpeg,.png,.webp" style="font-size:13px" />
+                  </div>
+                  <button class="account-btn" id="upload-doc-btn" style="white-space:nowrap">Envoyer</button>
+                </div>
+                <div id="doc-upload-error" style="color:#b91c1c;font-size:13px;margin-top:8px;display:none"></div>
+                <div id="doc-upload-success" style="color:#15803d;font-size:13px;margin-top:8px;display:none"></div>
               </div>
 
               <div id="sepa-setup" style="display:none">
@@ -79,7 +111,7 @@ const bodyClasses = [
     <DeferredLoader />
 
     <script>
-      import { getMe, getSEPAMandates, createSEPASetupIntent, isLoggedIn, formatDate } from '@plugins/ecommerce/frontend/lib/customer-api'
+      import { getMe, getSEPAMandates, createSEPASetupIntent, isLoggedIn, formatDate, formatPrice, getMyOrders, getSEPADocuments, uploadSEPADocument, deleteSEPADocument } from '@plugins/ecommerce/frontend/lib/customer-api'
       import { getPaymentConfig, loadStripe } from '@plugins/ecommerce/frontend/lib/stripe-api'
 
       if (!isLoggedIn()) window.location.href = '/compte/connexion?redirect=/compte/paiement'
@@ -95,6 +127,27 @@ const bodyClasses = [
         try {
           const customer = await getMe()
 
+          // Load payment history (all orders with payment info)
+          try {
+            const { orders } = await getMyOrders()
+            const paidOrders = orders.filter(o => o.payment_status !== 'unpaid')
+            if (paidOrders.length > 0) {
+              const paySection = document.getElementById('payments-section')!
+              paySection.style.display = ''
+              const PAYMENT_METHODS: Record<string, string> = { stripe: 'Carte bancaire', bank_transfer: 'Virement', on_invoice: 'Sur facture', cheque: 'Cheque', paypal: 'PayPal' }
+              const PAY_STATUS: Record<string, string> = { paid: 'Paye', pending: 'En attente', failed: 'Echoue', refunded: 'Rembourse', partially_refunded: 'Partiel. rembourse', unpaid: 'Non paye' }
+              document.getElementById('payments-list')!.innerHTML = `
+                <table class="account-table"><thead><tr><th>Commande</th><th>Date</th><th>Methode</th><th>Statut</th><th>Montant</th></tr></thead>
+                <tbody>${paidOrders.map(o => `<tr>
+                  <td><a href="/compte/commandes/detail?n=${o.order_number}">${o.order_number}</a></td>
+                  <td>${formatDate(o.placed_at)}</td>
+                  <td>${PAYMENT_METHODS[(o as any).payment_method] || (o as any).payment_method || '-'}</td>
+                  <td><span class="badge badge-${o.payment_status}">${PAY_STATUS[o.payment_status] || o.payment_status}</span></td>
+                  <td>${formatPrice(o.total_cents, o.currency)}</td>
+                </tr>`).join('')}</tbody></table>`
+            }
+          } catch {}
+
           document.getElementById('sepa-loading')!.style.display = 'none'
           document.getElementById('sepa-content')!.style.display = ''
 
@@ -109,6 +162,11 @@ const bodyClasses = [
 
           document.getElementById('sepa-mandates')!.style.display = ''
           renderMandates(mandates)
+
+          // Documents section
+          document.getElementById('sepa-documents')!.style.display = ''
+          loadDocuments()
+          initDocUpload()
 
           // Setup SEPA button
           document.getElementById('setup-sepa-btn')!.addEventListener('click', startSetup)
@@ -140,6 +198,85 @@ const bodyClasses = [
             </div>
           </div>
         `).join('')
+      }
+
+      const DOC_TYPE_LABELS: Record<string, string> = {
+        rib: 'RIB', kbis: 'Kbis', mandate: 'Mandat signe', other: 'Autre',
+      }
+
+      function formatSize(bytes: number): string {
+        if (bytes < 1024) return bytes + ' o'
+        if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' Ko'
+        return (bytes / (1024 * 1024)).toFixed(1) + ' Mo'
+      }
+
+      async function loadDocuments() {
+        try {
+          const { documents } = await getSEPADocuments()
+          const list = document.getElementById('docs-list')!
+          if (documents.length === 0) {
+            list.innerHTML = '<p style="font-size:13px;color:var(--color-text-muted,#6b6b67)">Aucun document envoye.</p>'
+          } else {
+            list.innerHTML = documents.map(d => `
+              <div class="account-card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                <div>
+                  <span class="badge badge-active" style="font-size:11px">${DOC_TYPE_LABELS[d.doc_type] || d.doc_type}</span>
+                  <span style="font-size:13px;margin-left:8px">${d.original_name}</span>
+                  <span style="font-size:11px;color:var(--color-text-muted,#6b6b67);margin-left:6px">${formatSize(d.size)} — ${formatDate(d.created_at)}</span>
+                </div>
+                <button class="account-btn-outline" style="font-size:12px;padding:4px 10px" data-delete-doc="${d.id}">Supprimer</button>
+              </div>
+            `).join('')
+
+            list.querySelectorAll('[data-delete-doc]').forEach(btn => {
+              btn.addEventListener('click', async () => {
+                const docId = parseInt((btn as HTMLElement).dataset.deleteDoc!, 10)
+                if (!confirm('Supprimer ce document ?')) return
+                try {
+                  await deleteSEPADocument(docId)
+                  loadDocuments()
+                } catch (e: any) {
+                  alert(e.message || 'Erreur')
+                }
+              })
+            })
+          }
+        } catch {}
+      }
+
+      function initDocUpload() {
+        const uploadBtn = document.getElementById('upload-doc-btn') as HTMLButtonElement
+        if (!uploadBtn) return
+
+        uploadBtn.addEventListener('click', async () => {
+          const fileInput = document.getElementById('doc-file-input') as HTMLInputElement
+          const typeSelect = document.getElementById('doc-type-select') as HTMLSelectElement
+          const errEl = document.getElementById('doc-upload-error')!
+          const successEl = document.getElementById('doc-upload-success')!
+
+          errEl.style.display = 'none'
+          successEl.style.display = 'none'
+
+          const file = fileInput.files?.[0]
+          if (!file) { errEl.textContent = 'Selectionnez un fichier'; errEl.style.display = ''; return }
+
+          uploadBtn.disabled = true
+          uploadBtn.textContent = 'Envoi...'
+
+          try {
+            await uploadSEPADocument(file, typeSelect.value)
+            successEl.textContent = 'Document envoye'
+            successEl.style.display = ''
+            fileInput.value = ''
+            loadDocuments()
+          } catch (e: any) {
+            errEl.textContent = e.message || 'Erreur lors de l\'envoi'
+            errEl.style.display = ''
+          } finally {
+            uploadBtn.disabled = false
+            uploadBtn.textContent = 'Envoyer'
+          }
+        })
       }
 
       async function startSetup() {

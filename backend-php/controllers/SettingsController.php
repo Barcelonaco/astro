@@ -125,6 +125,7 @@ class SettingsController {
         }
         // ecommerce_enabled est dérivé de l'état du plugin (plus de toggle séparé).
         $siteSettings['ecommerce_enabled'] = PluginController::isPluginActive('ecommerce') ? '1' : '0';
+        $siteSettings['poolp_configurator_enabled'] = PluginController::isPluginActive('poolp-configurator') ? '1' : '0';
 
         // Front page content
         $frontPage = null;

@@ -231,6 +231,81 @@ class CustomerAuthController {
         json_response(['message' => 'Déconnecté']);
     }
 
+    // ── Suppression compte (RGPD) ───────────────────────────────────────────
+
+    /**
+     * DELETE /customer/auth/account — suppression du compte client.
+     * Anonymise les donnees personnelles, conserve les commandes pour obligations legales.
+     */
+    public static function deleteAccount(): void {
+        require_ecommerce_enabled();
+        $auth = authenticate_customer();
+        $body = get_json_body();
+
+        // Require password confirmation for security
+        $password = $body['password'] ?? '';
+        if (empty($password)) {
+            error_response('Mot de passe requis pour confirmer la suppression', 400);
+        }
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT password_hash FROM customers WHERE id = ?');
+        $stmt->execute([$auth['id']]);
+        $customer = $stmt->fetch();
+        if (!$customer || !password_verify($password, $customer['password_hash'])) {
+            error_response('Mot de passe incorrect', 403);
+        }
+
+        // Anonymize instead of hard-delete (legal obligation: keep order history)
+        $anonEmail = 'anonymized_' . $auth['id'] . '@deleted.local';
+        $db->prepare("UPDATE customers SET
+            email = ?,
+            password_hash = '',
+            first_name = 'Compte',
+            last_name = 'Supprime',
+            phone = NULL,
+            company = NULL,
+            vat_number = NULL,
+            siret = NULL,
+            activity = NULL,
+            anonymized_at = NOW(),
+            anonymization_reason = 'user_request'
+            WHERE id = ?")
+            ->execute([$anonEmail, $auth['id']]);
+
+        // Delete addresses
+        $db->prepare('DELETE FROM customer_addresses WHERE customer_id = ?')->execute([$auth['id']]);
+
+        // Log erasure
+        $db->prepare("INSERT INTO gdpr_erasure_log (customer_id, action, details, performed_at) VALUES (?, 'account_deleted', ?, NOW())")
+            ->execute([$auth['id'], json_encode(['method' => 'self_service', 'ip' => $_SERVER['REMOTE_ADDR'] ?? null])]);
+
+        json_response(['message' => 'Compte supprime. Vos donnees personnelles ont ete anonymisees.']);
+    }
+
+    /**
+     * POST /customer/auth/erasure-request — demande de suppression RGPD (file d'attente admin).
+     */
+    public static function requestErasure(): void {
+        require_ecommerce_enabled();
+        $auth = authenticate_customer();
+        $body = get_json_body();
+
+        $db = Database::getInstance();
+
+        // Check if a pending request already exists
+        $stmt = $db->prepare("SELECT id FROM gdpr_erasure_requests WHERE customer_id = ? AND status = 'pending'");
+        $stmt->execute([$auth['id']]);
+        if ($stmt->fetch()) {
+            error_response('Une demande de suppression est deja en cours', 409);
+        }
+
+        $db->prepare("INSERT INTO gdpr_erasure_requests (customer_id, reason, requested_at, status) VALUES (?, ?, NOW(), 'pending')")
+            ->execute([$auth['id'], trim((string) ($body['reason'] ?? ''))]);
+
+        json_response(['message' => 'Demande de suppression enregistree. Elle sera traitee sous 30 jours.'], 201);
+    }
+
     // ── CRUD adresses ───────────────────────────────────────────────────────
     public static function listAddresses(): void {
         require_ecommerce_enabled();

@@ -5,9 +5,10 @@ interface Props {
   variants: ProductVariant[];
   variantAttributes: Array<{ name: string; options: string[] | string }>;
   currency?: string;
+  taxRate?: number;
 }
 
-const { variants, variantAttributes, currency = 'EUR' } = Astro.props;
+const { variants, variantAttributes, currency = 'EUR', taxRate = 20 } = Astro.props;
 
 // Normalize attribute options (can come as string with newlines or array)
 const attrs = variantAttributes.map((a) => {
@@ -20,7 +21,7 @@ const attrs = variantAttributes.map((a) => {
 const hasVariants = variants.length > 1 && attrs.length > 0;
 ---
 {hasVariants ? (
-  <div class="shop-variant-selector" data-variants={JSON.stringify(variants)} data-currency={currency}>
+  <div class="shop-variant-selector" data-variants={JSON.stringify(variants)} data-currency={currency} data-tax-rate={String(taxRate)}>
     {attrs.map((attr) => (
       <div class="shop-variant-selector__group">
         <label class="shop-variant-selector__label">{attr.name}</label>
@@ -46,6 +47,8 @@ const hasVariants = variants.length > 1 && attrs.length > 0;
     const root = document.querySelector('.shop-variant-selector');
     if (!root) return;
     const variants = JSON.parse(root.getAttribute('data-variants') || '[]');
+    const taxRate = parseFloat(root.getAttribute('data-tax-rate') || '20');
+    const variantCurrency = root.getAttribute('data-currency') || 'EUR';
     const hiddenInput = document.getElementById('selectedVariantId');
     const selection = {};
 
@@ -64,11 +67,18 @@ const hasVariants = variants.length > 1 && attrs.length > 0;
       const stockEl = document.getElementById('shopCurrentVariantStock');
       if (match) {
         if (priceEl) {
-          const fmt = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
-          priceEl.innerHTML = '<strong>' + fmt.format(match.price_cents / 100) + '</strong>';
+          const fmt = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: variantCurrency });
+          const htCents = Math.round(match.price_cents / (1 + taxRate / 100));
+          var html = '<div class="price-display" data-ht-min="' + htCents + '" data-ht-max="" data-tax-rate="' + taxRate + '" data-currency="' + variantCurrency + '">';
           if (match.compare_at_price_cents && match.compare_at_price_cents > match.price_cents) {
-            priceEl.innerHTML = '<span class="price-compare">' + fmt.format(match.compare_at_price_cents / 100) + '</span> ' + priceEl.innerHTML;
+            html += '<span class="price-compare">' + fmt.format(match.compare_at_price_cents / 100) + '</span>';
           }
+          html += '<span class="price-ht" style="display:none"><strong class="price-ht-value">' + fmt.format(htCents / 100) + '</strong> HT <span class="price-ht-discount" style="display:none"></span></span>';
+          html += '<span class="price-current"><strong>' + fmt.format(match.price_cents / 100) + '</strong> <span class="price-label-ttc">TTC</span></span>';
+          html += '</div>';
+          priceEl.innerHTML = html;
+          // Re-trigger pro-prices if customer is pro (event for any listener)
+          document.dispatchEvent(new CustomEvent('variant-price-updated'));
         }
         if (stockEl) {
           const available = !match.stock_managed || match.stock_quantity > 0;

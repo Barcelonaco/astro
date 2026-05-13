@@ -63,7 +63,7 @@ const seoDesc = (cat.seo_meta?.meta_description) || cat.description || SITE_DESC
     <BaseHead title={seoTitle} description={seoDesc} styleSettings={styleSettings} siteSettings={siteSettings} />
     <ModuleStyles blocks={null} />
   </head>
-  <body>
+  <body data-pro-pricing={siteSettings.poolp_configurator_enabled === '1' ? '1' : undefined}>
     <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
     <main id="main" class="main-page shop-archive" role="main" data-category-slug={cat.slug} data-category-path={cat.path}>
       <section>
@@ -204,6 +204,35 @@ const seoDesc = (cat.seo_meta?.meta_description) || cat.description || SITE_DESC
         background: var(--gray-50, #f9fafb); border: 1px dashed var(--gray-200, #e5e7eb); border-radius: 12px;
       }
     </style>
-    <script>import '@plugins/ecommerce/frontend/lib/pro-prices'</script>
+    <script is:inline define:vars={{ apiBase: import.meta.env.PUBLIC_API_URL || '/api' }}>
+      (function() {
+        if (document.body.dataset.proPricing !== '1') return;
+        var token = localStorage.getItem('customer_token');
+        if (!token) return;
+        fetch(apiBase + '/customer/auth/me', { headers: { Authorization: 'Bearer ' + token } })
+          .then(function(r) { return r.ok ? r.json() : null; })
+          .then(function(c) {
+            if (!c || !c.is_pro || c.pro_status !== 'approved') return;
+            var rate = c.discount_rate ? parseFloat(c.discount_rate) : 0;
+            document.querySelectorAll('.price-display').forEach(function(el) {
+              var htEl = el.querySelector('.price-ht');
+              if (!htEl) return;
+              var htMin = parseInt(el.dataset.htMin || '0', 10);
+              var currency = el.dataset.currency || 'EUR';
+              if (htMin <= 0) return;
+              var discounted = rate > 0 ? Math.round(htMin * (1 - rate / 100)) : htMin;
+              var valueEl = htEl.querySelector('.price-ht-value');
+              if (valueEl) valueEl.textContent = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currency }).format(discounted / 100);
+              if (rate > 0) {
+                var dEl = htEl.querySelector('.price-ht-discount');
+                if (dEl) { dEl.textContent = '(-' + rate + '%)'; dEl.style.display = ''; }
+              }
+              htEl.style.display = '';
+              el.classList.add('is-pro');
+            });
+          })
+          .catch(function() {});
+      })();
+    </script>
   </body>
 </html>

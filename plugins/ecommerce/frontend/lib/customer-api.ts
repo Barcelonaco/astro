@@ -234,6 +234,90 @@ export async function chargeSEPA(orderId: number): Promise<{ status: string; mes
   return apiFetch('/payments/sepa/charge', { method: 'POST', body: JSON.stringify({ order_id: orderId }) })
 }
 
+// ── SEPA documents (RIB, Kbis, mandate) ───────────────────────────
+
+export interface SEPADocument {
+  id: number
+  mandate_id: number | null
+  doc_type: 'rib' | 'kbis' | 'mandate' | 'other'
+  original_name: string
+  mime_type: string
+  size: number
+  created_at: string
+}
+
+export async function getSEPADocuments(): Promise<{ documents: SEPADocument[] }> {
+  return apiFetch('/payments/sepa/documents')
+}
+
+export async function uploadSEPADocument(file: File, docType: string, mandateId?: number): Promise<{ id: number; message: string }> {
+  const token = getToken()
+  const form = new FormData()
+  form.append('file', file)
+  form.append('doc_type', docType)
+  if (mandateId) form.append('mandate_id', String(mandateId))
+
+  const res = await fetch(`${API_URL}/payments/sepa/documents`, {
+    method: 'POST',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    body: form,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new ApiError(data.error || `HTTP ${res.status}`, res.status)
+  return data
+}
+
+export async function deleteSEPADocument(id: number): Promise<{ message: string }> {
+  return apiFetch(`/payments/sepa/documents/${id}`, { method: 'DELETE' })
+}
+
+// ── Product documents / resources (CDC §6.2) ──────────────────────
+
+export interface ProductDocument {
+  id: number
+  product_id: number | null
+  title: string
+  doc_type: 'technical_sheet' | 'manual' | 'notice' | 'certificate' | 'other'
+  original_name: string
+  mime_type: string
+  size: number
+  requires_purchase: boolean
+  product_title?: string
+  created_at: string
+}
+
+export async function getMyDocuments(): Promise<{ documents: ProductDocument[]; has_purchases: boolean }> {
+  return apiFetch('/customer/documents')
+}
+
+export function getDocumentDownloadUrl(docId: number): string {
+  const token = getToken()
+  return `${API_URL}/customer/documents/${docId}/download${token ? `?token=${encodeURIComponent(token)}` : ''}`
+}
+
+// ── Invoice download ────────────────────────────────────────────────
+
+export function getInvoiceUrl(orderId: number): string {
+  const token = getToken()
+  return `${API_URL}/orders/${orderId}/invoice${token ? `?token=${encodeURIComponent(token)}` : ''}`
+}
+
+// ── Account deletion (RGPD) ─────────────────────────────────────────
+
+export async function deleteAccount(password: string): Promise<{ message: string }> {
+  return apiFetch('/customer/auth/account', { method: 'POST', body: JSON.stringify({ password }) })
+}
+
+export async function requestErasure(reason?: string): Promise<{ message: string }> {
+  return apiFetch('/customer/auth/erasure-request', { method: 'POST', body: JSON.stringify({ reason }) })
+}
+
+// ── Payment history ─────────────────────────────────────────────────
+
+export async function getPaymentHistory(): Promise<{ orders: OrderSummary[] }> {
+  return apiFetch('/orders')
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 export function formatPrice(cents: number, currency = 'EUR'): string {
@@ -254,11 +338,10 @@ export const STATUS_LABELS: Record<string, string> = {
   awaiting_payment: 'En attente de paiement',
   paid: 'Payée',
   processing: 'En traitement',
-  fulfilled: 'Preparee',
-  shipped: 'Expediee',
-  delivered: 'Livree',
-  cancelled: 'Annulee',
-  refunded: 'Remboursee',
+  shipped: 'Expédiée',
+  delivered: 'Livrée',
+  cancelled: 'Annulée',
+  refunded: 'Remboursée',
 }
 
 export const PAYMENT_STATUS_LABELS: Record<string, string> = {

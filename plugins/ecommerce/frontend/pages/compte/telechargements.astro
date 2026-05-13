@@ -1,6 +1,7 @@
 ---
 /**
- * /compte/telechargements — digital downloads (placeholder).
+ * /compte/telechargements — product documents & resources.
+ * CDC §6.2: notices, fiches techniques, manuels — accessible si >= 1 achat paye.
  */
 import BaseHead from '@frontend/components/BaseHead.astro'
 import Header from '@frontend/components/Header.astro'
@@ -26,7 +27,7 @@ const bodyClasses = [
 <!DOCTYPE html>
 <html lang="fr">
   <head>
-    <BaseHead title={`Telechargements — ${siteName}`} description="Vos telechargements" styleSettings={styleSettings} siteSettings={siteSettings} />
+    <BaseHead title={`Ressources — ${siteName}`} description="Vos documents et notices produits" styleSettings={styleSettings} siteSettings={siteSettings} />
   </head>
   <body class={bodyClasses || undefined}>
     <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
@@ -36,8 +37,9 @@ const bodyClasses = [
         <div class="account-layout">
           <AccountNav active="downloads" />
           <div class="account-content">
-            <h1 class="account-section-title">Telechargements</h1>
-            <p class="account-empty">Aucun telechargement disponible.</p>
+            <h1 class="account-section-title">Ressources et documents</h1>
+            <div id="docs-loading" class="account-loading">Chargement...</div>
+            <div id="docs-content" style="display:none"></div>
           </div>
         </div>
       </div>
@@ -48,8 +50,91 @@ const bodyClasses = [
     <DeferredLoader />
 
     <script>
-      import { isLoggedIn } from '@plugins/ecommerce/frontend/lib/customer-api'
+      import { isLoggedIn, getMyDocuments, getDocumentDownloadUrl, formatDate, type ProductDocument } from '@plugins/ecommerce/frontend/lib/customer-api'
+
       if (!isLoggedIn()) window.location.href = '/compte/connexion?redirect=/compte/telechargements'
+
+      const DOC_TYPE_LABELS: Record<string, string> = {
+        technical_sheet: 'Fiche technique',
+        manual: 'Manuel',
+        notice: 'Notice',
+        certificate: 'Certificat',
+        other: 'Document',
+      }
+
+      function formatSize(bytes: number): string {
+        if (bytes < 1024) return bytes + ' o'
+        if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' Ko'
+        return (bytes / (1024 * 1024)).toFixed(1) + ' Mo'
+      }
+
+      function mimeIcon(mime: string): string {
+        if (mime === 'application/pdf') return 'PDF'
+        if (mime.startsWith('image/')) return 'IMG'
+        if (mime.includes('word') || mime.includes('doc')) return 'DOC'
+        if (mime.includes('sheet') || mime.includes('xls')) return 'XLS'
+        if (mime.includes('zip')) return 'ZIP'
+        return 'DOC'
+      }
+
+      async function init() {
+        const loading = document.getElementById('docs-loading')!
+        const content = document.getElementById('docs-content')!
+
+        try {
+          const { documents, has_purchases } = await getMyDocuments()
+
+          loading.style.display = 'none'
+          content.style.display = ''
+
+          if (!has_purchases) {
+            content.innerHTML = `
+              <div class="account-empty">
+                <p>Les ressources et documents sont accessibles apres votre premier achat.</p>
+                <a href="/boutique" class="account-btn" style="margin-top:12px">Voir la boutique</a>
+              </div>`
+            return
+          }
+
+          if (documents.length === 0) {
+            content.innerHTML = `<p class="account-empty">Aucun document disponible pour vos produits.</p>`
+            return
+          }
+
+          // Group by product
+          const byProduct = new Map<string, ProductDocument[]>()
+          for (const d of documents) {
+            const key = d.product_title || 'Autres documents'
+            if (!byProduct.has(key)) byProduct.set(key, [])
+            byProduct.get(key)!.push(d)
+          }
+
+          let html = ''
+          for (const [productName, docs] of byProduct) {
+            html += `<div style="margin-bottom:24px">
+              <h2 style="font-size:15px;font-weight:600;margin:0 0 10px">${productName}</h2>
+              ${docs.map(d => `
+                <a href="${getDocumentDownloadUrl(d.id)}" target="_blank" class="account-card" style="display:flex;align-items:center;gap:12px;margin-bottom:6px;text-decoration:none;color:inherit">
+                  <span style="width:36px;height:36px;border-radius:6px;background:var(--color-primary-light,#e8e8e5);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${mimeIcon(d.mime_type)}</span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.title}</div>
+                    <div style="font-size:11px;color:var(--color-text-muted,#6b6b67)">${DOC_TYPE_LABELS[d.doc_type] || d.doc_type} — ${formatSize(d.size)} — ${formatDate(d.created_at)}</div>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </a>
+              `).join('')}
+            </div>`
+          }
+
+          content.innerHTML = html
+
+        } catch (err: any) {
+          if (err?.status === 401) { window.location.href = '/compte/connexion'; return }
+          loading.textContent = 'Erreur de chargement.'
+        }
+      }
+
+      init()
     </script>
   </body>
 </html>

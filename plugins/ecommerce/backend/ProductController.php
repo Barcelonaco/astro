@@ -642,6 +642,12 @@ class ProductController {
             'low_stock' => $stockTracked && $lowStock,
             'is_configured' => $isConfigured,
             'currency' => 'EUR',
+            // Technical range (CDC §7.2 — plage technique)
+            'debit_min' => isset($cf['debit_min']) ? (float) $cf['debit_min'] : null,
+            'debit_max' => isset($cf['debit_max']) ? (float) $cf['debit_max'] : null,
+            'volume_min' => isset($cf['volume_min']) ? (float) $cf['volume_min'] : null,
+            'volume_max' => isset($cf['volume_max']) ? (float) $cf['volume_max'] : null,
+            'reference_constructeur' => $cf['reference_constructeur'] ?? null,
         ];
 
         // Détails complets pour la fiche produit

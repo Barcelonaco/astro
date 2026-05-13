@@ -13,6 +13,7 @@ import DeferredLoader from '@frontend/components/DeferredLoader.astro'
 import { SITE_TITLE } from '@frontend/consts'
 import { getFrontendBootstrap } from '@frontend/lib/api'
 import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+import '@plugins/ecommerce/frontend/styles/shop-buttons.css'
 
 const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
 const siteName = siteInfo.siteName || SITE_TITLE
@@ -114,11 +115,15 @@ const bodyClasses = [
           : ''
 
         const isPaid = order.payment_status === 'paid'
+        const isStripePending = order.payment_method === 'stripe' && order.payment_status === 'pending'
+        const isOfflineMethod = ['bank_transfer', 'cheque', 'on_invoice'].includes(order.payment_method)
         const heroCheck = isPaid
-          ? `<div class="conf-check">✓</div><h1>Commande confirmée</h1><p>Merci pour votre commande. Un email de confirmation a été envoyé à <strong>${escape(order.email)}</strong>.</p>`
+          ? `<div class="conf-check">✓</div><h1>Commande confirmee</h1><p>Merci pour votre commande. Un email de confirmation a ete envoye a <strong>${escape(order.email)}</strong>.</p>`
           : order.payment_status === 'failed'
-            ? `<div class="conf-check conf-check-error">!</div><h1>Paiement à finaliser</h1><p>Votre commande a été enregistrée mais le paiement n'a pas abouti.</p>`
-            : `<div class="conf-check conf-check-pending"><div class="conf-spinner conf-spinner--hero"></div></div><h1>Commande enregistrée</h1><p>Un email de confirmation sera envoyé à <strong>${escape(order.email)}</strong> des validation du paiement.</p>`
+            ? `<div class="conf-check conf-check-error">!</div><h1>Paiement a finaliser</h1><p>Votre commande a ete enregistree mais le paiement n'a pas abouti.</p>`
+            : isOfflineMethod
+              ? `<div class="conf-check">✓</div><h1>Commande enregistree</h1><p>Votre commande a ete enregistree. Un email de confirmation sera envoye a <strong>${escape(order.email)}</strong> des validation du paiement.</p>`
+              : `<div class="conf-check conf-check-pending"><div class="conf-spinner conf-spinner--hero"></div></div><h1>Commande enregistree</h1><p>Un email de confirmation sera envoye a <strong>${escape(order.email)}</strong> des validation du paiement.</p>`
 
         root.innerHTML = `
           <div class="conf-hero">

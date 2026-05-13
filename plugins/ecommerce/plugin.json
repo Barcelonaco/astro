@@ -86,6 +86,8 @@
     { "slug": "settings",  "label": "Paramètres e-commerce",  "url": "/plugin-assets/ecommerce/admin/settings.html",  "min_role": "super_admin" },
     { "slug": "shipping",  "label": "Zones de livraison",     "url": "/plugin-assets/ecommerce/admin/shipping.html",  "min_role": "editor" },
     { "slug": "tax",       "label": "Taux de TVA",            "url": "/plugin-assets/ecommerce/admin/tax.html",       "min_role": "editor" },
-    { "slug": "coupons",   "label": "Coupons de réduction",   "url": "/plugin-assets/ecommerce/admin/coupons.html",   "min_role": "editor" }
+    { "slug": "coupons",   "label": "Coupons de réduction",   "url": "/plugin-assets/ecommerce/admin/coupons.html",   "min_role": "editor" },
+    { "slug": "pro-tiers", "label": "Barème pros",             "url": "/plugin-assets/ecommerce/admin/pro-tiers.html", "min_role": "super_admin" },
+    { "slug": "invoices",  "label": "Factures",                "url": "/plugin-assets/ecommerce/admin/invoices.html",  "min_role": "editor" }
   ]
 }

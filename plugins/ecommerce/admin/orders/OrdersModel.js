@@ -5,7 +5,7 @@
  */
 
 import { BaseModel } from '../_lib/Model.js';
-import { apiGet, apiPut, apiPost } from '../_lib/api.js';
+import { apiGet, apiPut, apiPost, apiDelete } from '../_lib/api.js';
 
 export class OrdersModel extends BaseModel {
   constructor() {
@@ -49,6 +49,13 @@ export class OrdersModel extends BaseModel {
     const result = await apiPost(`/admin/orders/${id}/refund`, body);
     await this.load(this.state.filters);
     this.emit('refunded', result);
+    return result;
+  }
+
+  async deleteOrder(id) {
+    const result = await apiDelete(`/admin/orders/${id}`);
+    await this.load(this.state.filters);
+    this.emit('deleted', result);
     return result;
   }
 

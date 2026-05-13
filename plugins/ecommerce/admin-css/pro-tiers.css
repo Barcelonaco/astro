@@ -1,0 +1,52 @@
+/* Pro tiers admin page — bareme pros. */
+
+.tiers-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tiers-table th, .tiers-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--gray-200); }
+.tiers-table th { font-size: 11px; text-transform: uppercase; color: var(--gray-500); letter-spacing: 0.04em; font-weight: 500; }
+.tiers-table tbody tr:hover { background: var(--gray-50); }
+.tiers-table input {
+  width: 100%; box-sizing: border-box;
+  font-size: 13px; padding: 6px 8px;
+  border: 1px solid var(--gray-300); border-radius: 4px;
+  background: white; color: var(--gray-900);
+}
+.tiers-table input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(var(--primary-rgb, 59,130,246), 0.15); }
+.tiers-table input[type="number"] { text-align: right; }
+
+.tiers-actions {
+  display: flex; gap: 8px; align-items: center; margin-top: 16px;
+}
+
+.preview-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.preview-table th, .preview-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--gray-200); }
+.preview-table th { font-size: 11px; text-transform: uppercase; color: var(--gray-500); letter-spacing: 0.04em; font-weight: 500; }
+.preview-table tbody tr:hover { background: var(--gray-50); }
+
+.tier-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
+}
+.tier-badge.match { background: var(--gray-100); color: var(--gray-700); }
+.tier-badge.mismatch { background: #fff3cd; color: #856404; }
+
+.override-flag {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.override-flag.yes { background: #cce5ff; color: #004085; }
+.override-flag.no { background: var(--gray-100); color: var(--gray-500); }
+
+.row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+.icon-btn {
+  background: transparent; border: 1px solid var(--gray-300);
+  width: 32px; height: 32px; border-radius: 4px;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--gray-700);
+}
+.icon-btn:hover { background: var(--gray-100); }
+.icon-btn.danger:hover { background: #fee; color: #c00; border-color: #fcc; }
+
+.empty { padding: 32px; text-align: center; color: var(--gray-500); }
+
+.section-gap { margin-top: 32px; }

@@ -1,0 +1,320 @@
+---
+/**
+ * /politique-confidentialite — Politique de confidentialite (RGPD)
+ */
+import BaseHead from '@frontend/components/BaseHead.astro'
+import Header from '@frontend/components/Header.astro'
+import Footer from '@frontend/components/Footer.astro'
+import SiteOverlays from '@frontend/components/SiteOverlays.astro'
+import DeferredLoader from '@frontend/components/DeferredLoader.astro'
+import { SITE_TITLE } from '@frontend/consts'
+import { getFrontendBootstrap } from '@frontend/lib/api'
+import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+
+const companyName = siteSettings.company_name || '[Raison sociale]'
+const companyAddress = siteSettings.company_address || '[Adresse du siege social]'
+const companyEmail = siteSettings.company_email || '[Email de contact]'
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`Politique de confidentialite — ${siteName}`} description="Politique de confidentialite et protection des donnees personnelles" styleSettings={styleSettings} siteSettings={siteSettings} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page legal-wrap">
+      <div class="legal-container">
+        <h1>Politique de confidentialite</h1>
+
+        <nav class="legal-toc" aria-label="Sommaire">
+          <h2>Sommaire</h2>
+          <ol>
+            <li><a href="#introduction">Introduction</a></li>
+            <li><a href="#responsable">Responsable du traitement</a></li>
+            <li><a href="#collecte">Donnees collectees</a></li>
+            <li><a href="#finalites">Finalites du traitement</a></li>
+            <li><a href="#base-legale">Base legale des traitements</a></li>
+            <li><a href="#destinataires">Destinataires des donnees</a></li>
+            <li><a href="#transferts">Transferts de donnees</a></li>
+            <li><a href="#conservation">Duree de conservation</a></li>
+            <li><a href="#cookies">Cookies et traceurs</a></li>
+            <li><a href="#droits">Vos droits</a></li>
+            <li><a href="#securite">Securite des donnees</a></li>
+            <li><a href="#modifications">Modifications de la politique</a></li>
+            <li><a href="#contact">Contact</a></li>
+          </ol>
+        </nav>
+
+        <section id="introduction">
+          <h2>Article 1 — Introduction</h2>
+          <p>La societe {companyName} (ci-apres "nous", "notre", "le Responsable de traitement") accorde une importance particuliere a la protection de vos donnees personnelles.</p>
+          <p>La presente politique de confidentialite a pour objet de vous informer sur la maniere dont nous collectons, utilisons, partageons et protegeons vos donnees personnelles, conformement au Reglement (UE) 2016/679 du Parlement europeen et du Conseil du 27 avril 2016 relatif a la protection des personnes physiques a l'egard du traitement des donnees a caractere personnel (RGPD) et a la loi n° 78-17 du 6 janvier 1978 relative a l'informatique, aux fichiers et aux libertes.</p>
+          <p>Cette politique s'applique a l'ensemble des traitements de donnees personnelles realises dans le cadre de l'utilisation de notre site internet et de nos services.</p>
+        </section>
+
+        <section id="responsable">
+          <h2>Article 2 — Responsable du traitement</h2>
+          <p>Le responsable du traitement des donnees personnelles est :</p>
+          <ul>
+            <li><strong>Societe :</strong> {companyName}</li>
+            <li><strong>Adresse :</strong> {companyAddress}</li>
+            <li><strong>Email :</strong> {companyEmail}</li>
+          </ul>
+        </section>
+
+        <section id="collecte">
+          <h2>Article 3 — Donnees collectees</h2>
+          <p>Nous collectons les categories de donnees personnelles suivantes :</p>
+
+          <h3>3.1 Donnees d'identification</h3>
+          <ul>
+            <li>Nom et prenom</li>
+            <li>Adresse postale (livraison et facturation)</li>
+            <li>Adresse email</li>
+            <li>Numero de telephone</li>
+            <li>Pour les professionnels : raison sociale, numero SIRET, numero TVA intracommunautaire</li>
+          </ul>
+
+          <h3>3.2 Donnees de commande</h3>
+          <ul>
+            <li>Historique des commandes</li>
+            <li>Produits consultes et achetes</li>
+            <li>Montants des transactions</li>
+            <li>Mode de paiement utilise (sans les donnees bancaires completes)</li>
+            <li>Adresses de livraison</li>
+          </ul>
+
+          <h3>3.3 Donnees de connexion et de navigation</h3>
+          <ul>
+            <li>Adresse IP</li>
+            <li>Type et version du navigateur</li>
+            <li>Systeme d'exploitation</li>
+            <li>Pages visitees, date et heure de visite</li>
+            <li>Donnees de cookies et traceurs (voir article 9)</li>
+          </ul>
+
+          <h3>3.4 Donnees de communication</h3>
+          <ul>
+            <li>Messages envoyes via le formulaire de contact</li>
+            <li>Echanges avec le service client</li>
+            <li>Avis et evaluations de produits</li>
+          </ul>
+        </section>
+
+        <section id="finalites">
+          <h2>Article 4 — Finalites du traitement</h2>
+          <p>Vos donnees personnelles sont traitees pour les finalites suivantes :</p>
+          <ol>
+            <li><strong>Gestion des commandes :</strong> traitement, suivi et livraison des commandes ; gestion des retours et remboursements.</li>
+            <li><strong>Gestion de la relation client :</strong> creation et gestion de votre compte client ; service apres-vente ; reponse a vos demandes.</li>
+            <li><strong>Facturation et comptabilite :</strong> emission de factures ; gestion des paiements et des relances.</li>
+            <li><strong>Amelioration de nos services :</strong> analyse de la frequentation et du comportement de navigation ; personnalisation de l'experience utilisateur ; amelioration de notre catalogue et de notre site.</li>
+            <li><strong>Communication commerciale :</strong> envoi de newsletters et d'offres promotionnelles (sous reserve de votre consentement prealable).</li>
+            <li><strong>Obligations legales :</strong> respect de nos obligations legales et reglementaires (fiscalite, lutte contre la fraude).</li>
+            <li><strong>Securite :</strong> prevention et detection des fraudes ; securisation des transactions et du site.</li>
+          </ol>
+        </section>
+
+        <section id="base-legale">
+          <h2>Article 5 — Base legale des traitements</h2>
+          <p>Nos traitements de donnees personnelles reposent sur les bases legales suivantes :</p>
+          <ul>
+            <li><strong>Execution du contrat :</strong> le traitement est necessaire a l'execution de la commande et a la gestion de votre compte (article 6.1.b du RGPD).</li>
+            <li><strong>Consentement :</strong> pour l'envoi de communications commerciales et le depot de cookies non essentiels (article 6.1.a du RGPD).</li>
+            <li><strong>Interet legitime :</strong> pour l'amelioration de nos services, la prevention de la fraude et la securisation du site (article 6.1.f du RGPD).</li>
+            <li><strong>Obligation legale :</strong> pour le respect de nos obligations comptables et fiscales (article 6.1.c du RGPD).</li>
+          </ul>
+        </section>
+
+        <section id="destinataires">
+          <h2>Article 6 — Destinataires des donnees</h2>
+          <p>Vos donnees personnelles sont accessibles aux categories de destinataires suivantes :</p>
+          <ul>
+            <li><strong>Personnel habilite :</strong> les equipes internes (service commercial, service client, service comptable, equipe technique) dans la limite de leurs attributions respectives.</li>
+            <li><strong>Sous-traitants :</strong> prestataires techniques (hebergement, maintenance), prestataires de paiement, transporteurs et services de livraison.</li>
+            <li><strong>Partenaires :</strong> dans le cadre strict de l'execution de la commande (fabricants pour les garanties, etc.).</li>
+            <li><strong>Autorites competentes :</strong> sur requete judiciaire ou administrative, dans le cadre de nos obligations legales.</li>
+          </ul>
+          <p>Nous ne vendons jamais vos donnees personnelles a des tiers.</p>
+        </section>
+
+        <section id="transferts">
+          <h2>Article 7 — Transferts de donnees</h2>
+          <p>Vos donnees personnelles sont principalement traitees au sein de l'Union europeenne.</p>
+          <p>Dans le cas ou un transfert de donnees vers un pays situe hors de l'Union europeenne serait necessaire (par exemple pour l'utilisation de certains services techniques), nous nous assurons que ce transfert est encadre par :</p>
+          <ul>
+            <li>Une decision d'adequation de la Commission europeenne, ou</li>
+            <li>Des clauses contractuelles types approuvees par la Commission europeenne, ou</li>
+            <li>Tout autre mecanisme conforme au RGPD garantissant un niveau de protection adequat.</li>
+          </ul>
+        </section>
+
+        <section id="conservation">
+          <h2>Article 8 — Duree de conservation</h2>
+          <p>Vos donnees personnelles sont conservees pour la duree necessaire aux finalites pour lesquelles elles ont ete collectees :</p>
+          <ul>
+            <li><strong>Donnees de compte client :</strong> pendant toute la duree de la relation commerciale, puis 3 ans apres le dernier contact.</li>
+            <li><strong>Donnees de commande :</strong> 5 ans a compter de la fin de la relation commerciale (obligations comptables et fiscales).</li>
+            <li><strong>Donnees de facturation :</strong> 10 ans (obligations legales comptables).</li>
+            <li><strong>Donnees de prospection commerciale :</strong> 3 ans a compter du dernier contact actif.</li>
+            <li><strong>Cookies et traceurs :</strong> 13 mois maximum a compter du depot (voir article 9).</li>
+            <li><strong>Donnees de connexion (logs) :</strong> 12 mois.</li>
+          </ul>
+          <p>A l'issue de ces delais, les donnees sont supprimees ou anonymisees de maniere irreversible.</p>
+        </section>
+
+        <section id="cookies">
+          <h2>Article 9 — Cookies et traceurs</h2>
+
+          <h3>9.1 Definition</h3>
+          <p>Un cookie est un petit fichier texte depose sur votre terminal (ordinateur, tablette, telephone) lors de la visite d'un site internet. Il permet au site de memoriser des informations sur votre visite.</p>
+
+          <h3>9.2 Types de cookies utilises</h3>
+          <p>Notre site utilise les categories de cookies suivantes :</p>
+
+          <h3>Cookies strictement necessaires</h3>
+          <p>Ces cookies sont indispensables au fonctionnement du site. Ils permettent d'utiliser les fonctionnalites essentielles (navigation, session, panier d'achat, authentification). Ils ne necessitent pas votre consentement.</p>
+          <ul>
+            <li>Cookie de session</li>
+            <li>Cookie d'identification du panier</li>
+            <li>Cookie de consentement aux cookies</li>
+          </ul>
+
+          <h3>Cookies analytiques</h3>
+          <p>Ces cookies permettent de mesurer l'audience du site et d'analyser son utilisation (pages les plus visitees, parcours de navigation, etc.). Ils sont soumis a votre consentement.</p>
+          <ul>
+            <li>Google Analytics (si active)</li>
+          </ul>
+
+          <h3>Cookies marketing</h3>
+          <p>Ces cookies sont utilises pour vous presenter des publicites pertinentes et mesurer l'efficacite des campagnes publicitaires. Ils sont soumis a votre consentement.</p>
+          <ul>
+            <li>Meta Pixel (si active)</li>
+            <li>Google Tag Manager (si active)</li>
+          </ul>
+
+          <h3>9.3 Gestion des cookies</h3>
+          <p>Lors de votre premiere visite, un bandeau de consentement vous permet d'accepter ou de refuser les cookies non essentiels. Vous pouvez modifier vos preferences a tout moment.</p>
+          <p>Vous pouvez egalement configurer votre navigateur pour refuser les cookies. Notez que le refus de certains cookies peut limiter votre acces a certaines fonctionnalites du site.</p>
+
+          <h3>9.4 Duree de conservation des cookies</h3>
+          <p>Les cookies sont conserves pour une duree maximale de 13 mois a compter de leur depot sur votre terminal. Le consentement recueilli est valable pour une duree de 6 mois.</p>
+        </section>
+
+        <section id="droits">
+          <h2>Article 10 — Vos droits</h2>
+          <p>Conformement au RGPD et a la loi Informatique et Libertes, vous disposez des droits suivants sur vos donnees personnelles :</p>
+
+          <h3>10.1 Droit d'acces</h3>
+          <p>Vous avez le droit d'obtenir la confirmation que vos donnees personnelles sont ou ne sont pas traitees, ainsi que l'acces a ces donnees (article 15 du RGPD).</p>
+
+          <h3>10.2 Droit de rectification</h3>
+          <p>Vous avez le droit de demander la rectification de vos donnees personnelles si elles sont inexactes ou incompletes (article 16 du RGPD).</p>
+
+          <h3>10.3 Droit a l'effacement</h3>
+          <p>Vous avez le droit de demander l'effacement de vos donnees personnelles dans les cas prevus par l'article 17 du RGPD (donnees plus necessaires, retrait du consentement, etc.).</p>
+
+          <h3>10.4 Droit a la limitation du traitement</h3>
+          <p>Vous avez le droit de demander la limitation du traitement de vos donnees dans les cas prevus par l'article 18 du RGPD.</p>
+
+          <h3>10.5 Droit a la portabilite</h3>
+          <p>Vous avez le droit de recevoir vos donnees personnelles dans un format structure, couramment utilise et lisible par machine, et de les transmettre a un autre responsable de traitement (article 20 du RGPD).</p>
+
+          <h3>10.6 Droit d'opposition</h3>
+          <p>Vous avez le droit de vous opposer a tout moment au traitement de vos donnees personnelles fonde sur l'interet legitime, ainsi qu'au traitement a des fins de prospection commerciale (article 21 du RGPD).</p>
+
+          <h3>10.7 Droit de definir des directives post-mortem</h3>
+          <p>Vous avez le droit de definir des directives relatives a la conservation, a l'effacement et a la communication de vos donnees personnelles apres votre deces.</p>
+
+          <h3>10.8 Exercice des droits</h3>
+          <p>Pour exercer l'un de ces droits, vous pouvez nous contacter :</p>
+          <ul>
+            <li>Par email : {companyEmail}</li>
+            <li>Par courrier : {companyName}, {companyAddress}</li>
+          </ul>
+          <p>Nous nous engageons a repondre a votre demande dans un delai d'un mois. Ce delai peut etre prolonge de deux mois supplementaires compte tenu de la complexite ou du nombre de demandes.</p>
+          <p>Une piece d'identite pourra etre demandee en cas de doute raisonnable sur l'identite du demandeur.</p>
+
+          <h3>10.9 Reclamation aupres de la CNIL</h3>
+          <p>Si vous estimez que le traitement de vos donnees personnelles constitue une violation du RGPD, vous avez le droit d'introduire une reclamation aupres de la Commission Nationale de l'Informatique et des Libertes (CNIL) :</p>
+          <ul>
+            <li>En ligne : <a href="https://www.cnil.fr/fr/plaintes" target="_blank" rel="noopener noreferrer">www.cnil.fr/fr/plaintes</a></li>
+            <li>Par courrier : CNIL, 3 Place de Fontenoy, TSA 80715, 75334 Paris Cedex 07</li>
+          </ul>
+        </section>
+
+        <section id="securite">
+          <h2>Article 11 — Securite des donnees</h2>
+          <p>Nous mettons en place des mesures techniques et organisationnelles appropriees pour assurer la securite et la confidentialite de vos donnees personnelles, et notamment pour empecher tout acces non autorise, toute perte, alteration ou divulgation.</p>
+          <p>Ces mesures incluent notamment :</p>
+          <ul>
+            <li>Le chiffrement des communications (protocole HTTPS / TLS)</li>
+            <li>Le chiffrement des donnees sensibles (mots de passe, donnees de paiement)</li>
+            <li>La limitation des acces aux donnees aux seules personnes habilitees</li>
+            <li>La mise en place de sauvegardes regulieres</li>
+            <li>La mise a jour reguliere des systemes et logiciels</li>
+          </ul>
+        </section>
+
+        <section id="modifications">
+          <h2>Article 12 — Modifications de la politique</h2>
+          <p>Nous nous reservons le droit de modifier la presente politique de confidentialite a tout moment. Toute modification sera publiee sur cette page avec indication de la date de mise a jour.</p>
+          <p>En cas de modification substantielle affectant vos droits, nous vous en informerons par email ou par un avis visible sur le site.</p>
+          <p>Nous vous invitons a consulter regulierement cette page pour prendre connaissance des eventuelles modifications.</p>
+        </section>
+
+        <section id="contact">
+          <h2>Article 13 — Contact</h2>
+          <p>Pour toute question relative a la presente politique de confidentialite ou au traitement de vos donnees personnelles, vous pouvez nous contacter :</p>
+          <ul>
+            <li><strong>Email :</strong> {companyEmail}</li>
+            <li><strong>Courrier :</strong> {companyName}, {companyAddress}</li>
+          </ul>
+        </section>
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+
+    <style is:global>
+      .legal-wrap { min-height: 60vh; padding: 40px 0 80px; }
+      .legal-container { max-width: 900px; margin: 0 auto; padding: 0 20px; }
+      .legal-container h1 { font-size: 32px; margin-bottom: 32px; line-height: 1.2; }
+      .legal-container h2 { font-size: 22px; margin-top: 48px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+      .legal-container h3 { font-size: 17px; margin-top: 28px; margin-bottom: 10px; }
+      .legal-container p { font-size: 15px; line-height: 1.7; margin-bottom: 12px; color: #333; }
+      .legal-container ul, .legal-container ol { font-size: 15px; line-height: 1.7; margin: 12px 0; padding-left: 24px; color: #333; }
+      .legal-container li { margin-bottom: 6px; }
+      .legal-container a { color: var(--color-primary, #0f62fe); text-decoration: underline; }
+      .legal-container a:hover { text-decoration: none; }
+      .legal-container strong { font-weight: 600; }
+      .legal-container section { margin-bottom: 16px; }
+
+      .legal-toc { background: #fafaf8; border: 1px solid #eee; border-radius: 6px; padding: 24px 28px; margin-bottom: 40px; }
+      .legal-toc h2 { font-size: 18px; margin: 0 0 14px; padding: 0; border: none; }
+      .legal-toc ol { margin: 0; padding-left: 20px; }
+      .legal-toc li { margin-bottom: 4px; font-size: 14px; }
+      .legal-toc a { color: var(--color-primary, #0f62fe); text-decoration: none; }
+      .legal-toc a:hover { text-decoration: underline; }
+
+      @media (max-width: 600px) {
+        .legal-container h1 { font-size: 26px; }
+        .legal-container h2 { font-size: 19px; }
+        .legal-toc { padding: 18px 20px; }
+      }
+    </style>
+  </body>
+</html>

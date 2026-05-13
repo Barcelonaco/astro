@@ -44,6 +44,9 @@ require_once __DIR__ . '/OrderMailer.php';
 require_once __DIR__ . '/CustomerAdminController.php';
 require_once __DIR__ . '/StripeController.php';
 require_once __DIR__ . '/SEPAController.php';
+require_once __DIR__ . '/ProTierService.php';
+require_once __DIR__ . '/InvoiceController.php';
+require_once __DIR__ . '/ProductDocumentController.php';
 
 // ── Migration ──────────────────────────────────────────────────────────────
 register_plugin_migration('ecommerce', function (callable $log): int {
@@ -97,6 +100,8 @@ register_plugin_route('ecommerce', function (string $method, string $path) use (
     if ($method === 'PUT'  && $path === '/customer/auth/profile')           { CustomerAuthController::updateProfile();   return true; }
     if ($method === 'POST' && $path === '/customer/auth/forgot-password')   { CustomerAuthController::forgotPassword();  return true; }
     if ($method === 'POST' && $path === '/customer/auth/reset-password')    { CustomerAuthController::resetPassword();   return true; }
+    if (($method === 'DELETE' || $method === 'POST') && $path === '/customer/auth/account') { CustomerAuthController::deleteAccount(); return true; }
+    if ($method === 'POST'   && $path === '/customer/auth/erasure-request') { CustomerAuthController::requestErasure();  return true; }
     if ($method === 'GET'  && $path === '/customer/addresses')              { CustomerAuthController::listAddresses();   return true; }
     if ($method === 'POST' && $path === '/customer/addresses')              { CustomerAuthController::createAddress();   return true; }
     if ($method === 'PUT'    && $ecommerce_match('/customer/addresses/:id', $path, $params)) {
@@ -104,6 +109,14 @@ register_plugin_route('ecommerce', function (string $method, string $path) use (
     }
     if ($method === 'DELETE' && $ecommerce_match('/customer/addresses/:id', $path, $params)) {
         CustomerAuthController::deleteAddress((int) $params['id']); return true;
+    }
+
+    // ── Customer documents (resources / downloads) ──
+    if ($method === 'GET' && $path === '/customer/documents') {
+        ProductDocumentController::listForCustomer(); return true;
+    }
+    if ($method === 'GET' && $ecommerce_match('/customer/documents/:id/download', $path, $params)) {
+        ProductDocumentController::download((int) $params['id']); return true;
     }
 
     // ── Shop : catalogue public ──
@@ -132,6 +145,9 @@ register_plugin_route('ecommerce', function (string $method, string $path) use (
     if ($method === 'GET' && $path === '/shop/shipping-rates')      { ShippingController::rates();              return true; }
     if ($method === 'GET' && $path === '/shop/payment-config')      { StripeController::publicConfig();         return true; }
     if ($method === 'GET' && $path === '/shop/tax-rates')           { TaxAdminController::listPublic();         return true; }
+    if ($method === 'GET' && $ecommerce_match('/shop/products/:id/documents', $path, $params)) {
+        ProductDocumentController::listForProduct((int) $params['id']); return true;
+    }
 
     // ── Cart ──
     if ($method === 'GET'    && $path === '/cart')           { CartController::getCart();      return true; }
@@ -182,6 +198,17 @@ register_plugin_route('ecommerce', function (string $method, string $path) use (
         SEPAController::charge(); return true;
     }
 
+    // ── SEPA documents (customer) ──
+    if ($method === 'POST' && $path === '/payments/sepa/documents') {
+        SEPAController::uploadDocument(); return true;
+    }
+    if ($method === 'GET' && $path === '/payments/sepa/documents') {
+        SEPAController::listDocuments(); return true;
+    }
+    if ($method === 'DELETE' && $ecommerce_match('/payments/sepa/documents/:id', $path, $params)) {
+        SEPAController::deleteDocument((int) $params['id']); return true;
+    }
+
     // ── Admin SEPA mandates ──
     if ($method === 'GET' && $path === '/admin/sepa/mandates') {
         $u = authenticate_token(); require_min_role($u, 'editor');
@@ -193,6 +220,52 @@ register_plugin_route('ecommerce', function (string $method, string $path) use (
         $u = authenticate_token(); require_min_role($u, 'editor');
         require_ecommerce_enabled();
         SEPAController::adminUpdateMandate((int) $params['id']);
+        return true;
+    }
+
+    // ── Admin SEPA documents ──
+    if ($method === 'GET' && $path === '/admin/sepa/documents') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        SEPAController::adminListDocuments();
+        return true;
+    }
+    if ($method === 'GET' && $ecommerce_match('/admin/sepa/documents/:id/download', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        SEPAController::adminDownloadDocument((int) $params['id']);
+        return true;
+    }
+
+    // ── Admin product documents ──
+    if ($method === 'GET' && $path === '/admin/product-documents') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        ProductDocumentController::listAll();
+        return true;
+    }
+    if ($method === 'POST' && $path === '/admin/product-documents') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        ProductDocumentController::upload();
+        return true;
+    }
+    if ($method === 'PUT' && $ecommerce_match('/admin/product-documents/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        ProductDocumentController::update((int) $params['id']);
+        return true;
+    }
+    if ($method === 'DELETE' && $ecommerce_match('/admin/product-documents/:id', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        ProductDocumentController::delete((int) $params['id']);
+        return true;
+    }
+    if ($method === 'GET' && $ecommerce_match('/admin/product-documents/:id/download', $path, $params)) {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        ProductDocumentController::adminDownload((int) $params['id']);
         return true;
     }
 
@@ -357,6 +430,12 @@ register_plugin_route('ecommerce', function (string $method, string $path) use (
         OrderAdminController::refund((int) $params['id']);
         return true;
     }
+    if ($method === 'DELETE' && $ecommerce_match('/admin/orders/:id', $path, $params)) {
+        $u = authenticate_token(); require_admin($u);
+        require_ecommerce_enabled();
+        OrderAdminController::delete((int) $params['id']);
+        return true;
+    }
 
     // ── Admin Customers ──
     if ($method === 'GET' && $path === '/admin/customers') {
@@ -400,6 +479,64 @@ register_plugin_route('ecommerce', function (string $method, string $path) use (
         $u = authenticate_token(); require_min_role($u, 'editor');
         require_ecommerce_enabled();
         ProductCategoryController::delete((int) $params['id']);
+        return true;
+    }
+
+    // ── Admin Pro Tiers ──
+    if ($method === 'GET' && $path === '/admin/pro-tiers') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        ProTierService::getTiers();
+        return true;
+    }
+    if ($method === 'PUT' && $path === '/admin/pro-tiers') {
+        $u = authenticate_token(); require_admin($u);
+        ProTierService::updateTiers();
+        return true;
+    }
+    if ($method === 'POST' && $path === '/admin/pro-tiers/recalc') {
+        $u = authenticate_token(); require_admin($u);
+        ProTierService::recalcAll();
+        return true;
+    }
+    if ($method === 'GET' && $path === '/admin/pro-tiers/preview') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        ProTierService::preview();
+        return true;
+    }
+
+    // ── Admin Invoices ──
+    if ($method === 'GET' && $path === '/admin/invoices') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        InvoiceController::listAll();
+        return true;
+    }
+    if ($method === 'POST' && $path === '/admin/invoices/generate') {
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        InvoiceController::generate();
+        return true;
+    }
+    if ($method === 'GET' && $ecommerce_match('/admin/invoices/:id/pdf', $path, $params)) {
+        // Support ?token= for direct link downloads (admin opens PDF in new tab)
+        if (!empty($_GET['token']) && empty($_SERVER['HTTP_AUTHORIZATION'])) {
+            $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $_GET['token'];
+        }
+        $u = authenticate_token(); require_min_role($u, 'editor');
+        require_ecommerce_enabled();
+        InvoiceController::downloadPdf((int) $params['id']);
+        return true;
+    }
+
+    // ── Public signed invoice download (email link, no auth) ──
+    if ($method === 'GET' && $ecommerce_match('/invoices/download/:id', $path, $params)) {
+        InvoiceController::publicDownload((int) $params['id']);
+        return true;
+    }
+
+    // ── Customer invoice download ──
+    if ($method === 'GET' && $ecommerce_match('/orders/:id/invoice', $path, $params)) {
+        InvoiceController::customerDownload((int) $params['id']);
         return true;
     }
 

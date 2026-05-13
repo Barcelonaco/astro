@@ -128,6 +128,18 @@ class CustomerAdminController {
             }
         }
 
+        if (isset($body['payment_terms'])) {
+            $allowedTerms = ['immediate', 'net15', 'net30', 'net45', 'net60'];
+            if (in_array($body['payment_terms'], $allowedTerms, true)) {
+                try {
+                    $db->prepare('UPDATE customers SET payment_terms = ? WHERE id = ?')
+                        ->execute([$body['payment_terms'], $id]);
+                } catch (\Throwable $e) {
+                    error_log('payment_terms update failed (column may not exist yet): ' . $e->getMessage());
+                }
+            }
+        }
+
         if (array_key_exists('discount_override', $body)) {
             try {
                 $db->prepare('UPDATE customers SET discount_override = ? WHERE id = ?')

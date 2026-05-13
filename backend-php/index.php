@@ -107,8 +107,9 @@ if (in_array($origin, $allowedOrigins)) {
     header("Access-Control-Allow-Origin: $origin");
 }
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Cart-Token');
 header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Expose-Headers: X-Cart-Token');
 
 // ─── Security headers ────────────────────────────────────────────────────────
 header('X-Content-Type-Options: nosniff');
@@ -213,6 +214,13 @@ if (preg_match('#^/admin(?:/(.*))?$#', $uri, $m)) {
 // Image optimization: /uploads/media/_optimized/{filename}?w=&q=&f=
 if (preg_match('#^/uploads/media/_optimized/(.+)$#', $uri, $m)) {
     serve_optimized_image($m[1]);
+    exit;
+}
+
+// Block direct access to private upload directories
+if (preg_match('#^/uploads/(sepa-docs|product-docs)/#', $uri)) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Access denied']);
     exit;
 }
 
@@ -956,7 +964,7 @@ try {
         require_min_role($user, 'editor');
         CustomPostTypeController::updateItem($params['postType'], (int) $params['id']);
     }
-    elseif ($method === 'DELETE' && match_route('/cpt/:postType/:id', $path, $params)) {
+    elseif ($method === 'DELETE' && match_route('/cpt/:postType/:id', $path, $params) && ctype_digit((string) $params['id'])) {
         $user = authenticate_token();
         require_min_role($user, 'editor');
         CustomPostTypeController::deleteItem($params['postType'], (int) $params['id']);

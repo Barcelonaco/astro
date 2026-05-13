@@ -41,6 +41,7 @@ const initialState = initialProject?.state || null
     getPoolpBootstrap,
     getProject,
     saveProject,
+    updateProject,
     exportProjectPdf,
     addProjectToCart,
     API_URL,
@@ -53,12 +54,14 @@ const initialState = initialProject?.state || null
     runCompute,
     setProjectToken,
     getState,
+    reset,
   } from '../../lib/poolp-store'
   import type {
     PoolpInput,
     Traitement,
     FiltreType,
     PompeType,
+    BoxCode,
   } from '../../lib/poolp-types'
 
   const dataNode = document.getElementById('poolp-bootstrap-data')
@@ -126,12 +129,18 @@ const initialState = initialProject?.state || null
     const params = new URLSearchParams(window.location.search)
     const token = params.get('p')
     if (token) {
+      // Editing an existing project — load its state, start from step 1
+      reset()
       const proj = await getProject(token)
-      if (proj?.state) { updateInput(proj.state as Partial<PoolpInput>); setProjectToken(token) }
-    } else if (initialState) {
-      updateInput(initialState as Partial<PoolpInput>)
+      if (proj?.state) {
+        updateInput(proj.state as Partial<PoolpInput>)
+        setProjectToken(token)
+        setStep(1)
+      }
+    } else {
+      // Fresh wizard — full reset, no leftover data
+      reset()
     }
-    if (initialToken && !token) setProjectToken(initialToken)
     return true
   }
 
@@ -385,7 +394,7 @@ const initialState = initialProject?.state || null
     regul_ph: '<svg viewBox="0 0 24 24"><path d="M12 2C8 2 5 7 5 12s3 10 7 10 7-5 7-10S16 2 12 2z"/><line x1="12" y1="8" x2="12" y2="16"/></svg>',
     electrolyse_ph: '<svg viewBox="0 0 24 24"><path d="M12 2C8 2 5 7 5 12s3 10 7 10 7-5 7-10S16 2 12 2z"/><path d="M9 12h6M12 9v6"/></svg>',
     electrolyse_ph_redox: '<svg viewBox="0 0 24 24"><path d="M12 2C8 2 5 7 5 12s3 10 7 10 7-5 7-10S16 2 12 2z"/><path d="M9 12h6M12 9v6"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>',
-    uv_oxygene: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M8 12h8"/></svg>',
+    uv_oxygene: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></svg>',
     bypass_off: '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="2"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="12" y1="8" x2="12" y2="16"/></svg>',
     bypass_on: '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="2"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="12" y1="8" x2="12" y2="16"/><path d="M17 5l2 3h-4z"/></svg>',
     coffret_distrib: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.2" stroke-linecap="round"><rect x="3" y="6" width="18" height="12" rx="2"/><line x1="7" y1="6" x2="7" y2="18"/><line x1="12" y1="6" x2="12" y2="18"/></svg>',
@@ -444,11 +453,12 @@ const initialState = initialProject?.state || null
 
       <div class="poolp-field-group">
         <div class="poolp-field-label"><strong>Traitement de l'eau</strong> <span class="poolp-info-btn" tabindex="0">i<span class="poolp-tooltip">Automatisez la qualité de l'eau. L'électrolyse au sel produit du chlore naturellement. Le REDOX mesure l'oxydoréduction pour un dosage précis.</span></span></div>
-        <div class="poolp-equip-grid-4">
+        <div class="poolp-equip-grid-5">
           ${tCard('aucun', 'Aucun', 'Traitement manuel')}
           ${tCard('regul_ph', 'Régul pH', 'Dosage auto du pH')}
           ${tCard('electrolyse_ph', 'pH + électrolyse', 'Chlore naturel au sel')}
           ${tCard('electrolyse_ph_redox', '+ REDOX', 'Dosage précis oxydation')}
+          ${tCard('uv_oxygene', 'Combiné UV', 'UV + oxygène actif, sans sel')}
         </div>
       </div>
 
@@ -504,10 +514,42 @@ const initialState = initialProject?.state || null
         <div class="poolp-product-img">${ICONS[iconKey] || ICONS.coffret_distrib}</div>
         <div class="poolp-product-body">
           <div class="poolp-product-name">${escapeHtml(eq!.label)}</div>
-          <div class="poolp-product-ref">${eq!.reference ? `Réf. ${escapeHtml(eq!.reference)}` : 'Réf. [à fournir Scanzi]'}</div>
+          <div class="poolp-product-ref">${eq!.reference ? `Réf. ${escapeHtml(eq!.reference)}` : ''}</div>
         </div>
       </div>`
     }).join('')
+
+    // Build box size selector — all boxes minus excluded, current highlighted
+    const ALL_BOXES: Array<{ code: 'S' | 'M' | 'L'; label: string; volume: string; surface: string }> = [
+      { code: 'S', label: 'Box S', volume: '37 m³', surface: '1,27 m²' },
+      { code: 'M', label: 'Box M', volume: '52 m³', surface: '1,70 m²' },
+      { code: 'L', label: 'Box L', volume: '75 m³', surface: '2,07 m²' },
+    ]
+    const excluded = c.excluded_boxes || []
+    const available = ALL_BOXES.filter(b => !excluded.includes(b.code))
+    const currentCode = c.box.code
+
+    const boxSelector = available.length > 1
+      ? `<div class="poolp-field-group" style="margin-top:24px">
+          <div class="poolp-field-label"><strong>Taille de la box</strong> <span class="poolp-info-btn" tabindex="0">i<span class="poolp-tooltip">La taille recommandee est selectionnee automatiquement. Vous pouvez choisir une taille superieure pour plus d'espace de rangement (robot, bidons…).</span></span></div>
+          <div class="poolp-equip-grid" style="grid-template-columns: repeat(${available.length}, 1fr)">
+            ${available.map(b => {
+              const isSel = b.code === currentCode
+              const isDefault = !s.input.box_override && isSel
+              return `<button class="poolp-equip-card ${isSel ? 'sel' : ''}" data-set-box="${b.code}" type="button">
+                <div class="poolp-equip-card-header">
+                  <div class="poolp-equip-card-name">${b.label}</div>
+                </div>
+                <div class="poolp-equip-card-desc">
+                  Jusqu'a ${b.volume}<br>${b.surface} utile
+                  ${isDefault ? '<br><span style="font-size:11px;color:var(--p-accent,#2563eb);font-weight:600">Recommandee</span>' : ''}
+                </div>
+              </button>`
+            }).join('')}
+          </div>
+          ${excluded.length > 0 ? `<div style="font-size:12px;color:var(--color-text-muted,#6b6b67);margin-top:6px">Box ${excluded.join(' et ')} non disponible${excluded.length > 1 ? 's' : ''} pour votre configuration.</div>` : ''}
+        </div>`
+      : ''
 
     return `
       <div class="poolp-step-title">Étape 3 — Votre box configurée</div>
@@ -527,6 +569,8 @@ const initialState = initialProject?.state || null
           </div>
         </div>
       </div>
+
+      ${boxSelector}
 
       <div class="poolp-nav-btns">
         <button class="poolp-btn sec" data-go-step="3" type="button">← Étape précédente</button>
@@ -660,27 +704,55 @@ const initialState = initialProject?.state || null
       </div>
 
       <div class="poolp-recap-table">
-        <div class="poolp-recap-table-header"><span>Équipement</span><span>Prix TTC</span></div>
-        <div class="poolp-recap-table-row"><span>${escapeHtml(eqLabel)}</span><span>${money(eqPrice)}</span></div>
-        ${fin && fin.title ? `<div class="poolp-recap-table-row"><span>Finition ${escapeHtml(fin.title)}</span><span>${money((fin.custom_fields as { prix_supplement_ttc?: number })?.prix_supplement_ttc ?? 0)}</span></div>` : ''}
-        ${c.livraison ? `<div class="poolp-recap-table-row"><span>Livraison ${escapeHtml(c.livraison.zone_label)} (${s.input.mode_livraison})</span><span>${money(c.livraison.fee_ttc)}</span></div>` : ''}
-        <div class="poolp-recap-table-total"><span>Total TTC</span><span>${money(c.totaux.ttc)}</span></div>
+        <div class="poolp-recap-table-header"><span>Équipement</span><span>${c.is_pro ? 'Prix HT pro' : 'Prix TTC'}</span></div>
+        <div class="poolp-recap-table-row"><span>${escapeHtml(eqLabel)}</span><span>${c.is_pro ? money(Object.values(c.equipements || {}).reduce((sum, eq) => sum + (eq?.prix_pro_ht || 0), 0) + (c.box.prix_base_pro_ht || 0)) : money(eqPrice)}</span></div>
+        ${fin && fin.title ? `<div class="poolp-recap-table-row"><span>Finition ${escapeHtml(fin.title)}</span><span>${c.is_pro ? money((fin.custom_fields as any)?.prix_supplement_pro_ht ?? 0) : money((fin.custom_fields as any)?.prix_supplement_ttc ?? 0)}</span></div>` : ''}
+        ${c.livraison ? `<div class="poolp-recap-table-row"><span>Livraison ${escapeHtml(c.livraison.zone_label)} (${s.input.mode_livraison})</span><span>${c.is_pro ? money(c.livraison.fee_pro_ht ?? 0) : money(c.livraison.fee_ttc)}</span></div>` : ''}
+        ${c.is_pro && c.totaux.discount_rate > 0 ? `
+          <div class="poolp-recap-table-row" style="border-top:1px solid #eee">
+            <span>Sous-total HT</span><span>${money(c.totaux.pro_ht_brut)}</span>
+          </div>
+          <div class="poolp-recap-table-row" style="color:var(--color-primary,#1a5276)">
+            <span>Remise pro (${(c.totaux.discount_rate * 100).toFixed(0)}%)</span><span>-${money(c.totaux.pro_ht_brut - (c.totaux.pro_ht_remise ?? c.totaux.pro_ht_brut))}</span>
+          </div>
+          <div class="poolp-recap-table-total"><span>Total HT remise</span><span>${money(c.totaux.pro_ht_remise)}</span></div>
+        ` : `
+          <div class="poolp-recap-table-total"><span>Total TTC</span><span>${money(c.totaux.ttc)}</span></div>
+        `}
       </div>
 
-      ${c.warnings?.includes('triphase') ? `<div class="poolp-warn-band">⚠ Installation triphasée ou ERP ? Contactez-nous pour un devis adapté.</div>` : ''}
+      ${c.warnings?.includes('triphase') ? `
+        <div class="poolp-warn-block poolp-warn-triphase">
+          <div class="poolp-warn-icon"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+          <div class="poolp-warn-content">
+            <div class="poolp-warn-title">Installation triphase detectee</div>
+            <p>Votre configuration necessite une alimentation electrique triphase. L'installation doit etre realisee par un electricien qualifie. Des equipements supplementaires peuvent etre necessaires.</p>
+            <a href="/contact" class="poolp-warn-cta">Contactez notre equipe pour un devis adapte</a>
+          </div>
+        </div>` : ''}
+      ${c.warnings?.includes('erp') ? `
+        <div class="poolp-warn-block poolp-warn-erp">
+          <div class="poolp-warn-icon"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+          <div class="poolp-warn-content">
+            <div class="poolp-warn-title">Etablissement Recevant du Public (ERP)</div>
+            <p>Pour une installation en ERP, des normes specifiques s'appliquent (securite, accessibilite, signalisation). Un devis sur mesure est necessaire.</p>
+            <a href="/contact" class="poolp-warn-cta">Demander un devis ERP</a>
+          </div>
+        </div>` : ''}
 
-      <div class="poolp-pro-prompt">
-        <div class="poolp-pro-prompt-title">Vous êtes professionnel ?</div>
-        <p class="poolp-pro-prompt-desc">Connectez-vous ou créez un compte pro pour accéder à vos tarifs revendeurs HT.</p>
+      ${!isLoggedIn() ? `<div class="poolp-pro-prompt">
+        <div class="poolp-pro-prompt-title">Vous etes professionnel ?</div>
+        <p class="poolp-pro-prompt-desc">Connectez-vous ou creez un compte pro pour acceder a vos tarifs revendeurs HT.</p>
         <div style="display:flex;gap:10px">
           <a class="poolp-btn sec" href="/compte/connexion" style="font-size:12px;padding:7px 14px">Me connecter</a>
-          <a class="poolp-btn sec" href="/inscription-pro" style="font-size:12px;padding:7px 14px">Créer un compte pro</a>
+          <a class="poolp-btn sec" href="/inscription-pro" style="font-size:12px;padding:7px 14px">Creer un compte pro</a>
         </div>
-      </div>
+      </div>` : ''}
 
       <div class="poolp-actions-grid">
         <button class="poolp-btn cta" data-action="add-to-cart" type="button" style="text-align:center">Ajouter au panier</button>
-        <button class="poolp-btn sec" data-action="save-project" type="button" style="text-align:center">Sauvegarder le projet</button>
+        <button class="poolp-btn sec" data-action="save-project" type="button" style="text-align:center">${getState().projectToken ? 'Sauvegarder les modifications' : 'Sauvegarder le projet'}</button>
+        <button class="poolp-btn sec" data-action="request-quote" type="button" style="text-align:center">Demander un devis</button>
         ${c.is_pro ? `<button class="poolp-btn sec" data-action="export-pdf" type="button" style="text-align:center">Exporter en PDF</button>` : ''}
       </div>
 
@@ -732,6 +804,14 @@ const initialState = initialProject?.state || null
     root.querySelectorAll<HTMLButtonElement>('[data-set-bypass]').forEach(btn => {
       btn.addEventListener('click', () => updateInput({ bypass_pac: btn.dataset.setBypass === '1' }))
     })
+    root.querySelectorAll<HTMLButtonElement>('[data-set-box]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const code = btn.dataset.setBox as BoxCode
+        const current = getState().input.box_override
+        // Click on same override → clear override (back to auto)
+        updateInput({ box_override: current === code ? null : code })
+      })
+    })
     root.querySelectorAll<HTMLButtonElement>('[data-set-finition]').forEach(btn => {
       btn.addEventListener('click', () => updateInput({ finition_id: Number(btn.dataset.setFinition) }))
     })
@@ -746,20 +826,72 @@ const initialState = initialProject?.state || null
     })
   }
 
+  function isLoggedIn(): boolean {
+    return !!localStorage.getItem('customer_token')
+  }
+
+  async function showProQualifModal(): Promise<boolean> {
+    return new Promise(resolve => {
+      const overlay = document.createElement('div')
+      overlay.className = 'poolp-modal-overlay'
+      overlay.innerHTML = `
+        <div class="poolp-modal">
+          <div class="poolp-modal-header">Etes-vous un professionnel ?</div>
+          <p class="poolp-modal-body">Si vous etes un professionnel du batiment ou de la piscine, vous pouvez beneficier de tarifs revendeurs HT et de conditions de paiement adaptees.</p>
+          <div class="poolp-modal-actions">
+            <a href="/inscription-pro" class="poolp-btn cta" style="font-size:13px;padding:8px 16px">Oui, creer un compte pro</a>
+            <button class="poolp-btn sec" data-dismiss="pro-modal" type="button" style="font-size:13px;padding:8px 16px">Non, continuer en tant que particulier</button>
+          </div>
+        </div>`
+      document.body.appendChild(overlay)
+      overlay.querySelector('[data-dismiss="pro-modal"]')?.addEventListener('click', () => {
+        overlay.remove()
+        resolve(true)
+      })
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) { overlay.remove(); resolve(true) }
+      })
+    })
+  }
+
+  async function maybeAskProQualif(): Promise<void> {
+    if (isLoggedIn()) return
+    const s = getState()
+    if (s.input && (s.input as any).qualif_pro_asked) return
+    await showProQualifModal()
+    updateInput({ qualif_pro_asked: 1 } as any)
+    if (s.projectToken) {
+      const { qualifyProject } = await import('@frontend/lib/poolp-api')
+      qualifyProject(s.projectToken, true)
+    }
+  }
+
   async function onRecapAction(action: string): Promise<void> {
     const status = document.getElementById('poolp-recap-status')
     const setStatus = (msg: string) => { if (status) status.textContent = msg }
     const s = getState()
 
     if (action === 'save-project') {
+      await maybeAskProQualif()
       setStatus('Sauvegarde…')
-      const result = await saveProject(s.input)
-      if (!result) return setStatus('Erreur lors de la sauvegarde.')
-      setProjectToken(result.token)
-      const url = new URL(window.location.href)
-      url.searchParams.set('p', result.token)
-      window.history.replaceState({}, '', url.toString())
-      setStatus(`Projet sauvegardé (réf : ${result.token.slice(0, 8)}…)`)
+      const auth = localStorage.getItem('customer_token') || undefined
+      if (s.projectToken) {
+        // Update existing project
+        const ok = await updateProject(s.projectToken, { state: s.input })
+        if (!ok) return setStatus('Erreur lors de la mise a jour.')
+        if (isLoggedIn()) { window.location.href = '/compte/projets'; return }
+        setStatus(`Projet mis a jour (ref : ${s.projectToken.slice(0, 8)}…)`)
+      } else {
+        // Create new project
+        const result = await saveProject(s.input, undefined, auth)
+        if (!result) return setStatus('Erreur lors de la sauvegarde.')
+        setProjectToken(result.token)
+        if (isLoggedIn()) { window.location.href = '/compte/projets'; return }
+        const url = new URL(window.location.href)
+        url.searchParams.set('p', result.token)
+        window.history.replaceState({}, '', url.toString())
+        setStatus(`Projet sauvegarde (ref : ${result.token.slice(0, 8)}…)`)
+      }
       return
     }
     if (action === 'export-pdf') {
@@ -776,7 +908,24 @@ const initialState = initialProject?.state || null
       setStatus(`PDF prêt : ${result.url}`)
       return
     }
+    if (action === 'request-quote') {
+      await maybeAskProQualif()
+      setStatus('Envoi de la demande de devis...')
+      let token = s.projectToken
+      if (!token) {
+        const auth = localStorage.getItem('customer_token') || undefined
+        const saved = await saveProject(s.input, undefined, auth)
+        if (!saved) return setStatus('Sauvegarde du projet echouee.')
+        setProjectToken(saved.token); token = saved.token
+      }
+      const { requestQuote } = await import('@frontend/lib/poolp-api')
+      const result = await requestQuote(token)
+      if (!result) return setStatus('Erreur lors de l\'envoi de la demande.')
+      setStatus('Demande de devis envoyee. Notre equipe vous recontactera rapidement.')
+      return
+    }
     if (action === 'add-to-cart') {
+      await maybeAskProQualif()
       setStatus('Ajout au panier…')
       let token = s.projectToken
       if (!token) {

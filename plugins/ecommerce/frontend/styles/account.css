@@ -267,3 +267,5 @@
 .account-form-status { margin: 10px 0; font-size: 13px; }
 .account-form-status[data-kind="error"] { color: #b91c1c; }
 .account-form-status[data-kind="success"] { color: #276022; }
+
+/* Shop button overrides → see shop-buttons.css (imported per page) */

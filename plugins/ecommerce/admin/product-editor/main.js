@@ -138,6 +138,7 @@ async function mountViews() {
       attributes: qs('#pe-data-attributes'),
       variations: qs('#pe-data-variations'),
       downloads:  qs('#pe-data-downloads'),
+      pro:        qs('#pe-data-pro'),
       advanced:   qs('#pe-data-advanced'),
     },
   }).bind({

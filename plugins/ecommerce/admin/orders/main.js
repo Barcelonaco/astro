@@ -86,9 +86,24 @@ async function openDetail(id) {
   });
 }
 
+// ── Delete order ──
+async function deleteOrder(id, orderNumber) {
+  const ok = await confirmDanger({
+    title: 'Supprimer cette commande ?',
+    text: `La commande ${orderNumber || id} sera definitivement supprimee avec ses articles, factures et paiements associes. Cette action est irreversible.`,
+    confirmText: 'Supprimer',
+  });
+  if (!ok) return;
+  try {
+    await model.deleteOrder(id);
+    toastSuccess('Commande supprimee');
+  } catch (err) { toastError(err?.message || 'Erreur'); }
+}
+
 // ── Wire table view ──
 tableView.mount(document.body).bind({
   onView: withErrorToast(openDetail, 'Erreur chargement commande'),
+  onDelete: deleteOrder,
   onPage: (page) => reloadFiltered(page),
 });
 

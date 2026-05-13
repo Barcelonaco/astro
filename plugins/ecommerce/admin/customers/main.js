@@ -54,10 +54,12 @@ async function openDetail(id) {
           try {
             const proStatus = qs('#detail-pro-status').value;
             const discountRaw = qs('#detail-discount').value;
+            const paymentTerms = qs('#detail-payment-terms')?.value || 'immediate';
             const note = qs('#detail-note').value.trim();
             const body = {
               pro_status: proStatus,
               discount_rate: discountRaw !== '' ? parseFloat(discountRaw) : null,
+              payment_terms: paymentTerms,
               note: note || undefined,
             };
             await model.updateCustomer(id, body);

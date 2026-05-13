@@ -15,11 +15,10 @@ const STATUS_LABELS = {
   awaiting_payment: 'Attente paiement',
   paid: 'Payée',
   processing: 'En traitement',
-  fulfilled: 'Preparee',
-  shipped: 'Expediee',
-  delivered: 'Livree',
-  cancelled: 'Annulee',
-  refunded: 'Remboursee',
+  shipped: 'Expediée',
+  delivered: 'Livrée',
+  cancelled: 'Annulée',
+  refunded: 'Remboursée',
 };
 
 const PAYMENT_LABELS = {
@@ -51,6 +50,13 @@ export class OrdersTableView extends BaseView {
     // Row click → view detail
     delegate(this.tbody, 'click', '[data-view]', (e, btn) => {
       this.handlers.onView?.(+btn.dataset.view);
+    });
+    // Row delete
+    delegate(this.tbody, 'click', '[data-delete]', (e, btn) => {
+      e.stopPropagation();
+      const tr = btn.closest('tr');
+      const id = tr?.dataset?.id;
+      if (id) this.handlers.onDelete?.(+id, tr.querySelector('.cell-order')?.textContent?.trim() || '');
     });
     delegate(this.tbody, 'click', 'tr', (e) => {
       if (e.target.closest('button')) return;

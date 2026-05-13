@@ -61,13 +61,88 @@ class ShippingController {
             ];
         }
 
+        // If cart contains a POOLP configured box, inject the POOLP delivery rate
+        // from the config_snapshot (poolp_delivery_zones) and remove ecommerce rates
+        $poolpRate = self::resolvePoolpDeliveryRate($postcode);
+        if ($poolpRate !== null) {
+            // POOLP rate overrides ecommerce shipping for configured boxes
+            $rates = [$poolpRate];
+        }
+
+        // Rate validity: 7 days from now (CDC §4.2)
+        $validityDays = (int) (PluginController::getPluginOption('ecommerce', 'shipping_rate_validity_days') ?? 7);
+        $validUntil = date('Y-m-d\TH:i:s', strtotime("+{$validityDays} days"));
+
         json_response([
             'postcode' => $postcode,
             'country' => $country,
             'rates' => $rates,
             'subtotal_cents' => $cartContext['subtotal_cents'],
             'weight_grams' => $cartContext['weight_grams'],
+            'valid_until' => $validUntil,
+            'fetched_at' => date('Y-m-d\TH:i:s'),
         ]);
+    }
+
+    /**
+     * If the poolp-configurator plugin is active and the cart contains a POOLP
+     * configured box, resolve delivery from poolp_delivery_zones and return a
+     * virtual shipping rate. Returns null if not applicable.
+     */
+    private static function resolvePoolpDeliveryRate(string $postcode): ?array {
+        // Check cart has poolp custom items
+        $token = trim((string) ($_GET['cart_token'] ?? ($_SERVER['HTTP_X_CART_TOKEN'] ?? '')));
+        if ($token === '') return null;
+
+        $db = Database::getInstance();
+
+        // Check poolp_delivery_zones table exists (plugin active)
+        try {
+            $db->query("SELECT 1 FROM poolp_delivery_zones LIMIT 1");
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        // Check cart has poolp custom items
+        $cart = CartController::loadByToken($token);
+        if (!$cart) return null;
+        $custom = CartController::getCustomItems((int) $cart['id']);
+        $hasPoolp = false;
+        $modeLivraison = 'kit';
+        foreach ($custom as $c) {
+            if (($c['source_type'] ?? '') === 'poolp_configurator') {
+                $hasPoolp = true;
+                $snapshot = is_string($c['config_snapshot']) ? json_decode($c['config_snapshot'], true) : ($c['config_snapshot'] ?? []);
+                $modeLivraison = $snapshot['state']['mode_livraison'] ?? 'kit';
+                break;
+            }
+        }
+        if (!$hasPoolp) return null;
+
+        // Resolve from poolp_delivery_zones
+        $zones = $db->query("SELECT * FROM poolp_delivery_zones WHERE is_active = 1 ORDER BY sort_order, id")->fetchAll();
+        foreach ($zones as $z) {
+            $patterns = is_string($z['postal_codes']) ? json_decode($z['postal_codes'], true) : ($z['postal_codes'] ?? []);
+            if (!empty($patterns) && self::postcodeMatches($postcode, $patterns)) {
+                $feeCents = $modeLivraison === 'montee'
+                    ? (int) ($z['fee_assembled_ttc_cents'] ?? 0)
+                    : (int) ($z['fee_kit_ttc_cents'] ?? 0);
+                return [
+                    'method_id' => -1,
+                    'zone_id' => -1,
+                    'zone_name' => $z['zone_label'],
+                    'name' => 'Livraison POOLP — ' . $z['zone_label'],
+                    'description' => $z['delay_label'] ?? '',
+                    'type' => 'poolp',
+                    'price_cents' => $feeCents,
+                    'tax_code' => 'FR_STANDARD',
+                    'delivery_min_days' => null,
+                    'delivery_max_days' => null,
+                    '_poolp' => true,
+                ];
+            }
+        }
+        return null;
     }
 
     public static function postcodeMatches(string $cp, array $patterns): bool {

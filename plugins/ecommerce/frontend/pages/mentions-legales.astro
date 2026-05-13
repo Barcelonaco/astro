@@ -1,0 +1,186 @@
+---
+/**
+ * /mentions-legales — Mentions legales obligatoires
+ */
+import BaseHead from '@frontend/components/BaseHead.astro'
+import Header from '@frontend/components/Header.astro'
+import Footer from '@frontend/components/Footer.astro'
+import SiteOverlays from '@frontend/components/SiteOverlays.astro'
+import DeferredLoader from '@frontend/components/DeferredLoader.astro'
+import { SITE_TITLE } from '@frontend/consts'
+import { getFrontendBootstrap } from '@frontend/lib/api'
+import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+
+/* Valeurs injectees depuis les settings — a completer dans l'administration */
+const companyName = siteSettings.company_name || '[Raison sociale]'
+const companyForm = siteSettings.company_form || '[Forme juridique]'
+const companyCapital = siteSettings.company_capital || '[Capital social]'
+const companyRcs = siteSettings.company_rcs || '[Numero RCS]'
+const companySiret = siteSettings.company_siret || '[Numero SIRET]'
+const companyTva = siteSettings.company_tva || '[Numero TVA intracommunautaire]'
+const companyAddress = siteSettings.company_address || '[Adresse du siege social]'
+const companyPhone = siteSettings.company_phone || '[Telephone]'
+const companyEmail = siteSettings.company_email || '[Email de contact]'
+const companyDirector = siteSettings.company_director || '[Nom du directeur de publication]'
+const hostName = siteSettings.host_name || '[Nom de l\'hebergeur]'
+const hostAddress = siteSettings.host_address || '[Adresse de l\'hebergeur]'
+const hostPhone = siteSettings.host_phone || '[Telephone de l\'hebergeur]'
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`Mentions legales — ${siteName}`} description="Mentions legales" styleSettings={styleSettings} siteSettings={siteSettings} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page legal-wrap">
+      <div class="legal-container">
+        <h1>Mentions legales</h1>
+
+        <nav class="legal-toc" aria-label="Sommaire">
+          <h2>Sommaire</h2>
+          <ol>
+            <li><a href="#editeur">Editeur du site</a></li>
+            <li><a href="#publication">Directeur de publication</a></li>
+            <li><a href="#hebergeur">Hebergeur</a></li>
+            <li><a href="#propriete">Propriete intellectuelle</a></li>
+            <li><a href="#responsabilite">Limitation de responsabilite</a></li>
+            <li><a href="#liens">Liens hypertextes</a></li>
+            <li><a href="#donnees">Donnees personnelles</a></li>
+            <li><a href="#cookies">Cookies</a></li>
+            <li><a href="#droit">Droit applicable</a></li>
+          </ol>
+        </nav>
+
+        <section id="editeur">
+          <h2>Article 1 — Editeur du site</h2>
+          <p>Le present site est edite par :</p>
+          <ul>
+            <li><strong>Raison sociale :</strong> {companyName}</li>
+            <li><strong>Forme juridique :</strong> {companyForm}</li>
+            <li><strong>Capital social :</strong> {companyCapital}</li>
+            <li><strong>Siege social :</strong> {companyAddress}</li>
+            <li><strong>Numero RCS :</strong> {companyRcs}</li>
+            <li><strong>Numero SIRET :</strong> {companySiret}</li>
+            <li><strong>Numero TVA intracommunautaire :</strong> {companyTva}</li>
+            <li><strong>Telephone :</strong> {companyPhone}</li>
+            <li><strong>Email :</strong> {companyEmail}</li>
+          </ul>
+        </section>
+
+        <section id="publication">
+          <h2>Article 2 — Directeur de publication</h2>
+          <p>Le directeur de la publication du site est : <strong>{companyDirector}</strong>.</p>
+          <p>Contact : {companyEmail}</p>
+        </section>
+
+        <section id="hebergeur">
+          <h2>Article 3 — Hebergeur</h2>
+          <p>Le site est heberge par :</p>
+          <ul>
+            <li><strong>Raison sociale :</strong> {hostName}</li>
+            <li><strong>Adresse :</strong> {hostAddress}</li>
+            <li><strong>Telephone :</strong> {hostPhone}</li>
+          </ul>
+        </section>
+
+        <section id="propriete">
+          <h2>Article 4 — Propriete intellectuelle</h2>
+          <p>L'ensemble des elements figurant sur le site (textes, images, photographies, illustrations, logos, icones, sons, videos, logiciels, bases de donnees, mises en page, etc.) sont proteges par les dispositions du Code de la propriete intellectuelle et appartiennent a l'editeur ou font l'objet d'une autorisation d'utilisation.</p>
+          <p>Toute reproduction, representation, modification, publication, adaptation, totale ou partielle, de ces elements, par quelque moyen ou procede que ce soit, est interdite sans l'autorisation ecrite prealable de l'editeur.</p>
+          <p>Toute exploitation non autorisee du site ou de l'un quelconque des elements qu'il contient sera consideree comme constitutive d'une contrefacon et poursuivie conformement aux dispositions des articles L.335-2 et suivants du Code de la propriete intellectuelle.</p>
+        </section>
+
+        <section id="responsabilite">
+          <h2>Article 5 — Limitation de responsabilite</h2>
+          <p>L'editeur s'efforce de fournir sur le site des informations aussi precises que possible. Toutefois, il ne pourra etre tenu responsable des omissions, des inexactitudes et des carences dans la mise a jour, qu'elles soient de son fait ou du fait de tiers.</p>
+          <p>L'editeur ne saurait etre tenu responsable des dommages directs ou indirects causes au materiel de l'utilisateur lors de l'acces au site, resultant soit de l'utilisation d'un materiel ne repondant pas aux specifications techniques requises, soit de l'apparition d'un bug ou d'une incompatibilite.</p>
+          <p>L'editeur se reserve le droit de modifier, corriger, interrompre ou suspendre le site sans preavis, notamment pour des raisons de maintenance.</p>
+        </section>
+
+        <section id="liens">
+          <h2>Article 6 — Liens hypertextes</h2>
+          <p>Le site peut contenir des liens hypertextes vers d'autres sites internet. L'editeur n'exerce aucun controle sur le contenu de ces sites et decline toute responsabilite quant a leur contenu.</p>
+          <p>La mise en place de liens hypertextes vers le site est autorisee sans demande prealable, sous reserve que la page du site ne soit pas imbriquee a l'interieur des pages d'un autre site (framing).</p>
+        </section>
+
+        <section id="donnees">
+          <h2>Article 7 — Donnees personnelles</h2>
+          <p>Le site collecte des donnees personnelles dans le cadre de son fonctionnement. Le traitement des donnees personnelles est realise conformement au Reglement General sur la Protection des Donnees (RGPD) du 27 avril 2016 et a la loi Informatique et Libertes du 6 janvier 1978 modifiee.</p>
+          <p>Pour toute information detaillee sur le traitement de vos donnees personnelles, veuillez consulter notre <a href="/politique-confidentialite">Politique de confidentialite</a>.</p>
+          <p>Conformement a la reglementation en vigueur, vous disposez des droits suivants :</p>
+          <ul>
+            <li>Droit d'acces a vos donnees personnelles</li>
+            <li>Droit de rectification</li>
+            <li>Droit a l'effacement (droit a l'oubli)</li>
+            <li>Droit a la limitation du traitement</li>
+            <li>Droit a la portabilite</li>
+            <li>Droit d'opposition</li>
+          </ul>
+          <p>Pour exercer ces droits, vous pouvez contacter l'editeur a l'adresse : {companyEmail}.</p>
+          <p>En cas de reclamation non resolue, vous pouvez introduire une reclamation aupres de la Commission Nationale de l'Informatique et des Libertes (CNIL) — <a href="https://www.cnil.fr" target="_blank" rel="noopener noreferrer">www.cnil.fr</a>.</p>
+        </section>
+
+        <section id="cookies">
+          <h2>Article 8 — Cookies</h2>
+          <p>Le site utilise des cookies pour assurer son bon fonctionnement et ameliorer l'experience utilisateur. En poursuivant votre navigation sur le site, vous acceptez l'utilisation de cookies conformement a notre <a href="/politique-confidentialite">Politique de confidentialite</a>.</p>
+          <p>Les cookies utilises se repartissent en plusieurs categories :</p>
+          <ul>
+            <li><strong>Cookies strictement necessaires :</strong> indispensables au fonctionnement du site (session, panier, authentification).</li>
+            <li><strong>Cookies analytiques :</strong> permettent de mesurer l'audience et d'analyser le trafic du site (sous reserve de consentement).</li>
+            <li><strong>Cookies de personnalisation :</strong> memorisent les preferences de l'utilisateur.</li>
+          </ul>
+          <p>Vous pouvez gerer vos preferences en matiere de cookies a tout moment via le bandeau de consentement ou les parametres de votre navigateur.</p>
+        </section>
+
+        <section id="droit">
+          <h2>Article 9 — Droit applicable</h2>
+          <p>Les presentes mentions legales sont soumises au droit francais. Tout litige relatif a l'utilisation du site sera soumis a la competence exclusive des tribunaux francais.</p>
+        </section>
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+
+    <style is:global>
+      .legal-wrap { min-height: 60vh; padding: 40px 0 80px; }
+      .legal-container { max-width: 900px; margin: 0 auto; padding: 0 20px; }
+      .legal-container h1 { font-size: 32px; margin-bottom: 32px; line-height: 1.2; }
+      .legal-container h2 { font-size: 22px; margin-top: 48px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+      .legal-container h3 { font-size: 17px; margin-top: 28px; margin-bottom: 10px; }
+      .legal-container p { font-size: 15px; line-height: 1.7; margin-bottom: 12px; color: #333; }
+      .legal-container ul, .legal-container ol { font-size: 15px; line-height: 1.7; margin: 12px 0; padding-left: 24px; color: #333; }
+      .legal-container li { margin-bottom: 6px; }
+      .legal-container a { color: var(--color-primary, #0f62fe); text-decoration: underline; }
+      .legal-container a:hover { text-decoration: none; }
+      .legal-container strong { font-weight: 600; }
+      .legal-container section { margin-bottom: 16px; }
+
+      .legal-toc { background: #fafaf8; border: 1px solid #eee; border-radius: 6px; padding: 24px 28px; margin-bottom: 40px; }
+      .legal-toc h2 { font-size: 18px; margin: 0 0 14px; padding: 0; border: none; }
+      .legal-toc ol { margin: 0; padding-left: 20px; }
+      .legal-toc li { margin-bottom: 4px; font-size: 14px; }
+      .legal-toc a { color: var(--color-primary, #0f62fe); text-decoration: none; }
+      .legal-toc a:hover { text-decoration: underline; }
+
+      @media (max-width: 600px) {
+        .legal-container h1 { font-size: 26px; }
+        .legal-container h2 { font-size: 19px; }
+        .legal-toc { padding: 18px 20px; }
+      }
+    </style>
+  </body>
+</html>

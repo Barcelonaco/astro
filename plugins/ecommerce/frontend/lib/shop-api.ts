@@ -382,19 +382,40 @@ export async function clearCart(): Promise<Cart> {
   return (await shopRequest<Cart>('DELETE', '/cart'))!
 }
 
+export interface ShippingRatesResponse {
+  rates: ShippingRate[]
+  valid_until: string | null
+  fetched_at: string | null
+}
+
 export async function getShippingRates(postcode: string, country = 'FR'): Promise<ShippingRate[]> {
+  const res = await getShippingRatesWithValidity(postcode, country)
+  return res.rates
+}
+
+export async function getShippingRatesWithValidity(postcode: string, country = 'FR'): Promise<ShippingRatesResponse> {
   const token = getCartToken() || ''
   const q = new URLSearchParams({ postcode, country })
   if (token) q.set('cart_token', token)
-  const res = await shopRequest<{ rates: ShippingRate[] }>('GET', `/shop/shipping-rates?${q.toString()}`)
-  return res?.rates || []
+  const res = await shopRequest<ShippingRatesResponse>('GET', `/shop/shipping-rates?${q.toString()}`)
+  return res || { rates: [], valid_until: null, fetched_at: null }
+}
+
+// ── Coupons ───────────────────────────────────────────────────────────
+
+export async function applyCoupon(code: string): Promise<Cart> {
+  return (await shopRequest<Cart>('POST', '/cart/coupon', { code }))!
+}
+
+export async function removeCoupon(): Promise<Cart> {
+  return (await shopRequest<Cart>('DELETE', '/cart/coupon'))!
 }
 
 export interface CheckoutPayload {
   billing: Partial<OrderAddress>
   shipping?: Partial<OrderAddress>
   shipping_method_id: number
-  payment_method: 'stripe' | 'paypal' | 'bank_transfer' | 'on_invoice'
+  payment_method: 'stripe' | 'paypal' | 'bank_transfer' | 'on_invoice' | 'cheque'
   notes?: string
 }
 
