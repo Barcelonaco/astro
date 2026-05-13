@@ -82,23 +82,44 @@ class RenderBlockController {
         }
 
         if (!$reviewsData) {
-            $url = "https://maps.googleapis.com/maps/api/place/details/json"
-                . "?place_id=" . urlencode($placeId)
-                . "&fields=reviews,rating,user_ratings_total"
-                . "&key=" . urlencode($apiKey)
-                . "&language=fr";
+            // Places API (New)
+            $url = "https://places.googleapis.com/v1/places/" . urlencode($placeId) . "?languageCode=fr";
             $ch = curl_init($url);
-            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2]);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+                CURLOPT_HTTPHEADER => [
+                    'X-Goog-Api-Key: ' . $apiKey,
+                    'X-Goog-FieldMask: rating,userRatingCount,reviews',
+                ],
+            ]);
             $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
             $json = json_decode($response, true);
-            if (!$json || ($json['status'] ?? '') !== 'OK') {
-                return '<p style="text-align:center;padding:2rem;color:red;">Erreur API Google Places: ' . htmlspecialchars($json['status'] ?? 'UNKNOWN') . '</p>';
+            if (!$json || $httpCode !== 200) {
+                $errorMsg = $json['error']['message'] ?? 'UNKNOWN';
+                return '<p style="text-align:center;padding:2rem;color:red;">Erreur API Google Places: ' . htmlspecialchars($errorMsg) . '</p>';
+            }
+            // Normalize new API response → legacy format
+            $reviews = [];
+            foreach ($json['reviews'] ?? [] as $r) {
+                $reviews[] = [
+                    'author_name' => $r['authorAttribution']['displayName'] ?? '',
+                    'author_url' => $r['authorAttribution']['uri'] ?? '',
+                    'profile_photo_url' => $r['authorAttribution']['photoUri'] ?? '',
+                    'rating' => (int) ($r['rating'] ?? 0),
+                    'relative_time_description' => $r['relativePublishTimeDescription'] ?? '',
+                    'text' => $r['text']['text'] ?? '',
+                    'time' => strtotime($r['publishTime'] ?? 'now'),
+                ];
             }
             $reviewsData = [
-                'rating' => $json['result']['rating'] ?? 0,
-                'user_ratings_total' => $json['result']['user_ratings_total'] ?? 0,
-                'reviews' => $json['result']['reviews'] ?? [],
+                'rating' => $json['rating'] ?? 0,
+                'user_ratings_total' => $json['userRatingCount'] ?? 0,
+                'reviews' => $reviews,
             ];
             file_put_contents($cacheFile, json_encode($reviewsData, JSON_UNESCAPED_UNICODE));
         }
