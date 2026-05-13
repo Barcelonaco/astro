@@ -63,7 +63,8 @@ import NicklPrivacyPolicy from './blocks/NicklPrivacyPolicy.astro';
 import BeforeAfter from './blocks/BeforeAfter.astro';
 import ParallaxInit from './ParallaxInit.astro';
 import ModuleAnimations from './ModuleAnimations.astro';
-
+import PoolpBoxHero from '@plugins/poolp-box-hero/templates/PoolpBoxHero.astro';
+import PoolpBoxFinitions from '@plugins/poolp-box-finitions/templates/PoolpBoxFinitions.astro';
 interface Block {
   id?: string;
   type: string;
@@ -215,6 +216,10 @@ const blocks = rawBlocks.filter(b => !inactiveSet.has(b.type));
       // Plugins
       case 'before-after':
         return <BeforeAfter data={data} />;
+      case 'poolp-box-hero':
+        return <PoolpBoxHero data={data} />;
+      case 'poolp-box-finitions':
+        return <PoolpBoxFinitions data={data} />;
 
       default:
         // Plugin blocks: rendered server-side via API
