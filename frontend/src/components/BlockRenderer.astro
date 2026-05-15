@@ -215,6 +215,10 @@ const blocks = rawBlocks.filter(b => !inactiveSet.has(b.type));
       // Plugins
       case 'before-after':
         return <BeforeAfter data={data} />;
+      case 'poolp-box-hero':
+        return <PoolpBoxHero data={data} />;
+      case 'poolp-box-finitions':
+        return <PoolpBoxFinitions data={data} />;
 
       default:
         // Plugin blocks: rendered server-side via API
