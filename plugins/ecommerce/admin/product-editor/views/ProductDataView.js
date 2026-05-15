@@ -27,6 +27,7 @@ export class ProductDataView extends BaseView {
     this._renderAttributesPlaceholder();
     this._renderVariationsPlaceholder();
     this._renderDownloads();
+    this._renderPro();
     this._renderAdvanced();
     return this;
   }
@@ -65,6 +66,16 @@ export class ProductDataView extends BaseView {
     // Downloads
     qs('#pe-dl-file', this.panels.downloads).value = cf.download_file || '';
     qs('#pe-dl-limit', this.panels.downloads).value = cf.download_limit ?? '';
+
+    // Pro / Technique
+    if (this.panels.pro) {
+      qs('#pe-pro-price', this.panels.pro).value = cf.pro_price ?? '';
+      qs('#pe-debit-min', this.panels.pro).value = cf.debit_min ?? '';
+      qs('#pe-debit-max', this.panels.pro).value = cf.debit_max ?? '';
+      qs('#pe-volume-min', this.panels.pro).value = cf.volume_min ?? '';
+      qs('#pe-volume-max', this.panels.pro).value = cf.volume_max ?? '';
+      qs('#pe-reference-constructeur', this.panels.pro).value = cf.reference_constructeur ?? '';
+    }
 
     // Advanced
     qs('#pe-purchase-note', this.panels.advanced).value = cf.purchase_note || '';
@@ -412,6 +423,50 @@ export class ProductDataView extends BaseView {
         h('input', { id: 'pe-dl-limit', class: 'form-input', type: 'number',
           placeholder: 'Vide = illimité',
           onchange: (e) => this._patch({ download_limit: +e.target.value || null }) }),
+      ),
+    );
+  }
+
+  _renderPro() {
+    if (!this.panels.pro) return;
+    this.panels.pro.replaceChildren(
+      h('p', { style: 'font-size:12px;color:#666;margin-bottom:12px' }, 'Prix professionnel et plage technique (CDC §7.2). Le prix pro HT est utilise pour calculer la remise par statut.'),
+      h('div', { class: 'form-row' },
+        h('div', { class: 'form-group' },
+          h('label', { class: 'form-label' }, 'Prix pro HT (EUR)'),
+          h('input', { id: 'pe-pro-price', class: 'form-input', type: 'number', step: '0.01',
+            onchange: (e) => this._patch({ pro_price: parseFloat(e.target.value) || null }) }),
+        ),
+        h('div', { class: 'form-group' },
+          h('label', { class: 'form-label' }, 'Reference constructeur'),
+          h('input', { id: 'pe-reference-constructeur', class: 'form-input', type: 'text',
+            onchange: (e) => this._patch({ reference_constructeur: e.target.value || null }) }),
+        ),
+      ),
+      h('div', { style: 'font-size:12px;font-weight:600;margin:12px 0 6px;color:#333' }, 'Plage technique'),
+      h('div', { class: 'form-row' },
+        h('div', { class: 'form-group' },
+          h('label', { class: 'form-label' }, 'Debit min (m3/h)'),
+          h('input', { id: 'pe-debit-min', class: 'form-input', type: 'number', step: '0.1',
+            onchange: (e) => this._patch({ debit_min: parseFloat(e.target.value) || null }) }),
+        ),
+        h('div', { class: 'form-group' },
+          h('label', { class: 'form-label' }, 'Debit max (m3/h)'),
+          h('input', { id: 'pe-debit-max', class: 'form-input', type: 'number', step: '0.1',
+            onchange: (e) => this._patch({ debit_max: parseFloat(e.target.value) || null }) }),
+        ),
+      ),
+      h('div', { class: 'form-row' },
+        h('div', { class: 'form-group' },
+          h('label', { class: 'form-label' }, 'Volume min (m3)'),
+          h('input', { id: 'pe-volume-min', class: 'form-input', type: 'number', step: '0.1',
+            onchange: (e) => this._patch({ volume_min: parseFloat(e.target.value) || null }) }),
+        ),
+        h('div', { class: 'form-group' },
+          h('label', { class: 'form-label' }, 'Volume max (m3)'),
+          h('input', { id: 'pe-volume-max', class: 'form-input', type: 'number', step: '0.1',
+            onchange: (e) => this._patch({ volume_max: parseFloat(e.target.value) || null }) }),
+        ),
       ),
     );
   }

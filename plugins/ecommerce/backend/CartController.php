@@ -124,6 +124,7 @@ class CartController {
         $db = Database::getInstance();
         $db->prepare('DELETE FROM cart_items WHERE cart_id = ?')->execute([$cart['id']]);
         $db->prepare('DELETE FROM cart_items_custom WHERE cart_id = ?')->execute([$cart['id']]);
+        $db->prepare('UPDATE carts SET coupon_code = NULL WHERE id = ?')->execute([$cart['id']]);
         self::touchCart($cart['id']);
         json_response(self::serialize(self::loadCart($cart['id'])));
     }
@@ -134,9 +135,31 @@ class CartController {
         if ($code === '') error_response('code requis', 400);
         $cart = self::requireCart();
         $db = Database::getInstance();
-        $stmt = $db->prepare('SELECT id FROM coupons WHERE code = ? AND is_active = 1 AND (expires_at IS NULL OR expires_at > NOW()) AND (starts_at IS NULL OR starts_at <= NOW())');
+        $stmt = $db->prepare('SELECT * FROM coupons WHERE code = ? AND is_active = 1 AND (expires_at IS NULL OR expires_at > NOW()) AND (starts_at IS NULL OR starts_at <= NOW())');
         $stmt->execute([$code]);
-        if (!$stmt->fetch()) error_response('Code invalide ou expiré', 404);
+        $coupon = $stmt->fetch();
+        if (!$coupon) error_response('Code invalide ou expire', 404);
+
+        // Check max uses (global)
+        $maxUses = $coupon['max_uses'] !== null ? (int) $coupon['max_uses'] : null;
+        $timesUsed = (int) ($coupon['used_count'] ?? 0);
+        if ($maxUses !== null && $timesUsed >= $maxUses) {
+            error_response('Ce code promo a atteint sa limite d\'utilisation', 400);
+        }
+
+        // Check max uses per customer
+        $maxPerCustomer = $coupon['max_uses_per_customer'] !== null ? (int) $coupon['max_uses_per_customer'] : null;
+        if ($maxPerCustomer !== null) {
+            $customerId = self::optionalCustomerId();
+            if ($customerId) {
+                $stmt = $db->prepare('SELECT COUNT(*) FROM coupon_usages WHERE coupon_id = ? AND customer_id = ?');
+                $stmt->execute([$coupon['id'], $customerId]);
+                if ((int) $stmt->fetchColumn() >= $maxPerCustomer) {
+                    error_response('Vous avez deja utilise ce code promo', 400);
+                }
+            }
+        }
+
         $db->prepare('UPDATE carts SET coupon_code = ? WHERE id = ?')->execute([$code, $cart['id']]);
         json_response(self::serialize(self::loadCart($cart['id'])));
     }
@@ -218,6 +241,7 @@ class CartController {
                 'source_type' => $r['source_type'],
                 'source_id' => $r['source_id'] !== null ? (int) $r['source_id'] : null,
                 'title' => $r['title'],
+                'subtitle' => $r['subtitle'] ?? null,
                 'config_snapshot' => is_string($r['config_snapshot']) ? json_decode($r['config_snapshot'], true) : $r['config_snapshot'],
                 'quantity' => (int) $r['quantity'],
                 'unit_price_cents' => (int) $r['unit_price_ttc_cents'],
@@ -245,35 +269,95 @@ class CartController {
         $taxBreakdown = [];
         $taxMention = $taxContext['mention'] ?? '';
 
-        // Tous les prix (produits shop ET custom POOLP) sont stockés TTC.
+        // Tous les prix (produits shop ET custom items) sont stockés TTC.
         foreach (array_merge($items, $custom) as $line) {
             $subtotalTtc += $line['line_total_cents'];
             $nominalRate = self::taxRate($line['tax_code'] ?? 'FR_STANDARD');
             $key = (string) $nominalRate;
 
             if ($taxContext && $taxContext['exempt']) {
-                // Client exonere (pro UE/export/franchise) → 0% TVA
                 $tax = 0;
             } else {
-                // TVA normale : extraire du TTC
                 $tax = (int) round($line['line_total_cents'] - $line['line_total_cents'] / (1 + $nominalRate / 100));
             }
             $taxBreakdown[$key] = ($taxBreakdown[$key] ?? 0) + $tax;
         }
 
-        $taxTotal = array_sum($taxBreakdown);
-        $subtotalHt = $subtotalTtc - $taxTotal;
+        // Coupon discount
+        $discountCents = 0;
+        $couponCode = null;
+        $cart = self::loadCart($cartId);
+        if ($cart && !empty($cart['coupon_code'])) {
+            $couponCode = $cart['coupon_code'];
+            $coupon = self::loadCoupon($couponCode);
+            if ($coupon) {
+                $discountCents = self::computeCouponDiscount($coupon, $subtotalTtc, $items);
+            }
+        }
+
+        $afterDiscountTtc = max(0, $subtotalTtc - $discountCents);
+
+        // Recalculate tax on discounted total (proportional reduction)
+        $taxTotal = 0;
+        if ($subtotalTtc > 0 && $afterDiscountTtc > 0) {
+            $ratio = $afterDiscountTtc / $subtotalTtc;
+            $recalcBreakdown = [];
+            foreach ($taxBreakdown as $k => $v) {
+                $adjusted = (int) round($v * $ratio);
+                $recalcBreakdown[$k] = $adjusted;
+                $taxTotal += $adjusted;
+            }
+            $taxBreakdown = $recalcBreakdown;
+        } elseif ($afterDiscountTtc <= 0) {
+            $taxBreakdown = [];
+        }
+
+        $subtotalHt = $afterDiscountTtc - $taxTotal;
 
         return [
             'subtotal_cents' => $subtotalHt,
             'tax_cents' => $taxTotal,
             'tax_breakdown' => $taxBreakdown,
-            'total_cents' => $subtotalTtc,
+            'total_cents' => $afterDiscountTtc,
+            'discount_cents' => $discountCents,
+            'coupon_code' => $couponCode,
             'tax_mention' => $taxMention,
             'tax_exempt' => !empty($taxContext['exempt']),
             'items_count' => array_sum(array_map(fn($i) => $i['quantity'], $items))
                 + array_sum(array_map(fn($i) => $i['quantity'], $custom)),
         ];
+    }
+
+    public static function loadCouponStatic(string $code): ?array {
+        return self::loadCoupon($code);
+    }
+
+    private static function loadCoupon(string $code): ?array {
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT * FROM coupons WHERE code = ? AND is_active = 1 AND (expires_at IS NULL OR expires_at > NOW()) AND (starts_at IS NULL OR starts_at <= NOW())');
+        $stmt->execute([$code]);
+        return $stmt->fetch() ?: null;
+    }
+
+    private static function computeCouponDiscount(array $coupon, int $subtotalTtc, array $items): int {
+        $type = $coupon['type'];
+        $minSubtotal = $coupon['min_subtotal_cents'] !== null ? (int) $coupon['min_subtotal_cents'] : 0;
+        if ($subtotalTtc < $minSubtotal) return 0;
+
+        if ($type === 'free_shipping') return 0; // handled at shipping level
+
+        if ($type === 'percent') {
+            $pct = (float) ($coupon['percent'] ?? 0);
+            if ($pct <= 0 || $pct > 100) return 0;
+            return (int) round($subtotalTtc * $pct / 100);
+        }
+
+        if ($type === 'fixed') {
+            $fixed = (int) ($coupon['value_cents'] ?? 0);
+            return min($fixed, $subtotalTtc);
+        }
+
+        return 0;
     }
 
     public static function emptyCart(): array {

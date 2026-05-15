@@ -214,6 +214,142 @@ class SEPAController {
         json_response(['message' => 'Mandat mis a jour']);
     }
 
+    // ── Documents (RIB, Kbis, mandate scans) ───────────────────────────
+
+    private static $ALLOWED_DOC_TYPES = ['rib', 'kbis', 'mandate', 'other'];
+    private static $ALLOWED_DOC_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
+    private static $MAX_DOC_SIZE = 10 * 1024 * 1024; // 10 MB
+
+    /** Upload a SEPA document (RIB, Kbis, mandate scan). */
+    public static function uploadDocument(): void {
+        require_ecommerce_enabled();
+        $customer = authenticate_customer();
+        self::requireProApproved($customer);
+
+        $docType = $_POST['doc_type'] ?? '';
+        if (!in_array($docType, self::$ALLOWED_DOC_TYPES, true)) {
+            error_response('Type de document invalide (rib, kbis, mandate, other)', 400);
+        }
+
+        $mandateId = !empty($_POST['mandate_id']) ? (int) $_POST['mandate_id'] : null;
+
+        if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+            error_response('Aucun fichier fourni', 400);
+        }
+
+        $file = $_FILES['file'];
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if (!in_array($ext, self::$ALLOWED_DOC_EXTENSIONS, true)) {
+            error_response('Format non accepte (PDF, JPG, PNG, WEBP uniquement)', 400);
+        }
+        if ($file['size'] > self::$MAX_DOC_SIZE) {
+            error_response('Fichier trop volumineux (10 Mo max)', 400);
+        }
+
+        // Verify real MIME
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $realMime = $finfo->file($file['tmp_name']);
+        $allowedMimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+        if (!in_array($realMime, $allowedMimes, true)) {
+            error_response('Type de fichier non autorise', 400);
+        }
+
+        // Store in uploads/sepa-docs/ (private — not served publicly)
+        $uploadDir = dirname(__DIR__, 3) . '/backend-php/uploads/sepa-docs';
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+        $filename = $customer['id'] . '_' . $docType . '_' . time() . '_' . substr(bin2hex(random_bytes(4)), 0, 8) . '.' . $ext;
+        $destPath = $uploadDir . '/' . $filename;
+
+        if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+            error_response('Erreur lors de l\'enregistrement du fichier', 500);
+        }
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare('INSERT INTO sepa_documents (customer_id, mandate_id, doc_type, original_name, filename, mime_type, size) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        $stmt->execute([$customer['id'], $mandateId, $docType, $file['name'], $filename, $realMime, $file['size']]);
+
+        json_response([
+            'id' => (int) $db->lastInsertId(),
+            'doc_type' => $docType,
+            'original_name' => $file['name'],
+            'created_at' => date('Y-m-d H:i:s'),
+            'message' => 'Document envoye',
+        ], 201);
+    }
+
+    /** List customer's SEPA documents. */
+    public static function listDocuments(): void {
+        require_ecommerce_enabled();
+        $customer = authenticate_customer();
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT id, mandate_id, doc_type, original_name, mime_type, size, created_at FROM sepa_documents WHERE customer_id = ? ORDER BY created_at DESC');
+        $stmt->execute([$customer['id']]);
+        json_response(['documents' => $stmt->fetchAll()]);
+    }
+
+    /** Delete a customer's own SEPA document. */
+    public static function deleteDocument(int $id): void {
+        require_ecommerce_enabled();
+        $customer = authenticate_customer();
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT * FROM sepa_documents WHERE id = ? AND customer_id = ?');
+        $stmt->execute([$id, $customer['id']]);
+        $doc = $stmt->fetch();
+        if (!$doc) error_response('Document introuvable', 404);
+
+        // Delete file
+        $uploadDir = dirname(__DIR__, 3) . '/backend-php/uploads/sepa-docs';
+        @unlink($uploadDir . '/' . $doc['filename']);
+
+        $db->prepare('DELETE FROM sepa_documents WHERE id = ?')->execute([$id]);
+        json_response(['message' => 'Document supprime']);
+    }
+
+    /** Admin: list all SEPA documents (optionally filtered by customer_id). */
+    public static function adminListDocuments(): void {
+        $db = Database::getInstance();
+        $where = ['1 = 1'];
+        $params = [];
+
+        if (!empty($_GET['customer_id'])) {
+            $where[] = 'd.customer_id = ?';
+            $params[] = (int) $_GET['customer_id'];
+        }
+
+        $stmt = $db->prepare('
+            SELECT d.*, c.email, c.first_name, c.last_name, c.company
+            FROM sepa_documents d
+            LEFT JOIN customers c ON c.id = d.customer_id
+            WHERE ' . implode(' AND ', $where) . '
+            ORDER BY d.created_at DESC
+            LIMIT 200
+        ');
+        $stmt->execute($params);
+        json_response(['documents' => $stmt->fetchAll()]);
+    }
+
+    /** Admin: download a SEPA document. */
+    public static function adminDownloadDocument(int $id): void {
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT * FROM sepa_documents WHERE id = ?');
+        $stmt->execute([$id]);
+        $doc = $stmt->fetch();
+        if (!$doc) error_response('Document introuvable', 404);
+
+        $uploadDir = dirname(__DIR__, 3) . '/backend-php/uploads/sepa-docs';
+        $filePath = $uploadDir . '/' . $doc['filename'];
+        if (!file_exists($filePath)) error_response('Fichier introuvable sur le serveur', 404);
+
+        header('Content-Type: ' . $doc['mime_type']);
+        header('Content-Disposition: inline; filename="' . $doc['original_name'] . '"');
+        header('Content-Length: ' . filesize($filePath));
+        readfile($filePath);
+        exit;
+    }
+
     // ── Internal ──────────────────────────────────────────────────────────
 
     private static function requireProApproved(array $customer): void {

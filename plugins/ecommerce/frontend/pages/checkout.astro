@@ -22,6 +22,7 @@ import DeferredLoader from '@frontend/components/DeferredLoader.astro'
 import { SITE_TITLE } from '@frontend/consts'
 import { getFrontendBootstrap } from '@frontend/lib/api'
 import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+import '@plugins/ecommerce/frontend/styles/shop-buttons.css'
 
 const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
 const siteName = siteInfo.siteName || SITE_TITLE
@@ -61,7 +62,7 @@ const bodyClasses = [
     <script>
       import {
         getCart,
-        getShippingRates,
+        getShippingRatesWithValidity,
         createOrder,
         formatPrice,
         type Cart,
@@ -109,8 +110,9 @@ const bodyClasses = [
         billingDifferent: false,
         rates: [] as ShippingRate[],
         ratesPostcode: '',
+        ratesValidUntil: null as string | null,
         selectedRateId: 0,
-        paymentMethod: 'stripe' as 'stripe' | 'bank_transfer' | 'on_invoice',
+        paymentMethod: 'stripe' as 'stripe' | 'paypal' | 'bank_transfer' | 'on_invoice' | 'cheque',
         notes: '',
         submitting: false,
         error: '',
@@ -159,10 +161,12 @@ const bodyClasses = [
         }
         const rate = state.rates.find(r => r.method_id === state.selectedRateId)
         const shipping = rate ? rate.price_cents : 0
-        const total = c.subtotal_cents + c.tax_cents + shipping
+        const discount = (c as any).discount_cents || 0
+        const total = c.total_cents + shipping
         summaryRoot.innerHTML = `
           <h2>Votre commande</h2>
           <div class="checkout-sum-list">${lines.join('')}</div>
+          ${c.coupon_code ? `<div class="checkout-sum-row coupon"><span>Code promo : <strong>${escape(c.coupon_code)}</strong></span><strong style="color:#16a34a">-${formatPrice(discount)}</strong></div>` : ''}
           <div class="checkout-sum-row"><span>Sous-total HT</span><strong>${formatPrice(c.subtotal_cents)}</strong></div>
           <div class="checkout-sum-row"><span>Livraison</span><strong>${shipping ? formatPrice(shipping) : '—'}</strong></div>
           <div class="checkout-sum-row"><span>TVA</span><strong>${c.tax_exempt ? '0,00 €' : formatPrice(c.tax_cents)}</strong></div>
@@ -342,7 +346,9 @@ const bodyClasses = [
 
       async function loadShippingRates(): Promise<void> {
         try {
-          state.rates = await getShippingRates(state.shipping.postcode, state.shipping.country_code)
+          const res = await getShippingRatesWithValidity(state.shipping.postcode, state.shipping.country_code)
+          state.rates = res.rates
+          state.ratesValidUntil = res.valid_until
           state.ratesPostcode = state.shipping.postcode
           if (state.rates.length && !state.rates.find(r => r.method_id === state.selectedRateId)) {
             state.selectedRateId = state.rates[0].method_id
@@ -350,6 +356,11 @@ const bodyClasses = [
         } catch (err) {
           state.rates = []
         }
+      }
+
+      function isRateExpired(): boolean {
+        if (!state.ratesValidUntil) return false
+        return new Date(state.ratesValidUntil) < new Date()
       }
 
       function renderStep3(): void {
@@ -367,16 +378,23 @@ const bodyClasses = [
           `).join('')
           : `<div class="checkout-empty">Aucun mode de livraison disponible pour <strong>${escape(state.shipping.postcode)}</strong> (${escape(state.shipping.country_code)}). <button type="button" class="btn-link" data-back="1">Modifier l'adresse</button></div>`
 
+        const expired = isRateExpired()
         formRoot.innerHTML = `
           <h2>Mode de livraison</h2>
           <p class="checkout-step-desc">Livraison à <strong>${escape(state.shipping.postcode)} ${escape(state.shipping.city)}</strong>.</p>
+          ${expired ? `<div class="checkout-warning" style="background:#fef3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px">Les tarifs de livraison ont expire. <button type="button" class="btn-link" id="refresh-rates">Actualiser les tarifs</button></div>` : ''}
           <div class="checkout-rates">${list}</div>
           ${state.error ? `<div class="checkout-error">${escape(state.error)}</div>` : ''}
           <div class="checkout-nav">
             <button type="button" class="btn btn-secondary" data-back="2">← Précédent</button>
-            <button type="button" class="btn btn-primary" id="checkout-next" ${state.rates.length ? '' : 'disabled'}>Continuer →</button>
+            <button type="button" class="btn btn-primary" id="checkout-next" ${state.rates.length && !expired ? '' : 'disabled'}>Continuer →</button>
           </div>
         `
+        document.getElementById('refresh-rates')?.addEventListener('click', async () => {
+          await loadShippingRates()
+          renderStep3()
+          renderSummary()
+        })
         formRoot.querySelectorAll<HTMLInputElement>('[name="rate"]').forEach(r => {
           r.addEventListener('change', () => {
             state.selectedRateId = Number(r.value)
@@ -401,33 +419,30 @@ const bodyClasses = [
         const stripeAvailable = state.paymentConfig?.stripe?.enabled && !!state.paymentConfig.stripe.pk
         const methodsAvailable = state.paymentConfig?.payment_methods || ['stripe', 'bank_transfer']
 
-        const stripeOption = stripeAvailable && methodsAvailable.includes('stripe')
-          ? `<label class="checkout-payment ${state.paymentMethod === 'stripe' ? 'sel' : ''}">
-              <input type="radio" name="pm" value="stripe" ${state.paymentMethod === 'stripe' ? 'checked' : ''} />
-              <div>
-                <strong>Carte bancaire</strong>
-                <div class="checkout-payment-desc">Paiement sécurisé via Stripe (CB / Visa / Mastercard).</div>
-              </div>
-            </label>`
-          : ''
-        const bankOption = methodsAvailable.includes('bank_transfer')
-          ? `<label class="checkout-payment ${state.paymentMethod === 'bank_transfer' ? 'sel' : ''}">
-              <input type="radio" name="pm" value="bank_transfer" ${state.paymentMethod === 'bank_transfer' ? 'checked' : ''} />
-              <div>
-                <strong>Virement bancaire</strong>
-                <div class="checkout-payment-desc">RIB envoyé par email après validation. Commande traitée à réception du virement.</div>
-              </div>
-            </label>`
-          : ''
+        const pmDefs: Array<{ key: string; label: string; desc: string; condition: boolean }> = [
+          { key: 'stripe', label: 'Carte bancaire', desc: 'Paiement securise via Stripe (CB / Visa / Mastercard).', condition: stripeAvailable && methodsAvailable.includes('stripe') },
+          { key: 'paypal', label: 'PayPal', desc: 'Redirection vers PayPal pour finaliser le paiement.', condition: methodsAvailable.includes('paypal') },
+          { key: 'bank_transfer', label: 'Virement bancaire', desc: 'RIB envoye par email apres validation. Commande traitee a reception du virement.', condition: methodsAvailable.includes('bank_transfer') },
+          { key: 'cheque', label: 'Cheque', desc: 'Commande traitee a reception du cheque. Adresse d\'envoi communiquee par email.', condition: methodsAvailable.includes('cheque') },
+          { key: 'on_invoice', label: 'Sur facture', desc: 'Paiement differe a reception de facture (comptes professionnels uniquement).', condition: methodsAvailable.includes('on_invoice') },
+        ]
+        const availablePms = pmDefs.filter(p => p.condition)
+        const pmOptionsHtml = availablePms.map(p => `
+          <label class="checkout-payment ${state.paymentMethod === p.key ? 'sel' : ''}">
+            <input type="radio" name="pm" value="${p.key}" ${state.paymentMethod === p.key ? 'checked' : ''} />
+            <div>
+              <strong>${p.label}</strong>
+              <div class="checkout-payment-desc">${p.desc}</div>
+            </div>
+          </label>`).join('')
 
         formRoot.innerHTML = `
           <h2>Paiement</h2>
-          <p class="checkout-step-desc">Sélectionnez votre mode de paiement.</p>
+          <p class="checkout-step-desc">Selectionnez votre mode de paiement.</p>
 
           <div class="checkout-payment-list">
-            ${stripeOption}
-            ${bankOption}
-            ${!stripeOption && !bankOption ? '<div class="checkout-empty">Aucun mode de paiement disponible. Contactez l\'administrateur.</div>' : ''}
+            ${pmOptionsHtml}
+            ${!availablePms.length ? '<div class="checkout-empty">Aucun mode de paiement disponible. Contactez l\'administrateur.</div>' : ''}
           </div>
 
           <div class="checkout-field" style="margin-top:24px">
@@ -450,7 +465,7 @@ const bodyClasses = [
 
           <div class="checkout-nav">
             <button type="button" class="btn btn-secondary" data-back="3">← Précédent</button>
-            <button type="button" class="btn btn-primary" id="checkout-submit" ${state.submitting || (!stripeOption && !bankOption) ? 'disabled' : ''}>${state.submitting ? 'Traitement…' : (state.paymentMethod === 'stripe' ? 'Continuer vers le paiement →' : 'Confirmer la commande')}</button>
+            <button type="button" class="btn btn-primary" id="checkout-submit" ${state.submitting || !availablePms.length ? 'disabled' : ''}>${state.submitting ? 'Traitement…' : (state.paymentMethod === 'stripe' ? 'Continuer vers le paiement →' : 'Confirmer la commande')}</button>
           </div>
         `
         formRoot.querySelectorAll<HTMLInputElement>('[name="pm"]').forEach(r => {
@@ -610,8 +625,13 @@ const bodyClasses = [
           }
           // Default payment method = first available
           const methods = paymentConfig.payment_methods || []
-          if (paymentConfig.stripe.enabled && methods.includes('stripe')) state.paymentMethod = 'stripe'
-          else if (methods.includes('bank_transfer')) state.paymentMethod = 'bank_transfer'
+          // Default = first available payment method
+          const pmPriority = ['stripe', 'paypal', 'bank_transfer', 'cheque', 'on_invoice']
+          const firstAvailable = pmPriority.find(m => {
+            if (m === 'stripe') return paymentConfig.stripe.enabled && methods.includes('stripe')
+            return methods.includes(m)
+          })
+          if (firstAvailable) state.paymentMethod = firstAvailable as any
 
           // Pre-fill from customer account if logged in
           if (isLoggedIn()) {

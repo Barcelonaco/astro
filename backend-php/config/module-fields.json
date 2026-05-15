@@ -3370,21 +3370,6 @@
                     },
                     "subFields": null,
                     "defaultValue": "Voir tous les avis"
-                },
-                {
-                    "name": "button_link",
-                    "label": "Lien",
-                    "type": "Text",
-                    "choices": null,
-                    "onLabel": null,
-                    "offLabel": null,
-                    "conditional": {
-                        "field": "display_google_reviews_link",
-                        "operator": "==",
-                        "value": "1"
-                    },
-                    "subFields": null,
-                    "defaultValue": "https://g.page/r/PLACE_ID/reviews"
                 }
             ]
         },

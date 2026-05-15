@@ -48,7 +48,8 @@ const bodyClasses = [
     <DeferredLoader />
 
     <script>
-      import { getOrderByNumber, isLoggedIn, formatPrice, formatDate, formatDateTime, STATUS_LABELS, PAYMENT_STATUS_LABELS } from '@plugins/ecommerce/frontend/lib/customer-api'
+      import { getOrderByNumber, isLoggedIn, formatPrice, formatDate, formatDateTime, STATUS_LABELS, PAYMENT_STATUS_LABELS, getToken } from '@plugins/ecommerce/frontend/lib/customer-api'
+      const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api'
 
       if (!isLoggedIn()) window.location.href = '/compte/connexion?redirect=' + encodeURIComponent(window.location.href)
 
@@ -91,6 +92,13 @@ const bodyClasses = [
             <div class="od-grid">
               <div class="od-section"><h3>Adresse de livraison</h3><div class="od-addr">${fmtAddr(o.shipping_address)}</div>
                 ${o.shipping_method_label ? `<div class="od-ship-method">${o.shipping_method_label}</div>` : ''}
+                ${o.tracking_number || o.tracking_url ? `
+                  <div style="margin-top:10px;padding:10px 14px;background:var(--color-primary-light,#e8f5e9);border-radius:8px;font-size:13px">
+                    <strong>Suivi de livraison</strong>
+                    ${o.tracking_number ? `<div style="margin-top:4px">N° de suivi : <code style="font-weight:600">${o.tracking_number}</code></div>` : ''}
+                    ${o.tracking_url ? `<div style="margin-top:4px"><a href="${o.tracking_url}" target="_blank" rel="noopener" style="color:var(--color-primary,#2563eb);text-decoration:underline">Suivre mon colis</a></div>` : ''}
+                  </div>
+                ` : ''}
               </div>
               <div class="od-section"><h3>Adresse de facturation</h3><div class="od-addr">${fmtAddr(o.billing_address)}</div></div>
             </div>
@@ -118,8 +126,13 @@ const bodyClasses = [
               <div class="od-total-line"><span>Paiement</span><span>${paymentLabels[o.payment_method] || o.payment_method}</span></div>
             </div>
 
-            <div style="margin-top:28px">
+            <div style="margin-top:28px;display:flex;gap:12px;flex-wrap:wrap">
               <a href="/compte/commandes" class="account-btn-outline">Retour aux commandes</a>
+              ${o.payment_status === 'paid' || o.payment_status === 'partially_refunded' ? `
+                <a href="${API_URL}/orders/${o.id}/invoice${getToken() ? '?token=' + encodeURIComponent(getToken()!) : ''}" target="_blank" class="account-btn-outline" style="display:inline-flex;align-items:center;gap:6px">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Telecharger la facture
+                </a>` : ''}
             </div>
           `
         } catch (err: any) {

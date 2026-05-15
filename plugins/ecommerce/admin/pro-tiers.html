@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Bareme pros</title>
+  <link rel="stylesheet" href="/admin/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="/plugin-assets/ecommerce/admin-css/ecommerce.css">
+  <link rel="stylesheet" href="/plugin-assets/ecommerce/admin-css/pro-tiers.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1>Bareme pros</h1>
+      <p class="page-subtitle">Definissez les paliers de remise selon le chiffre d'affaires annuel. Les clients pro sont automatiquement affectes au palier correspondant.</p>
+    </div>
+  </div>
+
+  <!-- Tiers table -->
+  <div class="card" id="tiers-card">
+    <h2 class="card-title">Paliers de remise</h2>
+    <p class="card-hint">Chaque palier definit un intervalle de CA (365 jours glissants) et la remise associee. Les intervalles ne doivent pas se chevaucher.</p>
+
+    <div id="tiers-loading" style="text-align:center;color:var(--gray-500)">Chargement...</div>
+
+    <table class="tiers-table" id="tiers-table" style="display:none">
+      <thead>
+        <tr>
+          <th>Nom du palier</th>
+          <th style="text-align:right">CA min (EUR)</th>
+          <th style="text-align:right">CA max (EUR)</th>
+          <th style="text-align:right">Remise %</th>
+          <th style="text-align:right">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tiers-tbody"></tbody>
+    </table>
+
+    <div class="tiers-actions" id="tiers-actions" style="display:none">
+      <button class="btn btn-outline" id="tier-add-btn" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        Ajouter un palier
+      </button>
+      <button class="btn btn-primary" id="tiers-save-btn" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Enregistrer
+      </button>
+    </div>
+  </div>
+
+  <!-- Pro customers preview -->
+  <div class="card section-gap" id="preview-card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 class="card-title" style="border:none;padding-bottom:0;margin-bottom:4px">Apercu clients pro</h2>
+        <p class="card-hint">Palier et remise actuels calcules d'apres le CA sur la periode anniversaire du compte.</p>
+      </div>
+      <button class="btn btn-outline" id="recalc-btn" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        Recalculer tout
+      </button>
+    </div>
+
+    <div id="preview-loading" style="text-align:center;color:var(--gray-500)">Chargement...</div>
+
+    <table class="preview-table" id="preview-table" style="display:none">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Entreprise</th>
+          <th style="text-align:right">CA 365 derniers jours</th>
+          <th>Palier</th>
+          <th style="text-align:right">Remise</th>
+          <th>Override</th>
+        </tr>
+      </thead>
+      <tbody id="preview-tbody"></tbody>
+    </table>
+
+    <div id="preview-empty" style="display:none;text-align:center;padding:24px;color:var(--gray-500)">
+      <p>Aucun client pro trouve.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { api, apiGet, apiPut, apiPost } from './_lib/api.js';
+
+/* ── Helpers ── */
+
+const $ = (sel, ctx = document) => ctx.querySelector(sel);
+const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
+
+function toast(msg, icon = 'success') {
+  Swal.fire({ toast: true, position: 'top-end', icon, title: msg, showConfirmButton: false, timer: 2500 });
+}
+
+function fmt(n) {
+  return n != null ? Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+}
+
+/* ── Tiers CRUD ── */
+
+let tiers = [];
+
+async function loadTiers() {
+  try {
+    const data = await apiGet('/admin/pro-tiers');
+    const raw = Array.isArray(data) ? data : (data.tiers || []);
+    // Backend stores in cents + discount_rate → convert to EUR + discount for UI
+    tiers = raw.map(t => ({
+      name: t.name || '',
+      min_ca: t.min_cents != null ? t.min_cents / 100 : null,
+      max_ca: t.max_cents != null ? t.max_cents / 100 : null,
+      discount: t.discount_rate ?? t.discount ?? 0,
+    }));
+  } catch (e) {
+    console.error('loadTiers', e);
+    tiers = [];
+  }
+  renderTiers();
+}
+
+function renderTiers() {
+  const tbody = $('#tiers-tbody');
+  const table = $('#tiers-table');
+  const actions = $('#tiers-actions');
+  const loading = $('#tiers-loading');
+
+  loading.style.display = 'none';
+  table.style.display = '';
+  actions.style.display = '';
+
+  tbody.innerHTML = '';
+  tiers.forEach((t, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" value="${esc(t.name || '')}" data-idx="${i}" data-field="name" placeholder="Ex: Bronze"></td>
+      <td><input type="number" value="${t.min_ca ?? ''}" data-idx="${i}" data-field="min_ca" step="0.01" min="0" placeholder="0.00"></td>
+      <td><input type="number" value="${t.max_ca ?? ''}" data-idx="${i}" data-field="max_ca" step="0.01" min="0" placeholder="999999.99"></td>
+      <td><input type="number" value="${t.discount ?? ''}" data-idx="${i}" data-field="discount" step="0.01" min="0" max="100" placeholder="0"></td>
+      <td>
+        <div class="row-actions">
+          <button class="icon-btn danger" data-delete-tier="${i}" title="Supprimer ce palier">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+          </button>
+        </div>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Bind inputs
+  $$('input', tbody).forEach(inp => {
+    inp.addEventListener('input', () => {
+      const idx = Number(inp.dataset.idx);
+      const field = inp.dataset.field;
+      if (field === 'name') {
+        tiers[idx].name = inp.value;
+      } else {
+        tiers[idx][field] = inp.value === '' ? null : Number(inp.value);
+      }
+    });
+  });
+
+  // Bind delete buttons
+  $$('[data-delete-tier]', tbody).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.deleteTier);
+      tiers.splice(idx, 1);
+      renderTiers();
+    });
+  });
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+$('#tier-add-btn').addEventListener('click', () => {
+  tiers.push({ name: '', min_ca: null, max_ca: null, discount: 0 });
+  renderTiers();
+  // Focus the new name input
+  const inputs = $$('#tiers-tbody input[data-field="name"]');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+});
+
+$('#tiers-save-btn').addEventListener('click', async () => {
+  const btn = $('#tiers-save-btn');
+  btn.disabled = true;
+  try {
+    // Convert EUR → cents + discount → discount_rate for backend
+    const payload = tiers.map(t => ({
+      name: t.name,
+      min_cents: t.min_ca != null ? Math.round(t.min_ca * 100) : 0,
+      max_cents: t.max_ca != null ? Math.round(t.max_ca * 100) : null,
+      discount_rate: t.discount ?? 0,
+    }));
+    await apiPut('/admin/pro-tiers', { tiers: payload });
+    toast('Paliers enregistres');
+    await loadPreview();
+  } catch (e) {
+    console.error('saveTiers', e);
+    Swal.fire({ icon: 'error', title: 'Erreur', text: e.message || 'Impossible d\'enregistrer les paliers.' });
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ── Preview ── */
+
+let previewData = [];
+
+async function loadPreview() {
+  const loading = $('#preview-loading');
+  const table = $('#preview-table');
+  const empty = $('#preview-empty');
+
+  loading.style.display = '';
+  table.style.display = 'none';
+  empty.style.display = 'none';
+
+  try {
+    const data = await apiGet('/admin/pro-tiers/preview');
+    previewData = Array.isArray(data) ? data : (data.pros || data.customers || []);
+  } catch (e) {
+    console.error('loadPreview', e);
+    previewData = [];
+  }
+  renderPreview();
+}
+
+function renderPreview() {
+  const loading = $('#preview-loading');
+  const table = $('#preview-table');
+  const empty = $('#preview-empty');
+  const tbody = $('#preview-tbody');
+
+  loading.style.display = 'none';
+
+  if (!previewData.length) {
+    table.style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+
+  table.style.display = '';
+  empty.style.display = 'none';
+  tbody.innerHTML = '';
+
+  previewData.forEach(c => {
+    const ca365Eur = (parseInt(c.revenue_365_cents || 0, 10) / 100);
+    const tierName = c.computed_tier || c.pro_tier || '—';
+    const discountRate = c.computed_discount ?? c.discount_rate ?? 0;
+    const hasOverride = c.is_override === true || c.discount_override == 1;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${esc(c.email || '')}</td>
+      <td>${esc(c.company || '—')}</td>
+      <td style="text-align:right">${fmt(ca365Eur)} EUR</td>
+      <td><span class="tier-badge match">${esc(tierName)}</span></td>
+      <td style="text-align:right;font-weight:600">${discountRate} %</td>
+      <td><span class="override-flag ${hasOverride ? 'yes' : 'no'}">${hasOverride ? 'Oui' : 'Non'}</span></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+$('#recalc-btn').addEventListener('click', async () => {
+  const btn = $('#recalc-btn');
+  const ok = await Swal.fire({
+    title: 'Recalculer tous les paliers ?',
+    text: 'Les remises de chaque client pro seront recalculees selon leur CA 365 jours et le bareme actuel. Les overrides manuels ne seront pas modifies.',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Recalculer',
+    cancelButtonText: 'Annuler',
+  });
+  if (!ok.isConfirmed) return;
+
+  btn.disabled = true;
+  try {
+    const result = await apiPost('/admin/pro-tiers/recalc');
+    const count = result?.updated ?? 0;
+    toast(count + ' client(s) mis a jour');
+    await loadPreview();
+  } catch (e) {
+    console.error('recalc', e);
+    Swal.fire({ icon: 'error', title: 'Erreur', text: e.message || 'Impossible de recalculer.' });
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ── Init ── */
+
+loadTiers();
+loadPreview();
+</script>
+</body>
+</html>

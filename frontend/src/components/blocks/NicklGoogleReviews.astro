@@ -25,6 +25,12 @@ const reviews = reviewsData?.reviews || [];
 const rating = reviewsData?.rating || 0;
 const total = reviewsData?.total || 0;
 
+const showLink = data.display_google_reviews_link === true || data.display_google_reviews_link === 1 || data.display_google_reviews_link === '1';
+const buttonText = data.button_text || 'Voir tous les avis';
+// Place ID from block data or fallback to plugin settings (returned by API)
+const placeId = data.place_id || reviewsData?.place_id || '';
+const buttonLink = placeId ? `https://search.google.com/local/reviews?placeid=${placeId}` : '';
+
 function renderStars(score: number): string {
   return Array.from({ length: 5 }, (_, i) =>
     `<svg class="ti-star ${i < Math.round(score) ? 'ti-star-filled' : ''}" viewBox="0 0 24 24" width="18" height="18"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`
@@ -96,9 +102,23 @@ function renderStarsLg(score: number): string {
         </div>
 
       </div>
+
+      {showLink && buttonLink && (
+        <div class="ti-google-link">
+          <a href={buttonLink} target="_blank" rel="noopener noreferrer" class="btn btn-tertiary">{buttonText}</a>
+        </div>
+      )}
+
     </div>
   )}
 </NicklModuleWrapper>
+
+<style is:global>
+.module-google-reviews .ti-google-link {
+  text-align: center;
+  margin-top: 2rem;
+}
+</style>
 
 <script is:inline>
 (function() {

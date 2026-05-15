@@ -157,4 +157,70 @@ export async function addProjectToCart(
   }
 }
 
+export async function requestQuote(
+  token: string,
+): Promise<{ ok: boolean; status?: string } | null> {
+  try {
+    const auth = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (auth) headers['Authorization'] = `Bearer ${auth}`
+    const res = await fetch(`${API_URL}/poolp/projects/${token}/quote`, {
+      method: 'POST',
+      headers,
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch (err) {
+    console.error('requestQuote failed', err)
+    return null
+  }
+}
+
+export async function getMyProjects(): Promise<{ projects: any[] }> {
+  try {
+    const auth = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null
+    if (!auth) return { projects: [] }
+    const res = await fetch(`${API_URL}/poolp/my-projects`, {
+      headers: { Authorization: `Bearer ${auth}` },
+    })
+    if (!res.ok) return { projects: [] }
+    return await res.json()
+  } catch (err) {
+    console.error('getMyProjects failed', err)
+    return { projects: [] }
+  }
+}
+
+export async function deleteProject(token: string): Promise<boolean> {
+  try {
+    const auth = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null
+    if (!auth) return false
+    const res = await fetch(`${API_URL}/poolp/projects/${token}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${auth}` },
+    })
+    return res.ok
+  } catch (err) {
+    console.error('deleteProject failed', err)
+    return false
+  }
+}
+
+export async function qualifyProject(
+  token: string,
+  qualifProAsked: boolean,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/poolp/projects/${token}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ qualif_pro_asked: qualifProAsked ? 1 : 0 }),
+    })
+    return res.ok
+  } catch (err) {
+    console.error('qualifyProject failed', err)
+    return false
+  }
+}
+
 export { API_URL }

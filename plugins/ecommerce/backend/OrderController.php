@@ -35,10 +35,12 @@ class OrderController {
         $shipping = self::validateAddress($body['shipping'] ?? $body['billing'] ?? null, 'shipping');
 
         $shippingMethodId = (int) ($body['shipping_method_id'] ?? 0);
-        $shippingMethod = self::loadShippingMethod($shippingMethodId);
+        // POOLP virtual shipping rate (method_id = -1)
+        $isPoolpShipping = $shippingMethodId === -1;
+        $shippingMethod = $isPoolpShipping ? null : self::loadShippingMethod($shippingMethodId);
 
         $paymentMethod = (string) ($body['payment_method'] ?? 'stripe');
-        if (!in_array($paymentMethod, ['stripe', 'paypal', 'bank_transfer', 'on_invoice'], true)) {
+        if (!in_array($paymentMethod, ['stripe', 'paypal', 'bank_transfer', 'on_invoice', 'cheque'], true)) {
             error_response('Méthode de paiement invalide', 400);
         }
 
@@ -62,7 +64,20 @@ class OrderController {
         $taxContext = TaxResolver::resolve($billing['country_code'] ?? 'FR', $isPro, $vatNumber);
 
         $totals = CartController::computeTotals((int) $cart['id'], $taxContext);
-        $shippingPrice = $shippingMethod ? self::resolveShippingPrice($shippingMethod, $totals['subtotal_cents'], $items, $custom) : 0;
+        if ($isPoolpShipping) {
+            // Resolve POOLP delivery price from config_snapshot
+            $shippingPrice = self::resolvePoolpShippingPrice($custom, $shipping['postcode'] ?? '');
+        } else {
+            $shippingPrice = $shippingMethod ? self::resolveShippingPrice($shippingMethod, $totals['subtotal_cents'], $items, $custom) : 0;
+        }
+
+        // Free shipping coupon → override shipping price to 0
+        if (!empty($totals['coupon_code'])) {
+            $coupon = CartController::loadCouponStatic($totals['coupon_code']);
+            if ($coupon && $coupon['type'] === 'free_shipping') {
+                $shippingPrice = 0;
+            }
+        }
 
         $db = Database::getInstance();
         $db->beginTransaction();
@@ -74,7 +89,9 @@ class OrderController {
                  coupon_code, shipping_method_id, shipping_method_label, notes, ip_address, placed_at, guest_token)
                 VALUES (?, ?, ?, "awaiting_payment", "unpaid", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)');
             $guestToken = $customerId ? null : bin2hex(random_bytes(24));
-            $totalCents = $totals['subtotal_cents'] + $shippingPrice + $totals['tax_cents'];
+            $discountCents = (int) ($totals['discount_cents'] ?? 0);
+            // total_cents from cart = subtotal_ht + tax (already discounted)
+            $totalCents = $totals['total_cents'] + $shippingPrice;
             // Include tax mention in breakdown for invoicing
             $taxBreakdownFull = $totals['tax_breakdown'];
             if (!empty($taxContext['mention'])) {
@@ -88,14 +105,14 @@ class OrderController {
                 $paymentMethod,
                 $cart['currency'] ?? 'EUR',
                 $totals['subtotal_cents'],
-                0,
+                $discountCents,
                 $shippingPrice,
                 $totals['tax_cents'],
                 $totalCents,
                 json_encode($taxBreakdownFull, JSON_UNESCAPED_UNICODE),
                 $cart['coupon_code'] ?? null,
-                $shippingMethodId ?: null,
-                $shippingMethod['name'] ?? null,
+                $isPoolpShipping ? null : ($shippingMethodId ?: null),
+                $isPoolpShipping ? 'Livraison POOLP' : ($shippingMethod['name'] ?? null),
                 trim((string) ($body['notes'] ?? '')) ?: null,
                 $_SERVER['REMOTE_ADDR'] ?? null,
                 $guestToken,
@@ -139,7 +156,7 @@ class OrderController {
                 ]);
             }
 
-            // Custom items (POOLP) : prix TTC, on extrait la TVA contenue.
+            // Custom items : prix TTC, on extrait la TVA contenue.
             foreach ($custom as $line) {
                 $rate = self::taxRate($line['tax_code'] ?? 'FR_STANDARD');
                 $lineTtc = (int) $line['line_total_cents'];
@@ -168,9 +185,20 @@ class OrderController {
             $stmt = $db->prepare('INSERT INTO audit_log (entity_type, entity_id, event_type, payload, actor_type) VALUES ("order", ?, "created", ?, "customer")');
             $stmt->execute([$orderId, json_encode(['ip' => $_SERVER['REMOTE_ADDR'] ?? null], JSON_UNESCAPED_UNICODE)]);
 
-            // Vide le panier
+            // Record coupon usage + increment counter
+            if ($discountCents > 0 && !empty($totals['coupon_code'])) {
+                $couponCode = $totals['coupon_code'];
+                $db->prepare('INSERT INTO coupon_usages (coupon_id, order_id, customer_id, used_at)
+                    SELECT id, ?, ?, NOW() FROM coupons WHERE code = ?')
+                    ->execute([$orderId, $customerId, $couponCode]);
+                $db->prepare('UPDATE coupons SET used_count = COALESCE(used_count, 0) + 1 WHERE code = ?')
+                    ->execute([$couponCode]);
+            }
+
+            // Vide le panier + retire le coupon
             $db->prepare('DELETE FROM cart_items WHERE cart_id = ?')->execute([$cart['id']]);
             $db->prepare('DELETE FROM cart_items_custom WHERE cart_id = ?')->execute([$cart['id']]);
+            $db->prepare('UPDATE carts SET coupon_code = NULL WHERE id = ?')->execute([$cart['id']]);
 
             $db->commit();
         } catch (\Throwable $e) {
@@ -180,6 +208,17 @@ class OrderController {
         }
 
         $order = self::loadFull($orderId);
+
+        // Offline payment methods → send confirmation email immediately (no webhook to trigger it)
+        if (in_array($paymentMethod, ['bank_transfer', 'cheque', 'on_invoice'], true)) {
+            try {
+                OrderMailer::sendOrderConfirmation($order);
+                OrderMailer::sendAdminOrderNotif($order);
+            } catch (\Throwable $e) {
+                error_log('OrderMailer offline order error: ' . $e->getMessage());
+            }
+        }
+
         json_response($order, 201);
     }
 
@@ -202,7 +241,7 @@ class OrderController {
     public static function listMine(): void {
         $customer = authenticate_customer();
         $db = Database::getInstance();
-        $stmt = $db->prepare('SELECT id, order_number, status, payment_status, total_cents, currency, placed_at, paid_at, shipped_at, delivered_at FROM orders WHERE customer_id = ? ORDER BY placed_at DESC LIMIT 200');
+        $stmt = $db->prepare('SELECT id, order_number, status, payment_status, payment_method, total_cents, currency, tracking_number, tracking_url, placed_at, paid_at, shipped_at, delivered_at FROM orders WHERE customer_id = ? ORDER BY placed_at DESC LIMIT 200');
         $stmt->execute([$customer['id']]);
         json_response(['orders' => $stmt->fetchAll()]);
     }
@@ -379,6 +418,33 @@ class OrderController {
             }
         }
         return (int) ($method['price_cents'] ?? 0);
+    }
+
+    /**
+     * Resolve POOLP shipping price from poolp_delivery_zones for cart custom items.
+     */
+    private static function resolvePoolpShippingPrice(array $customItems, string $postcode): int {
+        $modeLivraison = 'kit';
+        foreach ($customItems as $c) {
+            if (($c['source_type'] ?? '') === 'poolp_configurator') {
+                $snapshot = is_string($c['config_snapshot']) ? json_decode($c['config_snapshot'], true) : ($c['config_snapshot'] ?? []);
+                $modeLivraison = $snapshot['state']['mode_livraison'] ?? 'kit';
+                break;
+            }
+        }
+        try {
+            $db = Database::getInstance();
+            $zones = $db->query("SELECT * FROM poolp_delivery_zones WHERE is_active = 1 ORDER BY sort_order, id")->fetchAll();
+            foreach ($zones as $z) {
+                $patterns = is_string($z['postal_codes']) ? json_decode($z['postal_codes'], true) : ($z['postal_codes'] ?? []);
+                if (!empty($patterns) && ShippingController::postcodeMatches($postcode, $patterns)) {
+                    return $modeLivraison === 'montee'
+                        ? (int) ($z['fee_assembled_ttc_cents'] ?? 0)
+                        : (int) ($z['fee_kit_ttc_cents'] ?? 0);
+                }
+            }
+        } catch (\Throwable $e) {}
+        return 0;
     }
 
     private static function isFirstOrder(?int $customerId, string $email): bool {

@@ -1,0 +1,349 @@
+---
+/**
+ * /compte/projets — saved POOLP configurations list.
+ *
+ * Conditioned on the poolp-configurator plugin being active.
+ * Client-side gate: isPoolpPluginActive() + isLoggedIn().
+ */
+import BaseHead from '@frontend/components/BaseHead.astro'
+import Header from '@frontend/components/Header.astro'
+import Footer from '@frontend/components/Footer.astro'
+import SiteOverlays from '@frontend/components/SiteOverlays.astro'
+import DeferredLoader from '@frontend/components/DeferredLoader.astro'
+import AccountNav from '@plugins/ecommerce/frontend/components/AccountNav.astro'
+import { SITE_TITLE } from '@frontend/consts'
+import { getFrontendBootstrap } from '@frontend/lib/api'
+import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+import '@plugins/ecommerce/frontend/styles/account.css'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`Mes projets — ${siteName}`} description="Vos configurations POOLP sauvegardees" styleSettings={styleSettings} siteSettings={siteSettings} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page account-wrap">
+      <div class="account-container">
+        <div class="account-layout">
+          <AccountNav active="projects" />
+          <div class="account-content">
+            <h1 class="account-section-title">Mes projets</h1>
+            <p class="account-section-desc" style="margin-bottom:20px;color:#666;font-size:14px">Retrouvez vos configurations POOLP sauvegardees. Vous pouvez les modifier, les ajouter au panier ou demander un devis.</p>
+            <div id="projects-loading" class="account-loading">Chargement...</div>
+            <div id="projects-empty" style="display:none" class="account-empty">
+              <p>Vous n'avez pas encore de projet sauvegarde.</p>
+              <a href="/configurateur" class="account-btn" style="margin-top:12px">Configurer une box POOLP</a>
+            </div>
+            <div id="projects-list" style="display:none"></div>
+            <div id="projects-status" style="display:none;margin-top:12px;padding:10px 14px;border-radius:6px;font-size:13px"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+    <script is:inline src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+      import { isPoolpPluginActive, getMyProjects, deleteProject, addProjectToCart, requestQuote, exportProjectPdf } from '@frontend/lib/poolp-api'
+      import { isLoggedIn } from '@plugins/ecommerce/frontend/lib/customer-api'
+
+      if (!isLoggedIn()) window.location.href = '/compte/connexion?redirect=/compte/projets'
+
+      const STATUS_LABELS: Record<string, string> = {
+        draft: 'Brouillon',
+        saved: 'Sauvegarde',
+        quote_requested: 'Devis demande',
+        converted_to_cart: 'Ajoute au panier',
+        ordered: 'Commande',
+      }
+
+      function formatPrice(amount: number): string {
+        return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount)
+      }
+      function formatDate(d: string): string {
+        return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      }
+
+      function swalFeedback(icon: string, title: string, text?: string) {
+        const Swal = (window as any).Swal
+        if (Swal) { Swal.fire({ icon, title, text, confirmButtonColor: 'var(--color-primary, #0f62fe)' }); return }
+        showStatus(text || title, icon === 'error' ? 'error' : 'success')
+      }
+
+      function showStatus(msg: string, type: 'success' | 'error' = 'success') {
+        const el = document.getElementById('projects-status')!
+        el.style.display = ''
+        el.textContent = msg
+        el.style.background = type === 'success' ? '#e8f5e9' : '#fce4ec'
+        el.style.color = type === 'success' ? '#2e7d32' : '#c62828'
+        setTimeout(() => { el.style.display = 'none' }, 5000)
+      }
+
+      async function init() {
+        const active = await isPoolpPluginActive()
+        if (!active) {
+          document.getElementById('projects-loading')!.textContent = 'Le configurateur n\'est pas disponible sur ce site.'
+          return
+        }
+
+        try {
+          const data = await getMyProjects()
+          const projects = data.projects || []
+          document.getElementById('projects-loading')!.style.display = 'none'
+
+          if (projects.length === 0) {
+            document.getElementById('projects-empty')!.style.display = ''
+            return
+          }
+
+          renderList(projects)
+        } catch (err: any) {
+          if (err?.status === 401) { window.location.href = '/compte/connexion'; return }
+          document.getElementById('projects-loading')!.textContent = 'Erreur de chargement.'
+        }
+      }
+
+      function renderList(projects: any[]) {
+        const list = document.getElementById('projects-list')!
+        list.style.display = ''
+        list.innerHTML = `
+          <div class="projects-grid">
+            ${projects.map(p => {
+              const s = p.summary || {}
+              const ref = p.public_token.slice(0, 8)
+              const statusLabel = STATUS_LABELS[p.status] || p.status
+              const statusClass = p.status === 'quote_requested' ? 'badge-processing'
+                : p.status === 'ordered' ? 'badge-completed'
+                : p.status === 'converted_to_cart' ? 'badge-on-hold'
+                : 'badge-pending'
+              return `
+              <div class="project-card" data-token="${p.public_token}">
+                <div class="project-card-header">
+                  <div>
+                    <span class="project-ref" style="font-family:monospace;font-weight:600;font-size:13px">${ref}...</span>
+                    <span class="badge ${statusClass}" style="margin-left:8px;font-size:11px">${statusLabel}</span>
+                  </div>
+                  <span style="font-size:12px;color:#888">${formatDate(p.created_at)}</span>
+                </div>
+                <div class="project-card-body">
+                  <div class="project-section-label">Bassin</div>
+                  <div class="project-detail"><strong>Dimensions</strong> ${s.longueur || '-'} x ${s.largeur || '-'} x ${s.hauteur || '-'} m</div>
+                  <div class="project-detail"><strong>Volume</strong> ${s.volume ? Math.round(s.volume) + ' m3' : '-'}</div>
+                  <div class="project-detail"><strong>Debit</strong> ${s.debit ? s.debit + ' m3/h' : '-'}</div>
+                  <div class="project-detail"><strong>Skimmers</strong> ${s.nb_skimmers ?? '-'}</div>
+                  <div class="project-detail"><strong>Volet immerge</strong> ${s.volet_immerge ? 'Oui' : 'Non'}</div>
+                  <div class="project-detail"><strong>Prise balai</strong> ${s.prise_balai ? 'Oui' : 'Non'}</div>
+                  <div class="project-detail"><strong>Bassin couvert</strong> ${s.bassin_couvert ? 'Oui' : 'Non'}</div>
+                  <div class="project-detail"><strong>Projecteurs LED</strong> ${s.projecteurs_led ?? 0}</div>
+
+                  <div class="project-section-label">Equipements</div>
+                  <div class="project-detail"><strong>Box</strong> ${s.box_title || s.box_code || '-'}</div>
+                  <div class="project-detail"><strong>Filtre</strong> ${s.filtre || '-'}</div>
+                  <div class="project-detail"><strong>Pompe</strong> ${s.pompe || '-'}</div>
+                  <div class="project-detail"><strong>Traitement</strong> ${s.traitement || 'Aucun'}</div>
+                  <div class="project-detail"><strong>By-pass PAC</strong> ${s.bypass_pac ? 'Oui' : 'Non'}</div>
+                  <div class="project-detail"><strong>Coffret</strong> ${s.coffret || '-'}</div>
+                  <div class="project-detail"><strong>Finition</strong> ${s.finition || '-'}</div>
+
+                  <div class="project-section-label">Livraison</div>
+                  <div class="project-detail"><strong>Mode</strong> ${s.mode_livraison === 'montee' ? 'Assemblee' : 'En kit'}</div>
+                  <div class="project-detail"><strong>Zone</strong> ${s.livraison_zone || '-'}${s.code_postal ? ' (' + s.code_postal + ')' : ''}</div>
+                  ${s.livraison_fee_ttc ? `<div class="project-detail"><strong>Frais livraison</strong> ${formatPrice(s.livraison_fee_ttc)}</div>` : ''}
+
+                  <div class="project-section-label">Prix</div>
+                  <div class="project-detail project-price"><strong>Total TTC</strong> ${s.total_ttc ? formatPrice(s.total_ttc) : '-'}</div>
+                  ${s.total_pro_ht ? `<div class="project-detail project-price-pro"><strong>Total HT pro</strong> ${formatPrice(s.total_pro_ht)}</div>` : ''}
+                  ${(s.warnings || []).includes('erp') ? `<div class="project-warnings"><span class="project-warn-tag">ERP</span></div>` : ''}
+                </div>
+                <div class="project-card-actions">
+                  <a href="/configurateur?p=${p.public_token}" class="project-action-btn">Modifier</a>
+                  <button class="project-action-btn" data-project-action="cart" data-token="${p.public_token}" type="button">Ajouter au panier</button>
+                  <button class="project-action-btn" data-project-action="quote" data-token="${p.public_token}" type="button">Demander un devis</button>
+                  <button class="project-action-btn" data-project-action="pdf" data-token="${p.public_token}" type="button">PDF</button>
+                  <button class="project-action-btn project-action-danger" data-project-action="delete" data-token="${p.public_token}" type="button">Supprimer</button>
+                </div>
+              </div>`
+            }).join('')}
+          </div>`
+
+        list.addEventListener('click', async (e) => {
+          const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-project-action]')
+          if (!btn) return
+          const action = btn.dataset.projectAction!
+          const token = btn.dataset.token!
+          btn.disabled = true
+
+          if (action === 'delete') {
+            const Swal = (window as any).Swal
+            const confirmed = Swal
+              ? (await Swal.fire({
+                  title: 'Supprimer ce projet ?',
+                  text: 'Cette action est irreversible.',
+                  icon: 'warning',
+                  showCancelButton: true,
+                  confirmButtonText: 'Supprimer',
+                  cancelButtonText: 'Annuler',
+                  confirmButtonColor: '#dc3545',
+                  reverseButtons: true,
+                })).isConfirmed
+              : confirm('Supprimer ce projet ?')
+            if (!confirmed) { btn.disabled = false; return }
+            const ok = await deleteProject(token)
+            if (ok) {
+              btn.closest('.project-card')?.remove()
+              if (Swal) Swal.fire({ icon: 'success', title: 'Projet supprime', timer: 1500, showConfirmButton: false })
+              else showStatus('Projet supprime.')
+              if (!list.querySelector('.project-card')) {
+                list.style.display = 'none'
+                document.getElementById('projects-empty')!.style.display = ''
+              }
+            } else {
+              if (Swal) Swal.fire({ icon: 'error', title: 'Erreur', text: 'Impossible de supprimer ce projet.' })
+              else showStatus('Erreur lors de la suppression.', 'error')
+              btn.disabled = false
+            }
+          }
+          if (action === 'cart') {
+            const result = await addProjectToCart(token)
+            if (result) {
+              window.location.href = '/panier'
+            } else {
+              swalFeedback('error', 'Erreur', 'Impossible d\'ajouter au panier.')
+              btn.disabled = false
+            }
+          }
+          if (action === 'quote') {
+            const result = await requestQuote(token)
+            if (result) {
+              swalFeedback('success', 'Demande envoyee', 'Notre equipe vous recontactera rapidement.')
+              const badge = btn.closest('.project-card')?.querySelector('.badge')
+              if (badge) { badge.textContent = 'Devis demande'; badge.className = 'badge badge-processing' }
+            } else {
+              swalFeedback('error', 'Erreur', 'Impossible d\'envoyer la demande de devis.')
+            }
+            btn.disabled = false
+          }
+          if (action === 'pdf') {
+            const result = await exportProjectPdf(token)
+            if (result?.url) {
+              window.open(result.url, '_blank')
+            } else {
+              swalFeedback('error', 'Erreur', 'Impossible de generer le PDF.')
+            }
+            btn.disabled = false
+          }
+        })
+      }
+
+      init()
+    </script>
+
+    <style is:global>
+      .projects-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .project-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 16px;
+        background: #fafafa;
+      }
+      .project-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+      }
+      .project-card-body {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 8px;
+        margin-bottom: 14px;
+        font-size: 13px;
+      }
+      .project-detail strong {
+        display: block;
+        font-size: 11px;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        margin-bottom: 2px;
+      }
+      .project-section-label {
+        grid-column: 1 / -1;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #555;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #eee;
+      }
+      .project-section-label:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+      .project-warnings {
+        grid-column: 1 / -1;
+        display: flex;
+        gap: 6px;
+        margin-top: 4px;
+      }
+      .project-warn-tag {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #fff3e0;
+        color: #e65100;
+      }
+      .project-price { font-weight: 600; }
+      .project-price-pro { color: var(--color-primary, #1a5276); font-weight: 600; }
+      .project-card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .project-action-btn {
+        display: inline-block;
+        padding: 6px 14px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background: #fff;
+        color: #333;
+        font-size: 12px;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background 0.15s, border-color 0.15s;
+      }
+      .project-action-btn:hover { background: #f0f0f0; border-color: #999; }
+      .project-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .project-action-danger { color: #c62828; border-color: #e0b0b0; }
+      .project-action-danger:hover { background: #fce4ec; border-color: #c62828; }
+
+      @media (max-width: 600px) {
+        .project-card-body { grid-template-columns: 1fr 1fr; }
+        .project-card-actions { flex-direction: column; }
+        .project-action-btn { text-align: center; }
+      }
+    </style>
+  </body>
+</html>

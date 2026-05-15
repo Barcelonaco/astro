@@ -64,6 +64,14 @@ import BeforeAfter from './blocks/BeforeAfter.astro';
 import ParallaxInit from './ParallaxInit.astro';
 import ModuleAnimations from './ModuleAnimations.astro';
 
+// Dynamic plugin components — auto-discovered, no build error if absent
+const pluginGlob = import.meta.glob<{ default: any }>('@plugins/*/templates/*.astro', { eager: true });
+const pluginComponents: Record<string, any> = {};
+for (const [path, mod] of Object.entries(pluginGlob)) {
+  // Extract type from filename: /plugins/poolp-box-hero/templates/PoolpBoxHero.astro → poolp-box-hero
+  const match = path.match(/\/?(?:@?plugins)\/([^/]+)\/templates\//);
+  if (match) pluginComponents[match[1]] = mod.default;
+}
 interface Block {
   id?: string;
   type: string;
@@ -220,9 +228,12 @@ const blocks = rawBlocks.filter(b => !inactiveSet.has(b.type));
       case 'poolp-box-finitions':
         return <PoolpBoxFinitions data={data} />;
 
-      default:
-        // Plugin blocks: rendered server-side via API
+      default: {
+        // Dynamic plugin component if available, otherwise server-side render
+        const PluginComponent = pluginComponents[block.type];
+        if (PluginComponent) return <PluginComponent data={data} />;
         return <PluginBlock type={block.type} data={data} />;
+      }
     }
   })}
 </div>

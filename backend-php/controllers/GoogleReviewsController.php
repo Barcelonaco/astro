@@ -55,17 +55,18 @@ class GoogleReviewsController {
         }
 
         if (!$reviewsData) {
-            $url = "https://maps.googleapis.com/maps/api/place/details/json"
-                . "?place_id=" . urlencode($placeId)
-                . "&fields=reviews,rating,user_ratings_total"
-                . "&key=" . urlencode($apiKey)
-                . "&language=" . urlencode($lang);
+            // Places API (New)
+            $url = "https://places.googleapis.com/v1/places/" . urlencode($placeId) . "?languageCode=" . urlencode($lang);
 
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_TIMEOUT => 10,
                 CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_HTTPHEADER => [
+                    'X-Goog-Api-Key: ' . $apiKey,
+                    'X-Goog-FieldMask: rating,userRatingCount,reviews',
+                ],
             ]);
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -73,20 +74,34 @@ class GoogleReviewsController {
             curl_close($ch);
 
             if ($response === false || $httpCode !== 200) {
-                error_response('Erreur lors de la récupération des avis Google: ' . ($curlError ?: "HTTP $httpCode"), 502);
-            }
-
-            $json = json_decode($response, true);
-            if (!$json || ($json['status'] ?? '') !== 'OK') {
-                $status = $json['status'] ?? 'UNKNOWN';
-                $errorMsg = $json['error_message'] ?? $status;
+                $json = $response ? json_decode($response, true) : null;
+                $errorMsg = $json['error']['message'] ?? $curlError ?: "HTTP $httpCode";
                 error_response("Erreur API Google Places: $errorMsg", 502);
             }
 
+            $json = json_decode($response, true);
+            if (!$json) {
+                error_response('Réponse invalide de Google Places API.', 502);
+            }
+
+            // Normalize new API response → legacy format for cache/output
+            $reviews = [];
+            foreach ($json['reviews'] ?? [] as $r) {
+                $reviews[] = [
+                    'author_name' => $r['authorAttribution']['displayName'] ?? '',
+                    'author_url' => $r['authorAttribution']['uri'] ?? '',
+                    'profile_photo_url' => $r['authorAttribution']['photoUri'] ?? '',
+                    'rating' => (int) ($r['rating'] ?? 0),
+                    'relative_time_description' => $r['relativePublishTimeDescription'] ?? '',
+                    'text' => $r['text']['text'] ?? '',
+                    'time' => strtotime($r['publishTime'] ?? 'now'),
+                ];
+            }
+
             $reviewsData = [
-                'rating' => $json['result']['rating'] ?? 0,
-                'user_ratings_total' => $json['result']['user_ratings_total'] ?? 0,
-                'reviews' => $json['result']['reviews'] ?? [],
+                'rating' => $json['rating'] ?? 0,
+                'user_ratings_total' => $json['userRatingCount'] ?? 0,
+                'reviews' => $reviews,
             ];
 
             file_put_contents($cacheFile, json_encode($reviewsData, JSON_UNESCAPED_UNICODE));
@@ -102,6 +117,7 @@ class GoogleReviewsController {
             'rating' => $reviewsData['rating'],
             'total' => $reviewsData['user_ratings_total'],
             'reviews' => $reviews,
+            'place_id' => $placeId,
         ]);
     }
 }

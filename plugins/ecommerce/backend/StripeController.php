@@ -221,7 +221,7 @@ class StripeController {
                 ],
                 'description' => 'Commande ' . $order['order_number'],
                 'receipt_email' => $order['email'] ?: null,
-                'automatic_payment_methods' => ['enabled' => true],
+                'payment_method_types' => ['card'],
             ]);
         } catch (\Stripe\Exception\ApiErrorException $e) {
             error_log('Stripe createPaymentIntent failed: ' . $e->getMessage());
@@ -381,6 +381,20 @@ class StripeController {
                 }
             } catch (\Throwable $e) {
                 error_log('OrderMailer error: ' . $e->getMessage());
+            }
+
+            // Auto-generate invoice on payment + send by email
+            InvoiceController::autoGenerateOnPayment($orderId);
+            InvoiceController::sendInvoiceEmail($orderId);
+
+            // Recalculate pro tier if customer is pro
+            try {
+                $stmt2 = $db->prepare('SELECT customer_id FROM orders WHERE id = ?');
+                $stmt2->execute([$orderId]);
+                $cid = $stmt2->fetchColumn();
+                if ($cid) ProTierService::recalculateForCustomer((int) $cid);
+            } catch (\Throwable $e) {
+                error_log('ProTierService recalc error: ' . $e->getMessage());
             }
         }
     }

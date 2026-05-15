@@ -32,16 +32,7 @@ const discountPct = onSale ? Math.round(((compareAtCents! - priceCents) / compar
   {onSale && compareAtCents && (
     <span class="price-compare" aria-label={`Prix avant reduction ${formatPrice(compareAtCents, currency)}`}>{formatPrice(compareAtCents, currency)}</span>
   )}
-  <span class="price-current">
-    {hasRange ? (
-      <>A partir de <strong>{formatPrice(priceCents, currency)}</strong></>
-    ) : (
-      <strong>{formatPrice(priceCents, currency)}</strong>
-    )}
-    <span class="price-label-ttc">TTC</span>
-  </span>
-  {onSale && <span class="price-discount-badge">-{discountPct}%</span>}
-  {/* HT pro line — hidden by default, shown client-side if pro approved */}
+  {/* HT pro line — hidden by default, shown as primary price client-side if pro approved */}
   {priceHtCents !== undefined && priceHtCents > 0 && (
     <span class="price-ht" style="display:none">
       {hasRange ? (
@@ -52,14 +43,22 @@ const discountPct = onSale ? Math.round(((compareAtCents! - priceCents) / compar
       <span class="price-ht-discount" style="display:none"></span>
     </span>
   )}
+  <span class="price-current">
+    {hasRange ? (
+      <>A partir de <strong>{formatPrice(priceCents, currency)}</strong></>
+    ) : (
+      <strong>{formatPrice(priceCents, currency)}</strong>
+    )}
+    <span class="price-label-ttc">TTC</span>
+  </span>
+  {onSale && <span class="price-discount-badge">-{discountPct}%</span>}
 </div>
 
-<style>
+<style is:global>
   .price-display {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 10px;
-    flex-wrap: wrap;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
   .price-current {
     font-size: 1.1em;
@@ -87,14 +86,13 @@ const discountPct = onSale ? Math.round(((compareAtCents! - priceCents) / compar
     color: white;
     font-size: 0.75em;
     font-weight: 600;
+    align-self: flex-start;
   }
+  /* HT line — hidden by default */
   .price-ht {
-    display: block;
-    width: 100%;
     font-size: 0.85em;
-    color: var(--color-primary, var(--accent, #e8633a));
+    color: var(--gray-500, #6b7280);
     font-weight: 500;
-    margin-top: 2px;
   }
   .price-ht strong {
     font-weight: 700;
@@ -103,5 +101,39 @@ const discountPct = onSale ? Math.round(((compareAtCents! - priceCents) / compar
     font-size: 0.85em;
     margin-left: 4px;
     color: var(--gray-500, #6b7280);
+  }
+  /* Pro mode: HT becomes primary, TTC becomes strikethrough secondary */
+  .price-display.is-pro .price-ht {
+    font-size: 1.1em;
+    color: var(--color-default, #224f5a);
+    order: -1;
+  }
+  .price-display.is-pro .price-current {
+    font-size: 0.85em;
+    color: var(--gray-500, #6b7280);
+    text-decoration: line-through;
+  }
+  .price-display.is-pro .price-current strong {
+    font-weight: 500;
+  }
+  .price-display.is-pro .price-label-ttc {
+    text-decoration: none;
+  }
+  .pro-tier-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--color-primary, #1a5276);
+    color: #fff;
+    font-size: 0.75em;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .price-ht-discount {
+    font-size: 0.85em;
+    color: var(--color-primary, #1a5276);
+    font-weight: 600;
   }
 </style>

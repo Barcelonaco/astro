@@ -12,11 +12,11 @@ const ORDER_STATUS_LABELS = {
   awaiting_payment: 'Attente paiement',
   paid: 'Payée',
   processing: 'En traitement',
-  fulfilled: 'Preparee',
-  shipped: 'Expediee',
-  delivered: 'Livree',
-  cancelled: 'Annulee',
-  refunded: 'Remboursee',
+  fulfilled: 'Preparée',
+  shipped: 'Expédiée',
+  delivered: 'Livrée',
+  cancelled: 'Annulée',
+  refunded: 'Remboursée',
 };
 
 export class CustomerDetailView extends BaseView {
@@ -46,6 +46,7 @@ export class CustomerDetailView extends BaseView {
       <div class="detail-field"><strong>Commandes</strong> ${customer.order_count || 0}</div>
       <div class="detail-field"><strong>CA Payé</strong> ${fmtMoney(customer.total_spent_cents)}</div>
       <div class="detail-field"><strong>Remise actuelle</strong> ${customer.discount_rate != null ? customer.discount_rate + '%' : 'Aucune'}</div>
+      <div class="detail-field"><strong>Paiement</strong> ${{ immediate: 'Comptant', net15: 'Net 15j', net30: 'Net 30j', net45: 'Net 45j', net60: 'Net 60j' }[customer.payment_terms] || 'Comptant'}</div>
       <div class="detail-field"><strong>Marketing</strong> ${customer.accepts_marketing ? 'Opt-in' : 'Opt-out'}</div>
     </div>`;
     html += '</div>';
@@ -84,6 +85,7 @@ export class CustomerDetailView extends BaseView {
     }
 
     // Edit form
+    const PAYMENT_TERMS = { immediate: 'Comptant', net15: 'Net 15j', net30: 'Net 30j', net45: 'Net 45j', net60: 'Net 60j' };
     html += `<div class="edit-form" id="customer-edit-form">
       <div class="form-group">
         <label>Statut pro</label>
@@ -96,6 +98,14 @@ export class CustomerDetailView extends BaseView {
       <div class="form-group" style="max-width:120px">
         <label>Remise (%)</label>
         <input type="number" class="form-input" id="detail-discount" step="0.1" min="0" max="100" value="${customer.discount_rate ?? ''}" placeholder="-" style="height:36px">
+      </div>
+      <div class="form-group">
+        <label>Conditions de paiement</label>
+        <select class="form-select" id="detail-payment-terms" style="height:36px">
+          ${Object.entries(PAYMENT_TERMS).map(([k, v]) =>
+            `<option value="${k}" ${k === (customer.payment_terms || 'immediate') ? 'selected' : ''}>${v}</option>`
+          ).join('')}
+        </select>
       </div>
       <div class="form-group" style="flex:2">
         <label>Note interne</label>

@@ -4,7 +4,7 @@
  * Matches WooCommerce "My Account" layout.
  */
 interface Props {
-  active?: 'dashboard' | 'orders' | 'downloads' | 'addresses' | 'payment' | 'profile' | 'logout'
+  active?: 'dashboard' | 'orders' | 'projects' | 'downloads' | 'addresses' | 'payment' | 'profile' | 'logout'
 }
 
 const { active = 'dashboard' } = Astro.props
@@ -12,6 +12,7 @@ const { active = 'dashboard' } = Astro.props
 const links = [
   { key: 'dashboard', label: 'Tableau de bord', href: '/compte' },
   { key: 'orders', label: 'Commandes', href: '/compte/commandes' },
+  { key: 'projects', label: 'Mes projets', href: '/compte/projets', conditional: 'poolp' },
   { key: 'downloads', label: 'Telechargements', href: '/compte/telechargements' },
   { key: 'addresses', label: 'Adresses', href: '/compte/adresses' },
   { key: 'payment', label: 'Paiement', href: '/compte/paiement' },
@@ -26,6 +27,8 @@ const links = [
       href={link.href}
       class:list={['account-nav-link', { active: active === link.key }]}
       data-action={link.key === 'logout' ? 'logout' : undefined}
+      data-conditional={link.conditional || undefined}
+      style={link.conditional ? 'display:none' : undefined}
     >
       {link.label}
     </a>
@@ -40,4 +43,16 @@ const links = [
       window.location.href = '/compte/connexion'
     })
   })
+
+  // Show conditional nav links based on active plugins
+  async function checkConditionalLinks() {
+    const poolpLinks = document.querySelectorAll<HTMLElement>('[data-conditional="poolp"]')
+    if (poolpLinks.length === 0) return
+    try {
+      const { isPoolpPluginActive } = await import('@frontend/lib/poolp-api')
+      const active = await isPoolpPluginActive()
+      if (active) poolpLinks.forEach(el => el.style.display = '')
+    } catch {}
+  }
+  checkConditionalLinks()
 </script>

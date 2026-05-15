@@ -1,0 +1,15 @@
+/* ── Shop button overrides ─────────────────────────────────────────────
+   Nickl .btn-secondary = white text + transparent bg → invisible on light pages.
+   This file overrides .btn-secondary for all ecommerce pages.            */
+
+.main-page .btn-secondary {
+  background-color: transparent;
+  border: 2px solid var(--color-primary, #1a1a18);
+  color: var(--color-primary, #1a1a18);
+}
+.main-page .btn-secondary:hover:not(:active),
+.main-page .btn-secondary:focus:not(:active) {
+  background-color: var(--color-primary, #1a1a18);
+  border-color: var(--color-primary, #1a1a18);
+  color: #fff;
+}

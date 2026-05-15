@@ -1,0 +1,226 @@
+---
+/**
+ * /cgv — Conditions Generales de Vente
+ */
+import BaseHead from '@frontend/components/BaseHead.astro'
+import Header from '@frontend/components/Header.astro'
+import Footer from '@frontend/components/Footer.astro'
+import SiteOverlays from '@frontend/components/SiteOverlays.astro'
+import DeferredLoader from '@frontend/components/DeferredLoader.astro'
+import { SITE_TITLE } from '@frontend/consts'
+import { getFrontendBootstrap } from '@frontend/lib/api'
+import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
+
+const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
+const siteName = siteInfo.siteName || SITE_TITLE
+setDefaultImageUrl(siteSettings.replacement_image || '')
+
+const bodyClasses = [
+  siteSettings.rounded === '1' ? 'border-rounded' : '',
+  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
+].filter(Boolean).join(' ')
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <BaseHead title={`Conditions Generales de Vente — ${siteName}`} description="Conditions generales de vente" styleSettings={styleSettings} siteSettings={siteSettings} />
+  </head>
+  <body class={bodyClasses || undefined}>
+    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+
+    <main class="main-page legal-wrap">
+      <div class="legal-container">
+        <h1>Conditions Generales de Vente</h1>
+
+        <nav class="legal-toc" aria-label="Sommaire">
+          <h2>Sommaire</h2>
+          <ol>
+            <li><a href="#objet">Objet et champ d'application</a></li>
+            <li><a href="#prix">Prix et paiement</a></li>
+            <li><a href="#commandes">Commandes</a></li>
+            <li><a href="#livraison">Livraison et delais</a></li>
+            <li><a href="#retractation">Droit de retractation</a></li>
+            <li><a href="#garanties">Garanties et service apres-vente</a></li>
+            <li><a href="#responsabilite">Responsabilite</a></li>
+            <li><a href="#tarifs">Validite des tarifs</a></li>
+            <li><a href="#donnees">Protection des donnees personnelles</a></li>
+            <li><a href="#litiges">Litiges et droit applicable</a></li>
+          </ol>
+        </nav>
+
+        <section id="objet">
+          <h2>Article 1 — Objet et champ d'application</h2>
+          <p>Les presentes Conditions Generales de Vente (ci-apres "CGV") regissent l'ensemble des ventes de produits et services proposes par la societe (ci-apres "le Vendeur") via le site internet, destines aux professionnels et aux particuliers (ci-apres "le Client").</p>
+          <p>Les CGV s'appliquent a toute commande passee sur le site, que le Client soit un particulier ou un professionnel. Le fait de passer commande implique l'acceptation pleine et entiere des presentes CGV.</p>
+          <p>Le Vendeur se reserve le droit de modifier les presentes CGV a tout moment. Les CGV applicables sont celles en vigueur a la date de la commande.</p>
+          <p>Les produits proposes comprennent notamment : equipements de piscine, pompes a chaleur, systemes de filtration, produits d'entretien, accessoires, pieces detachees, et tout autre article figurant au catalogue du site.</p>
+        </section>
+
+        <section id="prix">
+          <h2>Article 2 — Prix et paiement</h2>
+
+          <h3>2.1 Prix</h3>
+          <p>Les prix sont indiques en euros et s'entendent hors taxes (HT) pour les professionnels et toutes taxes comprises (TTC) pour les particuliers, sauf mention contraire. La TVA applicable est celle en vigueur au jour de la commande.</p>
+          <p>Les frais de livraison ne sont pas inclus dans les prix affiches et sont calcules lors de la validation de la commande en fonction du poids, du volume et de la destination.</p>
+
+          <h3>2.2 Modalites de paiement</h3>
+          <p>Le paiement s'effectue selon les modalites suivantes :</p>
+          <ul>
+            <li><strong>Premiere commande :</strong> le reglement doit obligatoirement etre effectue comptant par carte bancaire (CB). Aucun autre moyen de paiement n'est accepte pour une premiere commande.</li>
+            <li><strong>A partir de la deuxieme commande (clients professionnels) :</strong> le reglement peut etre effectue par prelevement SEPA, sous reserve de la signature prealable d'un mandat de prelevement et de l'acceptation du dossier par le Vendeur.</li>
+            <li><strong>Carte bancaire :</strong> Visa, Mastercard. Le debit est effectue au moment de la validation de la commande.</li>
+          </ul>
+          <p>En cas de defaut de paiement, le Vendeur se reserve le droit de suspendre ou d'annuler toute commande en cours et toute livraison.</p>
+          <p>Pour les professionnels, toute somme non payee a l'echeance portera de plein droit interets au taux de trois fois le taux d'interet legal, sans qu'un rappel soit necessaire, conformement a l'article L.441-10 du Code de commerce. Une indemnite forfaitaire de 40 euros pour frais de recouvrement sera exigible de plein droit.</p>
+
+          <h3>2.3 Securite des paiements</h3>
+          <p>Les transactions sont securisees par un systeme de paiement en ligne certifie. Les donnees bancaires du Client sont chiffrees et ne sont jamais stockees sur les serveurs du Vendeur.</p>
+        </section>
+
+        <section id="commandes">
+          <h2>Article 3 — Commandes</h2>
+          <p>Le Client passe commande sur le site en suivant le processus de commande en ligne. Toute commande vaut acceptation des prix et descriptions des produits disponibles a la vente.</p>
+          <p>Le Vendeur se reserve le droit de refuser ou d'annuler toute commande d'un Client avec lequel il existerait un litige relatif au paiement d'une commande precedente.</p>
+          <p>La commande n'est definitive qu'apres confirmation du paiement integral. Un email de confirmation de commande est envoye au Client recapitulant les details de la commande.</p>
+        </section>
+
+        <section id="livraison">
+          <h2>Article 4 — Livraison et delais</h2>
+
+          <h3>4.1 Zones et modes de livraison</h3>
+          <p>Les livraisons sont effectuees a l'adresse de livraison indiquee lors de la commande. Le Vendeur propose plusieurs modes de livraison dont les modalites et tarifs sont precises lors de la commande.</p>
+          <p>Pour les equipements volumineux (pompes a chaleur, systemes de filtration, etc.), la livraison s'effectue au pied du camion. Le dechargement et la mise en place ne sont pas inclus sauf accord specifique.</p>
+
+          <h3>4.2 Delais de livraison</h3>
+          <p>Les delais de livraison sont donnes a titre indicatif et varient selon la disponibilite des produits et la destination. Ils courent a compter de la confirmation de la commande et du reglement effectif.</p>
+          <p>Un retard de livraison ne peut donner lieu a l'annulation de la commande que si le delai depasse 30 jours a compter de la date de livraison prevue, apres mise en demeure restee infructueuse pendant 15 jours, conformement aux dispositions de l'article L.216-2 du Code de la consommation.</p>
+
+          <h3>4.3 Reception et reserves</h3>
+          <p>Le Client est tenu de verifier l'etat des produits a la reception. Toute anomalie (colis endommage, produit manquant ou non conforme) doit etre signalee au transporteur par des reserves ecrites sur le bon de livraison et confirmee au Vendeur par ecrit dans un delai de 3 jours ouvrables suivant la reception.</p>
+          <p>A defaut de reserves dans les delais impartis, les produits seront reputes conformes et acceptes.</p>
+
+          <h3>4.4 Transfert de risques</h3>
+          <p>Pour les particuliers, le transfert des risques s'effectue au moment de la livraison. Pour les professionnels, le transfert des risques s'effectue des la remise des produits au transporteur.</p>
+        </section>
+
+        <section id="retractation">
+          <h2>Article 5 — Droit de retractation</h2>
+
+          <h3>5.1 Delai de retractation</h3>
+          <p>Conformement aux articles L.221-18 et suivants du Code de la consommation, le Client consommateur dispose d'un delai de 14 jours calendaires a compter de la reception des produits pour exercer son droit de retractation, sans avoir a justifier de motif ni a payer de penalites.</p>
+
+          <h3>5.2 Exclusions du droit de retractation</h3>
+          <p>Conformement a l'article L.221-28 du Code de la consommation, le droit de retractation ne peut etre exerce pour :</p>
+          <ul>
+            <li>Les produits confectionnes sur mesure ou clairement personnalises (liners sur mesure, couvertures de piscine aux dimensions specifiques, pieces decoupees selon un plan, etc.).</li>
+            <li>Les produits qui ont ete descelles apres la livraison et qui ne peuvent etre renvoyes pour des raisons d'hygiene ou de protection de la sante (produits chimiques d'entretien ouverts, etc.).</li>
+            <li>Les produits qui, apres avoir ete livres et de par leur nature, sont meles de maniere indissociable avec d'autres articles.</li>
+          </ul>
+
+          <h3>5.3 Modalites de retour</h3>
+          <p>Pour exercer son droit de retractation, le Client doit notifier sa decision par courrier, email ou via le formulaire de retractation disponible sur le site. Les produits doivent etre retournes dans leur emballage d'origine, complets et en parfait etat, dans un delai de 14 jours suivant la notification de la retractation.</p>
+          <p>Les frais de retour sont a la charge du Client, sauf en cas de produit non conforme ou defectueux.</p>
+
+          <h3>5.4 Remboursement</h3>
+          <p>Le remboursement sera effectue dans un delai maximum de 14 jours a compter de la reception des produits retournes ou de la preuve d'expedition de ceux-ci, par le meme moyen de paiement que celui utilise lors de la commande.</p>
+        </section>
+
+        <section id="garanties">
+          <h2>Article 6 — Garanties et service apres-vente</h2>
+
+          <h3>6.1 Garantie legale de conformite</h3>
+          <p>Conformement aux articles L.217-3 et suivants du Code de la consommation, le Vendeur est tenu de livrer un bien conforme au contrat. Le Client beneficie d'un delai de 2 ans a compter de la delivrance du bien pour agir au titre de la garantie legale de conformite.</p>
+
+          <h3>6.2 Garantie des vices caches</h3>
+          <p>Conformement aux articles 1641 a 1649 du Code civil, le Client peut demander la resolution de la vente ou une reduction du prix en cas de vice cache rendant le produit impropre a l'usage auquel il est destine.</p>
+
+          <h3>6.3 Garantie commerciale</h3>
+          <p>Certains produits beneficient d'une garantie commerciale (garantie constructeur). Les conditions et la duree de cette garantie sont precises sur la fiche produit et/ou dans la documentation fournie par le fabricant.</p>
+
+          <h3>6.4 Service apres-vente</h3>
+          <p>Pour toute demande relative au SAV, le Client peut contacter le Vendeur par email ou telephone. Le Vendeur s'engage a traiter les demandes dans les meilleurs delais et a proposer une solution adaptee (reparation, echange ou remboursement selon les cas).</p>
+        </section>
+
+        <section id="responsabilite">
+          <h2>Article 7 — Responsabilite</h2>
+
+          <h3>7.1 Responsabilite du Vendeur</h3>
+          <p>Le Vendeur est responsable de la conformite des produits vendus et de tout dommage direct cause par un defaut de ses produits. La responsabilite du Vendeur ne saurait etre engagee pour les dommages indirects (perte de profit, perte de chance, prejudice commercial) resultant de l'utilisation des produits.</p>
+          <p>Le Vendeur n'est pas responsable des retards ou de l'inexecution de ses obligations resultant d'un cas de force majeure tel que defini par l'article 1218 du Code civil.</p>
+
+          <h3>7.2 Installation et mise en service</h3>
+          <p>Le Vendeur fournit les produits mais n'assure pas leur installation sauf convention contraire. Le Client est seul responsable de l'installation et de la mise en service des produits commandes.</p>
+          <p><strong>Avertissement important :</strong> les equipements necessitant une alimentation electrique en triphase (pompes a chaleur, systemes de filtration haute puissance, eclairages professionnels, etc.) ainsi que les equipements destines a etre installes dans des Etablissements Recevant du Public (ERP) doivent imperativement etre installes par un professionnel qualifie et habilite. Le Vendeur decline toute responsabilite en cas de dommage, accident ou dysfonctionnement resultant d'une installation non conforme aux normes en vigueur ou realisee par une personne non qualifiee.</p>
+          <p>Le Client s'engage a respecter les notices d'installation et d'utilisation fournies avec les produits, ainsi que les normes electriques et de securite applicables (norme NF C 15-100, etc.).</p>
+
+          <h3>7.3 Responsabilite du Client</h3>
+          <p>Le Client est responsable de l'exactitude des informations fournies lors de la commande. Toute erreur dans le libelle des coordonnees du destinataire peut entrainer des retards ou des impossibilites de livraison dont le Vendeur ne saurait etre tenu responsable.</p>
+        </section>
+
+        <section id="tarifs">
+          <h2>Article 8 — Validite des tarifs</h2>
+          <p>Les prix affiches sur le site sont valables au moment de la consultation et de la passation de commande. Le Vendeur se reserve le droit de modifier ses tarifs a tout moment, sans preavis.</p>
+          <p>En cas de modification tarifaire entre la consultation du site et la passation de commande, le prix applicable est celui affiche au moment de la validation de la commande par le Client.</p>
+          <p>Les tarifs des produits figurant au catalogue sont garantis pour la duree de validite indiquee, le cas echeant. En l'absence de mention de duree, les tarifs sont valables tant qu'ils figurent sur le site, dans la limite des stocks disponibles.</p>
+          <p>Les eventuelles promotions et remises sont valables dans les conditions et pour la duree specifiees sur le site.</p>
+        </section>
+
+        <section id="donnees">
+          <h2>Article 9 — Protection des donnees personnelles</h2>
+          <p>Le Vendeur collecte et traite les donnees personnelles du Client dans le cadre de l'execution de la commande et de la gestion de la relation commerciale, conformement au Reglement General sur la Protection des Donnees (RGPD) et a la loi Informatique et Libertes.</p>
+          <p>Pour toute information detaillee sur la collecte, le traitement et la protection de vos donnees personnelles, veuillez consulter notre <a href="/politique-confidentialite">Politique de confidentialite</a>.</p>
+        </section>
+
+        <section id="litiges">
+          <h2>Article 10 — Litiges et droit applicable</h2>
+
+          <h3>10.1 Droit applicable</h3>
+          <p>Les presentes CGV sont soumises au droit francais. Toute question relative a leur interpretation et/ou execution releve de la legislation francaise.</p>
+
+          <h3>10.2 Reglement amiable</h3>
+          <p>En cas de litige, le Client est invite a contacter en premier lieu le Vendeur afin de rechercher une solution amiable.</p>
+
+          <h3>10.3 Mediation</h3>
+          <p>Conformement aux articles L.611-1 et suivants du Code de la consommation, le Client consommateur peut recourir gratuitement au service de mediation propose par le Vendeur. Le mediateur tentera, en toute independance et impartialite, de rapprocher les parties en vue d'une resolution amiable du litige.</p>
+
+          <h3>10.4 Juridiction competente</h3>
+          <p>A defaut de resolution amiable, tout litige relatif aux presentes CGV sera soumis a la competence exclusive du Tribunal de commerce territorialement competent, y compris en cas de pluralite de defendeurs ou d'appel en garantie.</p>
+          <p>Pour les litiges impliquant un Client consommateur, les regles de competence legales s'appliquent.</p>
+        </section>
+      </div>
+    </main>
+
+    <Footer siteSettings={siteSettings} />
+    <SiteOverlays siteSettings={siteSettings} />
+    <DeferredLoader />
+
+    <style is:global>
+      .legal-wrap { min-height: 60vh; padding: 40px 0 80px; }
+      .legal-container { max-width: 900px; margin: 0 auto; padding: 0 20px; }
+      .legal-container h1 { font-size: 32px; margin-bottom: 32px; line-height: 1.2; }
+      .legal-container h2 { font-size: 22px; margin-top: 48px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+      .legal-container h3 { font-size: 17px; margin-top: 28px; margin-bottom: 10px; }
+      .legal-container p { font-size: 15px; line-height: 1.7; margin-bottom: 12px; color: #333; }
+      .legal-container ul, .legal-container ol { font-size: 15px; line-height: 1.7; margin: 12px 0; padding-left: 24px; color: #333; }
+      .legal-container li { margin-bottom: 6px; }
+      .legal-container a { color: var(--color-primary, #0f62fe); text-decoration: underline; }
+      .legal-container a:hover { text-decoration: none; }
+      .legal-container strong { font-weight: 600; }
+      .legal-container section { margin-bottom: 16px; }
+
+      .legal-toc { background: #fafaf8; border: 1px solid #eee; border-radius: 6px; padding: 24px 28px; margin-bottom: 40px; }
+      .legal-toc h2 { font-size: 18px; margin: 0 0 14px; padding: 0; border: none; }
+      .legal-toc ol { margin: 0; padding-left: 20px; }
+      .legal-toc li { margin-bottom: 4px; font-size: 14px; }
+      .legal-toc a { color: var(--color-primary, #0f62fe); text-decoration: none; }
+      .legal-toc a:hover { text-decoration: underline; }
+
+      @media (max-width: 600px) {
+        .legal-container h1 { font-size: 26px; }
+        .legal-container h2 { font-size: 19px; }
+        .legal-toc { padding: 18px 20px; }
+      }
+    </style>
+  </body>
+</html>

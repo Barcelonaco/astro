@@ -148,7 +148,7 @@ class OrderAdminController {
         $db = Database::getInstance();
         $body = get_json_body();
 
-        $stmt = $db->prepare('SELECT id, status FROM orders WHERE id = ?');
+        $stmt = $db->prepare('SELECT id, status, payment_status, paid_at, shipped_at, delivered_at FROM orders WHERE id = ?');
         $stmt->execute([$id]);
         $order = $stmt->fetch();
         if (!$order) error_response('Commande introuvable', 404);
@@ -157,18 +157,31 @@ class OrderAdminController {
         $values = [];
 
         if (isset($body['status'])) {
-            $allowed = ['awaiting_payment', 'paid', 'processing', 'fulfilled', 'shipped', 'delivered', 'cancelled', 'refunded'];
+            $allowed = ['awaiting_payment', 'paid', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
             if (!in_array($body['status'], $allowed, true)) {
                 error_response('Statut invalide', 400);
             }
             $fields[] = 'status = ?';
             $values[] = $body['status'];
 
+            // Auto-sync payment_status when order status implies payment
+            $newStatus = $body['status'];
+            if (in_array($newStatus, ['paid', 'processing', 'shipped', 'delivered'], true)
+                && in_array($order['payment_status'] ?? '', ['unpaid', 'pending'], true)) {
+                $fields[] = 'payment_status = ?';
+                $values[] = 'paid';
+                $fields[] = 'paid_at = COALESCE(paid_at, NOW())';
+            }
+            if ($newStatus === 'cancelled' && in_array($order['payment_status'] ?? '', ['unpaid', 'pending'], true)) {
+                $fields[] = 'payment_status = ?';
+                $values[] = 'failed';
+            }
+
             // Auto-set timestamp fields
-            if ($body['status'] === 'shipped' && empty($order['shipped_at'])) {
+            if ($newStatus === 'shipped' && empty($order['shipped_at'])) {
                 $fields[] = 'shipped_at = NOW()';
             }
-            if ($body['status'] === 'delivered' && empty($order['delivered_at'])) {
+            if ($newStatus === 'delivered' && empty($order['delivered_at'])) {
                 $fields[] = 'delivered_at = NOW()';
             }
         }
@@ -191,17 +204,39 @@ class OrderAdminController {
             $stmt->execute([$id, json_encode(['from' => $order['status'], 'to' => $body['status']], JSON_UNESCAPED_UNICODE), $user['id'] ?? null]);
         }
 
+        // Auto-generate invoice + send email when payment_status transitions to paid (offline payments)
+        if (isset($body['status']) && in_array($body['status'], ['paid', 'processing', 'shipped', 'delivered'], true)
+            && in_array($order['payment_status'] ?? '', ['unpaid', 'pending'], true)) {
+            InvoiceController::autoGenerateOnPayment($id);
+            InvoiceController::sendInvoiceEmail($id);
+            // Recalculate pro tier
+            try {
+                $stmt2 = $db->prepare('SELECT customer_id FROM orders WHERE id = ?');
+                $stmt2->execute([$id]);
+                $cid = $stmt2->fetchColumn();
+                if ($cid) ProTierService::recalculateForCustomer((int) $cid);
+            } catch (\Throwable $e) {}
+        }
+
         // Email notifications on status change
         if (isset($body['status']) && $body['status'] !== $order['status']) {
             try {
                 $fullOrder = self::loadFullOrder($id);
                 if ($fullOrder) {
-                    // Client: shipment notification
-                    if ($body['status'] === 'shipped') {
+                    $newStatus = $body['status'];
+                    // Client notifications per status
+                    if ($newStatus === 'shipped') {
                         OrderMailer::sendShipmentNotif($fullOrder, $body['tracking_url'] ?? null);
+                    } elseif ($newStatus === 'processing') {
+                        OrderMailer::sendClientStatusNotif($fullOrder, 'En traitement', 'Votre commande est en cours de preparation.', '#e3f2fd', '#1565c0');
+                    } elseif ($newStatus === 'delivered') {
+                        OrderMailer::sendClientStatusNotif($fullOrder, 'Livree', 'Votre commande a ete livree. Nous esperons qu\'elle vous donne entiere satisfaction.', '#e8f5e9', '#2e7d32');
+                    } elseif ($newStatus === 'cancelled') {
+                        OrderMailer::sendClientStatusNotif($fullOrder, 'Annulee', 'Votre commande a ete annulee. Si vous n\'etes pas a l\'origine de cette annulation, contactez-nous.', '#fef2f2', '#b91c1c');
                     }
+                    // Refund has its own dedicated email already (via refund endpoint)
                     // Admin: all status changes
-                    OrderMailer::sendAdminStatusChange($fullOrder, $order['status'], $body['status']);
+                    OrderMailer::sendAdminStatusChange($fullOrder, $order['status'], $newStatus);
                 }
             } catch (\Throwable $e) {
                 error_log('OrderMailer status change error: ' . $e->getMessage());
@@ -295,6 +330,30 @@ class OrderAdminController {
         ]);
     }
 
+    /** Suppression d'une commande (admin only). */
+    public static function delete(int $id): void {
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT id, order_number FROM orders WHERE id = ?');
+        $stmt->execute([$id]);
+        $order = $stmt->fetch();
+        if (!$order) error_response('Commande introuvable', 404);
+
+        $db->beginTransaction();
+        try {
+            $db->prepare('DELETE FROM order_items WHERE order_id = ?')->execute([$id]);
+            $db->prepare('DELETE FROM payment_intents WHERE order_id = ?')->execute([$id]);
+            $db->prepare('DELETE FROM invoices WHERE order_id = ?')->execute([$id]);
+            $db->prepare("DELETE FROM audit_log WHERE entity_type = 'order' AND entity_id = ?")->execute([$id]);
+            $db->prepare('DELETE FROM orders WHERE id = ?')->execute([$id]);
+            $db->commit();
+        } catch (\Throwable $e) {
+            $db->rollBack();
+            error_response('Erreur lors de la suppression : ' . $e->getMessage(), 500);
+        }
+
+        json_response(['message' => 'Commande ' . $order['order_number'] . ' supprimee']);
+    }
+
     /** Stats rapides pour le dashboard. */
     public static function stats(): void {
         $db = Database::getInstance();
@@ -304,7 +363,6 @@ class OrderAdminController {
                 SUM(CASE WHEN status = 'awaiting_payment' THEN 1 ELSE 0 END) AS awaiting_payment,
                 SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) AS paid,
                 SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS processing,
-                SUM(CASE WHEN status = 'fulfilled' THEN 1 ELSE 0 END) AS fulfilled,
                 SUM(CASE WHEN status = 'shipped' THEN 1 ELSE 0 END) AS shipped,
                 SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) AS delivered,
                 SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,

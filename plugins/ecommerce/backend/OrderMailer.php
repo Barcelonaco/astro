@@ -33,7 +33,9 @@ class OrderMailer {
         if (empty($recipients)) return;
 
         $d = self::buildOrderData($order);
-        $subject = "[Commande] {$order['order_number']} — {$d['total']} — {$d['siteName']}";
+        $isPaid = ($order['payment_status'] ?? '') === 'paid';
+        $prefix = $isPaid ? '[Commande Payee]' : '[Nouvelle commande]';
+        $subject = "{$prefix} {$order['order_number']} — {$d['total']} — {$d['siteName']}";
         $html = self::templateAdminNotif($d);
 
         foreach ($recipients as $email) {
@@ -82,6 +84,57 @@ class OrderMailer {
         foreach ($recipients as $email) {
             self::send(trim($email), $subject, $html);
         }
+    }
+
+    // ── Client: notification changement statut (processing, delivered, cancelled) ──
+
+    public static function sendClientStatusNotif(array $order, string $statusLabel, string $message, string $bgColor, string $fgColor): void {
+        if (empty($order['email'])) return;
+        $d = self::buildOrderData($order);
+        $subject = "Commande {$order['order_number']} — {$statusLabel} — {$d['siteName']}";
+
+        $html = self::wrapClientTemplate($d['siteName'], "
+            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-bottom:28px\"><tr><td align=\"center\">
+              <table cellpadding=\"0\" cellspacing=\"0\"><tr><td style=\"width:56px;height:56px;border-radius:50%;background:{$bgColor};color:{$fgColor};text-align:center;vertical-align:middle;font-size:28px;line-height:56px\">&#9679;</td></tr></table>
+              <h2 style=\"margin:16px 0 4px;font-size:22px;color:#222\">{$statusLabel}</h2>
+              <p style=\"margin:0;color:#666\">Commande <strong>{$d['orderNumber']}</strong></p>
+            </td></tr></table>
+
+            <div style=\"padding:16px;background:#fafafa;border-radius:8px;margin-bottom:20px;text-align:center;font-size:15px\">
+              {$message}
+            </div>
+
+            <div style=\"text-align:center;margin-top:20px\">
+              <a href=\"{$d['trackUrl']}\" style=\"display:inline-block;padding:10px 24px;background:{$d['primaryColor']};color:#fff;text-decoration:none;border-radius:6px;font-weight:600\">Voir ma commande</a>
+            </div>
+        ");
+
+        self::send($order['email'], $subject, $html);
+    }
+
+    // ── Client: facture disponible ──────────────────────────────────────
+
+    public static function buildInvoiceEmail(string $siteName, string $primaryColor, string $frontendUrl, string $invoiceNumber, string $orderNumber, string $total, string $downloadUrl): string {
+        $icon = self::iconCircle('&#128196;', '#e8f5e9', '#2e7d32');
+        return self::wrapClientTemplate($siteName, "
+            <div style=\"text-align:center;margin-bottom:28px\">
+              {$icon}
+              <h2 style=\"margin:0 0 4px;font-size:22px;color:#222\">Votre facture est disponible</h2>
+              <p style=\"margin:0;color:#666\">Commande <strong>{$orderNumber}</strong></p>
+            </div>
+
+            <div style=\"padding:16px;background:#fafafa;border-radius:8px;margin-bottom:20px;text-align:center\">
+              <div style=\"font-size:14px;color:#666\">Facture n°</div>
+              <div style=\"font-size:18px;font-weight:700;margin-top:4px\">{$invoiceNumber}</div>
+              <div style=\"font-size:14px;color:#666;margin-top:8px\">Montant : <strong>{$total}</strong></div>
+            </div>
+
+            <div style=\"text-align:center;margin-top:24px\">
+              <a href=\"{$downloadUrl}\" style=\"display:inline-block;padding:12px 28px;background:{$primaryColor};color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:15px\">Telecharger ma facture</a>
+            </div>
+
+            <p style=\"text-align:center;color:#999;font-size:12px;margin-top:16px\">Vous pouvez egalement retrouver toutes vos factures dans votre espace client.</p>
+        ");
     }
 
     // ── Admin: notification changement statut ─────────────────────────────
@@ -239,11 +292,10 @@ class OrderMailer {
             'awaiting_payment' => 'En attente de paiement',
             'paid' => 'Payée',
             'processing' => 'En traitement',
-            'fulfilled' => 'Preparee',
-            'shipped' => 'Expediee',
-            'delivered' => 'Livree',
-            'cancelled' => 'Annulee',
-            'refunded' => 'Remboursee',
+            'shipped' => 'Expédiée',
+            'delivered' => 'Livrée',
+            'cancelled' => 'Annulée',
+            'refunded' => 'Remboursée',
         ];
     }
 
@@ -253,6 +305,7 @@ class OrderMailer {
             'bank_transfer' => 'Virement bancaire',
             'on_invoice' => 'Sur facture',
             'paypal' => 'PayPal',
+            'cheque' => 'Chèque',
         ];
     }
 
@@ -313,14 +366,43 @@ class OrderMailer {
             'shippingMethod' => htmlspecialchars($order['shipping_method_label'] ?? ''),
             'trackUrl' => $trackUrl,
             'billingName' => trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? '')),
+            'paymentMethod' => $order['payment_method'] ?? '',
+            'paymentStatus' => $order['payment_status'] ?? '',
         ];
     }
 
-    // ── Template wrapper ──────────────────────────────────────────────────
+    // ── Template wrappers ─────────────────────────────────────────────────
 
+    /** Wrap for admin emails (no help section). */
     private static function wrapTemplate(string $siteName, string $body): string {
         $primaryColor = self::getPrimaryColor();
         $frontendUrl = rtrim($_ENV['FRONTEND_URL'] ?? '', '/');
+        return self::baseWrap($siteName, $primaryColor, $frontendUrl, $body, false);
+    }
+
+    /** Wrap for client emails (with help section). */
+    private static function wrapClientTemplate(string $siteName, string $body): string {
+        $primaryColor = self::getPrimaryColor();
+        $frontendUrl = rtrim($_ENV['FRONTEND_URL'] ?? '', '/');
+        return self::baseWrap($siteName, $primaryColor, $frontendUrl, $body, true);
+    }
+
+    private static function baseWrap(string $siteName, string $primaryColor, string $frontendUrl, string $body, bool $showHelp): string {
+        $helpBlock = '';
+        if ($showHelp) {
+            $contactEmail = self::getContactSetting('contact_email');
+            $contactPhone = self::getContactSetting('contact_phone');
+            if ($contactEmail || $contactPhone) {
+                $lines = [];
+                if ($contactEmail) $lines[] = "Email : <a href=\"mailto:{$contactEmail}\" style=\"color:{$primaryColor};text-decoration:none\">{$contactEmail}</a>";
+                if ($contactPhone) $lines[] = "Tel : <a href=\"tel:{$contactPhone}\" style=\"color:{$primaryColor};text-decoration:none\">{$contactPhone}</a>";
+                $helpBlock = "
+                <div style=\"margin-top:32px;padding:20px;background:#fafafa;border-radius:8px;text-align:center\">
+                  <h3 style=\"margin:0 0 8px;font-size:15px;color:#333\">Besoin d'aide ?</h3>
+                  <p style=\"margin:0;font-size:14px;color:#666;line-height:1.8\">" . implode('<br>', $lines) . "</p>
+                </div>";
+            }
+        }
         return <<<HTML
 <!DOCTYPE html>
 <html lang="fr">
@@ -332,6 +414,7 @@ class OrderMailer {
   </div>
   <div style="background:#fff;padding:32px;border-radius:0 0 8px 8px">
     {$body}
+    {$helpBlock}
   </div>
   <div style="text-align:center;padding:20px;font-size:12px;color:#999">
     <p style="margin:0">{$siteName} &middot; <a href="{$frontendUrl}" style="color:#999">{$frontendUrl}</a></p>
@@ -342,15 +425,74 @@ class OrderMailer {
 HTML;
     }
 
+    private static function getContactSetting(string $key): string {
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = ? LIMIT 1");
+            $stmt->execute([$key]);
+            $row = $stmt->fetch();
+            return ($row && $row['setting_value']) ? htmlspecialchars($row['setting_value']) : '';
+        } catch (\Throwable $e) { return ''; }
+    }
+
     // ── Templates ─────────────────────────────────────────────────────────
 
+    /** Helper: table-based centered icon circle (email-safe, no flexbox). */
+    private static function iconCircle(string $char, string $bg, string $fg): string {
+        return "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-bottom:16px\"><tr><td align=\"center\">
+            <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td width=\"56\" height=\"56\" style=\"width:56px;height:56px;border-radius:50%;background:{$bg};color:{$fg};text-align:center;vertical-align:middle;font-size:28px;line-height:56px;font-family:Arial,sans-serif\">{$char}</td></tr></table>
+        </td></tr></table>";
+    }
+
     private static function templateConfirmation(array $d): string {
-        return self::wrapTemplate($d['siteName'], "
+        $isPaid = $d['paymentStatus'] === 'paid';
+        $isBankTransfer = $d['paymentMethod'] === 'bank_transfer';
+        $isCheque = $d['paymentMethod'] === 'cheque';
+        $isOffline = in_array($d['paymentMethod'], ['bank_transfer', 'cheque', 'on_invoice'], true);
+
+        $heroTitle = $isPaid ? 'Commande confirmee' : 'Commande enregistree';
+        $heroSubtitle = $isPaid
+            ? "Merci pour votre commande <strong>{$d['orderNumber']}</strong>"
+            : "Votre commande <strong>{$d['orderNumber']}</strong> a bien ete enregistree";
+        $heroIcon = self::iconCircle($isPaid ? '&#10003;' : '&#128230;', $isPaid ? '#e8f5e9' : '#fff8e1', $isPaid ? '#2e7d32' : '#b28900');
+
+        // Bank transfer instructions with IBAN from settings
+        $bankBlock = '';
+        if ($isBankTransfer && !$isPaid) {
+            $iban = self::getBankSetting('bank_iban');
+            $bic = self::getBankSetting('bank_bic');
+            $bankName = self::getBankSetting('bank_account_name') ?: $d['siteName'];
+            $bankBlock = "
+            <div style=\"padding:16px 20px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;margin-bottom:24px\">
+              <h3 style=\"margin:0 0 10px;font-size:16px;color:#795548\">Instructions de virement</h3>
+              <p style=\"margin:0 0 10px;font-size:14px\">Effectuez le virement de <strong>{$d['total']}</strong> en mentionnant la reference <strong>{$d['orderNumber']}</strong>.</p>"
+              . ($iban ? "<table style=\"border-collapse:collapse;margin-bottom:10px;font-size:14px\">
+                <tr><td style=\"padding:4px 12px 4px 0;color:#666;font-weight:600\">Titulaire</td><td>{$bankName}</td></tr>
+                <tr><td style=\"padding:4px 12px 4px 0;color:#666;font-weight:600\">IBAN</td><td style=\"font-family:monospace;letter-spacing:1px\">{$iban}</td></tr>"
+                . ($bic ? "<tr><td style=\"padding:4px 12px 4px 0;color:#666;font-weight:600\">BIC</td><td style=\"font-family:monospace\">{$bic}</td></tr>" : '')
+                . "</table>" : '')
+              . "<p style=\"margin:0;font-size:13px;color:#888\">Votre commande sera traitee a reception du virement.</p>
+            </div>";
+        }
+        if ($isCheque && !$isPaid) {
+            $chequeAddress = self::getBankSetting('cheque_address') ?: '';
+            $bankBlock = "
+            <div style=\"padding:16px 20px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;margin-bottom:24px\">
+              <h3 style=\"margin:0 0 10px;font-size:16px;color:#795548\">Paiement par cheque</h3>
+              <p style=\"margin:0 0 10px;font-size:14px\">Etablissez un cheque de <strong>{$d['total']}</strong> a l'ordre de <strong>{$d['siteName']}</strong> en indiquant la reference <strong>{$d['orderNumber']}</strong> au dos.</p>"
+              . ($chequeAddress ? "<p style=\"margin:0 0 10px;font-size:14px\">Adresse d'envoi :<br><strong>" . nl2br(htmlspecialchars($chequeAddress)) . "</strong></p>" : '')
+              . "<p style=\"margin:0;font-size:13px;color:#888\">Votre commande sera traitee a reception du cheque.</p>
+            </div>";
+        }
+
+        return self::wrapClientTemplate($d['siteName'], "
     <div style=\"text-align:center;margin-bottom:28px\">
-      <div style=\"width:56px;height:56px;border-radius:50%;background:#e8f5e9;color:#2e7d32;display:inline-flex;align-items:center;justify-content:center;font-size:28px;line-height:1\">&#10003;</div>
-      <h2 style=\"margin:16px 0 4px;font-size:22px;color:#222\">Commande confirmee</h2>
-      <p style=\"margin:0;color:#666\">Merci pour votre commande <strong>{$d['orderNumber']}</strong></p>
+      {$heroIcon}
+      <h2 style=\"margin:0 0 4px;font-size:22px;color:#222\">{$heroTitle}</h2>
+      <p style=\"margin:0;color:#666\">{$heroSubtitle}</p>
     </div>
+
+    {$bankBlock}
 
     <table style=\"width:100%;border-collapse:collapse;margin-bottom:20px\">
       <thead><tr style=\"background:#fafafa\">
@@ -372,7 +514,7 @@ HTML;
     </table>
 
     <div style=\"padding:10px 14px;background:#fafafa;border-radius:6px;font-size:14px;margin-bottom:24px\">
-      <strong>Paiement :</strong> {$d['paymentLabel']}
+      <strong>Paiement :</strong> {$d['paymentLabel']}" . ($isOffline && !$isPaid ? " — <em>En attente</em>" : '') . "
     </div>
 
     <table style=\"width:100%;border-collapse:collapse;margin-bottom:24px\">
@@ -395,9 +537,26 @@ HTML;
         ");
     }
 
+    private static function getBankSetting(string $key): string {
+        static $encrypted = ['bank_iban', 'bank_bic'];
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = ? LIMIT 1");
+            $stmt->execute([$key]);
+            $row = $stmt->fetch();
+            if (!$row || !$row['setting_value']) return '';
+            if (in_array($key, $encrypted, true) && function_exists('decrypt_value')) {
+                return decrypt_value($row['setting_value']);
+            }
+            return $row['setting_value'];
+        } catch (\Throwable $e) { return ''; }
+    }
+
     private static function templateAdminNotif(array $d): string {
+        $isPaid = $d['paymentStatus'] === 'paid';
+        $title = $isPaid ? 'Nouvelle commande payee' : 'Nouvelle commande — en attente de paiement';
         return self::wrapTemplate($d['siteName'], "
-    <h2 style=\"margin:0 0 16px;font-size:20px;color:#222\">Nouvelle commande Payée</h2>
+    <h2 style=\"margin:0 0 16px;font-size:20px;color:#222\">{$title}</h2>
     <table style=\"width:100%;border-collapse:collapse;margin-bottom:16px\">
       <tr><td style=\"padding:8px 0;color:#666;width:140px\">N° commande</td><td style=\"font-weight:600\">{$d['orderNumber']}</td></tr>
       <tr><td style=\"padding:8px 0;color:#666\">Client</td><td>{$d['billingName']} ({$d['email']})</td></tr>
@@ -434,10 +593,11 @@ HTML;
             </div>";
         }
 
-        return self::wrapTemplate($d['siteName'], "
+        $icon = self::iconCircle('&#128230;', '#e3f2fd', '#1565c0');
+        return self::wrapClientTemplate($d['siteName'], "
     <div style=\"text-align:center;margin-bottom:28px\">
-      <div style=\"width:56px;height:56px;border-radius:50%;background:#e3f2fd;color:#1565c0;display:inline-flex;align-items:center;justify-content:center;font-size:28px;line-height:1\">&#128230;</div>
-      <h2 style=\"margin:16px 0 4px;font-size:22px;color:#222\">Votre commande a ete expediee</h2>
+      {$icon}
+      <h2 style=\"margin:0 0 4px;font-size:22px;color:#222\">Votre commande a ete expediee</h2>
       <p style=\"margin:0;color:#666\">Commande <strong>{$d['orderNumber']}</strong></p>
     </div>
 
@@ -460,10 +620,11 @@ HTML;
         $bgColor = $d['isFull'] ? '#fce4ec' : '#fff3e0';
         $fgColor = $d['isFull'] ? '#c62828' : '#e65100';
 
-        return self::wrapTemplate($d['siteName'], "
+        $iconHtml = self::iconCircle($icon, $bgColor, $fgColor);
+        return self::wrapClientTemplate($d['siteName'], "
     <div style=\"text-align:center;margin-bottom:28px\">
-      <div style=\"width:56px;height:56px;border-radius:50%;background:{$bgColor};color:{$fgColor};display:inline-flex;align-items:center;justify-content:center;font-size:28px;line-height:1\">{$icon}</div>
-      <h2 style=\"margin:16px 0 4px;font-size:22px;color:#222\">{$label}</h2>
+      {$iconHtml}
+      <h2 style=\"margin:0 0 4px;font-size:22px;color:#222\">{$label}</h2>
       <p style=\"margin:0;color:#666\">Commande <strong>{$d['orderNumber']}</strong></p>
     </div>
 
@@ -478,6 +639,101 @@ HTML;
       <a href=\"{$d['trackUrl']}\" style=\"display:inline-block;padding:10px 24px;background:{$d['primaryColor']};color:#fff;text-decoration:none;border-radius:6px;font-weight:600\">Voir ma commande</a>
     </div>
         ");
+    }
+
+    // ── Client: notification projet sauvegardé ──────────────────────────
+
+    public static function sendProjectSaved(string $email, string $firstName, string $token, string $projectLabel): void {
+        if (empty($email)) return;
+        $siteName = self::getSiteName();
+        $primaryColor = self::getPrimaryColor();
+        $frontend = rtrim($_ENV['FRONTEND_URL'] ?? '', '/');
+        $projectUrl = "{$frontend}/configurateur?p={$token}";
+        $name = htmlspecialchars($firstName ?: 'Bonjour');
+        $label = htmlspecialchars($projectLabel);
+
+        $iconHtml = self::iconCircle('&#128190;', '#e8f5e9', '#2e7d32');
+        $html = self::wrapClientTemplate($siteName, "
+            <div style=\"text-align:center;margin-bottom:28px\">
+              {$iconHtml}
+              <h2 style=\"margin:0 0 4px;font-size:22px;color:#222\">Projet sauvegarde</h2>
+              <p style=\"margin:0;color:#666\">Bonjour {$name}, votre projet <strong>{$label}</strong> a ete sauvegarde.</p>
+            </div>
+            <p style=\"color:#555;text-align:center\">Vous pouvez retrouver votre configuration a tout moment via le lien ci-dessous :</p>
+            <div style=\"text-align:center;margin:24px 0\">
+              <a href=\"{$projectUrl}\" style=\"display:inline-block;padding:12px 28px;background:{$primaryColor};color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:15px\">Reprendre mon projet</a>
+            </div>
+            <p style=\"color:#999;font-size:12px;text-align:center\">Reference : {$token}</p>
+        ");
+
+        self::send($email, "Votre projet a ete sauvegarde — {$siteName}", $html);
+    }
+
+    // ── Client: rappel echeance SEPA ──────────────────────────────────────
+
+    public static function sendSepaReminder(string $email, string $firstName, string $orderNumber, int $amountCents, string $dueDate): void {
+        if (empty($email)) return;
+        $siteName = self::getSiteName();
+        $primaryColor = self::getPrimaryColor();
+        $frontend = rtrim($_ENV['FRONTEND_URL'] ?? '', '/');
+        $name = htmlspecialchars($firstName ?: 'Bonjour');
+        $amount = self::formatPrice($amountCents);
+        $date = htmlspecialchars($dueDate);
+
+        $iconHtml = self::iconCircle('&#128197;', '#fff3e0', '#e65100');
+        $html = self::wrapClientTemplate($siteName, "
+            <div style=\"text-align:center;margin-bottom:28px\">
+              {$iconHtml}
+              <h2 style=\"margin:0 0 4px;font-size:22px;color:#222\">Echeance de prelevement</h2>
+            </div>
+            <p style=\"text-align:center;color:#555\">Bonjour {$name},</p>
+            <p style=\"text-align:center;color:#555\">Un prelevement SEPA de <strong>{$amount}</strong> pour la commande <strong>{$orderNumber}</strong> sera effectue le <strong>{$date}</strong>.</p>
+            <div style=\"padding:16px;background:#fafafa;border-radius:8px;margin:20px 0;text-align:center\">
+              <div style=\"font-size:14px;color:#666\">Montant</div>
+              <div style=\"font-size:22px;font-weight:700;margin-top:4px\">{$amount}</div>
+              <div style=\"font-size:13px;color:#888;margin-top:4px\">Date de prelevement : {$date}</div>
+            </div>
+            <p style=\"color:#666;font-size:14px;text-align:center\">Veuillez vous assurer que votre compte bancaire est suffisamment approvisionne.</p>
+            <div style=\"text-align:center;margin-top:24px\">
+              <a href=\"{$frontend}/compte/paiement\" style=\"display:inline-block;padding:10px 24px;background:{$primaryColor};color:#fff;text-decoration:none;border-radius:6px;font-weight:600\">Mon espace paiement</a>
+            </div>
+        ");
+
+        self::send($email, "Echeance de prelevement — commande {$orderNumber} — {$siteName}", $html);
+    }
+
+    // ── Admin: recap commande atelier ─────────────────────────────────────
+
+    public static function sendWorkshopRecap(array $order, array $workshopRecipients): void {
+        if (empty($workshopRecipients)) return;
+        $d = self::buildOrderData($order);
+        $subject = "[Atelier] Commande {$order['order_number']} — {$d['siteName']}";
+
+        $html = self::wrapTemplate($d['siteName'], "
+            <h2 style=\"margin:0 0 16px;font-size:20px;color:#222\">Nouvelle commande a preparer</h2>
+            <table style=\"width:100%;border-collapse:collapse;margin-bottom:16px\">
+              <tr><td style=\"padding:8px 0;color:#666;width:140px\">N° commande</td><td style=\"font-weight:600\">{$d['orderNumber']}</td></tr>
+              <tr><td style=\"padding:8px 0;color:#666\">Client</td><td>{$d['billingName']} ({$d['email']})</td></tr>
+              <tr><td style=\"padding:8px 0;color:#666\">Livraison</td><td>{$d['shippingMethod']}</td></tr>
+            </table>
+
+            <h3 style=\"margin:16px 0 8px;font-size:14px;text-transform:uppercase;color:#888\">Articles a preparer</h3>
+            <table style=\"width:100%;border-collapse:collapse;margin-bottom:20px\">
+              <thead><tr style=\"background:#fafafa\">
+                <th style=\"padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;color:#888;border-bottom:2px solid #eee\">Article</th>
+                <th style=\"padding:8px 12px;text-align:center;font-size:11px;text-transform:uppercase;color:#888;border-bottom:2px solid #eee\">Qte</th>
+              </tr></thead>
+              <tbody>{$d['itemsHtml']}</tbody>
+            </table>
+
+            <table style=\"width:100%;border-collapse:collapse;margin-bottom:16px\">
+              <tr><td style=\"padding:4px 0;color:#666\">Adresse livraison</td><td>{$d['shippingAddress']}</td></tr>
+            </table>
+        ");
+
+        foreach ($workshopRecipients as $email) {
+            self::send(trim($email), $subject, $html);
+        }
     }
 
     private static function templateAdminRefund(array $d, int $amountCents, bool $isFull): string {

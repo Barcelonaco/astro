@@ -13,6 +13,7 @@ const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL 
 interface CustomerInfo {
   is_pro: boolean
   pro_status: string
+  pro_tier: string | null
   discount_rate: number | null
 }
 
@@ -34,6 +35,7 @@ async function getCustomerIfPro(): Promise<CustomerInfo | null> {
       return {
         is_pro: true,
         pro_status: customer.pro_status,
+        pro_tier: customer.pro_tier || null,
         discount_rate: customer.discount_rate != null ? parseFloat(customer.discount_rate) : null,
       }
     }
@@ -43,6 +45,7 @@ async function getCustomerIfPro(): Promise<CustomerInfo | null> {
 
 function applyProPrices(customer: CustomerInfo): void {
   const rate = customer.discount_rate || 0
+  const tier = customer.pro_tier || ''
   const priceDisplays = document.querySelectorAll<HTMLElement>('.price-display')
 
   priceDisplays.forEach(el => {
@@ -60,21 +63,23 @@ function applyProPrices(customer: CustomerInfo): void {
     const valueEl = htEl.querySelector<HTMLElement>('.price-ht-value')
     if (valueEl) valueEl.textContent = formatPrice(discountedHt, currency)
 
-    // Show discount percentage if applicable
-    if (rate > 0) {
-      const discountEl = htEl.querySelector<HTMLElement>('.price-ht-discount')
-      if (discountEl) {
-        discountEl.textContent = `(-${rate}%)`
-        discountEl.style.display = ''
-      }
+    // Show tier badge with discount
+    const discountEl = htEl.querySelector<HTMLElement>('.price-ht-discount')
+    if (discountEl) {
+      const label = tier ? `Statut ${tier} -${rate}%` : `Pro -${rate}%`
+      discountEl.innerHTML = `<span class="pro-tier-badge">${label}</span>`
+      discountEl.style.display = ''
     }
 
+    // Add is-pro class: HT becomes primary, TTC becomes strikethrough
+    el.classList.add('is-pro')
     htEl.style.display = ''
   })
 }
 
-// Auto-run
+// Auto-run — only on sites with poolp-configurator (data-pro-pricing="1" on body)
 ;(async () => {
+  if (document.body.dataset.proPricing !== '1') return
   try {
     const customer = await getCustomerIfPro()
     if (customer) applyProPrices(customer)

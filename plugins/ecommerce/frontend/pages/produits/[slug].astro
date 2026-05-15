@@ -15,6 +15,7 @@ import { getFrontendBootstrap } from '@frontend/lib/api';
 import { getProduct, listProducts } from '@plugins/ecommerce/frontend/lib/shop-api';
 import { optimizedImageUrl } from '@frontend/lib/module-helpers';
 import { SITE_TITLE, SITE_DESCRIPTION } from '@frontend/consts';
+import '@plugins/ecommerce/frontend/styles/shop-buttons.css';
 
 // Génération statique d'une page par produit publié.
 export async function getStaticPaths() {
@@ -112,7 +113,7 @@ const showBreadcrumb = product.custom_fields?.layout_config?.show_breadcrumb !==
     <ModuleStyles blocks={[...(headerBlock ? [headerBlock] : []), ...contentBlocks]} />
     <script type="application/ld+json" set:html={JSON.stringify(schemaOrg).replace(/</g, '\\u003c')}></script>
   </head>
-  <body>
+  <body data-pro-pricing={siteSettings.poolp_configurator_enabled === '1' ? '1' : undefined}>
     <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} transparent={hasTopBanner} />
 
     <main id="main" class={`main-page shop-product${hasTopBanner ? ' has-top-banner' : ''}`} role="main">
@@ -170,6 +171,7 @@ const showBreadcrumb = product.custom_fields?.layout_config?.show_breadcrumb !==
                   variantAttributes={(product.custom_fields?.attributes || [])
                     .filter((a: any) => a.used_for_variations)
                     .map((a: any) => ({ name: a.name, options: a.values || a.options || [] }))}
+                  taxRate={product.tax_rate}
                 />
                 <AddToCartButton productSlug={product.slug} disabled={!product.in_stock} />
               </form>
@@ -225,6 +227,19 @@ const showBreadcrumb = product.custom_fields?.layout_config?.show_breadcrumb !==
                 }
                 if (cf.download_limit && cf.type === 'digital') {
                   rows.push({ label: 'Téléchargements max', value: cf.download_limit });
+                }
+                if (cf.debit_min || cf.debit_max) {
+                  const dMin = cf.debit_min ? `${cf.debit_min}` : '—';
+                  const dMax = cf.debit_max ? `${cf.debit_max}` : '—';
+                  rows.push({ label: 'Débit', value: `${dMin} – ${dMax} m³/h` });
+                }
+                if (cf.volume_min || cf.volume_max) {
+                  const vMin = cf.volume_min ? `${cf.volume_min}` : '—';
+                  const vMax = cf.volume_max ? `${cf.volume_max}` : '—';
+                  rows.push({ label: 'Volume bassin', value: `${vMin} – ${vMax} m³` });
+                }
+                if (cf.reference_constructeur) {
+                  rows.push({ label: 'Réf. constructeur', value: cf.reference_constructeur });
                 }
                 if (rows.length === 0) return null;
                 return (
@@ -460,6 +475,42 @@ const showBreadcrumb = product.custom_fields?.layout_config?.show_breadcrumb !==
         color: rgba(255,255,255,.7); font-size: 14px; font-weight: 500;
       }
     </style>
-    <script>import '@plugins/ecommerce/frontend/lib/pro-prices'</script>
+    <script is:inline define:vars={{ apiBase: import.meta.env.PUBLIC_API_URL || '/api' }}>
+      (function() {
+        if (document.body.dataset.proPricing !== '1') return;
+        var token = localStorage.getItem('customer_token');
+        if (!token) return;
+
+        function revealHtPrices(rate) {
+          document.querySelectorAll('.price-display').forEach(function(el) {
+            var htEl = el.querySelector('.price-ht');
+            if (!htEl) return;
+            var htMin = parseInt(el.dataset.htMin || '0', 10);
+            var currency = el.dataset.currency || 'EUR';
+            if (htMin <= 0) return;
+            var discounted = rate > 0 ? Math.round(htMin * (1 - rate / 100)) : htMin;
+            var valueEl = htEl.querySelector('.price-ht-value');
+            if (valueEl) valueEl.textContent = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currency }).format(discounted / 100);
+            if (rate > 0) {
+              var dEl = htEl.querySelector('.price-ht-discount');
+              if (dEl) { dEl.textContent = '(-' + rate + '%)'; dEl.style.display = ''; }
+            }
+            htEl.style.display = '';
+            el.classList.add('is-pro');
+          });
+        }
+
+        fetch(apiBase + '/customer/auth/me', { headers: { Authorization: 'Bearer ' + token } })
+          .then(function(r) { return r.ok ? r.json() : null; })
+          .then(function(c) {
+            if (!c || !c.is_pro || c.pro_status !== 'approved') return;
+            var rate = c.discount_rate ? parseFloat(c.discount_rate) : 0;
+            revealHtPrices(rate);
+            // Re-run when variant selector updates price
+            document.addEventListener('variant-price-updated', function() { revealHtPrices(rate); });
+          })
+          .catch(function() {});
+      })();
+    </script>
   </body>
 </html>

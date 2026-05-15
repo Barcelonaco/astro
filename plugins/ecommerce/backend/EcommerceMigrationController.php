@@ -52,6 +52,8 @@ class EcommerceMigrationController {
             if (self::ensureColumn($db, 'customers', 'pro_status', "ENUM('none','pending','approved','rejected') NOT NULL DEFAULT 'none'", 'is_pro', $log)) $changes++;
             if (self::ensureColumn($db, 'customers', 'discount_rate', "DECIMAL(5,2) DEFAULT NULL", 'pro_status', $log)) $changes++;
             if (self::ensureColumn($db, 'customers', 'discount_override', "TINYINT(1) NOT NULL DEFAULT 0", 'discount_rate', $log)) $changes++;
+            if (self::ensureColumn($db, 'customers', 'pro_tier', "VARCHAR(30) DEFAULT NULL", 'discount_override', $log)) $changes++;
+            if (self::ensureColumn($db, 'customers', 'payment_terms', "ENUM('immediate','net15','net30','net45','net60') NOT NULL DEFAULT 'immediate'", 'pro_tier', $log)) $changes++;
         }
 
         $changes += self::createTable($db, 'customer_addresses', "
@@ -239,9 +241,9 @@ class EcommerceMigrationController {
             order_number VARCHAR(30) NOT NULL UNIQUE,
             customer_id INT DEFAULT NULL,
             email VARCHAR(191) NOT NULL,
-            status ENUM('pending','awaiting_payment','paid','processing','shipped','delivered','cancelled','refunded','failed') NOT NULL DEFAULT 'pending',
+            status ENUM('pending','awaiting_payment','paid','processing','shipped','delivered','cancelled','refunded','failed') NOT NULL DEFAULT 'pending', /* fulfilled removed */
             payment_status ENUM('unpaid','pending','paid','partially_refunded','refunded','failed','refund_failed','refund_pending') NOT NULL DEFAULT 'unpaid',
-            payment_method ENUM('stripe','paypal','bank_transfer','on_invoice') NOT NULL,
+            payment_method ENUM('stripe','paypal','bank_transfer','on_invoice','cheque') NOT NULL,
             currency CHAR(3) NOT NULL DEFAULT 'EUR',
             subtotal_cents INT NOT NULL,
             discount_cents INT NOT NULL DEFAULT 0,
@@ -501,14 +503,14 @@ class EcommerceMigrationController {
         // self::consolidateLegacyTables() une fois les controllers à jour.
         self::consolidateAdditive($db, $log, $changes);
 
-        // ── PHASE 16 : Cart items custom (POOLP configurator) ───────────────
-        // Référencée par CartController/OrderController, jamais créée jusqu'ici.
+        // ── PHASE 16 : Cart items custom (configurateur, devis, etc.) ────────
         $changes += self::createTable($db, 'cart_items_custom', "
             id INT AUTO_INCREMENT PRIMARY KEY,
             cart_id INT NOT NULL,
             source_type VARCHAR(50) NOT NULL,
             source_id INT DEFAULT NULL,
             title VARCHAR(255) NOT NULL,
+            subtitle VARCHAR(255) DEFAULT NULL,
             config_snapshot JSON DEFAULT NULL,
             quantity INT NOT NULL DEFAULT 1,
             unit_price_ttc_cents INT NOT NULL,
@@ -517,6 +519,24 @@ class EcommerceMigrationController {
             INDEX idx_cart (cart_id),
             CONSTRAINT fk_cart_items_custom_cart FOREIGN KEY (cart_id) REFERENCES carts(id) ON DELETE CASCADE
         ", $log) ? 1 : 0;
+
+        if (self::tableExists($db, 'cart_items_custom')) {
+            if (self::ensureColumn($db, 'cart_items_custom', 'subtitle', "VARCHAR(255) DEFAULT NULL", 'title', $log)) $changes++;
+        }
+
+        // Align invoices table with InvoiceController (add missing columns)
+        if (self::tableExists($db, 'invoices')) {
+            if (self::ensureColumn($db, 'invoices', 'type', "ENUM('invoice','credit_note') NOT NULL DEFAULT 'invoice'", 'order_id', $log)) $changes++;
+            if (self::ensureColumn($db, 'invoices', 'amount_cents', "INT NOT NULL DEFAULT 0", 'invoice_number', $log)) $changes++;
+            if (self::ensureColumn($db, 'invoices', 'currency', "CHAR(3) NOT NULL DEFAULT 'EUR'", 'tax_cents', $log)) $changes++;
+        }
+
+        // Add cheque to payment_method ENUM if not already present
+        try {
+            $db->exec("ALTER TABLE orders MODIFY COLUMN payment_method ENUM('stripe','paypal','bank_transfer','on_invoice','cheque') NOT NULL");
+            $log('    + orders.payment_method: added cheque');
+            $changes++;
+        } catch (\Throwable $e) {}
 
         // ── Default data : TVA FR ───────────────────────────────────────────
         self::seedDefaultTaxRates($db, $log, $changes);
@@ -599,6 +619,40 @@ class EcommerceMigrationController {
             CONSTRAINT fk_sepa_mandates_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
             INDEX idx_customer (customer_id),
             INDEX idx_status (status)
+        ", $log) ? 1 : 0;
+
+        // SEPA customer documents (RIB, Kbis, mandate scans)
+        $changes += self::createTable($db, 'sepa_documents', "
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            customer_id INT NOT NULL,
+            mandate_id INT DEFAULT NULL,
+            doc_type ENUM('rib','kbis','mandate','other') NOT NULL,
+            original_name VARCHAR(255) NOT NULL,
+            filename VARCHAR(255) NOT NULL,
+            mime_type VARCHAR(100) NOT NULL,
+            size INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT fk_sepa_docs_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+            INDEX idx_customer (customer_id),
+            INDEX idx_mandate (mandate_id)
+        ", $log) ? 1 : 0;
+
+        // Product documents (technical sheets, manuals, resources — CDC §6.2 + §7.2)
+        $changes += self::createTable($db, 'product_documents', "
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            product_id INT DEFAULT NULL,
+            title VARCHAR(255) NOT NULL,
+            doc_type ENUM('technical_sheet','manual','notice','certificate','other') NOT NULL DEFAULT 'other',
+            original_name VARCHAR(255) NOT NULL,
+            filename VARCHAR(255) NOT NULL,
+            mime_type VARCHAR(100) NOT NULL,
+            size INT NOT NULL DEFAULT 0,
+            is_public TINYINT(1) NOT NULL DEFAULT 1,
+            requires_purchase TINYINT(1) NOT NULL DEFAULT 0,
+            position INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_product (product_id),
+            INDEX idx_type (doc_type)
         ", $log) ? 1 : 0;
 
         $changes += self::createTable($db, 'shipping_classes', "
@@ -881,6 +935,10 @@ class EcommerceMigrationController {
             'gdpr_auto_erase_enabled' => '0',
             'gdpr_inactivity_years' => '3',
             'gdpr_inactivity_notify_days_before' => '30',
+            'bank_account_name' => '',
+            'bank_iban' => '',
+            'bank_bic' => '',
+            'cheque_address' => '',
         ];
         $check = $db->prepare("SELECT COUNT(*) FROM settings WHERE setting_key = ?");
         $insert = $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)");
