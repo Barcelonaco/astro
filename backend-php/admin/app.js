@@ -4008,7 +4008,8 @@ function renderColumnsTabPreviewHtml(data) {
       try { subHtml = replaceEmptyImages(renderBlockPreviewHtml(subBlock)); } catch (e) { console.warn('Sub-module render error:', layout, e); }
       // If template rendering produced empty/whitespace-only output (no text
       // AND no images), show a meaningful fallback so the column isn't invisible.
-      if (!subHtml || (!subHtml.replace(/<[^>]*>/g, '').trim() && !/<img\s/i.test(subHtml) && !/<video\s/i.test(subHtml))) {
+      const isVisualOnly = layout === 'separator' || layout === 'Separator';
+      if (!isVisualOnly && (!subHtml || (!subHtml.replace(/<[^>]*>/g, '').trim() && !/<img\s/i.test(subHtml) && !/<video\s/i.test(subHtml)))) {
         subHtml = renderSubModuleFallback(layout, subModule);
       }
       return `<div class="module-in-column" style="width:100%">${subHtml}</div>`;
@@ -4130,6 +4131,30 @@ function renderBlockPreviewHtml(block) {
     // Ensure CSS is loaded
     if (!moduleTemplateCache['news-slider']) queueModuleTemplateLoad('news-slider');
     return `<div class="module module-news-slider ${escapeHtml(nsExtraCls)}" style="position:relative">${nsBgHtml}<div class="container-large">${nsTitleHtml}<div class="slider-wrapper"><div class="swiper slider js_news-slider columns-${escapeHtml(nsCols)}"><div class="swiper-wrapper" id="${nsId}"><p style="text-align:center;opacity:.5">Chargement des actualités…</p></div></div></div>${nsLinkHtml}</div></div>`;
+  }
+  // Separator — custom preview (Blade uses $width top-level var not in ctx)
+  if (block.type === 'separator' || block.type === 'Separator') {
+    const sepStyle = d.separator_style || 'style-3';
+    const sepWidth = d.width || 80;
+    const sepHeight = d.height || 2;
+    const sepText = d.text || '';
+    const sepCls = [d.bloc_color || '', d.padding_top || '', d.padding_bottom || ''].filter(Boolean).join(' ');
+    const withTextCls = sepText ? ' separator-with-text' : '';
+    let sepInner = '';
+    if (sepStyle === 'style-1') {
+      sepInner = `<span class="points-wrapper"><span class="point point-1"></span><span class="point point-2"></span><span class="point point-3"></span></span>`;
+      if (sepText) sepInner += `<span class="title title-section-3">${escapeHtml(sepText)}</span><span class="points-wrapper"><span class="point point-1"></span><span class="point point-2"></span><span class="point point-3"></span></span>`;
+    } else if (sepStyle === 'style-2') {
+      sepInner = `<hr class="default">`;
+      if (sepText) sepInner += `<span class="title title-section-3">${escapeHtml(sepText)}</span><hr class="default">`;
+    } else if (sepStyle === 'style-3') {
+      const hrStyle = `width:${sepWidth}%;height:${sepHeight}px;`;
+      sepInner = `<hr class="custom" style="${hrStyle}">`;
+      if (sepText) sepInner += `<span class="title title-section-3">${escapeHtml(sepText)}</span><hr class="custom" style="${hrStyle}">`;
+    }
+    // style-0 = no visual separator
+    if (!moduleTemplateCache['separator']) queueModuleTemplateLoad('separator');
+    return `<div class="module module-separator ${escapeHtml(sepCls)}${withTextCls}">${sepInner}</div>`;
   }
   // Accordion — empty state: render add button directly
   if ((block.type === 'accordion' || block.type === 'Accordion') && (!Array.isArray(d.accordions) || d.accordions.length === 0)) {
@@ -8623,7 +8648,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
       <div class="form-group">
         <label class="form-label">${escapeHtml(label)}</label>
         <div class="media-field" data-field="${escapeHtml(inputName)}">
-          <div class="media-preview">
+          <div class="media-preview" style="cursor:pointer" onclick="openMediaPicker('${pickerType}', '${blockId}', '${escapeHtml(inputName)}', { trigger: this })">
             ${url ? (isPdf ? `<div class="media-preview-icon" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f8f9fa;border-radius:8px;padding:1rem;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg></div>` : isVideo ? `<div class="media-preview-icon">🎬</div>` : `<img src="${escapeHtml(getOptimizedUrl(url, 400, 70))}" alt="${escapeHtml(meta)}">`) : ''}
           </div>
           <div class="media-preview-meta">${escapeHtml(meta)}</div>
@@ -8915,6 +8940,13 @@ function renderFlexibleContentItemHTML(item, index, blockId, fcCompoundName) {
   // Filter out BlockParams fields that are handled by the parent wrapper
   const skipFields = new Set(['title_bloc', 'title_style', 'title_align', 'bloc_color', 'padding_top', 'padding_bottom', 'is_visible', 'bg_img', 'bg_opacity', 'bg_parallax']);
   const itemFields = schemaFields.filter(f => !skipFields.has(f.name));
+
+  // Seed missing fields with defaults so conditionals evaluate correctly on new sub-modules
+  for (const sf of schemaFields) {
+    if (item[sf.name] === undefined && sf.defaultValue !== undefined) {
+      item[sf.name] = sf.defaultValue;
+    }
+  }
 
   const rowCtx = { parentName: `${fcCompoundName}::${index}`, rowIndex: null };
   const bodyHtml = itemFields.map(f => {
@@ -9672,7 +9704,9 @@ function updateSchemaConditionals(form) {
         if (input.type === 'checkbox') {
           currentVal = input.checked ? '1' : '0';
         } else if (input.type === 'radio') {
-          const checked = form.querySelector(`[name="${CSS.escape(condField)}"]:checked`);
+          const actualName = input.getAttribute('name') || condField;
+          const scope = containerBody || form;
+          const checked = scope.querySelector(`[name="${CSS.escape(actualName)}"]:checked`);
           currentVal = checked ? checked.value : '';
         } else {
           currentVal = input.value ?? '';
