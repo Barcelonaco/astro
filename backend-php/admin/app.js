@@ -8284,19 +8284,28 @@ function normalizeBoolVal(val) {
 // rowCtx = { parentName, rowIndex } when rendering inside a Repeater row or Group
 function renderSchemaField(field, value, blockId, allData, rowCtx = null) {
   const html = _renderSchemaFieldHTML(field, value, blockId, rowCtx);
-  const cond = field.conditional;
-  if (!cond) return html;
-  // Look up conditional field value: first in current scope (allData), then fallback to block-level data
-  let condFieldVal = allData?.[cond.field];
-  if (condFieldVal === undefined && rowCtx) {
-    const block = pageBuilderState.blocks.find(b => b.id === blockId);
-    const blockData = block?.data && typeof block.data === 'object' ? block.data : {};
-    condFieldVal = blockData[cond.field];
+  const rawCond = field.conditional;
+  if (!rawCond) return html;
+  // Support single conditional object or array of conditionals (AND logic)
+  const conds = Array.isArray(rawCond) ? rawCond : [rawCond];
+  let show = true;
+  for (const cond of conds) {
+    let condFieldVal = allData?.[cond.field];
+    if (condFieldVal === undefined && rowCtx) {
+      const block = pageBuilderState.blocks.find(b => b.id === blockId);
+      const blockData = block?.data && typeof block.data === 'object' ? block.data : {};
+      condFieldVal = blockData[cond.field];
+    }
+    condFieldVal = normalizeBoolVal(condFieldVal);
+    const isEmpty = cond.operator === '!=empty' || (cond.operator === '!=' && (cond.value === '' || cond.value === null || cond.value === 'null'));
+    const match = isEmpty ? condFieldVal !== '' : (cond.operator === '==' ? condFieldVal === String(cond.value ?? '') : condFieldVal !== String(cond.value ?? ''));
+    if (!match) { show = false; break; }
   }
-  condFieldVal = normalizeBoolVal(condFieldVal);
-  const isEmpty = cond.operator === '!=empty' || (cond.operator === '!=' && (cond.value === '' || cond.value === null || cond.value === 'null'));
-  const show = isEmpty ? condFieldVal !== '' : (cond.operator === '==' ? condFieldVal === String(cond.value ?? '') : condFieldVal !== String(cond.value ?? ''));
-  return `<div class="schema-cond-field" data-cond-field="${escapeHtml(cond.field)}" data-cond-op="${escapeHtml(cond.operator)}" data-cond-val="${escapeHtml(cond.value || '')}"${show ? '' : ' style="display:none"'}>${html}</div>`;
+  const condData = conds.map((c, i) => {
+    const suffix = i === 0 ? '' : `-${i}`;
+    return `data-cond-field${suffix}="${escapeHtml(c.field)}" data-cond-op${suffix}="${escapeHtml(c.operator)}" data-cond-val${suffix}="${escapeHtml(c.value || '')}"`;
+  }).join(' ');
+  return `<div class="schema-cond-field" data-cond-count="${conds.length}" ${condData}${show ? '' : ' style="display:none"'}>${html}</div>`;
 }
 
 function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
@@ -9641,34 +9650,38 @@ function saveSchemaData(blockId, event) {
 
 function updateSchemaConditionals(form) {
   form.querySelectorAll('.schema-cond-field').forEach(wrapper => {
-    const condField = wrapper.dataset.condField;
-    const condOp = wrapper.dataset.condOp;
-    const condVal = wrapper.dataset.condVal;
+    const count = parseInt(wrapper.dataset.condCount || '1', 10);
     // Inside a repeater row or group body, scope the lookup to that container
     const containerBody = wrapper.closest('.repeater-row-body, .group-field-body');
-    let input;
-    if (containerBody) {
-      // Sub-field inputs have data-rfield for row-scoped lookup
-      input = containerBody.querySelector(`[data-rfield="${CSS.escape(condField)}"]`);
-      // Fallback to form-level if the field is not inside the repeater (cross-scope conditional)
-      if (!input) input = form.querySelector(`[name="${CSS.escape(condField)}"]`);
-    } else {
-      input = form.querySelector(`[name="${CSS.escape(condField)}"]`);
-    }
-    // For radio buttons, find the checked input, not just the first one
-    let currentVal = '';
-    if (input) {
-      if (input.type === 'checkbox') {
-        currentVal = input.checked ? '1' : '0';
-      } else if (input.type === 'radio') {
-        const checked = form.querySelector(`[name="${CSS.escape(condField)}"]:checked`);
-        currentVal = checked ? checked.value : '';
+    let show = true;
+    for (let i = 0; i < count; i++) {
+      const suffix = i === 0 ? '' : `-${i}`;
+      const condField = wrapper.getAttribute(`data-cond-field${suffix}`);
+      const condOp = wrapper.getAttribute(`data-cond-op${suffix}`);
+      const condVal = wrapper.getAttribute(`data-cond-val${suffix}`);
+      if (!condField) continue;
+      let input;
+      if (containerBody) {
+        input = containerBody.querySelector(`[data-rfield="${CSS.escape(condField)}"]`);
+        if (!input) input = form.querySelector(`[name="${CSS.escape(condField)}"]`);
       } else {
-        currentVal = input.value ?? '';
+        input = form.querySelector(`[name="${CSS.escape(condField)}"]`);
       }
+      let currentVal = '';
+      if (input) {
+        if (input.type === 'checkbox') {
+          currentVal = input.checked ? '1' : '0';
+        } else if (input.type === 'radio') {
+          const checked = form.querySelector(`[name="${CSS.escape(condField)}"]:checked`);
+          currentVal = checked ? checked.value : '';
+        } else {
+          currentVal = input.value ?? '';
+        }
+      }
+      const isEmpty = condOp === '!=empty' || (condOp === '!=' && (condVal === '' || condVal === 'null'));
+      const match = isEmpty ? currentVal !== '' : (condOp === '==' ? currentVal === condVal : currentVal !== condVal);
+      if (!match) { show = false; break; }
     }
-    const isEmpty = condOp === '!=empty' || (condOp === '!=' && (condVal === '' || condVal === 'null'));
-    const show = isEmpty ? currentVal !== '' : (condOp === '==' ? currentVal === condVal : currentVal !== condVal);
     wrapper.style.display = show ? '' : 'none';
   });
 }

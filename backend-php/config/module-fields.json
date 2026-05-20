@@ -9226,7 +9226,7 @@
                     "conditional": {
                         "field": "media_choice",
                         "operator": "==",
-                        "value": "false"
+                        "value": "0"
                     },
                     "subFields": null,
                     "defaultValue": "mp4"
@@ -9238,11 +9238,18 @@
                     "choices": null,
                     "onLabel": null,
                     "offLabel": null,
-                    "conditional": {
-                        "field": "video_src",
-                        "operator": "==",
-                        "value": "mp4"
-                    },
+                    "conditional": [
+                        {
+                            "field": "media_choice",
+                            "operator": "==",
+                            "value": "0"
+                        },
+                        {
+                            "field": "video_src",
+                            "operator": "==",
+                            "value": "mp4"
+                        }
+                    ],
                     "subFields": null
                 },
                 {
@@ -9255,7 +9262,7 @@
                     "conditional": {
                         "field": "media_choice",
                         "operator": "==",
-                        "value": "false"
+                        "value": "0"
                     },
                     "subFields": null
                 },
@@ -9266,11 +9273,18 @@
                     "choices": null,
                     "onLabel": null,
                     "offLabel": null,
-                    "conditional": {
-                        "field": "video_src",
-                        "operator": "==",
-                        "value": "youtube"
-                    },
+                    "conditional": [
+                        {
+                            "field": "media_choice",
+                            "operator": "==",
+                            "value": "0"
+                        },
+                        {
+                            "field": "video_src",
+                            "operator": "==",
+                            "value": "youtube"
+                        }
+                    ],
                     "subFields": null
                 },
                 {
@@ -9280,11 +9294,18 @@
                     "choices": null,
                     "onLabel": null,
                     "offLabel": null,
-                    "conditional": {
-                        "field": "video_src",
-                        "operator": "==",
-                        "value": "vimeo"
-                    },
+                    "conditional": [
+                        {
+                            "field": "media_choice",
+                            "operator": "==",
+                            "value": "0"
+                        },
+                        {
+                            "field": "video_src",
+                            "operator": "==",
+                            "value": "vimeo"
+                        }
+                    ],
                     "subFields": null
                 },
                 {
@@ -9294,11 +9315,18 @@
                     "choices": null,
                     "onLabel": null,
                     "offLabel": null,
-                    "conditional": {
-                        "field": "video_src",
-                        "operator": "==",
-                        "value": "dailymotion"
-                    },
+                    "conditional": [
+                        {
+                            "field": "media_choice",
+                            "operator": "==",
+                            "value": "0"
+                        },
+                        {
+                            "field": "video_src",
+                            "operator": "==",
+                            "value": "dailymotion"
+                        }
+                    ],
                     "subFields": null
                 }
             ]
@@ -10301,11 +10329,18 @@
                     "choices": null,
                     "onLabel": null,
                     "offLabel": null,
-                    "conditional": {
-                        "field": "video_src",
-                        "operator": "==",
-                        "value": "mp4"
-                    },
+                    "conditional": [
+                        {
+                            "field": "media_choice",
+                            "operator": "==",
+                            "value": "0"
+                        },
+                        {
+                            "field": "video_src",
+                            "operator": "==",
+                            "value": "mp4"
+                        }
+                    ],
                     "subFields": null
                 },
                 {
@@ -10329,11 +10364,18 @@
                     "choices": null,
                     "onLabel": null,
                     "offLabel": null,
-                    "conditional": {
-                        "field": "video_src",
-                        "operator": "==",
-                        "value": "youtube"
-                    },
+                    "conditional": [
+                        {
+                            "field": "media_choice",
+                            "operator": "==",
+                            "value": "0"
+                        },
+                        {
+                            "field": "video_src",
+                            "operator": "==",
+                            "value": "youtube"
+                        }
+                    ],
                     "subFields": null
                 },
                 {
@@ -10343,11 +10385,18 @@
                     "choices": null,
                     "onLabel": null,
                     "offLabel": null,
-                    "conditional": {
-                        "field": "video_src",
-                        "operator": "==",
-                        "value": "vimeo"
-                    },
+                    "conditional": [
+                        {
+                            "field": "media_choice",
+                            "operator": "==",
+                            "value": "0"
+                        },
+                        {
+                            "field": "video_src",
+                            "operator": "==",
+                            "value": "vimeo"
+                        }
+                    ],
                     "subFields": null
                 },
                 {
@@ -10357,11 +10406,18 @@
                     "choices": null,
                     "onLabel": null,
                     "offLabel": null,
-                    "conditional": {
-                        "field": "video_src",
-                        "operator": "==",
-                        "value": "daylimotion"
-                    },
+                    "conditional": [
+                        {
+                            "field": "media_choice",
+                            "operator": "==",
+                            "value": "0"
+                        },
+                        {
+                            "field": "video_src",
+                            "operator": "==",
+                            "value": "dailymotion"
+                        }
+                    ],
                     "subFields": null
                 },
                 {
