@@ -10297,8 +10297,8 @@ function _createInlineToolbar() {
     if (btn) {
       const cmd = btn.dataset.cmd;
       if (cmd === 'createLink') {
-        const url = prompt('URL du lien :', 'https://');
-        if (url) document.execCommand('createLink', false, url);
+        _showInlineLinkDialog();
+        return; // don't _updateToolbarState yet — dialog handles it
       } else if (cmd === 'formatBlock') {
         document.execCommand('formatBlock', false, btn.dataset.value);
       } else if (cmd === 'indent') {
@@ -10322,6 +10322,131 @@ function _createInlineToolbar() {
 
   _inlineToolbar = bar;
   return bar;
+}
+
+let _inlineLinkDialog = null;
+let _savedSelection = null;
+
+function _saveSelection() {
+  const sel = window.getSelection();
+  if (sel.rangeCount > 0) {
+    _savedSelection = sel.getRangeAt(0).cloneRange();
+  }
+}
+
+function _restoreSelection() {
+  if (_savedSelection) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(_savedSelection);
+    _savedSelection = null;
+  }
+}
+
+function _showInlineLinkDialog() {
+  _saveSelection();
+  // Check if selection is inside an existing link
+  const sel = window.getSelection();
+  let existingUrl = '';
+  let existingLink = null;
+  if (sel.rangeCount > 0) {
+    let node = sel.anchorNode;
+    while (node && node !== _inlineEditingElement) {
+      if (node.nodeType === 1 && node.tagName === 'A') {
+        existingLink = node;
+        existingUrl = node.getAttribute('href') || '';
+        break;
+      }
+      node = node.parentNode;
+    }
+  }
+
+  _closeInlineLinkDialog();
+  const dialog = document.createElement('div');
+  dialog.className = 'inline-link-dialog';
+  dialog.innerHTML = `
+    <input type="text" class="link-url-input" placeholder="https://..." value="${existingUrl.replace(/"/g, '&quot;')}">
+    <button type="button" class="link-save-btn">OK</button>
+    ${existingLink ? '<button type="button" class="link-remove-btn">Supprimer</button>' : ''}
+    <button type="button" class="link-cancel-btn">Annuler</button>
+  `;
+  document.body.appendChild(dialog);
+  _inlineLinkDialog = dialog;
+
+  // Position below toolbar
+  if (_inlineToolbar) {
+    const tbRect = _inlineToolbar.getBoundingClientRect();
+    dialog.style.left = tbRect.left + 'px';
+    dialog.style.top = (tbRect.bottom + 4) + 'px';
+    requestAnimationFrame(() => {
+      const dRect = dialog.getBoundingClientRect();
+      if (dRect.right > window.innerWidth - 4) {
+        dialog.style.left = (window.innerWidth - dRect.width - 4) + 'px';
+      }
+      if (dRect.left < 4) dialog.style.left = '4px';
+    });
+  }
+
+  const input = dialog.querySelector('.link-url-input');
+  input.focus();
+  input.select();
+
+  const applyLink = () => {
+    const url = input.value.trim();
+    _restoreSelection();
+    if (url) {
+      document.execCommand('createLink', false, url);
+    }
+    _closeInlineLinkDialog();
+    _updateToolbarState();
+    if (_inlineEditingElement) {
+      _syncInlineContentToBlockData(_inlineEditingElement);
+      _inlineEditingElement.focus();
+    }
+  };
+
+  dialog.querySelector('.link-save-btn').addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    applyLink();
+  });
+
+  if (existingLink) {
+    dialog.querySelector('.link-remove-btn').addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      _restoreSelection();
+      document.execCommand('unlink', false, null);
+      _closeInlineLinkDialog();
+      _updateToolbarState();
+      if (_inlineEditingElement) {
+        _syncInlineContentToBlockData(_inlineEditingElement);
+        _inlineEditingElement.focus();
+      }
+    });
+  }
+
+  dialog.querySelector('.link-cancel-btn').addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    _closeInlineLinkDialog();
+    _restoreSelection();
+    if (_inlineEditingElement) _inlineEditingElement.focus();
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); applyLink(); }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      _closeInlineLinkDialog();
+      _restoreSelection();
+      if (_inlineEditingElement) _inlineEditingElement.focus();
+    }
+  });
+}
+
+function _closeInlineLinkDialog() {
+  if (_inlineLinkDialog) {
+    _inlineLinkDialog.remove();
+    _inlineLinkDialog = null;
+  }
 }
 
 function _showInlineToolbar(card, txtEditor) {
@@ -10360,6 +10485,11 @@ function _updateToolbarState() {
     if (['bold', 'italic', 'underline', 'strikeThrough', 'insertOrderedList', 'insertUnorderedList'].includes(cmd)) {
       btn.classList.toggle('active', document.queryCommandState(cmd));
     }
+  });
+  // Update alignment active state
+  ['justifyLeft', 'justifyCenter', 'justifyRight'].forEach(cmd => {
+    const btn = _inlineToolbar.querySelector(`button[data-cmd="${cmd}"]`);
+    if (btn) btn.classList.toggle('active', document.queryCommandState(cmd));
   });
   // Update heading select
   const select = _inlineToolbar.querySelector('.inline-toolbar-select');
@@ -10421,6 +10551,7 @@ function enableInlineEditing(blockId, targetTxtEditor, dataRef, fieldName) {
 
 function disableInlineEditing() {
   if (!_inlineEditingBlockId) return;
+  _closeInlineLinkDialog();
 
   // If in HTML source mode, sync textarea content back into the contenteditable first
   if (_inlineSourceTextarea && _inlineEditingElement) {
@@ -10483,6 +10614,8 @@ function _handleInlineBlur() {
     if (_inlineEditingElement && (_inlineEditingElement === active || _inlineEditingElement.contains(active))) return;
     // If focus moved to the HTML source textarea, don't disable
     if (_inlineSourceTextarea && _inlineSourceTextarea === active) return;
+    // If focus moved to the link dialog, don't disable
+    if (_inlineLinkDialog && _inlineLinkDialog.contains(active)) return;
     // Focus left the editing zone — disable inline editing
     disableInlineEditing();
   }, 150);
@@ -10578,13 +10711,37 @@ function _syncInlineContentToBlockData(txtEditorEl) {
   dataObj[_inlineEditingFieldName] = txtEditorEl.innerHTML;
 }
 
+function _findSubModuleQuillId(block, dataRef, fieldName) {
+  const columnsList = block.data?.columns_list;
+  if (!Array.isArray(columnsList)) return null;
+  for (let ci = 0; ci < columnsList.length; ci++) {
+    const subModules = columnsList[ci]?.columns_module;
+    if (!Array.isArray(subModules)) continue;
+    for (let si = 0; si < subModules.length; si++) {
+      if (subModules[si] === dataRef) {
+        const compoundName = `columns_list::${ci}::columns_module::${si}::${fieldName}`;
+        return `wysiwyg-${block.id}-${compoundName}`.replace(/[^a-zA-Z0-9_-]/g, '-');
+      }
+    }
+  }
+  return null;
+}
+
 function _syncInlineToSettingsPanelQuill() {
   if (!_inlineEditingBlockId || !_inlineEditingFieldName) return;
   const block = pageBuilderState.blocks.find(b => b.id === _inlineEditingBlockId);
   if (!block) return;
 
-  const editorId = `wysiwyg-${block.id}-${_inlineEditingFieldName}`.replace(/[^a-zA-Z0-9_-]/g, '-');
-  const quill = _quillInstances.get(editorId);
+  let editorId = `wysiwyg-${block.id}-${_inlineEditingFieldName}`.replace(/[^a-zA-Z0-9_-]/g, '-');
+  let quill = _quillInstances.get(editorId);
+  // Sub-module inside columns → Quill ID uses compound name
+  if (!quill && _inlineEditingDataRef && _inlineEditingDataRef !== block.data) {
+    const subId = _findSubModuleQuillId(block, _inlineEditingDataRef, _inlineEditingFieldName);
+    if (subId) {
+      editorId = subId;
+      quill = _quillInstances.get(subId);
+    }
+  }
   if (!quill) return;
 
   // Prevent circular update

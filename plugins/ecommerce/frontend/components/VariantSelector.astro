@@ -68,13 +68,15 @@ const hasVariants = variants.length > 1 && attrs.length > 0;
       if (match) {
         if (priceEl) {
           const fmt = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: variantCurrency });
-          const htCents = Math.round(match.price_cents / (1 + taxRate / 100));
-          var html = '<div class="price-display" data-ht-min="' + htCents + '" data-ht-max="" data-tax-rate="' + taxRate + '" data-currency="' + variantCurrency + '">';
-          if (match.compare_at_price_cents && match.compare_at_price_cents > match.price_cents) {
-            html += '<span class="price-compare">' + fmt.format(match.compare_at_price_cents / 100) + '</span>';
+          const isOnSale = match.compare_at_price_cents && match.compare_at_price_cents > 0 && match.compare_at_price_cents < match.price_cents;
+          const displayCents = isOnSale ? match.compare_at_price_cents : match.price_cents;
+          const htCents = Math.round(displayCents / (1 + taxRate / 100));
+          var html = '<div class="price-display" data-ht-min="' + htCents + '" data-ht-max="" data-tax-rate="' + taxRate + '" data-currency="' + variantCurrency + '"' + (isOnSale ? ' data-on-sale="1"' : '') + '>';
+          if (isOnSale) {
+            html += '<span class="price-compare">' + fmt.format(match.price_cents / 100) + '</span>';
           }
           html += '<span class="price-ht" style="display:none"><strong class="price-ht-value">' + fmt.format(htCents / 100) + '</strong> HT <span class="price-ht-discount" style="display:none"></span></span>';
-          html += '<span class="price-current"><strong>' + fmt.format(match.price_cents / 100) + '</strong> <span class="price-label-ttc">TTC</span></span>';
+          html += '<span class="price-current"><strong>' + fmt.format(displayCents / 100) + '</strong> <span class="price-label-ttc">TTC</span></span>';
           html += '</div>';
           priceEl.innerHTML = html;
           // Re-trigger pro-prices if customer is pro (event for any listener)

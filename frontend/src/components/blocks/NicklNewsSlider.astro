@@ -15,7 +15,6 @@ interface Props {
 const { data } = Astro.props;
 
 const p = getPreset('card');
-const displayPosts = (data.display_posts as string) || '1';
 const isManual = isTruthy(data.is_manual);
 const displayArchiveLink = isTruthy(data.display_archive_link);
 const archiveLinkLabel = (data.archive_link_label as string) || 'Voir toutes les actualités';
@@ -58,15 +57,61 @@ function getDate(item: ActualiteItem): string {
 
 <NicklModuleWrapper data={data} moduleName="news-slider" containerLarge>
   {posts.length > 0 ? (
-    <div class="slider-wrapper">
-      <div class={`swiper slider js_news-slider columns-${displayPosts}`}>
-        <div class="swiper-wrapper">
-          {posts.map((post) => {
+    <div class="news-grid-layout">
+      {/* First post — full width */}
+      {(() => {
+        const post = posts[0];
+        const image = getImage(post);
+        const category = getCategory(post);
+        const date = getDate(post);
+        return (
+          <div class="news-featured item">
+            <a href={`/actualites/${post.slug}`} class="link">
+              <div class="illus-wrapper">
+                {image ? (
+                  <img
+                    src={optimizedImageUrl(image, p.width, p.quality)}
+                    srcset={responsiveSrcset(image, p.srcsetWidths, p.srcsetQuality) || undefined}
+                    sizes="100vw"
+                    alt={post.title || ''}
+                    class="illus"
+                    width="1200"
+                    height="500"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div class="illus" style="background:var(--color-primary, #eee);"></div>
+                )}
+                <div class="overlay">
+                  <span class="icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="24" viewBox="0 0 40 23.99" fill="currentColor"><path d="M20,0C12.76,0,5.52,4,0,12c11.04,16,28.96,16,40,0C34.48,4,27.25,0,20,0m0,20c-4.42,0-8.01-3.58-8.02-8.01S15.57,3.98,19.99,3.98c4.42,0,8.01,3.58,8.02,8.01,0,0,0,.01,0,.01,0,4.42-3.59,8-8,8"/><path d="M20,7.99c2.21,0,4,1.79,4,4s-1.79,4-4,4-4-1.79-4-4h0c0-2.21,1.79-4,4-4"/></svg>
+                  </span>
+                  <span>Lire l'actualit&eacute;</span>
+                </div>
+              </div>
+              <div class="desc">
+                {category && <p class="category">{category}</p>}
+                {date && <time class="date">{date}</time>}
+                <h3 class="title">{post.title}</h3>
+                {post.excerpt && <p class="txt">{post.excerpt}</p>}
+                <div class="btn-wrapper">
+                  <span class="fake-link btn btn-tertiary color-primary">Lire l'actualit&eacute;</span>
+                </div>
+              </div>
+            </a>
+          </div>
+        );
+      })()}
+
+      {/* Remaining posts — 3 columns grid */}
+      {posts.length > 1 && (
+        <div class="news-grid-cols">
+          {posts.slice(1).map((post) => {
             const image = getImage(post);
             const category = getCategory(post);
             const date = getDate(post);
             return (
-              <div class="swiper-slide item">
+              <div class="item">
                 <a href={`/actualites/${post.slug}`} class="link">
                   <div class="illus-wrapper">
                     {image ? (
@@ -104,9 +149,7 @@ function getDate(item: ActualiteItem): string {
             );
           })}
         </div>
-      </div>
-      <button type="button" class="slider-navigation prev"></button>
-      <button type="button" class="slider-navigation next"></button>
+      )}
     </div>
   ) : (
     <p class="no-content">Aucune actualité pour le moment.</p>
@@ -119,55 +162,58 @@ function getDate(item: ActualiteItem): string {
   )}
 </NicklModuleWrapper>
 
-<script is:inline>
-(function() {
-  function initNewsSliders() {
-    if (!window.Swiper) return;
-    document.querySelectorAll('.module-news-slider .js_news-slider').forEach(function(el) {
-      if (el.swiper) return;
-
-      var slidesPerView = 1;
-      var breakpoints = {};
-
-      if (el.classList.contains('columns-2')) {
-        breakpoints = { 601: { slidesPerView: 2 } };
-      } else if (el.classList.contains('columns-3')) {
-        breakpoints = { 601: { slidesPerView: 1 }, 1025: { slidesPerView: 3 } };
-      } else if (el.classList.contains('columns-4')) {
-        breakpoints = { 601: { slidesPerView: 1 }, 1025: { slidesPerView: 4 } };
-      }
-
-      // Check if we have enough slides to need a slider
-      var items = el.querySelectorAll('.item');
-      var w = window.innerWidth;
-      var currentPerView = slidesPerView;
-      for (var bp in breakpoints) {
-        if (w >= parseInt(bp)) currentPerView = breakpoints[bp].slidesPerView;
-      }
-      if (items.length <= currentPerView) return;
-
-      var wrapper = el.closest('.slider-wrapper') || el.parentElement;
-      new window.Swiper(el, {
-        loop: true,
-        speed: 750,
-        slidesPerView: slidesPerView,
-        breakpoints: breakpoints,
-        spaceBetween: 26,
-        navigation: {
-          nextEl: wrapper.querySelector('.next'),
-          prevEl: wrapper.querySelector('.prev')
-        }
-      });
-    });
+<style is:global>
+  .module-news-slider .news-grid-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 1.625rem;
   }
-
-  if (window.Swiper) {
-    initNewsSliders();
-  } else {
-    var check = setInterval(function() {
-      if (window.Swiper) { clearInterval(check); initNewsSliders(); }
-    }, 500);
-    setTimeout(function() { clearInterval(check); }, 15000);
+  .module-news-slider .news-featured {
+    width: 100%;
   }
-})();
-</script>
+  .module-news-slider .news-featured .link {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.625rem;
+  }
+  .module-news-slider .news-featured .illus-wrapper {
+    flex: 0 1 65%;
+  }
+  .module-news-slider .news-featured .desc {
+    flex: 1;
+    margin-top: 0;
+    padding-top: 0.5rem;
+  }
+  .module-news-slider .news-featured .title {
+    font-size: 2rem;
+    margin-top: 0.5rem;
+  }
+  .module-news-slider .news-featured .txt,
+  .module-news-slider .news-featured .btn-wrapper {
+    display: block;
+  }
+  .module-news-slider .news-featured .date {
+    margin-top: 1.5rem;
+  }
+  .module-news-slider .news-grid-cols {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.625rem;
+  }
+  @media only screen and (max-width: 960px) {
+    .module-news-slider .news-featured .link {
+      display: block;
+    }
+    .module-news-slider .news-featured .desc {
+      margin-top: 0.75rem;
+    }
+    .module-news-slider .news-grid-cols {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media only screen and (max-width: 600px) {
+    .module-news-slider .news-grid-cols {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

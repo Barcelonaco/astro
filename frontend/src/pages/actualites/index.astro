@@ -204,10 +204,12 @@ function formatDate(dateStr: string): string {
     margin: 0;
   }
   .page-archive-news .list-single .item {
-    width: calc(33.333% - 1.35rem);
+    flex: 0 0 calc((100% - 4rem) / 3);
+    max-width: calc((100% - 4rem) / 3);
   }
   .page-archive-news .list-single .item:first-child {
-    width: 100%;
+    flex: 0 0 100%;
+    max-width: 100%;
   }
   .page-archive-news .list-single .item:first-child .link {
     display: flex;
@@ -325,16 +327,19 @@ function formatDate(dateStr: string): string {
 
   @media (max-width: 960px) {
     .page-archive-news .list-single .item {
-      width: calc(50% - 1rem);
+      flex: 0 0 calc(50% - 1rem);
+      max-width: calc(50% - 1rem);
     }
     .page-archive-news .list-single .item:first-child {
-      width: 100%;
+      flex: 0 0 100%;
+      max-width: 100%;
     }
   }
   @media (max-width: 600px) {
     .page-archive-news .list-single .item,
     .page-archive-news .list-single .item:first-child {
-      width: 100%;
+      flex: 0 0 100%;
+      max-width: 100%;
     }
     .page-archive-news .list-single .item:first-child .link {
       display: block;

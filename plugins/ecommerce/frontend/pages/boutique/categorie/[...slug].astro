@@ -138,11 +138,15 @@ const seoDesc = (cat.seo_meta?.meta_description) || cat.description || SITE_DESC
           const img = p.featured_image && (typeof p.featured_image === 'string' ? p.featured_image : (p.featured_image.sizes?.half || p.featured_image.url || ''));
           const imgTag = img ? `<img src="${optImg(img)}" alt="${esc(p.title)}" class="shop-product-card__image" loading="lazy" />` : '<div class="shop-product-card__image-placeholder"></div>';
           const fmt = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
-          const priceHtml = p.has_variants ? `À partir de <strong>${fmt.format(p.price_cents_min / 100)}</strong>` : `<strong>${fmt.format(p.price_cents_min / 100)}</strong>`;
-          const comparable = p.compare_at_price_cents && p.compare_at_price_cents > p.price_cents_min;
-          const cmpHtml = comparable ? `<span class="price-compare">${fmt.format(p.compare_at_price_cents / 100)}</span> ` : '';
+          const comparable = p.compare_at_price_cents && p.compare_at_price_cents > 0 && p.compare_at_price_cents < p.price_cents_min;
+          const displayPrice = comparable ? p.compare_at_price_cents : p.price_cents_min;
+          const taxRate = p.tax_rate || 20;
+          const htCents = Math.round(displayPrice / (1 + taxRate / 100));
+          const priceHtml = p.has_variants ? `À partir de <strong>${fmt.format(displayPrice / 100)}</strong>` : `<strong>${fmt.format(displayPrice / 100)}</strong>`;
+          const cmpHtml = comparable ? `<span class="price-compare">${fmt.format(p.price_cents_min / 100)}</span> ` : '';
+          const onSaleAttr = comparable ? ' data-on-sale="1"' : '';
           const cat = (p.categories && p.categories[0]) ? p.categories[0].name : '';
-          return `<article class="shop-product-card"><a href="/produits/${p.slug}" class="shop-product-card__link"><div class="shop-product-card__image-wrapper">${imgTag}${!p.in_stock ? '<span class="shop-product-card__badge shop-product-card__badge--out">Rupture</span>' : ''}</div><div class="shop-product-card__body">${cat ? `<p class="shop-product-card__category">${esc(cat)}</p>` : ''}<h3 class="shop-product-card__title">${esc(p.title)}</h3>${p.excerpt ? `<p class="shop-product-card__excerpt">${esc(p.excerpt)}</p>` : ''}<div class="shop-product-card__price"><div class="price-display">${cmpHtml}<span class="price-current">${priceHtml}</span></div></div></div></a></article>`;
+          return `<article class="shop-product-card"><a href="/produits/${p.slug}" class="shop-product-card__link"><div class="shop-product-card__image-wrapper">${imgTag}${!p.in_stock ? '<span class="shop-product-card__badge shop-product-card__badge--out">Rupture</span>' : ''}</div><div class="shop-product-card__body">${cat ? `<p class="shop-product-card__category">${esc(cat)}</p>` : ''}<h3 class="shop-product-card__title">${esc(p.title)}</h3>${p.excerpt ? `<p class="shop-product-card__excerpt">${esc(p.excerpt)}</p>` : ''}<div class="shop-product-card__price"><div class="price-display" data-ht-min="${htCents}" data-tax-rate="${taxRate}" data-currency="EUR"${onSaleAttr}>${cmpHtml}<span class="price-ht" style="display:none"><strong class="price-ht-value">${fmt.format(htCents / 100)}</strong> HT <span class="price-ht-discount" style="display:none"></span></span><span class="price-current">${priceHtml} <span class="price-label-ttc">TTC</span></span></div></div></div></a></article>`;
         }
         function renderPagination(current, total, baseUrl) {
           if (total <= 1) return '';
@@ -220,12 +224,20 @@ const seoDesc = (cat.seo_meta?.meta_description) || cat.description || SITE_DESC
               var htMin = parseInt(el.dataset.htMin || '0', 10);
               var currency = el.dataset.currency || 'EUR';
               if (htMin <= 0) return;
-              var discounted = rate > 0 ? Math.round(htMin * (1 - rate / 100)) : htMin;
+              var isOnSale = el.dataset.onSale === '1';
+              var hasDiscount = rate > 0 && !isOnSale;
+              var discounted = hasDiscount ? Math.round(htMin * (1 - rate / 100)) : htMin;
+              var fmt = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currency });
               var valueEl = htEl.querySelector('.price-ht-value');
-              if (valueEl) valueEl.textContent = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currency }).format(discounted / 100);
-              if (rate > 0) {
+              if (valueEl) valueEl.textContent = fmt.format(discounted / 100);
+              if (hasDiscount) {
                 var dEl = htEl.querySelector('.price-ht-discount');
-                if (dEl) { dEl.textContent = '(-' + rate + '%)'; dEl.style.display = ''; }
+                if (dEl) {
+                  var tier = c.pro_tier || '';
+                  var label = tier ? tier + ' -' + rate + '%' : '-' + rate + '%';
+                  dEl.innerHTML = '<span class="price-ht-original">' + fmt.format(htMin / 100) + '</span> <span class="pro-tier-badge">' + label + '</span>';
+                  dEl.style.display = '';
+                }
               }
               htEl.style.display = '';
               el.classList.add('is-pro');

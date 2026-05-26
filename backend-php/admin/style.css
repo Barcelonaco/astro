@@ -1764,6 +1764,90 @@ tr:hover {
 }
 .inline-html-source:focus { outline: none; }
 
+/* ── Inline editor content styles (alignment, blockquote, indent) ── */
+.builder-block-render .txt.editor blockquote {
+  border-left: 3px solid var(--primary, #667ee4);
+  padding-left: 12px;
+  margin: 0.5em 0;
+  color: var(--gray-600, #4b5563);
+}
+.builder-block-render .txt.editor [style*="text-align: center"],
+.builder-block-render .txt.editor [style*="text-align:center"],
+.builder-block-render .txt.editor [align="center"] {
+  text-align: center;
+}
+.builder-block-render .txt.editor [style*="text-align: right"],
+.builder-block-render .txt.editor [style*="text-align:right"],
+.builder-block-render .txt.editor [align="right"] {
+  text-align: right;
+}
+.builder-block-render .txt.editor [style*="text-align: justify"],
+.builder-block-render .txt.editor [style*="text-align:justify"],
+.builder-block-render .txt.editor [align="justify"] {
+  text-align: justify;
+}
+.builder-block-render .txt.editor a {
+  color: var(--primary, #667ee4);
+  text-decoration: underline;
+}
+
+/* ── Inline link dialog ───────────────────────────────────── */
+.inline-link-dialog {
+  position: fixed;
+  z-index: 10001;
+  background: #fff;
+  border: 1px solid var(--border-color, #d0d5dd);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12), 0 1px 3px rgba(0,0,0,.08);
+  padding: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 360px;
+}
+.inline-link-dialog input {
+  flex: 1;
+  height: 32px;
+  border: 1px solid var(--border-color, #d0d5dd);
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 13px;
+  outline: none;
+  min-width: 0;
+}
+.inline-link-dialog input:focus {
+  border-color: var(--primary, #667ee4);
+}
+.inline-link-dialog button {
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.inline-link-dialog .link-save-btn {
+  background: var(--primary, #667ee4);
+  color: #fff;
+}
+.inline-link-dialog .link-save-btn:hover {
+  opacity: 0.9;
+}
+.inline-link-dialog .link-remove-btn {
+  background: transparent;
+  color: var(--danger, #dc3545);
+  border: 1px solid var(--danger, #dc3545);
+}
+.inline-link-dialog .link-remove-btn:hover {
+  background: var(--danger, #dc3545);
+  color: #fff;
+}
+.inline-link-dialog .link-cancel-btn {
+  background: transparent;
+  color: var(--gray-600, #4b5563);
+}
+
 .preview-title {
   font-weight: 700;
   margin-bottom: 6px;

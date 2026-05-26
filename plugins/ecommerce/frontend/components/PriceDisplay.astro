@@ -20,17 +20,21 @@ const {
 } = Astro.props;
 
 const hasRange = priceCentsMax !== undefined && priceCentsMax !== priceCents;
-const onSale = showCompare && compareAtCents && compareAtCents > priceCents;
-const discountPct = onSale ? Math.round(((compareAtCents! - priceCents) / compareAtCents!) * 100) : 0;
+// Prix promo = compare_at_price, inférieur au prix de base quand actif
+const onSale = showCompare && compareAtCents && compareAtCents > 0 && compareAtCents < priceCents;
+const discountPct = onSale ? Math.round(((priceCents - compareAtCents!) / priceCents) * 100) : 0;
+// Prix effectif affiché
+const displayPrice = onSale ? compareAtCents! : priceCents;
 ---
 <div class="price-display"
   data-ht-min={priceHtCents ?? ''}
   data-ht-max={priceHtCentsMax ?? ''}
   data-tax-rate={taxRate ?? ''}
   data-currency={currency}
+  data-on-sale={onSale ? '1' : undefined}
 >
-  {onSale && compareAtCents && (
-    <span class="price-compare" aria-label={`Prix avant reduction ${formatPrice(compareAtCents, currency)}`}>{formatPrice(compareAtCents, currency)}</span>
+  {onSale && (
+    <span class="price-compare" aria-label={`Ancien prix ${formatPrice(priceCents, currency)}`}>{formatPrice(priceCents, currency)}</span>
   )}
   {/* HT pro line — hidden by default, shown as primary price client-side if pro approved */}
   {priceHtCents !== undefined && priceHtCents > 0 && (
@@ -45,9 +49,9 @@ const discountPct = onSale ? Math.round(((compareAtCents! - priceCents) / compar
   )}
   <span class="price-current">
     {hasRange ? (
-      <>A partir de <strong>{formatPrice(priceCents, currency)}</strong></>
+      <>A partir de <strong>{formatPrice(displayPrice, currency)}</strong></>
     ) : (
-      <strong>{formatPrice(priceCents, currency)}</strong>
+      <strong>{formatPrice(displayPrice, currency)}</strong>
     )}
     <span class="price-label-ttc">TTC</span>
   </span>
@@ -135,5 +139,11 @@ const discountPct = onSale ? Math.round(((compareAtCents! - priceCents) / compar
     font-size: 0.85em;
     color: var(--color-primary, #1a5276);
     font-weight: 600;
+  }
+  .price-ht-original {
+    text-decoration: line-through;
+    color: var(--gray-500, #6b7280);
+    font-weight: 400;
+    margin-right: 4px;
   }
 </style>

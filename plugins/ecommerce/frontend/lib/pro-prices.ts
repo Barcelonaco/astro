@@ -57,17 +57,22 @@ function applyProPrices(customer: CustomerInfo): void {
 
     if (htMin <= 0) return
 
-    // Apply discount
-    const discountedHt = rate > 0 ? Math.round(htMin * (1 - rate / 100)) : htMin
+    // Pas de remise pro sur un produit déjà en promo (prix promo = prix final)
+    const isOnSale = el.dataset.onSale === '1'
+
+    // Apply discount (sauf promo active)
+    const hasDiscount = rate > 0 && !isOnSale
+    const discountedHt = hasDiscount ? Math.round(htMin * (1 - rate / 100)) : htMin
 
     const valueEl = htEl.querySelector<HTMLElement>('.price-ht-value')
     if (valueEl) valueEl.textContent = formatPrice(discountedHt, currency)
 
-    // Show tier badge with discount
+    // Show original HT strikethrough + discount badge
     const discountEl = htEl.querySelector<HTMLElement>('.price-ht-discount')
-    if (discountEl) {
-      const label = tier ? `Statut ${tier} -${rate}%` : `Pro -${rate}%`
-      discountEl.innerHTML = `<span class="pro-tier-badge">${label}</span>`
+    if (discountEl && hasDiscount) {
+      const originalHtFormatted = formatPrice(htMin, currency)
+      const label = tier ? `${tier} -${rate}%` : `-${rate}%`
+      discountEl.innerHTML = `<span class="price-ht-original">${originalHtFormatted}</span> <span class="pro-tier-badge">${label}</span>`
       discountEl.style.display = ''
     }
 

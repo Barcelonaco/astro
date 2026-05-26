@@ -168,9 +168,14 @@ const showBreadcrumb = product.custom_fields?.layout_config?.show_breadcrumb !==
               <form id="shopProductForm" onsubmit="event.preventDefault()">
                 <VariantSelector
                   variants={product.variants}
-                  variantAttributes={(product.custom_fields?.attributes || [])
-                    .filter((a: any) => a.used_for_variations)
-                    .map((a: any) => ({ name: a.name, options: a.values || a.options || [] }))}
+                  variantAttributes={(() => {
+                    let attrs = product.custom_fields?.attributes;
+                    if (typeof attrs === 'string') { try { attrs = JSON.parse(attrs); } catch { attrs = []; } }
+                    if (!Array.isArray(attrs)) attrs = [];
+                    return attrs
+                      .filter((a: any) => a.used_for_variations)
+                      .map((a: any) => ({ name: a.name, options: a.values || a.options || [] }));
+                  })()}
                   taxRate={product.tax_rate}
                 />
                 <AddToCartButton productSlug={product.slug} disabled={!product.in_stock} />

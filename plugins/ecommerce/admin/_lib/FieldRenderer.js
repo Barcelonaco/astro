@@ -178,45 +178,57 @@ export class FieldRenderer {
 
   _renderMedia(f, value, kind) {
     const isVideo = kind === 'video';
+
+    // Preview carré cliquable (style identique aux champs image du CMS)
     const preview = h('div', {
       class: 'field-media-preview',
-      style: 'width:80px;height:80px;border:1px solid var(--gray-200);border-radius:6px;background-size:cover;background-position:center;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:12px',
+      style: 'width:160px;height:160px;border:2px dashed var(--gray-300);border-radius:8px;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:13px;cursor:pointer;transition:border-color .2s;overflow:hidden;position:relative',
     });
-    const urlEl = h('input', { class: 'form-input', type: 'text', readonly: true, placeholder: 'Aucun média',
-      style: 'flex:1;font-size:12px;background:var(--gray-50)' });
+    preview.addEventListener('mouseenter', () => { preview.style.borderColor = 'var(--color-primary, #0f62fe)'; });
+    preview.addEventListener('mouseleave', () => { preview.style.borderColor = hasUrl ? 'transparent' : 'var(--gray-300)'; });
+
+    let hasUrl = false;
 
     const setMedia = (m) => {
       const url = typeof m === 'string' ? m : (m?.url || '');
-      urlEl.value = url;
+      hasUrl = !!url;
       if (url && !isVideo) {
         preview.style.backgroundImage = `url("${url}")`;
-        preview.textContent = '';
+        preview.style.borderStyle = 'solid';
+        preview.style.borderColor = 'transparent';
+        preview.innerHTML = '';
       } else if (url && isVideo) {
         preview.style.backgroundImage = '';
-        preview.textContent = '▶ Vidéo';
+        preview.style.borderStyle = 'dashed';
+        preview.style.borderColor = 'var(--gray-300)';
+        preview.innerHTML = '<span style="font-size:28px">&#9654;</span><br><span style="font-size:11px">Video</span>';
       } else {
         preview.style.backgroundImage = '';
-        preview.textContent = '—';
+        preview.style.borderStyle = 'dashed';
+        preview.style.borderColor = 'var(--gray-300)';
+        preview.innerHTML = `<span style="display:flex;flex-direction:column;align-items:center;gap:4px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg><span style="font-size:11px">Choisir</span></span>`;
       }
-      this._set(f.name, m && typeof m === 'object' ? m : { url });
+      this._set(f.name, m && typeof m === 'object' ? m : (url ? { url } : null));
     };
 
     if (value) setMedia(typeof value === 'object' ? value : { url: value });
     else setMedia(null);
 
-    const btnPick = h('button', { class: 'btn btn-outline btn-sm', type: 'button' }, 'Choisir…');
-    btnPick.addEventListener('click', async () => {
-      const m = await pickMedia({ type: kind });
-      if (m) setMedia(m);
-    });
-    const btnClear = h('button', { class: 'btn btn-outline btn-sm', type: 'button', style: 'color:#c00' }, '×');
-    btnClear.addEventListener('click', () => setMedia(null));
+    const btnClear = h('button', { class: 'btn btn-outline btn-sm', type: 'button' }, 'Retirer');
+    const syncClearBtn = () => { btnClear.style.display = hasUrl ? '' : 'none'; };
+    syncClearBtn();
+    btnClear.addEventListener('click', () => { setMedia(null); syncClearBtn(); });
 
-    const row = h('div', { style: 'display:flex;gap:10px;align-items:center' },
-      preview, urlEl, btnPick, btnClear,
+    preview.addEventListener('click', async () => {
+      const m = await pickMedia({ type: kind });
+      if (m) { setMedia(m); syncClearBtn(); }
+    });
+
+    const container = h('div', { style: 'display:flex;flex-direction:column;gap:8px;align-items:flex-start' },
+      preview, btnClear,
     );
-    this.fieldRefs.set(f.name, { container: row, getValue: () => this.values[f.name] ?? null, setValue: v => setMedia(v) });
-    return this._wrap(f, row);
+    this.fieldRefs.set(f.name, { container, getValue: () => this.values[f.name] ?? null, setValue: v => { setMedia(v); syncClearBtn(); } });
+    return this._wrap(f, container);
   }
 
   _renderLink(f, value) {

@@ -124,3 +124,12 @@ function resolveImage(img: any): { url: string; alt: string } | null {
     </div>
   </div>
 )}
+
+<style is:global>
+  .module-posts-list .list > .item:first-child {
+    flex-basis: 100%;
+  }
+  .module-posts-list .list > .item:not(:first-child) {
+    flex: 0 1 calc(33.333% - 1.0834rem);
+  }
+</style>

@@ -70,6 +70,28 @@
   flex-basis: calc(25% - (9rem / 4));
 }
 
+/* Footer menu (col-2) */
+#footer .footer-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#footer .footer-menu-item {
+  margin-bottom: 0.5rem;
+}
+#footer .footer-menu-item a {
+  color: currentColor;
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 0 1px;
+  transition: background-size 0.3s;
+}
+#footer .footer-menu-item a:hover {
+  background-size: 100% 1px;
+}
+
 /* When col-1 is the only column, center everything */
 #footer .top .col-1:not(:has(~ .col)) {
   text-align: center;
@@ -584,9 +606,9 @@
   color: var(--color-background, #fff);
 }
 
-/* Hide col-2 (empty spacer) on tablet */
+/* Hide col-2 on tablet only when empty (no footer menu) */
 @media only screen and (max-width: 1024px) {
-  #footer .top .col-2 { display: none; }
+  #footer .top .col-2:empty { display: none; }
 }
 
 /* Mobile: bottom col-2 */

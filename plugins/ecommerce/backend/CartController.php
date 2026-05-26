@@ -41,13 +41,19 @@ class CartController {
         if ($variantId <= 0) error_response('variant_id requis', 400);
 
         $db = Database::getInstance();
-        $stmt = $db->prepare('SELECT v.id, v.product_id, v.price_cents, v.stock_managed, v.stock_quantity FROM product_variants v WHERE v.id = ?');
+        $stmt = $db->prepare('SELECT v.id, v.product_id, v.price_cents, v.compare_at_price_cents, v.stock_managed, v.stock_quantity FROM product_variants v WHERE v.id = ?');
         $stmt->execute([$variantId]);
         $variant = $stmt->fetch();
         if (!$variant) error_response('Variant introuvable', 404);
 
         if ((int) $variant['stock_managed'] === 1 && (int) $variant['stock_quantity'] < $qty) {
             error_response('Stock insuffisant', 409);
+        }
+
+        // Prix effectif : prix promo si actif (inférieur au prix de base), sinon prix de base
+        $effectivePrice = (int) $variant['price_cents'];
+        if (!empty($variant['compare_at_price_cents']) && (int) $variant['compare_at_price_cents'] < $effectivePrice) {
+            $effectivePrice = (int) $variant['compare_at_price_cents'];
         }
 
         $cart = self::resolveOrCreate(true);
@@ -59,11 +65,11 @@ class CartController {
 
         if ($existing) {
             $newQty = (int) $existing['quantity'] + $qty;
-            $stmt = $db->prepare('UPDATE cart_items SET quantity = ? WHERE id = ?');
-            $stmt->execute([$newQty, $existing['id']]);
+            $stmt = $db->prepare('UPDATE cart_items SET quantity = ?, unit_price_cents = ? WHERE id = ?');
+            $stmt->execute([$newQty, $effectivePrice, $existing['id']]);
         } else {
             $stmt = $db->prepare('INSERT INTO cart_items (cart_id, variant_id, product_id, quantity, unit_price_cents) VALUES (?, ?, ?, ?, ?)');
-            $stmt->execute([$cart['id'], $variantId, $variant['product_id'], $qty, $variant['price_cents']]);
+            $stmt->execute([$cart['id'], $variantId, $variant['product_id'], $qty, $effectivePrice]);
         }
 
         self::touchCart($cart['id']);
@@ -87,14 +93,19 @@ class CartController {
             $stmt = $db->prepare('DELETE FROM cart_items WHERE id = ?');
             $stmt->execute([$itemId]);
         } else {
-            $stmt = $db->prepare('SELECT stock_managed, stock_quantity FROM product_variants WHERE id = ?');
+            $stmt = $db->prepare('SELECT price_cents, compare_at_price_cents, stock_managed, stock_quantity FROM product_variants WHERE id = ?');
             $stmt->execute([$item['variant_id']]);
             $v = $stmt->fetch();
             if ($v && (int) $v['stock_managed'] === 1 && (int) $v['stock_quantity'] < $qty) {
                 error_response('Stock insuffisant', 409);
             }
-            $stmt = $db->prepare('UPDATE cart_items SET quantity = ? WHERE id = ?');
-            $stmt->execute([$qty, $itemId]);
+            // Refresh effective price (promo may have changed)
+            $effectivePrice = (int) ($v['price_cents'] ?? 0);
+            if ($v && !empty($v['compare_at_price_cents']) && (int) $v['compare_at_price_cents'] < $effectivePrice) {
+                $effectivePrice = (int) $v['compare_at_price_cents'];
+            }
+            $stmt = $db->prepare('UPDATE cart_items SET quantity = ?, unit_price_cents = ? WHERE id = ?');
+            $stmt->execute([$qty, $effectivePrice, $itemId]);
         }
 
         self::touchCart($cart['id']);
