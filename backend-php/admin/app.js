@@ -1279,25 +1279,16 @@ async function renderCPTEditPage(ptDef, itemId) {
         const fnEsc = escapeHtml(field.name);
         return `<div class="form-group"${w}>
           <label class="form-label">${escapeHtml(field.label)}</label>
-          <div class="form-row" style="display:grid;grid-template-columns:1fr 2fr 1fr auto;gap:8px;">
-            <div class="form-group" style="margin:0;">
-              <select class="form-input cpt-link-page-select" data-target="cf_${fnEsc}_url">
-                <option value="">— Page du site —</option>
-                ${allPages.filter(p => p.status === 'published').map(p => `<option value="/${escapeHtml(p.slug)}" ${lObj.url === '/' + p.slug ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
-              </select>
+          <div class="link-field" data-field="cf_${fnEsc}">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" class="form-input link-field-url" name="cf_${fnEsc}_url" value="${escapeHtml(lObj.url || '')}" placeholder="URL" style="flex:1">
+              <button type="button" class="btn-link-picker" onclick="openLinkPickerForField(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Parcourir</button>
             </div>
-            <div class="form-group" style="margin:0;">
-              <input type="text" class="form-input" name="cf_${fnEsc}_url" value="${escapeHtml(lObj.url || '')}" placeholder="URL (ou choisir une page)">
-            </div>
-            <div class="form-group" style="margin:0;">
-              <input type="text" class="form-input" name="cf_${fnEsc}_title" value="${escapeHtml(lObj.title || '')}" placeholder="Titre du lien">
-            </div>
-            <div class="form-group" style="margin:0;">
-              <select class="form-input" name="cf_${fnEsc}_target">
-                <option value="_self" ${lObj.target !== '_blank' ? 'selected' : ''}>Même fenêtre</option>
-                <option value="_blank" ${lObj.target === '_blank' ? 'selected' : ''}>Nouvel onglet</option>
-              </select>
-            </div>
+            <input type="text" class="form-input link-field-title" name="cf_${fnEsc}_title" value="${escapeHtml(lObj.title || '')}" placeholder="Titre du lien">
+            <select class="form-input" name="cf_${fnEsc}_target">
+              <option value="_self" ${lObj.target !== '_blank' ? 'selected' : ''}>Même fenêtre</option>
+              <option value="_blank" ${lObj.target === '_blank' ? 'selected' : ''}>Nouvel onglet</option>
+            </select>
           </div>
         </div>`;
       }
@@ -1608,16 +1599,6 @@ function attachCPTFormEvents(ptDef) {
       const target = document.querySelector(`.cpt-tab-content[data-tab="${tab.dataset.tab}"]`);
       if (target) target.style.display = '';
     });
-  });
-
-  // Link page selectors → URL sync (generic, supports multiple link fields)
-  document.querySelectorAll('.cpt-link-page-select').forEach(sel => {
-    const targetName = sel.dataset.target;
-    if (!targetName) return;
-    const urlInput = document.querySelector(`input[name="${targetName}"]`);
-    if (urlInput) {
-      sel.addEventListener('change', () => { if (sel.value) urlInput.value = sel.value; });
-    }
   });
 
   // TrueFalse toggle slider sync
@@ -3353,16 +3334,17 @@ async function renderPageBuilder() {
           const fnEsc = escapeHtml(field.name);
           return `<div class="form-group" style="margin-bottom:12px;">
             <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">${escapeHtml(field.label)}</label>
-            <select class="form-input cpt-link-page-select" data-target="cptBf_${fnEsc}_url" style="font-size:12px;margin-bottom:4px;">
-              <option value="">— Page du site —</option>
-              ${allPages.filter(p => p.status === 'published').map(p => `<option value="/${escapeHtml(p.slug)}" ${lObj.url === '/' + p.slug ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
-            </select>
-            <input type="text" class="form-input" id="cptBf_${fnEsc}_url" value="${escapeHtml(lObj.url || '')}" placeholder="URL" style="font-size:12px;margin-bottom:4px;">
-            <input type="text" class="form-input" id="cptBf_${fnEsc}_title" value="${escapeHtml(lObj.title || '')}" placeholder="Titre du lien" style="font-size:12px;margin-bottom:4px;">
-            <select class="form-input" id="cptBf_${fnEsc}_target" style="font-size:12px;">
-              <option value="_self" ${lObj.target !== '_blank' ? 'selected' : ''}>Même fenêtre</option>
-              <option value="_blank" ${lObj.target === '_blank' ? 'selected' : ''}>Nouvel onglet</option>
-            </select>
+            <div class="link-field" data-field="cptBf_${fnEsc}" style="font-size:12px;">
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input type="text" class="form-input link-field-url" id="cptBf_${fnEsc}_url" value="${escapeHtml(lObj.url || '')}" placeholder="URL" style="font-size:12px;flex:1">
+                <button type="button" class="btn-link-picker" onclick="openLinkPickerForField(this)" style="font-size:11px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Parcourir</button>
+              </div>
+              <input type="text" class="form-input link-field-title" id="cptBf_${fnEsc}_title" value="${escapeHtml(lObj.title || '')}" placeholder="Titre du lien" style="font-size:12px;">
+              <select class="form-input" id="cptBf_${fnEsc}_target" style="font-size:12px;">
+                <option value="_self" ${lObj.target !== '_blank' ? 'selected' : ''}>Même fenêtre</option>
+                <option value="_blank" ${lObj.target === '_blank' ? 'selected' : ''}>Nouvel onglet</option>
+              </select>
+            </div>
           </div>`;
         }
 
@@ -3755,6 +3737,7 @@ async function renderPageBuilder() {
           <div class="builder-settings" id="builderSettings" style="${selectedBlockId ? '' : 'display:none'}">
             ${renderBuilderSettingsPanel()}
           </div>
+          <div class="builder-sidebar-resize" id="builderSidebarResize"></div>
         </aside>
         ${cptDef?.hasModules === false ? '' : `<main class="builder-canvas" id="builderCanvas" data-drop-zone="true">
           <div class="builder-canvas-toolbar" id="builderToolbar" style="${pageBuilderState.blocks.length ? '' : 'display:none'}">
@@ -6046,6 +6029,68 @@ function attachPageBuilderListeners() {
   updateBuilderPlaceholder();
   renderBlockSettings();
   initPreviewScaling();
+  initBuilderSidebarResize();
+}
+
+// ── Resizable builder sidebar ───────────────────────────────────────────────
+function initBuilderSidebarResize() {
+  const handle = document.getElementById('builderSidebarResize');
+  const sidebar = handle?.closest('.builder-sidebar');
+  if (!handle || !sidebar) return;
+
+  const MIN_W = 280;
+  const MAX_W = 700;
+  const saved = localStorage.getItem('builderSidebarWidth');
+  if (saved) {
+    const w = Math.min(MAX_W, Math.max(MIN_W, parseInt(saved, 10)));
+    sidebar.style.setProperty('--builder-sidebar-width', w + 'px');
+  }
+
+  let startX = 0, startW = 0;
+
+  function onMove(e) {
+    const dx = (e.clientX || e.touches?.[0]?.clientX || 0) - startX;
+    const w = Math.min(MAX_W, Math.max(MIN_W, startW + dx));
+    sidebar.style.setProperty('--builder-sidebar-width', w + 'px');
+  }
+
+  function onUp() {
+    document.body.classList.remove('builder-resizing');
+    handle.classList.remove('is-dragging');
+    const w = parseInt(getComputedStyle(sidebar).width, 10);
+    localStorage.setItem('builderSidebarWidth', w);
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onUp);
+    applyPreviewScaling();
+  }
+
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = sidebar.getBoundingClientRect().width;
+    document.body.classList.add('builder-resizing');
+    handle.classList.add('is-dragging');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  handle.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startW = sidebar.getBoundingClientRect().width;
+    document.body.classList.add('builder-resizing');
+    handle.classList.add('is-dragging');
+    document.addEventListener('touchmove', onMove, { passive: true });
+    document.addEventListener('touchend', onUp);
+  }, { passive: true });
+
+  // Double-click → reset to default
+  handle.addEventListener('dblclick', () => {
+    sidebar.style.removeProperty('--builder-sidebar-width');
+    localStorage.removeItem('builderSidebarWidth');
+    applyPreviewScaling();
+  });
 }
 
 // ── Preview scaling ─────────────────────────────────────────────────────────
@@ -8297,7 +8342,11 @@ function switchBlockTab(tabBtn) {
   // Activate clicked tab and its target section
   tabBtn.classList.add('is-active');
   const target = form.querySelector(tabBtn.getAttribute('data-target'));
-  if (target) target.classList.add('is-active');
+  if (target) {
+    target.classList.add('is-active');
+    // Initialize deferred Quill editors now that the section is visible
+    initWysiwygEditors(target);
+  }
 }
 
 function normalizeBoolVal(val) {
@@ -8625,8 +8674,11 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
       <div class="form-group link-field-group">
         <label class="form-label">${escapeHtml(label)}</label>
         <div class="link-field" data-field="${escapeHtml(inputName)}">
-          <input type="url" class="form-input" name="${escapeHtml(inputName)}__url" placeholder="URL"${rfieldAttr} value="${escapeHtml(linkObj.url || '')}">
-          <input type="text" class="form-input" name="${escapeHtml(inputName)}__title" placeholder="Titre du lien" value="${escapeHtml(linkObj.title || '')}">
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="url" class="form-input link-field-url" name="${escapeHtml(inputName)}__url" placeholder="URL"${rfieldAttr} value="${escapeHtml(linkObj.url || '')}" style="flex:1">
+            <button type="button" class="btn-link-picker" onclick="openLinkPickerForField(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Parcourir</button>
+          </div>
+          <input type="text" class="form-input link-field-title" name="${escapeHtml(inputName)}__title" placeholder="Titre du lien" value="${escapeHtml(linkObj.title || '')}">
           <select class="form-select" name="${escapeHtml(inputName)}__target" style="max-width:180px">
             <option value="_self"${linkObj.target !== '_blank' ? ' selected' : ''}>Même fenêtre</option>
             <option value="_blank"${linkObj.target === '_blank' ? ' selected' : ''}>Nouvel onglet</option>
@@ -9208,6 +9260,8 @@ function toggleRepeaterRow(header) {
   const open = body.style.display !== 'none';
   body.style.display = open ? 'none' : '';
   row.classList.toggle('is-open', !open);
+  // Initialize deferred Quill editors now that the container is visible
+  if (!open) initWysiwygEditors(body);
   if (typeof updateBuilderBreadcrumb === 'function') updateBuilderBreadcrumb();
 }
 
@@ -9414,6 +9468,9 @@ function switchColsTab(tabBtn) {
   const idx = tabBtn.dataset.tabIndex;
   wrapper.dataset.activeTab = idx;
   wrapper.querySelectorAll(':scope > .cols-vtabs-rail > .cols-vtab').forEach(b => b.classList.toggle('is-active', b.dataset.tabIndex === idx));
+  // Initialize deferred Quill editors in the newly visible column
+  const activeRow = wrapper.querySelector(`.cols-vtabs-content > .repeater-row[data-row-index="${idx}"]`);
+  if (activeRow) initWysiwygEditors(activeRow);
   if (typeof updateBuilderBreadcrumb === 'function') updateBuilderBreadcrumb();
 }
 
@@ -9766,6 +9823,11 @@ function initWysiwygEditors(container) {
   if (typeof Quill === 'undefined') return;
   container.querySelectorAll('.wysiwyg-editor').forEach(el => {
     if (_quillInstances.has(el.id)) return;
+    // Defer init for editors inside hidden containers (display:none ancestors).
+    // Quill toolbar/alignment/code-view break when initialized while hidden.
+    // These editors will be initialized when their container becomes visible
+    // (toggleRepeaterRow, switchBlockTab, switchColsTab).
+    if (!el.offsetParent) return;
     const textarea = el.parentElement.querySelector('.wysiwyg-source');
     const quill = new Quill(el, {
       theme: 'snow',
@@ -10742,12 +10804,25 @@ function _syncInlineToSettingsPanelQuill() {
       quill = _quillInstances.get(subId);
     }
   }
-  if (!quill) return;
+  const dataRef = _inlineEditingDataRef || block.data;
+  const html = dataRef[_inlineEditingFieldName] || '';
+
+  if (!quill) {
+    // Quill not initialized yet (lazy init) — update DOM directly so
+    // Quill picks up the correct content when it initializes later.
+    const el = document.getElementById(editorId);
+    if (el) el.innerHTML = html;
+    const textarea = el?.parentElement?.querySelector('.wysiwyg-source');
+    if (textarea) textarea.value = html;
+    return;
+  }
 
   // Prevent circular update
   quill._syncingFromInline = true;
-  const html = block.data[_inlineEditingFieldName] || '';
-  quill.clipboard.dangerouslyPasteHTML(html);
+  // Set innerHTML directly — dangerouslyPasteHTML goes through clipboard
+  // matchers that strip bold/italic/color, causing formatting loss.
+  quill.root.innerHTML = html || '<p><br></p>';
+  quill.update('silent');
 
   // Also update the hidden textarea
   const el = document.getElementById(editorId);
@@ -11395,6 +11470,7 @@ async function renderReusableBlocBuilder() {
           <div class="builder-settings" id="builderSettings" style="${selectedBlockId ? '' : 'display:none'}">
             ${renderBuilderSettingsPanel()}
           </div>
+          <div class="builder-sidebar-resize" id="builderSidebarResize"></div>
         </aside>
         <main class="builder-canvas" id="builderCanvas" data-drop-zone="true">
           <div class="builder-canvas-inner" id="builderCanvasInner" style="${buildColorOverrideStyle()}">
@@ -16937,34 +17013,148 @@ function attachFormBuilderEvents() {
     const dragItem = items[idx];
     if (!dragItem) return;
 
-    dragItem.style.opacity = '0.5';
+    dragItem.classList.add('is-dragging');
+    document.body.classList.add('form-field-dragging');
     let currentIdx = idx;
+    let changed = false;
+
+    // Find the column partner of a 50% field (adjacent 50% field on same visual row)
+    const findColumnPartner = (fieldIdx) => {
+      const f = _formBuilderFields[fieldIdx];
+      const w = f?.settings?.width || '100';
+      if (w !== '50') return -1;
+      // Check previous neighbor
+      if (fieldIdx > 0 && (_formBuilderFields[fieldIdx - 1]?.settings?.width || '100') === '50') return fieldIdx - 1;
+      // Check next neighbor
+      if (fieldIdx < _formBuilderFields.length - 1 && (_formBuilderFields[fieldIdx + 1]?.settings?.width || '100') === '50') return fieldIdx + 1;
+      return -1;
+    };
+
+    const clearDropIndicators = () => {
+      canvas.querySelectorAll('.form-field-item').forEach(item => {
+        item.classList.remove('drop-before', 'drop-after', 'drop-left', 'drop-right');
+      });
+    };
 
     const onMove = (ev) => {
+      clearDropIndicators();
       const currentItems = canvas.querySelectorAll('.form-field-item');
+      let acted = false;
       currentItems.forEach((item, i) => {
-        if (i === currentIdx) return;
+        if (i === currentIdx || acted) return;
         const rect = item.getBoundingClientRect();
         const midY = rect.top + rect.height / 2;
+        const midX = rect.left + rect.width / 2;
+        const inVerticalBand = ev.clientY >= rect.top && ev.clientY <= rect.bottom;
+
+        // Side drop: cursor inside a field → show column indicator
+        if (inVerticalBand && ev.clientX >= rect.left && ev.clientX <= rect.right) {
+          const targetW = _formBuilderFields[i]?.settings?.width || '100';
+          // Allow side-drop on 100% fields OR on 50% fields (to swap within row)
+          if (targetW === '100') {
+            item.classList.add(ev.clientX < midX ? 'drop-left' : 'drop-right');
+            acted = true;
+            return;
+          }
+        }
+
+        // Vertical reorder
         if (ev.clientY < midY && i < currentIdx) {
           const moved = _formBuilderFields.splice(currentIdx, 1)[0];
           _formBuilderFields.splice(i, 0, moved);
           if (_formBuilderSelectedIdx === currentIdx) _formBuilderSelectedIdx = i;
           currentIdx = i;
+          changed = true;
           refreshFormFieldsCanvas();
+          const newItems = canvas.querySelectorAll('.form-field-item');
+          if (newItems[currentIdx]) newItems[currentIdx].classList.add('is-dragging');
+          acted = true;
         } else if (ev.clientY > midY && i > currentIdx) {
           const moved = _formBuilderFields.splice(currentIdx, 1)[0];
           _formBuilderFields.splice(i, 0, moved);
           if (_formBuilderSelectedIdx === currentIdx) _formBuilderSelectedIdx = i;
           currentIdx = i;
+          changed = true;
           refreshFormFieldsCanvas();
+          const newItems = canvas.querySelectorAll('.form-field-item');
+          if (newItems[currentIdx]) newItems[currentIdx].classList.add('is-dragging');
+          acted = true;
+        } else if (ev.clientY < midY && i > currentIdx) {
+          item.classList.add('drop-before');
+        } else if (ev.clientY >= midY && i < currentIdx) {
+          item.classList.add('drop-after');
         }
       });
     };
 
     const onUp = () => {
+      const dropLeft = canvas.querySelector('.form-field-item.drop-left');
+      const dropRight = canvas.querySelector('.form-field-item.drop-right');
+      const dropTarget = dropLeft || dropRight;
+
+      if (dropTarget) {
+        // Side-drop → pair as columns
+        const targetIdx = parseInt(dropTarget.dataset.idx);
+        const draggedField = _formBuilderFields[currentIdx];
+        const targetField = _formBuilderFields[targetIdx];
+        if (draggedField && targetField) {
+          // Orphan the old partner → 100%
+          const partnerIdx = findColumnPartner(currentIdx);
+          if (partnerIdx !== -1 && partnerIdx !== targetIdx) {
+            const partner = _formBuilderFields[partnerIdx];
+            if (partner?.settings) partner.settings.width = '100';
+          }
+          // Remove dragged from current position
+          _formBuilderFields.splice(currentIdx, 1);
+          let newTargetIdx = targetIdx > currentIdx ? targetIdx - 1 : targetIdx;
+          if (dropLeft) {
+            _formBuilderFields.splice(newTargetIdx, 0, draggedField);
+          } else {
+            _formBuilderFields.splice(newTargetIdx + 1, 0, draggedField);
+          }
+          if (!draggedField.settings) draggedField.settings = {};
+          if (!targetField.settings) targetField.settings = {};
+          draggedField.settings.width = '50';
+          targetField.settings.width = '50';
+          changed = true;
+          const newDragIdx = _formBuilderFields.indexOf(draggedField);
+          if (_formBuilderSelectedIdx === currentIdx) _formBuilderSelectedIdx = newDragIdx;
+        }
+      } else if (changed) {
+        // Vertical reorder happened — check if dragged field left a column pair
+        const draggedField = _formBuilderFields[currentIdx];
+        const draggedW = draggedField?.settings?.width || '100';
+        if (draggedW === '50') {
+          // Find if it still has an adjacent 50% partner at new position
+          const newPartner = findColumnPartner(currentIdx);
+          if (newPartner === -1) {
+            // No partner at new position → reset to 100%
+            if (draggedField.settings) draggedField.settings.width = '100';
+          }
+        }
+        // Reset any orphaned 50% fields (no adjacent 50% neighbor)
+        _formBuilderFields.forEach((f, i) => {
+          if ((f.settings?.width || '100') === '50' && findColumnPartner(i) === -1) {
+            f.settings.width = '100';
+          }
+        });
+      }
+
+      clearDropIndicators();
+      document.body.classList.remove('form-field-dragging');
+      const finalItems = canvas.querySelectorAll('.form-field-item');
+      finalItems.forEach(item => item.classList.remove('is-dragging'));
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      if (changed || dropTarget) {
+        refreshFormFieldsCanvas();
+        if (_formBuilderData?.id) {
+          apiFetch(`/forms/${_formBuilderData.id}/reorder-fields`, {
+            method: 'PUT',
+            body: JSON.stringify({ fields: _formBuilderFields }),
+          }).catch(() => {});
+        }
+      }
     };
 
     document.addEventListener('mousemove', onMove);
@@ -17615,4 +17805,117 @@ async function loadAiUsagePage(page) {
       ${usageLog.pages > 1 ? `<div style="margin-top:12px;text-align:center">${renderAiPagination(usageLog.page, usageLog.pages)}</div>` : ''}
     `;
   } catch (e) { showToast('Erreur : ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Link Picker Modal — search across pages, posts & CPTs
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _linkPickerCallback = null;
+let _linkPickerDebounce = null;
+
+const LINK_PICKER_TYPE_LABELS = {
+  page: 'Page',
+  post: 'Article',
+  actualites: 'Actualite',
+  evenements: 'Evenement',
+  references: 'Reference',
+  portfolio: 'Portfolio',
+  products: 'Produit',
+};
+
+function getLinkPickerTypeLabel(resultType) {
+  return LINK_PICKER_TYPE_LABELS[resultType] || resultType.replace(/^cpt_/, '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function ensureLinkPickerModal() {
+  if (document.getElementById('linkPickerModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'linkPickerModal';
+  modal.className = 'link-picker-modal';
+  modal.innerHTML = `
+    <div class="link-picker-backdrop" onclick="closeLinkPicker()"></div>
+    <div class="link-picker-panel">
+      <div class="link-picker-header">
+        <div class="link-picker-title">Choisir un lien</div>
+        <button style="background:none;border:none;cursor:pointer;padding:4px;color:var(--gray-400)" onclick="closeLinkPicker()" aria-label="Fermer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="link-picker-search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:30px;top:50%;transform:translateY(-50%);color:var(--gray-400)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="form-input" id="linkPickerSearchInput" placeholder="Rechercher un contenu..." style="padding-left:36px" oninput="handleLinkPickerSearch(this.value)">
+      </div>
+      <div class="link-picker-results" id="linkPickerResults">
+        <div class="link-picker-loading">Chargement...</div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+async function openLinkPicker(callback) {
+  _linkPickerCallback = callback;
+  ensureLinkPickerModal();
+  document.getElementById('linkPickerSearchInput').value = '';
+  document.getElementById('linkPickerModal').classList.add('is-open');
+  document.getElementById('linkPickerResults').innerHTML = '<div class="link-picker-loading">Chargement...</div>';
+  try {
+    const data = await apiFetch('/search?limit=100');
+    renderLinkPickerResults(data.results || []);
+  } catch (e) {
+    document.getElementById('linkPickerResults').innerHTML = '<div class="link-picker-empty">Erreur de chargement</div>';
+  }
+  setTimeout(() => document.getElementById('linkPickerSearchInput').focus(), 100);
+}
+
+function closeLinkPicker() {
+  _linkPickerCallback = null;
+  const modal = document.getElementById('linkPickerModal');
+  if (modal) modal.classList.remove('is-open');
+}
+
+function handleLinkPickerSearch(q) {
+  clearTimeout(_linkPickerDebounce);
+  _linkPickerDebounce = setTimeout(async () => {
+    const container = document.getElementById('linkPickerResults');
+    container.innerHTML = '<div class="link-picker-loading">Recherche...</div>';
+    try {
+      const data = await apiFetch(`/search?q=${encodeURIComponent(q)}&limit=50`);
+      renderLinkPickerResults(data.results || []);
+    } catch (e) {
+      container.innerHTML = '<div class="link-picker-empty">Erreur de recherche</div>';
+    }
+  }, 250);
+}
+
+function renderLinkPickerResults(results) {
+  const container = document.getElementById('linkPickerResults');
+  if (!results.length) {
+    container.innerHTML = '<div class="link-picker-empty">Aucun resultat</div>';
+    return;
+  }
+  container.innerHTML = results.map(r => {
+    const url = (r.base_url || '/') + (r.slug || '');
+    const typeLabel = getLinkPickerTypeLabel(r.result_type);
+    const safeTitle = (r.title || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return `<button type="button" class="link-picker-item" onclick="selectLinkPickerItem('${escapeHtml(url)}', '${safeTitle}')">
+      <span class="link-picker-item-title">${escapeHtml(r.title)}</span>
+      <span class="link-picker-item-type">${escapeHtml(typeLabel)}</span>
+    </button>`;
+  }).join('');
+}
+
+function selectLinkPickerItem(url, title) {
+  if (_linkPickerCallback) _linkPickerCallback(url, title);
+  closeLinkPicker();
+}
+
+function openLinkPickerForField(btn) {
+  const field = btn.closest('.link-field');
+  if (!field) return;
+  openLinkPicker((url, title) => {
+    const urlInput = field.querySelector('.link-field-url') || field.querySelector('input[name$="__url"]') || field.querySelector('input[placeholder="URL"]');
+    const titleInput = field.querySelector('.link-field-title') || field.querySelector('input[name$="__title"]') || field.querySelector('input[placeholder*="itre"]');
+    if (urlInput) { urlInput.value = url; urlInput.dispatchEvent(new Event('input', { bubbles: true })); }
+    if (titleInput) { titleInput.value = title; titleInput.dispatchEvent(new Event('input', { bubbles: true })); }
+  });
 }

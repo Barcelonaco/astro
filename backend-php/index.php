@@ -830,6 +830,11 @@ try {
         require_min_role($user, 'admin_site');
         FormController::create();
     }
+    elseif ($method === 'PUT' && match_route('/forms/:id/reorder-fields', $path, $params)) {
+        $user = authenticate_token();
+        require_min_role($user, 'admin_site');
+        FormController::reorderFields((int) $params['id']);
+    }
     elseif ($method === 'PUT' && match_route('/forms/:id', $path, $params)) {
         $user = authenticate_token();
         require_min_role($user, 'admin_site');

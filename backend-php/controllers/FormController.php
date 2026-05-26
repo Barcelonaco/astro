@@ -52,6 +52,19 @@ class FormController {
         json_response($updated);
     }
 
+    public static function reorderFields(int $id): void {
+        $form = FormModel::findById($id);
+        if (!$form) error_response('Form not found', 404);
+
+        $body = get_json_body();
+        if (!isset($body['fields']) || !is_array($body['fields'])) {
+            error_response('Fields array is required', 400);
+        }
+
+        FormModel::saveFields($id, $body['fields']);
+        json_response(['success' => true]);
+    }
+
     public static function delete(int $id): void {
         $form = FormModel::findById($id);
         if (!$form) error_response('Form not found', 404);

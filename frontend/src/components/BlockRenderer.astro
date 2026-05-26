@@ -78,7 +78,7 @@ interface Block {
   data?: Record<string, unknown>;
 }
 
-const { blocks: rawBlocks = [] } = Astro.props as { blocks: Block[] };
+const { blocks: rawBlocks = [], pageTitle = '' } = Astro.props as { blocks: Block[]; pageTitle?: string };
 
 // Filter out blocks belonging to disabled plugins
 const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
@@ -145,7 +145,7 @@ const blocks = rawBlocks.filter(b => !inactiveSet.has(b.type));
       case 'text-image':
         return <NicklTextImage data={data} />;
       case 'banner':
-        return <NicklBanner data={data} />;
+        return <NicklBanner data={data} pageTitle={pageTitle} />;
       case 'video':
         return <NicklVideo data={data} />;
       case 'key-figures':

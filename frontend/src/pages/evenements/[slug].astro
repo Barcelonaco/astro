@@ -323,7 +323,7 @@ const calEnd = `${cf.end_date || cf.start_date || ''} ${cf.end_time || ''}`.trim
           {/* Flexible content modules */}
           {blocks && blocks.length > 0 && (
             <div class="content content-blocks">
-              <BlockRenderer blocks={blocks} />
+              <BlockRenderer blocks={blocks} pageTitle={item.title} />
             </div>
           )}
         </article>

@@ -139,7 +139,7 @@ const bodyClasses = [
 					)}
 					<div class={isBlockPage ? 'content content-blocks' : 'content'}>
 						{isBlockPage ? (
-							<BlockRenderer blocks={blocks} />
+							<BlockRenderer blocks={blocks} pageTitle={page?.title || ''} />
 						) : (
 							<div class="prose" set:html={formatContent(page.content)} />
 						)}

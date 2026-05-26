@@ -1,7 +1,7 @@
 ---
 /**
  * Module Form — Système de formulaires intégré
- * Récupère la structure du formulaire via l'API et rend les champs HTML.
+ * Structure du formulaire chargée côté client (fetch API) → pas besoin de rebuild.
  * La soumission est gérée côté client (fetch + reCAPTCHA v3).
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
@@ -12,186 +12,146 @@ interface Props {
 
 const { data } = Astro.props;
 const formId = data.form_id;
-const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
-
-let form: any = null;
-if (formId) {
-  try {
-    const res = await fetch(`${API_URL}/forms/public/${formId}`);
-    if (res.ok) form = await res.json();
-  } catch (e) {
-    console.error('Error fetching form:', e);
-  }
-}
-
-const settings = form?.settings || {};
-const submitText = settings.submit_text || 'Envoyer';
-const recaptchaSiteKey = form?.recaptcha_site_key || null;
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
 ---
 
 <NicklModuleWrapper data={data} moduleName="form">
-  {form ? (
-    <div class="nickl-form-container" data-form-id={formId} data-api-url={API_URL} data-recaptcha-key={recaptchaSiteKey || ''} data-redirect-url={settings.redirect_url || ''}>
-      <form class="nickl-form" novalidate>
-        <div class="nickl-form-fields">
-          {form.fields.map((field: any) => {
-            const width = field.settings?.width || '100';
-            const cssClass = field.settings?.css_class || '';
-            const req = field.required;
-
-            if (field.type === 'hidden') {
-              return <input type="hidden" name={field.name} value={field.settings?.default_value || ''} />;
-            }
-
-            if (field.type === 'html') {
-              return (
-                <div class={`nickl-form-field nickl-form-field--html w-${width} ${cssClass}`}>
-                  <Fragment set:html={field.settings?.html_content || ''} />
-                </div>
-              );
-            }
-
-            if (field.type === 'name') {
-              const firstLabel = field.settings?.first_label || 'Prénom';
-              const lastLabel = field.settings?.last_label || 'Nom';
-              return (
-                <div class={`nickl-form-field nickl-form-field--name w-${width} ${cssClass}`}>
-                  <div class="nickl-form-name-row">
-                    <div class="nickl-form-name-col">
-                      <div class="nickl-form-floating">
-                        <input type="text" name={`${field.name}_first`} id={`field-${formId}-${field.name}_first`} class="nickl-form-input" placeholder=" " required={req} />
-                        <label class="nickl-form-label" for={`field-${formId}-${field.name}_first`}>{firstLabel}{req && <span class="required">*</span>}</label>
-                      </div>
-                    </div>
-                    <div class="nickl-form-name-col">
-                      <div class="nickl-form-floating">
-                        <input type="text" name={`${field.name}_last`} id={`field-${formId}-${field.name}_last`} class="nickl-form-input" placeholder=" " required={req} />
-                        <label class="nickl-form-label" for={`field-${formId}-${field.name}_last`}>{lastLabel}{req && <span class="required">*</span>}</label>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="nickl-form-error" data-field={field.name}></div>
-                </div>
-              );
-            }
-
-            /* Floating label for text-like inputs and textarea */
-            const isFloatable = ['text', 'email', 'phone', 'number', 'url', 'date', 'time', 'textarea'].includes(field.type);
-
-            return (
-              <div class={`nickl-form-field nickl-form-field--${field.type} w-${width} ${cssClass}`}>
-
-                {isFloatable ? (
-                  <div class="nickl-form-floating">
-                    {field.type === 'textarea' ? (
-                      <textarea
-                        name={field.name}
-                        id={`field-${formId}-${field.name}`}
-                        class="nickl-form-textarea"
-                        placeholder=" "
-                        rows={field.settings?.rows || 4}
-                        required={req}
-                      />
-                    ) : (
-                      <input
-                        type={field.type === 'phone' ? 'tel' : field.type}
-                        name={field.name}
-                        id={`field-${formId}-${field.name}`}
-                        class="nickl-form-input"
-                        placeholder=" "
-                        required={req}
-                        min={field.settings?.min}
-                        max={field.settings?.max}
-                      />
-                    )}
-                    <label class="nickl-form-label" for={`field-${formId}-${field.name}`}>
-                      {field.label}{req && <span class="required">*</span>}
-                    </label>
-                  </div>
-                ) : (
-                  <>
-                    <label class="nickl-form-label nickl-form-label--static" for={`field-${formId}-${field.name}`}>
-                      {field.label}{req && <span class="required">*</span>}
-                    </label>
-
-                    {field.type === 'select' ? (
-                      <select name={field.name} id={`field-${formId}-${field.name}`} class="nickl-form-select" required={req}>
-                        <option value="">{field.placeholder || '— Choisir —'}</option>
-                        {(field.options || []).map((opt: string) => {
-                          const [label, val] = opt.includes('|') ? opt.split('|') : [opt, opt];
-                          return <option value={val}>{label}</option>;
-                        })}
-                      </select>
-                    ) : field.type === 'radio' ? (
-                      <div class="nickl-form-radio-group">
-                        {(field.options || []).map((opt: string, i: number) => {
-                          const [label, val] = opt.includes('|') ? opt.split('|') : [opt, opt];
-                          return (
-                            <label class="nickl-form-radio-label">
-                              <input type="radio" name={field.name} value={val} required={req && i === 0} />
-                              <span>{label}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    ) : field.type === 'checkbox' ? (
-                      <div class="nickl-form-checkbox-group">
-                        {(field.options || []).map((opt: string) => {
-                          const [label, val] = opt.includes('|') ? opt.split('|') : [opt, opt];
-                          return (
-                            <label class="nickl-form-checkbox-label">
-                              <input type="checkbox" name={field.name} value={val} />
-                              <span>{label}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    ) : field.type === 'file' ? (
-                      <input
-                        type="file"
-                        name={field.name}
-                        id={`field-${formId}-${field.name}`}
-                        class="nickl-form-input"
-                        accept={field.settings?.accept || ''}
-                        required={req}
-                      />
-                    ) : null}
-                  </>
-                )}
-
-                <div class="nickl-form-error" data-field={field.name}></div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div class="nickl-form-submit">
-          <button type="submit" class="nickl-form-btn">{submitText}</button>
-        </div>
-
-        <div class="nickl-form-message" style="display:none"></div>
-      </form>
+  {formId ? (
+    <div class="nickl-form-container" data-form-id={formId} data-api-url={API_URL}>
+      <div class="nickl-form-loading" style="text-align:center;padding:20px;opacity:0.5;">Chargement du formulaire…</div>
     </div>
   ) : (
     <p class="placeholder-message" style="text-align:center;opacity:0.6;">
-      {formId ? 'Formulaire introuvable.' : 'Aucun formulaire sélectionné.'}
+      Aucun formulaire sélectionné.
     </p>
   )}
 </NicklModuleWrapper>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.nickl-form-container').forEach((container) => {
-      const formEl = container.querySelector('.nickl-form') as HTMLFormElement;
-      if (!formEl) return;
-
+    document.querySelectorAll('.nickl-form-container').forEach(async (container) => {
       const formId = container.getAttribute('data-form-id');
       const apiUrl = container.getAttribute('data-api-url');
-      const recaptchaKey = container.getAttribute('data-recaptcha-key');
-      const redirectUrl = container.getAttribute('data-redirect-url');
-      const messageEl = container.querySelector('.nickl-form-message') as HTMLElement;
-      const submitBtn = formEl.querySelector('.nickl-form-btn') as HTMLButtonElement;
+      if (!formId || !apiUrl) return;
 
-      // Load reCAPTCHA v3 if enabled
+      // Fetch form structure at runtime
+      let form: any = null;
+      try {
+        const res = await fetch(`${apiUrl}/forms/public/${formId}`);
+        if (res.ok) form = await res.json();
+      } catch (e) {
+        console.error('Error fetching form:', e);
+      }
+
+      if (!form) {
+        container.innerHTML = '<p class="placeholder-message" style="text-align:center;opacity:0.6;">Formulaire introuvable.</p>';
+        return;
+      }
+
+      const settings = form.settings || {};
+      const submitText = settings.submit_text || 'Envoyer';
+      const recaptchaKey = form.recaptcha_site_key || null;
+      const redirectUrl = settings.redirect_url || '';
+
+      // Store keys as data attrs for submit handler
+      if (recaptchaKey) container.setAttribute('data-recaptcha-key', recaptchaKey);
+      if (redirectUrl) container.setAttribute('data-redirect-url', redirectUrl);
+
+      // Build form HTML
+      const fieldsHtml = form.fields.map((field: any) => {
+        const width = field.settings?.width || '100';
+        const cssClass = field.settings?.css_class || '';
+        const req = field.required;
+        const reqAttr = req ? ' required' : '';
+        const reqSpan = req ? '<span class="required">*</span>' : '';
+
+        if (field.type === 'hidden') {
+          return `<input type="hidden" name="${field.name}" value="${field.settings?.default_value || ''}" />`;
+        }
+
+        if (field.type === 'html') {
+          return `<div class="nickl-form-field nickl-form-field--html w-${width} ${cssClass}">${field.settings?.html_content || ''}</div>`;
+        }
+
+        if (field.type === 'name') {
+          const firstLabel = field.settings?.first_label || 'Prénom';
+          const lastLabel = field.settings?.last_label || 'Nom';
+          return `
+            <div class="nickl-form-field nickl-form-field--name w-${width} ${cssClass}">
+              <div class="nickl-form-name-row">
+                <div class="nickl-form-name-col">
+                  <div class="nickl-form-floating">
+                    <input type="text" name="${field.name}_first" id="field-${formId}-${field.name}_first" class="nickl-form-input" placeholder=" "${reqAttr} />
+                    <label class="nickl-form-label" for="field-${formId}-${field.name}_first">${firstLabel}${reqSpan}</label>
+                  </div>
+                </div>
+                <div class="nickl-form-name-col">
+                  <div class="nickl-form-floating">
+                    <input type="text" name="${field.name}_last" id="field-${formId}-${field.name}_last" class="nickl-form-input" placeholder=" "${reqAttr} />
+                    <label class="nickl-form-label" for="field-${formId}-${field.name}_last">${lastLabel}${reqSpan}</label>
+                  </div>
+                </div>
+              </div>
+              <div class="nickl-form-error" data-field="${field.name}"></div>
+            </div>`;
+        }
+
+        const isFloatable = ['text', 'email', 'phone', 'number', 'url', 'date', 'time', 'textarea'].includes(field.type);
+        const inputType = field.type === 'phone' ? 'tel' : field.type;
+
+        let inner = '';
+
+        if (isFloatable) {
+          const inputEl = field.type === 'textarea'
+            ? `<textarea name="${field.name}" id="field-${formId}-${field.name}" class="nickl-form-textarea" placeholder=" " rows="${field.settings?.rows || 4}"${reqAttr}></textarea>`
+            : `<input type="${inputType}" name="${field.name}" id="field-${formId}-${field.name}" class="nickl-form-input" placeholder=" "${reqAttr}${field.settings?.min != null ? ` min="${field.settings.min}"` : ''}${field.settings?.max != null ? ` max="${field.settings.max}"` : ''} />`;
+          inner = `
+            <div class="nickl-form-floating">
+              ${inputEl}
+              <label class="nickl-form-label" for="field-${formId}-${field.name}">${field.label}${reqSpan}</label>
+            </div>`;
+        } else {
+          const labelHtml = `<label class="nickl-form-label nickl-form-label--static" for="field-${formId}-${field.name}">${field.label}${reqSpan}</label>`;
+
+          if (field.type === 'select') {
+            const optsHtml = (field.options || []).map((opt: string) => {
+              const [label, val] = opt.includes('|') ? opt.split('|') : [opt, opt];
+              return `<option value="${val}">${label}</option>`;
+            }).join('');
+            inner = `${labelHtml}<select name="${field.name}" id="field-${formId}-${field.name}" class="nickl-form-select"${reqAttr}><option value="">${field.placeholder || '— Choisir —'}</option>${optsHtml}</select>`;
+          } else if (field.type === 'radio') {
+            const optsHtml = (field.options || []).map((opt: string, i: number) => {
+              const [label, val] = opt.includes('|') ? opt.split('|') : [opt, opt];
+              return `<label class="nickl-form-radio-label"><input type="radio" name="${field.name}" value="${val}"${req && i === 0 ? ' required' : ''} /><span>${label}</span></label>`;
+            }).join('');
+            inner = `${labelHtml}<div class="nickl-form-radio-group">${optsHtml}</div>`;
+          } else if (field.type === 'checkbox') {
+            const optsHtml = (field.options || []).map((opt: string) => {
+              const [label, val] = opt.includes('|') ? opt.split('|') : [opt, opt];
+              return `<label class="nickl-form-checkbox-label"><input type="checkbox" name="${field.name}" value="${val}" /><span>${label}</span></label>`;
+            }).join('');
+            inner = `${labelHtml}<div class="nickl-form-checkbox-group">${optsHtml}</div>`;
+          } else if (field.type === 'file') {
+            inner = `${labelHtml}<input type="file" name="${field.name}" id="field-${formId}-${field.name}" class="nickl-form-input"${field.settings?.accept ? ` accept="${field.settings.accept}"` : ''}${reqAttr} />`;
+          }
+        }
+
+        return `
+          <div class="nickl-form-field nickl-form-field--${field.type} w-${width} ${cssClass}">
+            ${inner}
+            <div class="nickl-form-error" data-field="${field.name}"></div>
+          </div>`;
+      }).join('');
+
+      container.innerHTML = `
+        <form class="nickl-form" novalidate>
+          <div class="nickl-form-fields">${fieldsHtml}</div>
+          <div class="nickl-form-submit">
+            <button type="submit" class="nickl-form-btn">${submitText}</button>
+          </div>
+          <div class="nickl-form-message" style="display:none"></div>
+        </form>`;
+
+      // reCAPTCHA
       if (recaptchaKey) {
         const script = document.createElement('script');
         script.src = `https://www.google.com/recaptcha/api.js?render=${recaptchaKey}`;
@@ -199,19 +159,21 @@ const recaptchaSiteKey = form?.recaptcha_site_key || null;
         document.head.appendChild(script);
       }
 
+      // Submit handler
+      const formEl = container.querySelector('.nickl-form') as HTMLFormElement;
+      const messageEl = container.querySelector('.nickl-form-message') as HTMLElement;
+      const submitBtn = formEl.querySelector('.nickl-form-btn') as HTMLButtonElement;
+
       formEl.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        // Clear errors
         container.querySelectorAll('.nickl-form-error').forEach(el => el.textContent = '');
         container.querySelectorAll('.is-error').forEach(el => el.classList.remove('is-error'));
         messageEl.style.display = 'none';
 
-        // Collect data
         const formData = new FormData(formEl);
         const payload: Record<string, any> = {};
 
-        // Handle checkboxes (multiple values)
         const checkboxNames = new Set<string>();
         formEl.querySelectorAll('input[type="checkbox"]').forEach((cb: any) => {
           checkboxNames.add(cb.name);
@@ -226,7 +188,6 @@ const recaptchaSiteKey = form?.recaptcha_site_key || null;
           }
         }
 
-        // Name fields: combine first + last
         formEl.querySelectorAll('.nickl-form-field--name').forEach(nameField => {
           const firstInput = nameField.querySelector('input[name$="_first"]') as HTMLInputElement;
           const lastInput = nameField.querySelector('input[name$="_last"]') as HTMLInputElement;
@@ -238,7 +199,6 @@ const recaptchaSiteKey = form?.recaptcha_site_key || null;
           }
         });
 
-        // reCAPTCHA token (non-bloquant si le script n'a pas chargé)
         if (recaptchaKey && (window as any).grecaptcha) {
           try {
             await new Promise(resolve => (window as any).grecaptcha.ready(resolve));
@@ -249,7 +209,6 @@ const recaptchaSiteKey = form?.recaptcha_site_key || null;
           }
         }
 
-        // Submit
         submitBtn.disabled = true;
         const originalText = submitBtn.textContent;
         submitBtn.textContent = 'Envoi en cours…';
@@ -273,7 +232,6 @@ const recaptchaSiteKey = form?.recaptcha_site_key || null;
               setTimeout(() => { window.location.href = redirectUrl; }, 1500);
             }
           } else {
-            // Field-specific error
             if (result.field) {
               const errorEl = container.querySelector(`.nickl-form-error[data-field="${result.field}"]`);
               if (errorEl) errorEl.textContent = result.error;

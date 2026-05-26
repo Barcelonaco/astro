@@ -70,18 +70,29 @@
   flex-basis: calc(25% - (9rem / 4));
 }
 
-/* Footer menu (col-2) */
+/* Footer menu (col-2) — matches Nickl .menu-wrapper pattern */
 #footer .footer-menu {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 #footer .footer-menu-item {
-  margin-bottom: 0.5rem;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  margin-top: 2rem;
+}
+#footer .footer-menu-item:first-child {
+  margin-top: 0;
 }
 #footer .footer-menu-item a {
   color: currentColor;
   text-decoration: none;
+  font-family: var(--font-title, inherit);
+  font-size: 1.25rem;
+  line-height: 1.5;
+  letter-spacing: -0.04em;
+  font-weight: 700;
   background-image: linear-gradient(currentColor, currentColor);
   background-position: 0 100%;
   background-repeat: no-repeat;
@@ -90,6 +101,16 @@
 }
 #footer .footer-menu-item a:hover {
   background-size: 100% 1px;
+  color: var(--color-primary, var(--accent));
+}
+#footer.has-background-primary .footer-menu-item a:hover,
+#footer.has-background-secondary .footer-menu-item a:hover,
+#footer.has-background-dark .footer-menu-item a:hover {
+  color: currentColor;
+}
+.mode-uppercase #footer .footer-menu-item a {
+  text-transform: uppercase;
+  font-size: 1rem;
 }
 
 /* When col-1 is the only column, center everything */
