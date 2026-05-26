@@ -90,6 +90,16 @@ const hasMultipleSlides = slider.length > 1;
                             <source src={previewUrl} type="video/mp4" />
                           </video>
                         )}
+                        {!preview && youtubeId && (
+                          <img
+                            src={`https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`}
+                            alt=""
+                            class="illus"
+                            width="1280"
+                            height="720"
+                            loading="lazy"
+                          />
+                        )}
                         <button type="button" class="btn js_btn-video" data-src={youtubeId}>
                           <span class="icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24" width="24" height="24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
@@ -133,3 +143,28 @@ const hasMultipleSlides = slider.length > 1;
     )}
   </div>
 </NicklModuleWrapper>
+
+<script>
+  document.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('.js_btn-video') as HTMLElement | null;
+    if (!btn) return;
+    const wrapper = btn.closest('.video-wrapper') || btn.closest('.video');
+    if (!wrapper) return;
+    const iframe = wrapper.querySelector('iframe');
+    if (!iframe) return;
+
+    const ytId = btn.dataset.src;
+    const vimeoId = btn.dataset.srcVimeo;
+    const dmId = btn.dataset.srcDailymotion;
+
+    if (ytId) {
+      iframe.src = `https://www.youtube.com/embed/${ytId}?autoplay=1`;
+    } else if (vimeoId) {
+      iframe.src = `https://player.vimeo.com/video/${vimeoId}?autoplay=1`;
+    } else if (dmId) {
+      iframe.src = `https://geo.dailymotion.com/player.html?video=${dmId}&autoplay=1`;
+    }
+
+    wrapper.classList.add('active');
+  });
+</script>

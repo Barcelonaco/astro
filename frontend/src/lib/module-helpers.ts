@@ -133,13 +133,15 @@ export function getDefaultImageUrl(): string {
   return _defaultImageUrl;
 }
 
-/** Extrait l'ID YouTube depuis une URL (watch?v=, youtu.be/, embed/) */
+/** Extrait l'ID YouTube depuis une URL (watch?v=, youtu.be/, embed/, shorts/, live/) */
 export function extractYouTubeId(url: string): string {
   if (!url) return '';
   const m =
     url.match(/[?&]v=([^&#]+)/) ||
     url.match(/youtu\.be\/([^?&#]+)/) ||
-    url.match(/embed\/([^?&#]+)/);
+    url.match(/embed\/([^?&#]+)/) ||
+    url.match(/shorts\/([^?&#]+)/) ||
+    url.match(/live\/([^?&#]+)/);
   return m ? m[1] : '';
 }
 
