@@ -71,15 +71,44 @@ const ADMIN_THEMES = {
   nature: { primary: '#2ecc71', primaryDark: '#27ae60', dark: false }
 };
 
-function applyAdminTheme(useChildTheme, activeTheme) {
+async function applyAdminTheme(useChildTheme, activeTheme) {
   const root = document.documentElement;
   if (!useChildTheme) {
     root.style.removeProperty('--primary');
     root.style.removeProperty('--primary-dark');
     root.removeAttribute('data-admin-theme');
+    const oldLink = document.getElementById('child-theme-admin-css');
+    if (oldLink) oldLink.remove();
     return;
   }
-  const theme = ADMIN_THEMES[activeTheme];
+  let theme = ADMIN_THEMES[activeTheme];
+  if (!theme) {
+    // Custom theme — fetch colors from theme.json
+    try {
+      const res = await fetch(`/themes/${activeTheme}/theme.json`);
+      if (res.ok) {
+        const manifest = await res.json();
+        if (manifest.colors) {
+          theme = { primary: manifest.colors.accent, primaryDark: manifest.colors.accentDark, dark: false };
+        }
+      }
+    } catch {}
+  }
+  // Inject child theme admin.css if it exists
+  const existingLink = document.getElementById('child-theme-admin-css');
+  if (existingLink) existingLink.remove();
+  const cssUrl = `/themes/${activeTheme}/admin.css`;
+  try {
+    const cssCheck = await fetch(cssUrl, { method: 'HEAD' });
+    if (cssCheck.ok) {
+      const link = document.createElement('link');
+      link.id = 'child-theme-admin-css';
+      link.rel = 'stylesheet';
+      link.href = cssUrl;
+      document.head.appendChild(link);
+    }
+  } catch {}
+
   if (!theme) return;
   root.style.setProperty('--primary', theme.primary);
   root.style.setProperty('--primary-dark', theme.primaryDark);
@@ -15016,18 +15045,13 @@ function initFontPreview() {
 }
 
 // ========== THÈME ==========
-const THEME_OPTIONS = [
-  { id: 'default', name: 'Thème par défaut' },
-  { id: 'dark', name: 'Thème sombre' },
-  { id: 'minimal', name: 'Thème minimaliste' },
-  { id: 'colorful', name: 'Thème coloré' },
-  { id: 'nature', name: 'Thème nature' }
-];
-
 async function renderTheme() {
   showLoading();
   try {
-    const settings = await apiFetch('/settings');
+    const [settings, themeOptions] = await Promise.all([
+      apiFetch('/settings'),
+      apiFetch('/themes'),
+    ]);
     const useChildTheme = settings.theme_use_child === '1';
     const activeTheme = settings.active_theme || 'default';
 
@@ -15052,7 +15076,7 @@ async function renderTheme() {
           <div class="form-group" id="themeChildGroup">
             <label class="form-label">Thème enfant</label>
             <select class="form-select" id="activeTheme" name="active_theme">
-              ${THEME_OPTIONS.map(t => `
+              ${themeOptions.map(t => `
                 <option value="${t.id}" ${activeTheme === t.id ? 'selected' : ''}>${t.name}</option>
               `).join('')}
             </select>

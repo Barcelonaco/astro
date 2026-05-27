@@ -575,6 +575,9 @@ try {
     elseif ($method === 'GET' && $path === '/settings/theme') {
         SettingsController::getThemeSettings();
     }
+    elseif ($method === 'GET' && $path === '/themes') {
+        SettingsController::getAvailableThemes();
+    }
     elseif ($method === 'GET' && $path === '/settings/site') {
         SettingsController::getSiteInfo();
     }

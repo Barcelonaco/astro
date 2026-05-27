@@ -35,6 +35,36 @@ class SettingsController {
         ]);
     }
 
+    public static function getAvailableThemes(): void {
+        $builtins = [
+            ['id' => 'default', 'name' => 'Thème par défaut', 'builtin' => true],
+            ['id' => 'dark', 'name' => 'Thème sombre', 'builtin' => true],
+            ['id' => 'minimal', 'name' => 'Thème minimaliste', 'builtin' => true],
+            ['id' => 'colorful', 'name' => 'Thème coloré', 'builtin' => true],
+            ['id' => 'nature', 'name' => 'Thème nature', 'builtin' => true],
+        ];
+        $builtinIds = array_column($builtins, 'id');
+
+        $themesDir = realpath(__DIR__ . '/../../frontend/public/themes');
+        $custom = [];
+        if ($themesDir && is_dir($themesDir)) {
+            foreach (scandir($themesDir) as $dir) {
+                if ($dir === '.' || $dir === '..' || in_array($dir, $builtinIds)) continue;
+                $jsonPath = $themesDir . '/' . $dir . '/theme.json';
+                if (is_file($jsonPath)) {
+                    $manifest = json_decode(file_get_contents($jsonPath), true);
+                    $custom[] = [
+                        'id' => $dir,
+                        'name' => $manifest['name'] ?? $dir,
+                        'builtin' => false,
+                    ];
+                }
+            }
+        }
+
+        json_response(array_merge($builtins, $custom));
+    }
+
     public static function getThemeSettings(): void {
         $s = self::getSettingsMap(['theme_use_child', 'active_theme']);
         json_response([
