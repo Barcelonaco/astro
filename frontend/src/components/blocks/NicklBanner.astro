@@ -59,7 +59,7 @@ const titleSizeClass = titleSize ? ` h1-${titleSize}` : '';
     {/* Image banner principale */}
     {heightBanner !== 'none' && imgUrl && (
       <div class="background">
-        <img src={optimizedImageUrl(imgUrl, p.width, p.quality)} srcset={bannerSrcset || undefined} sizes="100vw" width={imgDims.width || 1440} height={imgDims.height || 600} fetchpriority="high" loading="eager" decoding="sync" alt={imgAlt} title={imgTitle || undefined} class="illus" />
+        <img src={optimizedImageUrl(imgUrl, p.width, p.quality)} srcset={bannerSrcset || undefined} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 1440px" width={imgDims.width || 1440} height={imgDims.height || 600} fetchpriority="high" loading="eager" decoding="sync" alt={imgAlt} title={imgTitle || undefined} class="illus" />
       </div>
     )}
 
