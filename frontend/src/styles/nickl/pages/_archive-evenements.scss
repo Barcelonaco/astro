@@ -628,3 +628,61 @@
         }
     }
 }
+
+@media only screen and (max-width: 600px) {
+    .page-archive-event {
+        .archive-top {
+            .title {
+                padding-bottom: rem(24px);
+            }
+            .txt {
+                padding-bottom: rem(32px);
+            }
+            .columns-2 {
+                &.cols-wrapper {
+                    flex-direction: column;
+                }
+                .col-1, .col-2 {
+                    flex-basis: 100%;
+                }
+            }
+        }
+        .event-top-option {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: rem(16px);
+        }
+        .grid {
+            .month-list {
+                gap: rem(16px);
+            }
+            .item .title {
+                font-size: rem(28px);
+            }
+            .date-month {
+                font-size: rem(36px);
+            }
+            &.a4 .month-list > * {
+                flex-basis: calc(50% - rem(8px));
+            }
+        }
+        .list .item {
+            flex-direction: column;
+            gap: rem(20px);
+            &:not(:last-child) {
+                padding-bottom: rem(50px);
+            }
+            .date-list .date-num {
+                font-size: rem(60px);
+                line-height: rem(60px);
+            }
+            .illus-wrapper {
+                max-width: 100%;
+                order: 0;
+            }
+            .desc {
+                width: 100%;
+            }
+        }
+    }
+}

@@ -5,3 +5,16 @@
     margin: rem(35px) rem(15px);
   }
 }
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 600px) {
+  .page-single-post {
+    pre {
+      margin: rem(20px) rem(8px);
+      font-size: rem(13px);
+      overflow-x: auto;
+    }
+  }
+}

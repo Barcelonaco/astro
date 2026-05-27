@@ -1277,6 +1277,39 @@ body:not(.scroll-down).mega-menu-active #header {
 }
 
 
+@media only screen and (max-width: 600px) {
+  #header {
+    .logo-wrapper {
+      max-width: rem(180px);
+      margin: 0 0 0 rem(8px);
+    }
+    .logo {
+      max-height: rem(50px);
+    }
+    .menu-mobile-wrapper .menu-mobile {
+      &.container-large {
+        padding-left: 5vw;
+      }
+    }
+    .hamburger .line-wrapper {
+      width: 1.2rem;
+      height: 1rem;
+    }
+    .btn-wrapper {
+      gap: rem(6px);
+      padding-left: rem(10px);
+      margin-left: rem(6px);
+    }
+    .btn-search,
+    .btn-cart,
+    .btn-account {
+      width: rem(20px);
+      height: rem(16px);
+    }
+  }
+}
+
+
 @keyframes close-top-reverse {
   0% {
     transform: rotate(-45deg) translate(0);

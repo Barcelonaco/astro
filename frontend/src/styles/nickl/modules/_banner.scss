@@ -99,6 +99,7 @@
 }
 
 
+
 /* === Migré depuis NicklBanner.astro === */
 .module-banner-page { position: relative; overflow: hidden; }
 .module-banner-page.large  { height: 100vh; }
@@ -126,3 +127,24 @@ body:not(.scroll-down):not(.scroll-up) #header:not(.background-transparent) ~ ma
 .module-banner-page p,
 .module-banner-page .editor,
 .module-banner-page .txt { color: #fff; }
+
+
+/* Mobile — must come AFTER migrated rules to override heights */
+@media only screen and (max-width: 600px) {
+    .module-banner-page {
+        &.large  { height: 70vh; }
+        &.medium { height: 50vh; }
+        &.small  { height: 40vh; }
+        .title {
+            padding: 1.5rem 0;
+        }
+        .title,
+        .title.title-section-1,
+        h1.title {
+            font-size: 2rem !important;
+        }
+        .background::before {
+            height: rem(150px);
+        }
+    }
+}

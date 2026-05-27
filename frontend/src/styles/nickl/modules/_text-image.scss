@@ -403,3 +403,22 @@
         }
     }
 }
+
+@media only screen and (max-width: 600px) {
+    .module-text-image {
+        .col-2 {
+            margin-top: rem(18px);
+        }
+        .btn {
+            font-size: rem(16px);
+            svg {
+                width: rem(60px);
+            }
+        }
+        &.full-height {
+            .video-wrapper, .col-1, iframe, button, .background-video {
+                height: 60vh;
+            }
+        }
+    }
+}

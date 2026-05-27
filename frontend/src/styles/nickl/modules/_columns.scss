@@ -325,7 +325,9 @@
                 }
 
                 &.columns-2,
-                &.columns-3 {
+                &.columns-3,
+                &.columns-4,
+                &[class*="columns-2_"] {
                     .col {
                         width: 100%;
                     }
@@ -616,7 +618,8 @@
 
 /* @960px: columns stack */
 @media screen and (max-width: 960px) {
-    .module-columns .cols-wrapper.columns-4 .col {
+    .module-columns .cols-wrapper.columns-4 .col,
+    .module-columns .cols-wrapper[class*="columns-2_"] .col {
         width: 100%;
     }
 

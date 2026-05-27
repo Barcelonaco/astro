@@ -263,3 +263,45 @@
        }
     }
 }
+
+@media only screen and (max-width: 600px) {
+    .page-single-event {
+        .head {
+            h1 {
+                font-size: rem(32px);
+                letter-spacing: rem(-1px);
+            }
+            &-bottom {
+                flex-direction: column;
+                gap: rem(4px);
+            }
+        }
+        .container {
+            .content-main {
+                padding-top: rem(30px);
+                padding-bottom: rem(30px);
+                &.a4 {
+                    flex-direction: column;
+                    .illus-wrapper {
+                        max-width: 100%;
+                        .illus {
+                            min-width: 100%;
+                        }
+                    }
+                }
+            }
+            .event-recapitulatif {
+                &-title {
+                    font-size: rem(16px);
+                    padding-top: rem(30px);
+                }
+                &-item-col-2 {
+                    width: 100%;
+                }
+                .mapboxgl-map {
+                    height: 280px;
+                }
+            }
+        }
+    }
+}

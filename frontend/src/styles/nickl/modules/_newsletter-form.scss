@@ -201,3 +201,18 @@
     }
   }
 }
+
+@media only screen and (max-width: 600px) {
+  .module-newsletter-form {
+    #acym_fulldiv_formAcym1 {
+      .acym__user__edit__email {
+        padding: rem(9px) rem(16px);
+        font-size: rem(14px);
+      }
+      .acym__subscription__form__button button {
+        font-size: rem(14px);
+        padding: rem(11px) rem(16px);
+      }
+    }
+  }
+}

@@ -54,3 +54,27 @@
     }
 
 }
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 600px) {
+    .page-archive-references {
+        .archive-top {
+            .title {
+                padding-bottom: rem(24px);
+            }
+            .txt {
+                padding-bottom: rem(32px);
+            }
+            .columns-2 {
+                &.cols-wrapper {
+                    flex-direction: column;
+                }
+                .col-1, .col-2 {
+                    flex-basis: 100%;
+                }
+            }
+        }
+    }
+}

@@ -87,7 +87,7 @@ for (const [name, file] of Object.entries(allEntries)) {
       loadPaths: [srcDir],
       silenceDeprecations: ['import', 'global-builtin'],
     });
-    writeFileSync(outputPath, `@layer nickl{${result.css}}`);
+    writeFileSync(outputPath, result.css);
     compiled++;
   } catch (err) {
     console.error(`✗ ${name}: ${err.message}`);

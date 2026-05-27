@@ -409,6 +409,22 @@
                     }
                 }
             }
+            /* items-8 flat layout: 2 cols on tablet */
+            &.items-8 .item {
+                flex-basis: calc(50% - 0.875rem) !important;
+            }
+            /* items-6/7 cols layout */
+            &.items-6, &.items-7 {
+                .col-1, .col-1-bis {
+                    flex-basis: 100%;
+                }
+                .col-2 {
+                    flex-basis: 100%;
+                    .item {
+                        flex-basis: calc(50% - 0.875rem);
+                    }
+                }
+            }
         }
         .list .item {
             flex-grow: 0;
@@ -459,6 +475,19 @@
                     flex-basis: 100%;
                 }
             }
+            /* items-8 flat layout: single col on mobile */
+            &.items-8 .item {
+                flex-basis: 100% !important;
+            }
+            /* items-6/7: single col on mobile */
+            &.items-6, &.items-7 {
+                .col-1, .col-1-bis, .col-2 {
+                    flex-basis: 100%;
+                }
+                .col-2 .item {
+                    flex-basis: 100%;
+                }
+            }
         }
         .list .item {
             flex-basis: 100%;
@@ -502,4 +531,47 @@
 .module-clickable .list.items-7 .item:hover,
 .module-clickable .list.items-8 .item:hover {
     flex-basis: 25% !important;
+}
+
+/* Mobile overrides for items-6/7/8 carousel layout */
+@media only screen and (max-width: 1024px) {
+    .module-clickable .list.items-6,
+    .module-clickable .list.items-7,
+    .module-clickable .list.items-8 {
+        flex-wrap: wrap !important;
+    }
+    .module-clickable .list.items-6 .item .desc,
+    .module-clickable .list.items-7 .item .desc,
+    .module-clickable .list.items-8 .item .desc {
+        opacity: 1 !important;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+    .module-clickable .list.items-6 .item::before,
+    .module-clickable .list.items-7 .item::before,
+    .module-clickable .list.items-8 .item::before {
+        padding-top: 73% !important;
+    }
+    .module-clickable .list.items-6 .item,
+    .module-clickable .list.items-7 .item,
+    .module-clickable .list.items-8 .item {
+        flex-basis: calc(50% - 0.875rem) !important;
+    }
+    .module-clickable .list.items-6 .item:hover,
+    .module-clickable .list.items-7 .item:hover,
+    .module-clickable .list.items-8 .item:hover {
+        flex-basis: calc(50% - 0.875rem) !important;
+    }
+}
+@media only screen and (max-width: 600px) {
+    .module-clickable .list.items-6 .item,
+    .module-clickable .list.items-7 .item,
+    .module-clickable .list.items-8 .item {
+        flex-basis: 100% !important;
+    }
+    .module-clickable .list.items-6 .item:hover,
+    .module-clickable .list.items-7 .item:hover,
+    .module-clickable .list.items-8 .item:hover {
+        flex-basis: 100% !important;
+    }
 }

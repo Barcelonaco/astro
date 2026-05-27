@@ -1,1 +1,1 @@
-@layer nickl{.module-plansite .list{display:flex;flex-wrap:wrap;gap:2.5rem}.module-plansite .item{flex-basis:calc(33.3333333333% - 2.5rem*2/3)}@media only screen and (max-width: 960px){.module-plansite .item{flex-basis:100%}}}
+.module-plansite .list{display:flex;flex-wrap:wrap;gap:2.5rem}.module-plansite .item{flex-basis:calc(33.3333333333% - 2.5rem*2/3)}@media only screen and (max-width: 960px){.module-plansite .item{flex-basis:100%}}@media only screen and (max-width: 600px){.module-plansite .list{gap:1.5rem}}

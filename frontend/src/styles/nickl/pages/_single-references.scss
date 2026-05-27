@@ -144,3 +144,14 @@
     }
   }
 }
+
+@media only screen and (max-width: 600px) {
+  .page-single-refs {
+    .container .cols-wrapper {
+      gap: rem(24px);
+      .name {
+        font-size: rem(20px);
+      }
+    }
+  }
+}
