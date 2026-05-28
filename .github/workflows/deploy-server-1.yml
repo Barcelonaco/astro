@@ -2,8 +2,8 @@ name: Deploy Server 192.19.56.20 (alp, astro, atempora, audition-confiance,
   masaiges, darcy)
 
 on:
-  push:
-    branches: [main]
+  # push:
+  #   branches: [main]
   workflow_dispatch:
     inputs:
       site:
