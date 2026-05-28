@@ -165,6 +165,8 @@ function _showInlineLinkDialog() {
   // Check if selection is inside an existing link
   const sel = window.getSelection();
   let existingUrl = '';
+  let existingTitle = '';
+  let existingTarget = '_self';
   let existingLink = null;
   if (sel.rangeCount > 0) {
     let node = sel.anchorNode;
@@ -172,6 +174,8 @@ function _showInlineLinkDialog() {
       if (node.nodeType === 1 && node.tagName === 'A') {
         existingLink = node;
         existingUrl = node.getAttribute('href') || '';
+        existingTitle = node.getAttribute('title') || '';
+        existingTarget = node.getAttribute('target') || '_self';
         break;
       }
       node = node.parentNode;
@@ -179,43 +183,95 @@ function _showInlineLinkDialog() {
   }
 
   _closeInlineLinkDialog();
-  const dialog = document.createElement('div');
-  dialog.className = 'inline-link-dialog';
-  dialog.innerHTML = `
-    <input type="text" class="link-url-input" placeholder="https://..." value="${existingUrl.replace(/"/g, '&quot;')}">
-    <button type="button" class="link-save-btn">OK</button>
-    ${existingLink ? '<button type="button" class="link-remove-btn">Supprimer</button>' : ''}
-    <button type="button" class="link-cancel-btn">Annuler</button>
+
+  // Build modal
+  const backdrop = document.createElement('div');
+  backdrop.className = 'inline-link-modal-backdrop';
+  const modal = document.createElement('div');
+  modal.className = 'inline-link-modal';
+  modal.innerHTML = `
+    <div class="inline-link-modal-header">
+      <h3>Lien</h3>
+      <button type="button" class="link-modal-close" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--gray-400)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="inline-link-modal-body">
+      <div class="inline-link-modal-field">
+        <label>URL</label>
+        <div class="inline-link-modal-url-row">
+          <input type="text" class="form-input link-modal-url" placeholder="https://..." value="${existingUrl.replace(/"/g, '&quot;')}">
+          <button type="button" class="btn-browse">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Parcourir
+          </button>
+        </div>
+      </div>
+      <div class="inline-link-modal-field">
+        <label>Titre du lien</label>
+        <input type="text" class="form-input link-modal-title" placeholder="Titre du lien" value="${existingTitle.replace(/"/g, '&quot;')}">
+      </div>
+      <div class="inline-link-modal-field">
+        <label>Cible</label>
+        <select class="form-select link-modal-target">
+          <option value="_self"${existingTarget === '_self' ? ' selected' : ''}>Meme fenetre</option>
+          <option value="_blank"${existingTarget === '_blank' ? ' selected' : ''}>Nouvelle fenetre</option>
+        </select>
+      </div>
+    </div>
+    <div class="inline-link-modal-footer">
+      ${existingLink ? '<button type="button" class="btn-danger link-modal-remove">Supprimer</button>' : ''}
+      <button type="button" class="link-modal-cancel">Annuler</button>
+      <button type="button" class="btn-primary link-modal-save">Enregistrer</button>
+    </div>
   `;
-  document.body.appendChild(dialog);
-  window._inlineLinkDialog = dialog;
-  _inlineLinkDialog = dialog;
 
-  // Position below toolbar
-  if (_inlineToolbar) {
-    const tbRect = _inlineToolbar.getBoundingClientRect();
-    dialog.style.left = tbRect.left + 'px';
-    dialog.style.top = (tbRect.bottom + 4) + 'px';
-    requestAnimationFrame(() => {
-      const dRect = dialog.getBoundingClientRect();
-      if (dRect.right > window.innerWidth - 4) {
-        dialog.style.left = (window.innerWidth - dRect.width - 4) + 'px';
-      }
-      if (dRect.left < 4) dialog.style.left = '4px';
-    });
-  }
+  document.body.appendChild(backdrop);
+  document.body.appendChild(modal);
 
-  const input = dialog.querySelector('.link-url-input');
-  input.focus();
-  input.select();
+  // Store references for cleanup
+  const dialogRef = { backdrop, modal };
+  window._inlineLinkDialog = dialogRef;
+  _inlineLinkDialog = dialogRef;
+
+  const urlInput = modal.querySelector('.link-modal-url');
+  const titleInput = modal.querySelector('.link-modal-title');
+  const targetSelect = modal.querySelector('.link-modal-target');
+
+  urlInput.focus();
+  urlInput.select();
+
+  const closeModal = () => {
+    backdrop.remove();
+    modal.remove();
+    window._inlineLinkDialog = null;
+    _inlineLinkDialog = null;
+  };
 
   const applyLink = () => {
-    const url = input.value.trim();
+    const url = urlInput.value.trim();
+    const title = titleInput.value.trim();
+    const target = targetSelect.value;
     _restoreSelection();
     if (url) {
       document.execCommand('createLink', false, url);
+      // Find the newly created (or existing) link and set title + target
+      const newSel = window.getSelection();
+      if (newSel.rangeCount > 0) {
+        let linkNode = newSel.anchorNode;
+        while (linkNode && linkNode !== _inlineEditingElement) {
+          if (linkNode.nodeType === 1 && linkNode.tagName === 'A') break;
+          linkNode = linkNode.parentNode;
+        }
+        if (linkNode && linkNode.tagName === 'A') {
+          if (title) linkNode.setAttribute('title', title);
+          else linkNode.removeAttribute('title');
+          if (target === '_blank') linkNode.setAttribute('target', '_blank');
+          else linkNode.removeAttribute('target');
+        }
+      }
     }
-    _closeInlineLinkDialog();
+    closeModal();
     _updateToolbarState();
     if (_inlineEditingElement) {
       _syncInlineContentToBlockData(_inlineEditingElement);
@@ -223,17 +279,26 @@ function _showInlineLinkDialog() {
     }
   };
 
-  dialog.querySelector('.link-save-btn').addEventListener('mousedown', (e) => {
-    e.preventDefault();
-    applyLink();
+  // Browse button → open link picker
+  modal.querySelector('.btn-browse').addEventListener('click', () => {
+    if (typeof openLinkPicker === 'function') {
+      openLinkPicker((url, title) => {
+        urlInput.value = url;
+        if (title && !titleInput.value) titleInput.value = title;
+        urlInput.focus();
+      });
+    }
   });
 
+  // Save
+  modal.querySelector('.link-modal-save').addEventListener('click', applyLink);
+
+  // Remove link
   if (existingLink) {
-    dialog.querySelector('.link-remove-btn').addEventListener('mousedown', (e) => {
-      e.preventDefault();
+    modal.querySelector('.link-modal-remove').addEventListener('click', () => {
       _restoreSelection();
       document.execCommand('unlink', false, null);
-      _closeInlineLinkDialog();
+      closeModal();
       _updateToolbarState();
       if (_inlineEditingElement) {
         _syncInlineContentToBlockData(_inlineEditingElement);
@@ -242,18 +307,33 @@ function _showInlineLinkDialog() {
     });
   }
 
-  dialog.querySelector('.link-cancel-btn').addEventListener('mousedown', (e) => {
-    e.preventDefault();
-    _closeInlineLinkDialog();
+  // Cancel
+  modal.querySelector('.link-modal-cancel').addEventListener('click', () => {
+    closeModal();
     _restoreSelection();
     if (_inlineEditingElement) _inlineEditingElement.focus();
   });
 
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); applyLink(); }
+  // Close button
+  modal.querySelector('.link-modal-close').addEventListener('click', () => {
+    closeModal();
+    _restoreSelection();
+    if (_inlineEditingElement) _inlineEditingElement.focus();
+  });
+
+  // Backdrop click
+  backdrop.addEventListener('click', () => {
+    closeModal();
+    _restoreSelection();
+    if (_inlineEditingElement) _inlineEditingElement.focus();
+  });
+
+  // Keyboard
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.tagName !== 'SELECT') { e.preventDefault(); applyLink(); }
     if (e.key === 'Escape') {
       e.preventDefault();
-      _closeInlineLinkDialog();
+      closeModal();
       _restoreSelection();
       if (_inlineEditingElement) _inlineEditingElement.focus();
     }
@@ -262,7 +342,14 @@ function _showInlineLinkDialog() {
 
 function _closeInlineLinkDialog() {
   if (_inlineLinkDialog) {
-    _inlineLinkDialog.remove();
+    // New modal structure (backdrop + modal)
+    if (_inlineLinkDialog.backdrop) {
+      _inlineLinkDialog.backdrop.remove();
+      _inlineLinkDialog.modal.remove();
+    } else {
+      // Legacy single-element dialog
+      _inlineLinkDialog.remove();
+    }
     window._inlineLinkDialog = null;
     _inlineLinkDialog = null;
   }
@@ -434,8 +521,14 @@ function _handleInlineBlur() {
     if (_inlineEditingElement && (_inlineEditingElement === active || _inlineEditingElement.contains(active))) return;
     // If focus moved to the HTML source textarea, don't disable
     if (_inlineSourceTextarea && _inlineSourceTextarea === active) return;
-    // If focus moved to the link dialog, don't disable
-    if (_inlineLinkDialog && _inlineLinkDialog.contains(active)) return;
+    // If focus moved to the link modal, don't disable
+    if (_inlineLinkDialog) {
+      if (_inlineLinkDialog.modal && _inlineLinkDialog.modal.contains(active)) return;
+      if (_inlineLinkDialog.contains && _inlineLinkDialog.contains(active)) return;
+    }
+    // If focus is inside the link picker modal, don't disable
+    const linkPickerModal = document.getElementById('linkPickerModal');
+    if (linkPickerModal && linkPickerModal.classList.contains('is-open') && linkPickerModal.contains(active)) return;
     // Focus left the editing zone — disable inline editing
     disableInlineEditing();
   }, 150);

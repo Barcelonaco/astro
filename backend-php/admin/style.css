@@ -764,6 +764,31 @@ tr:hover {
   color: var(--gray-600);
   margin: 0.5em 0;
 }
+/* Ensure bold/italic render visibly inside Quill editor */
+.wysiwyg-wrapper .ql-editor strong,
+.wysiwyg-wrapper .ql-editor b {
+  font-weight: 700;
+}
+.wysiwyg-wrapper .ql-editor em,
+.wysiwyg-wrapper .ql-editor i {
+  font-style: italic;
+}
+.wysiwyg-wrapper .ql-editor s {
+  text-decoration: line-through;
+}
+/* Quill alignment classes inside Quill editor */
+.wysiwyg-wrapper .ql-editor .ql-align-center { text-align: center; }
+.wysiwyg-wrapper .ql-editor .ql-align-right { text-align: right; }
+.wysiwyg-wrapper .ql-editor .ql-align-justify { text-align: justify; }
+/* Quill indent classes inside Quill editor */
+.wysiwyg-wrapper .ql-editor .ql-indent-1 { padding-left: 3em; }
+.wysiwyg-wrapper .ql-editor .ql-indent-2 { padding-left: 6em; }
+.wysiwyg-wrapper .ql-editor .ql-indent-3 { padding-left: 9em; }
+.wysiwyg-wrapper .ql-editor .ql-indent-4 { padding-left: 12em; }
+.wysiwyg-wrapper .ql-editor .ql-indent-5 { padding-left: 15em; }
+.wysiwyg-wrapper .ql-editor .ql-indent-6 { padding-left: 18em; }
+.wysiwyg-wrapper .ql-editor .ql-indent-7 { padding-left: 21em; }
+.wysiwyg-wrapper .ql-editor .ql-indent-8 { padding-left: 24em; }
 /* Bouton "voir le HTML" + textarea source */
 .ql-snow.ql-toolbar button.ql-html,
 .ql-snow .ql-toolbar button.ql-html {
@@ -1836,8 +1861,132 @@ body.builder-resizing .builder-sidebar-resize {
   color: var(--primary, #667ee4);
   text-decoration: underline;
 }
+/* Quill alignment classes in preview */
+.builder-block-render .txt.editor .ql-align-center { text-align: center; }
+.builder-block-render .txt.editor .ql-align-right { text-align: right; }
+.builder-block-render .txt.editor .ql-align-justify { text-align: justify; }
+/* Quill indent classes in preview */
+.builder-block-render .txt.editor .ql-indent-1 { padding-left: 3em; }
+.builder-block-render .txt.editor .ql-indent-2 { padding-left: 6em; }
+.builder-block-render .txt.editor .ql-indent-3 { padding-left: 9em; }
+.builder-block-render .txt.editor .ql-indent-4 { padding-left: 12em; }
+.builder-block-render .txt.editor .ql-indent-5 { padding-left: 15em; }
+.builder-block-render .txt.editor .ql-indent-6 { padding-left: 18em; }
+.builder-block-render .txt.editor .ql-indent-7 { padding-left: 21em; }
+.builder-block-render .txt.editor .ql-indent-8 { padding-left: 24em; }
 
-/* ── Inline link dialog ───────────────────────────────────── */
+/* ── Inline link modal ───────────────────────────────────── */
+.inline-link-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  z-index: 10001;
+}
+.inline-link-modal {
+  position: fixed;
+  z-index: 10002;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.08);
+  width: 460px;
+  max-width: 90vw;
+  overflow: hidden;
+}
+.inline-link-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gray-200, #e5e7eb);
+}
+.inline-link-modal-header h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gray-800, #1f2937);
+  margin: 0;
+}
+.inline-link-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.inline-link-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.inline-link-modal-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-600, #4b5563);
+}
+.inline-link-modal-url-row {
+  display: flex;
+  gap: 8px;
+}
+.inline-link-modal-url-row input {
+  flex: 1;
+}
+.inline-link-modal-url-row .btn-browse {
+  white-space: nowrap;
+  padding: 0 12px;
+  height: 36px;
+  border: 1px solid var(--border-color, #d0d5dd);
+  border-radius: 6px;
+  background: var(--gray-50, #f9fafb);
+  color: var(--gray-700, #374151);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s;
+}
+.inline-link-modal-url-row .btn-browse:hover {
+  background: var(--gray-100, #f3f4f6);
+}
+.inline-link-modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--gray-200, #e5e7eb);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.inline-link-modal-footer button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border-color, #d0d5dd);
+  background: #fff;
+  color: var(--gray-700, #374151);
+  transition: background 0.15s;
+}
+.inline-link-modal-footer button:hover {
+  background: var(--gray-50, #f9fafb);
+}
+.inline-link-modal-footer .btn-primary {
+  background: var(--primary, #667eea);
+  color: #fff;
+  border-color: var(--primary, #667eea);
+}
+.inline-link-modal-footer .btn-primary:hover {
+  background: var(--primary-dark, #5568d3);
+}
+.inline-link-modal-footer .btn-danger {
+  color: var(--danger, #f56565);
+  border-color: var(--danger, #f56565);
+}
+.inline-link-modal-footer .btn-danger:hover {
+  background: #fef2f2;
+}
+
+/* ── Inline link dialog (legacy — kept for compatibility) ── */
 .inline-link-dialog {
   position: fixed;
   z-index: 10001;

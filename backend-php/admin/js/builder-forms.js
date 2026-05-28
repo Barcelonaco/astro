@@ -1686,6 +1686,11 @@ function renderBlockSettings() {
 
 // ── WYSIWYG Editor (Quill) ──────────────────────────────────────────────────
 
+// Clean Quill 2 getSemanticHTML() output: replace &nbsp; with regular spaces
+function _cleanQuillHtml(html) {
+  return html.replace(/&nbsp;/g, ' ').replace(/\u00A0/g, ' ');
+}
+
 function _quillCleanPasteMatchers() {
   if (typeof Quill === 'undefined') return [];
   const Delta = Quill.import('delta');
@@ -1745,14 +1750,14 @@ function initWysiwygEditors(container) {
     });
     quill.on('text-change', () => {
       if (quill._syncingFromInline) return;
-      const html = quill.getSemanticHTML();
+      const html = _cleanQuillHtml(quill.getSemanticHTML());
       if (textarea) {
         textarea.value = html;
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
       }
     });
     attachHtmlSourceToggle(quill, {
-      getHtml: () => quill.getSemanticHTML(),
+      getHtml: () => _cleanQuillHtml(quill.getSemanticHTML()),
       onSync: (html) => {
         if (textarea) {
           textarea.value = html;
@@ -1760,18 +1765,19 @@ function initWysiwygEditors(container) {
         }
       }
     });
+    attachQuillLinkHandler(quill, textarea);
     _quillInstances.set(el.id, quill);
   });
 }
 
 function attachHtmlSourceToggle(quill, { getHtml, onSync } = {}) {
   const toolbar = quill.getModule && quill.getModule('toolbar');
-  if (!toolbar || typeof toolbar.addHandler !== 'function') return;
   const editorRoot = quill.root;
   const qlContainer = editorRoot.parentNode;
   let textarea = null;
-  toolbar.addHandler('html', function() {
-    const btn = toolbar.container && toolbar.container.querySelector('button.ql-html');
+
+  const toggleHtml = () => {
+    const btn = toolbar && toolbar.container && toolbar.container.querySelector('button.ql-html');
     if (!textarea) {
       const html = typeof getHtml === 'function' ? getHtml() : editorRoot.innerHTML;
       textarea = document.createElement('textarea');
@@ -1795,7 +1801,169 @@ function attachHtmlSourceToggle(quill, { getHtml, onSync } = {}) {
       if (btn) btn.classList.remove('ql-active');
       quill.focus();
     }
-  });
+  };
+
+  // Primary: register via Quill toolbar handler API
+  if (toolbar && typeof toolbar.addHandler === 'function') {
+    toolbar.addHandler('html', toggleHtml);
+  }
+
+  // Fallback: direct click handler on the .ql-html button (Quill 2 may not
+  // fire addHandler callbacks for non-registered formats in some contexts)
+  const htmlBtn = toolbar && toolbar.container && toolbar.container.querySelector('button.ql-html');
+  if (htmlBtn && !htmlBtn._htmlToggleAttached) {
+    htmlBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleHtml();
+    });
+    htmlBtn._htmlToggleAttached = true;
+  }
+}
+
+function attachQuillLinkHandler(quill, textarea) {
+  const toolbar = quill.getModule && quill.getModule('toolbar');
+  if (!toolbar) return;
+
+  const syncToTextarea = () => {
+    if (textarea) {
+      textarea.value = _cleanQuillHtml(quill.getSemanticHTML());
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  };
+
+  const linkHandler = function() {
+    const range = quill.getSelection();
+    if (!range) return;
+
+    // Check if cursor is on an existing link
+    const [leaf] = quill.getLeaf(range.index);
+    const existingLink = leaf && leaf.parent && leaf.parent.domNode && leaf.parent.domNode.tagName === 'A'
+      ? leaf.parent.domNode : null;
+    const existingUrl = existingLink ? (existingLink.getAttribute('href') || '') : '';
+    const existingTitle = existingLink ? (existingLink.getAttribute('title') || '') : '';
+    const existingTarget = existingLink ? (existingLink.getAttribute('target') || '_self') : '_self';
+
+    // Build modal
+    const backdrop = document.createElement('div');
+    backdrop.className = 'inline-link-modal-backdrop';
+    const modal = document.createElement('div');
+    modal.className = 'inline-link-modal';
+    modal.innerHTML = `
+      <div class="inline-link-modal-header">
+        <h3>Lien</h3>
+        <button type="button" class="link-modal-close" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--gray-400)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="inline-link-modal-body">
+        <div class="inline-link-modal-field">
+          <label>URL</label>
+          <div class="inline-link-modal-url-row">
+            <input type="text" class="form-input link-modal-url" placeholder="https://..." value="${existingUrl.replace(/"/g, '&quot;')}">
+            <button type="button" class="btn-browse">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Parcourir
+            </button>
+          </div>
+        </div>
+        <div class="inline-link-modal-field">
+          <label>Titre du lien</label>
+          <input type="text" class="form-input link-modal-title" placeholder="Titre du lien" value="${existingTitle.replace(/"/g, '&quot;')}">
+        </div>
+        <div class="inline-link-modal-field">
+          <label>Cible</label>
+          <select class="form-select link-modal-target">
+            <option value="_self"${existingTarget === '_self' ? ' selected' : ''}>Meme fenetre</option>
+            <option value="_blank"${existingTarget === '_blank' ? ' selected' : ''}>Nouvelle fenetre</option>
+          </select>
+        </div>
+      </div>
+      <div class="inline-link-modal-footer">
+        ${existingLink ? '<button type="button" class="btn-danger link-modal-remove">Supprimer</button>' : ''}
+        <button type="button" class="link-modal-cancel">Annuler</button>
+        <button type="button" class="btn-primary link-modal-save">Enregistrer</button>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+    document.body.appendChild(modal);
+
+    const urlInput = modal.querySelector('.link-modal-url');
+    const titleInput = modal.querySelector('.link-modal-title');
+    const targetSelect = modal.querySelector('.link-modal-target');
+    urlInput.focus();
+    urlInput.select();
+
+    const closeModal = () => {
+      backdrop.remove();
+      modal.remove();
+    };
+
+    const applyLink = () => {
+      const url = urlInput.value.trim();
+      const title = titleInput.value.trim();
+      const target = targetSelect.value;
+      if (url) {
+        // Apply link format via Quill API
+        if (range.length === 0) {
+          // No selection — insert the URL as text + link
+          const linkText = title || url;
+          quill.insertText(range.index, linkText, 'link', url, 'user');
+        } else {
+          quill.formatText(range.index, range.length, 'link', url, 'user');
+        }
+        // Quill doesn't natively support title/target on links — set via DOM
+        setTimeout(() => {
+          const linkEls = quill.root.querySelectorAll(`a[href="${CSS.escape(url)}"]`);
+          linkEls.forEach(a => {
+            if (title) a.setAttribute('title', title);
+            if (target === '_blank') a.setAttribute('target', '_blank');
+            else a.removeAttribute('target');
+          });
+          syncToTextarea();
+        }, 10);
+      }
+      closeModal();
+      quill.focus();
+    };
+
+    // Browse
+    modal.querySelector('.btn-browse').addEventListener('click', () => {
+      if (typeof openLinkPicker === 'function') {
+        openLinkPicker((url, pickedTitle) => {
+          urlInput.value = url;
+          if (pickedTitle && !titleInput.value) titleInput.value = pickedTitle;
+          urlInput.focus();
+        });
+      }
+    });
+
+    modal.querySelector('.link-modal-save').addEventListener('click', applyLink);
+
+    if (existingLink) {
+      modal.querySelector('.link-modal-remove').addEventListener('click', () => {
+        quill.formatText(range.index, range.length, 'link', false, 'user');
+        syncToTextarea();
+        closeModal();
+        quill.focus();
+      });
+    }
+
+    modal.querySelector('.link-modal-cancel').addEventListener('click', () => { closeModal(); quill.focus(); });
+    modal.querySelector('.link-modal-close').addEventListener('click', () => { closeModal(); quill.focus(); });
+    backdrop.addEventListener('click', () => { closeModal(); quill.focus(); });
+
+    modal.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target.tagName !== 'SELECT') { e.preventDefault(); applyLink(); }
+      if (e.key === 'Escape') { e.preventDefault(); closeModal(); quill.focus(); }
+    });
+  };
+
+  // Override Quill's default link handler
+  if (typeof toolbar.addHandler === 'function') {
+    toolbar.addHandler('link', linkHandler);
+  }
 }
 
 function destroyWysiwygEditors(container) {
@@ -1804,7 +1972,7 @@ function destroyWysiwygEditors(container) {
     if (quill) {
       // Sync final content to textarea before destroying
       const textarea = el.parentElement?.querySelector('.wysiwyg-source');
-      if (textarea) textarea.value = quill.getSemanticHTML();
+      if (textarea) textarea.value = _cleanQuillHtml(quill.getSemanticHTML());
     }
     _quillInstances.delete(el.id);
   });

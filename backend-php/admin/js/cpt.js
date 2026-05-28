@@ -1258,7 +1258,7 @@ async function saveCPTBuilder() {
     const el = document.getElementById(id);
     if (!el) return;
     const textarea = el.parentElement?.querySelector('.wysiwyg-source');
-    if (textarea) textarea.value = quill.getSemanticHTML();
+    if (textarea) textarea.value = (quill.getSemanticHTML() || '').replace(/&nbsp;/g, ' ').replace(/\u00A0/g, ' ');
   });
   // Sync currently open block settings
   const panel = document.getElementById('builderSettings');
