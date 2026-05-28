@@ -19,7 +19,7 @@ const primaryCategory = product.categories?.find(c => c.level === Math.max(...pr
 // Afficher "Rupture" uniquement si le stock est suivi ET le produit est configuré (prix > 0 ou variants).
 // Évite d'afficher "Rupture" sur des produits tout juste créés via le CPT admin générique.
 const showOutOfStock = product.stock_tracked && !product.in_stock && product.is_configured;
-const showOnSale = product.compare_at_price_cents && product.compare_at_price_cents > product.price_cents_min;
+const showOnSale = product.compare_at_price_cents && product.compare_at_price_cents > 0 && product.compare_at_price_cents < product.price_cents_min;
 const showUnconfigured = !product.is_configured;
 ---
 <article class="shop-product-card">

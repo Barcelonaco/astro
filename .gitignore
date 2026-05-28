@@ -64,6 +64,8 @@ backend/uploads/media/
 # -------------------------------------------------
 .cache/
 .parcel-cache/
+.bootstrap_cache.json
+.rebuild_status.json
 
 # -------------------------------------------------
 # 🔟 Divers
@@ -82,11 +84,13 @@ TODO.md
 TODO-CDC.md
 MODIFIER_MODULE.md
 SYSTEM_PROMPT_CLAUDE.md
+PERFORMANCE_FIXES.md
 
 # -------------------------------------------------
 # 12️⃣ Répertoires personnalisés
 # -------------------------------------------------
 /nickl/
+/styles_nickl/
 
 # -------------------------------------------------
 # 13️⃣ Fichiers lock (on veut les versionner → **ne pas ignorer**)

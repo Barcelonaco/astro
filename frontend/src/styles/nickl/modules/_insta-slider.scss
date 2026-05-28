@@ -169,3 +169,17 @@
     }
   }
 }
+
+@media only screen and (max-width: 600px) {
+  .module-insta-slider {
+    .item .illus-wrapper {
+      height: 200px;
+    }
+    .slider.columns-1 .insta-item {
+      max-width: 100%;
+    }
+    .btn-more-wrapper {
+      margin-top: rem(30px);
+    }
+  }
+}

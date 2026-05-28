@@ -31,42 +31,42 @@ export interface ImagePreset {
 export const IMAGE_PRESETS: Record<string, ImagePreset> = {
   hero: {
     width: 1440,
-    quality: 78,
+    quality: 75,
     format: 'webp',
-    srcsetWidths: [480, 960, 1440],
+    srcsetWidths: [360, 720, 1080, 1440],
     srcsetQuality: 75,
   },
   banner: {
     width: 1440,
-    quality: 76,
+    quality: 73,
     format: 'webp',
-    srcsetWidths: [480, 900, 1440],
+    srcsetWidths: [360, 720, 1080, 1440],
     srcsetQuality: 73,
   },
   feature: {
     width: 960,
-    quality: 76,
+    quality: 73,
     format: 'webp',
     srcsetWidths: [480, 720, 960],
     srcsetQuality: 73,
   },
   card: {
     width: 600,
-    quality: 74,
+    quality: 72,
     format: 'webp',
     srcsetWidths: [300, 450, 600],
     srcsetQuality: 72,
   },
   thumbnail: {
     width: 450,
-    quality: 73,
+    quality: 70,
     format: 'webp',
     srcsetWidths: [225, 350, 450],
     srcsetQuality: 70,
   },
   icon: {
     width: 220,
-    quality: 75,
+    quality: 73,
     format: 'webp',
     srcsetWidths: [110, 220],
     srcsetQuality: 73,
@@ -133,13 +133,15 @@ export function getDefaultImageUrl(): string {
   return _defaultImageUrl;
 }
 
-/** Extrait l'ID YouTube depuis une URL (watch?v=, youtu.be/, embed/) */
+/** Extrait l'ID YouTube depuis une URL (watch?v=, youtu.be/, embed/, shorts/, live/) */
 export function extractYouTubeId(url: string): string {
   if (!url) return '';
   const m =
     url.match(/[?&]v=([^&#]+)/) ||
     url.match(/youtu\.be\/([^?&#]+)/) ||
-    url.match(/embed\/([^?&#]+)/);
+    url.match(/embed\/([^?&#]+)/) ||
+    url.match(/shorts\/([^?&#]+)/) ||
+    url.match(/live\/([^?&#]+)/);
   return m ? m[1] : '';
 }
 

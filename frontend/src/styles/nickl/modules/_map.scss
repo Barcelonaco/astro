@@ -156,3 +156,9 @@
         padding-top: 75%;
     }
 }
+
+@media only screen and (max-width: 600px) {
+    .module-map .map-wrapper::before {
+        padding-top: 100%;
+    }
+}

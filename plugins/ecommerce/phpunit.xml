@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         bootstrap="backend/tests/bootstrap.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache"
+         executionOrder="default"
+         beStrictAboutOutputDuringTests="true"
+         failOnWarning="true">
+    <!-- IMPORTANT: lancer avec -d auto_prepend_file=backend/tests/prepend.php
+         pour remplacer les helpers exit() par des stubs throw() testables.
+         Exemple : php -d auto_prepend_file=backend/tests/prepend.php ../../backend-php/vendor/bin/phpunit -->
+    <php>
+        <env name="BACKEND_PHP_DIR" value="" force="false"/>
+    </php>
+    <testsuites>
+        <testsuite name="ecommerce">
+            <directory>backend/tests</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>backend</directory>
+        </include>
+    </source>
+</phpunit>

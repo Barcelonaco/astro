@@ -10,9 +10,10 @@ import { MEDIA_ORIGIN } from '../../lib/api';
 
 interface Props {
   data: Record<string, any>;
+  pageTitle?: string;
 }
 
-const { data } = Astro.props;
+const { data, pageTitle = '' } = Astro.props;
 
 const apiOrigin = MEDIA_ORIGIN;
 
@@ -27,7 +28,7 @@ const p = getPreset('banner');
 const heightBanner = (data.banner_height as string) || 'small';
 const titleInHeader = data.title_in_header !== 'hideTitle' ? 'showTitle' : 'hideTitle';
 const h1InHeader = (data.h1_in_header as string) || 'yes';
-const title = (data.title as string) || '';
+const title = (data.title as string) || pageTitle;
 const titleSize = (data.title_size as string) || '';
 const imgBanner = data.image as any;
 const imgUrl = resolveImageUrl(imgBanner, apiOrigin);
@@ -58,7 +59,7 @@ const titleSizeClass = titleSize ? ` h1-${titleSize}` : '';
     {/* Image banner principale */}
     {heightBanner !== 'none' && imgUrl && (
       <div class="background">
-        <img src={optimizedImageUrl(imgUrl, p.width, p.quality)} srcset={bannerSrcset || undefined} sizes="100vw" width={imgDims.width || 1440} height={imgDims.height || 600} fetchpriority="high" loading="eager" decoding="sync" alt={imgAlt} title={imgTitle || undefined} class="illus" />
+        <img src={optimizedImageUrl(imgUrl, p.width, p.quality)} srcset={bannerSrcset || undefined} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 1440px" width={imgDims.width || 1440} height={imgDims.height || 600} fetchpriority="high" loading="eager" decoding="sync" alt={imgAlt} title={imgTitle || undefined} class="illus" />
       </div>
     )}
 

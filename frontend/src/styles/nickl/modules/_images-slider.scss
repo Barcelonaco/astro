@@ -259,3 +259,21 @@
         }
     }
 }
+
+@media only screen and (max-width: 600px) {
+    .module-images-slider {
+        .desc {
+            .title {
+                font-size: rem(22px);
+            }
+        }
+        &:not(.full-width) .slider-navigation {
+            &.prev {
+                left: calc(.5rem + #{$container-padding});
+            }
+            &.next {
+                right: calc(.5rem + #{$container-padding});
+            }
+        }
+    }
+}

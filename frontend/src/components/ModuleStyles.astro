@@ -166,6 +166,16 @@ for (const type of pluginBlockTypes) {
   if (css) pluginCssChunks.push(css);
 }
 const pluginInlinedCss = pluginCssChunks.filter(Boolean).join('\n');
+
+// Child theme — inject custom CSS/JS as last stylesheets (highest priority)
+const childThemeSlug = await (async () => {
+  const { getStyleSettings } = await import('../lib/api');
+  const s = await getStyleSettings();
+  if (s.theme_use_child !== '1') return null;
+  return s.active_theme || 'default';
+})();
+const hasChildCss = !!childThemeSlug && fs.existsSync(path.join(process.cwd(), 'public', 'themes', childThemeSlug, 'style.css'));
+const hasChildJs = !!childThemeSlug && fs.existsSync(path.join(process.cwd(), 'public', 'themes', childThemeSlug, 'script.js'));
 ---
 
 {/* Nickl module CSS — external cacheable files, non-blocking */}
@@ -182,3 +192,7 @@ const pluginInlinedCss = pluginCssChunks.filter(Boolean).join('\n');
 
 {/* Plugin CSS — inlined (small, not available as external files) */}
 {pluginInlinedCss && <style set:html={pluginInlinedCss} />}
+
+{/* Child theme — loaded last for maximum CSS specificity */}
+{hasChildCss && <link rel="stylesheet" href={`/themes/${childThemeSlug}/style.css`} />}
+{hasChildJs && <script is:inline src={`/themes/${childThemeSlug}/script.js`} defer />}

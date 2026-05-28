@@ -147,3 +147,20 @@
         }
     }
 }
+
+@media only screen and (max-width: 600px) {
+    .popin-alert-wrapper {
+        .popin {
+            max-width: 95vw;
+            max-height: 90vh;
+        }
+    }
+    .module-alert .btn-wrapper {
+        flex-direction: column;
+        align-items: stretch;
+        gap: rem(12px);
+        .btn {
+            text-align: center;
+        }
+    }
+}

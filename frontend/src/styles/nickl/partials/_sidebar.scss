@@ -82,3 +82,16 @@
     }
 
 }
+
+@media only screen and (max-width: 600px) {
+    .wrapper-sidebar {
+        .sidebar {
+            margin-bottom: rem(24px);
+        }
+        .widget-woof {
+            h3 {
+                font-size: rem(18px);
+            }
+        }
+    }
+}

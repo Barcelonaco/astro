@@ -127,3 +127,15 @@
         margin-bottom: 3.125rem;
     }
 }
+
+@media only screen and (max-width: 600px) {
+    .page-account {
+        form.woocommerce-form-login, form.woocommerce-form-register, form.woocommerce-ResetPassword {
+            max-width: 100%;
+        }
+        .woocommerce-MyAccount-navigation a {
+            font-size: rem(17px);
+            padding: rem(8px) 0;
+        }
+    }
+}

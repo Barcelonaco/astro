@@ -533,10 +533,30 @@ class ProductController {
             $variants = ProductVariantModel::findByProduct($id);
         }
 
-        // Sync default variant from CPT custom_fields for non-variant products
-        // (admin CPT save updates custom_fields but not product_variants — keep them aligned).
-        // Inclut prix, compare_at, poids, stock_quantity, stock_managed, low_stock_threshold.
+        // Sync compare_at_price from CPT custom_fields → ALL variants
+        // (quand le prix promo global est vidé, tous les variants doivent être réinitialisés)
         $variantsEnabled = !empty($cf['variants_enabled']);
+        if (array_key_exists('compare_at_price', $cf)) {
+            $expectedCompareCents = !empty($cf['compare_at_price'])
+                ? (int) round(((float) $cf['compare_at_price']) * 100)
+                : 0;
+            $needsSync = false;
+            foreach ($variants as $v) {
+                if ((int) ($v['compare_at_price_cents'] ?? 0) !== $expectedCompareCents) {
+                    $needsSync = true;
+                    break;
+                }
+            }
+            if ($needsSync) {
+                $newVal = $expectedCompareCents ?: null;
+                foreach ($variants as $v) {
+                    ProductVariantModel::update((int) $v['id'], ['compare_at_price_cents' => $newVal]);
+                }
+                $variants = ProductVariantModel::findByProduct($id);
+            }
+        }
+
+        // Sync remaining fields for non-variant products only
         if (!$variantsEnabled && count($variants) === 1) {
             $variant = $variants[0];
             $patch = [];
@@ -545,14 +565,6 @@ class ProductController {
                 $expectedPriceCents = (int) round(((float) $cf['base_price']) * 100);
                 if ((int) $variant['price_cents'] !== $expectedPriceCents) {
                     $patch['price_cents'] = $expectedPriceCents;
-                }
-            }
-            if (array_key_exists('compare_at_price', $cf)) {
-                $expectedCompareCents = !empty($cf['compare_at_price'])
-                    ? (int) round(((float) $cf['compare_at_price']) * 100)
-                    : 0;
-                if ((int) ($variant['compare_at_price_cents'] ?? 0) !== $expectedCompareCents) {
-                    $patch['compare_at_price_cents'] = $expectedCompareCents ?: null;
                 }
             }
             if (isset($cf['weight_grams'])) {
@@ -588,9 +600,10 @@ class ProductController {
 
         $minPrice = min(array_map(fn($v) => $v['price_cents'], $variants));
         $maxPrice = max(array_map(fn($v) => $v['price_cents'], $variants));
+        // compare_at_price_cents = prix promo (inférieur au prix de base quand actif)
         $compareMin = null;
         foreach ($variants as $v) {
-            if (!empty($v['compare_at_price_cents']) && $v['compare_at_price_cents'] > $v['price_cents']) {
+            if (!empty($v['compare_at_price_cents']) && $v['compare_at_price_cents'] < $v['price_cents']) {
                 $compareMin = $compareMin === null ? $v['compare_at_price_cents'] : min($compareMin, $v['compare_at_price_cents']);
             }
         }
@@ -610,10 +623,11 @@ class ProductController {
         // Un produit est "configuré" dès qu'il a un prix ou qu'il a été explicitement mis en stock
         $isConfigured = $minPrice > 0 || (!empty($variants) && count($variants) > 1);
 
-        // HT prices (TTC ÷ (1 + taux TVA))
+        // HT prices (TTC ÷ (1 + taux TVA)) — basé sur prix effectif (promo si active)
         $taxCode = $cf['tax_code'] ?? 'FR_STANDARD';
         $taxRate = self::getTaxRate($taxCode);
-        $htMin = (int) round($minPrice / (1 + $taxRate / 100));
+        $effectiveMin = ($compareMin !== null && $compareMin < $minPrice) ? $compareMin : $minPrice;
+        $htMin = (int) round($effectiveMin / (1 + $taxRate / 100));
         $htMax = (int) round($maxPrice / (1 + $taxRate / 100));
 
         $out = [

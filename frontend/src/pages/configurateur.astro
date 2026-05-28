@@ -46,7 +46,7 @@ const bodyClasses = [
     <Header siteName={siteName} navigation={navigationData} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
     <main class="main-page poolp-page-wrap">
       <div class="poolp-container">
-        <PoolpWizard bootstrap={null} initialProject={null} />
+        <PoolpWizard bootstrap={null} initialProject={null} defaultImage={siteSettings.replacement_image || ''} />
       </div>
     </main>
     <Footer siteSettings={siteSettings} />

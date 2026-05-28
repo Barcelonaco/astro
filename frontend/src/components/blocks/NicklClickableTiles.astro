@@ -103,7 +103,7 @@ function hasDesc(item: any): boolean {
       )}
 
       {/* Flat grid: non-interlocking OR interlocking 8+ items (same single-row layout) */}
-      {!interlockingTiles || count >= 8 ? (
+      {!interlockingTiles ? (
         <div class={`list items items-${count}`}>
           {listItems.map((item) => (
             <div
@@ -171,7 +171,7 @@ function hasDesc(item: any): boolean {
       ) : (
         /* Interlocking cols */
         <div class={`cols-wrapper items-${count}`}>
-          {count >= 8 ? (
+          {count === 8 ? (
             /* 8+ items: flat layout inside cols-wrapper */
             <div class="items">
               {listItems.map((item) => (

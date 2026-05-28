@@ -283,3 +283,43 @@
         }
     }
 }
+
+@media only screen and (max-width: 600px) {
+    .page-cart {
+        .woocommerce-cart-form .shop_table td {
+            &.product-thumbnail {
+                width: rem(100px);
+                img {
+                    width: rem(90px);
+                }
+            }
+            &.product-name {
+                font-size: rem(16px);
+            }
+            &.product-subtotal {
+                font-size: rem(16px);
+            }
+            &.actions .coupon .input-text {
+                width: 100%;
+                margin-right: 0;
+                margin-bottom: rem(8px);
+            }
+        }
+        .cart-collaterals .cart_totals {
+            h2 {
+                font-size: rem(20px);
+            }
+            th {
+                font-size: rem(16px);
+            }
+            td {
+                font-size: rem(20px);
+            }
+            .checkout-button {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+        }
+    }
+}

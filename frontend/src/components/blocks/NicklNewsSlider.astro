@@ -1,7 +1,7 @@
 ---
 /**
  * Module NewsSlider — Reproduit news-slider.blade.php
- * Slider d'actualités. Fetch les actualités depuis le CPT actualites au build time.
+ * Slider d'actualités avec Swiper. columns-1 = featured layout, columns-2/3/4 = grille.
  */
 import NicklModuleWrapper from './NicklModuleWrapper.astro';
 import { isTruthy } from '../../lib/module-classes';
@@ -15,10 +15,10 @@ interface Props {
 const { data } = Astro.props;
 
 const p = getPreset('card');
-const displayPosts = (data.display_posts as string) || '1';
 const isManual = isTruthy(data.is_manual);
 const displayArchiveLink = isTruthy(data.display_archive_link);
 const archiveLinkLabel = (data.archive_link_label as string) || 'Voir toutes les actualités';
+const displayPosts = data.display_posts || '3';
 
 // Fetch actualités depuis le CPT
 let posts: ActualiteItem[] = [];
@@ -29,12 +29,11 @@ if (isManual && data.news_id) {
     const allItems = Array.isArray(allResult) ? allResult : allResult.items;
     posts = ids
       .map((id: number) => allItems.find(a => a.id === id))
-      .filter((a): a is ActualiteItem => !!a)
-      .slice(0, 6);
+      .filter((a): a is ActualiteItem => !!a);
   }
 } else {
-  const result = await getActualites({ status: 'published', limit: 6 });
-  posts = Array.isArray(result) ? result.slice(0, 6) : result.items.slice(0, 6);
+  const result = await getActualites({ status: 'published', limit: 12 });
+  posts = Array.isArray(result) ? result : result.items;
 }
 
 function getImage(item: ActualiteItem): string {
@@ -73,11 +72,9 @@ function getDate(item: ActualiteItem): string {
                       <img
                         src={optimizedImageUrl(image, p.width, p.quality)}
                         srcset={responsiveSrcset(image, p.srcsetWidths, p.srcsetQuality) || undefined}
-                        sizes="(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw"
+                        sizes={displayPosts === '1' ? '100vw' : `(max-width: 600px) 100vw, (max-width: 960px) 50vw, ${Math.round(100 / Number(displayPosts))}vw`}
                         alt={post.title || ''}
                         class="illus"
-                        width="600"
-                        height="400"
                         loading="lazy"
                       />
                     ) : (
@@ -118,56 +115,3 @@ function getDate(item: ActualiteItem): string {
     </div>
   )}
 </NicklModuleWrapper>
-
-<script is:inline>
-(function() {
-  function initNewsSliders() {
-    if (!window.Swiper) return;
-    document.querySelectorAll('.module-news-slider .js_news-slider').forEach(function(el) {
-      if (el.swiper) return;
-
-      var slidesPerView = 1;
-      var breakpoints = {};
-
-      if (el.classList.contains('columns-2')) {
-        breakpoints = { 601: { slidesPerView: 2 } };
-      } else if (el.classList.contains('columns-3')) {
-        breakpoints = { 601: { slidesPerView: 1 }, 1025: { slidesPerView: 3 } };
-      } else if (el.classList.contains('columns-4')) {
-        breakpoints = { 601: { slidesPerView: 1 }, 1025: { slidesPerView: 4 } };
-      }
-
-      // Check if we have enough slides to need a slider
-      var items = el.querySelectorAll('.item');
-      var w = window.innerWidth;
-      var currentPerView = slidesPerView;
-      for (var bp in breakpoints) {
-        if (w >= parseInt(bp)) currentPerView = breakpoints[bp].slidesPerView;
-      }
-      if (items.length <= currentPerView) return;
-
-      var wrapper = el.closest('.slider-wrapper') || el.parentElement;
-      new window.Swiper(el, {
-        loop: true,
-        speed: 750,
-        slidesPerView: slidesPerView,
-        breakpoints: breakpoints,
-        spaceBetween: 26,
-        navigation: {
-          nextEl: wrapper.querySelector('.next'),
-          prevEl: wrapper.querySelector('.prev')
-        }
-      });
-    });
-  }
-
-  if (window.Swiper) {
-    initNewsSliders();
-  } else {
-    var check = setInterval(function() {
-      if (window.Swiper) { clearInterval(check); initNewsSliders(); }
-    }, 500);
-    setTimeout(function() { clearInterval(check); }, 15000);
-  }
-})();
-</script>

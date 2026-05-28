@@ -59,8 +59,7 @@ class MenuController {
             json_response($items);
             return;
         }
-        // Fallback to page-based navigation
-        json_response(PageModel::findNavigation());
+        json_response([]);
     }
 
     public static function getAvailablePages(): void {

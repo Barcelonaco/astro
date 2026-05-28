@@ -130,3 +130,16 @@
     }
   }
 }
+
+@media only screen and (max-width: 600px) {
+  .module-summary {
+    .menu > .menu-item {
+      > a, .title {
+        font-size: rem(22px);
+      }
+    }
+    .menu {
+      gap: rem(24px);
+    }
+  }
+}

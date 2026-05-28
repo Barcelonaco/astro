@@ -131,7 +131,7 @@ const extraClasses = extraParts.join(' ');
             )}
             {!preview && videoSrc === 'youtube' && youtubeId && (
               <img
-                src={`https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`}
+                src={`https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`}
                 alt=""
                 class="illus-video"
               />
@@ -147,9 +147,14 @@ const extraClasses = extraParts.join(' ');
                   <span class="txt">Lire la vidéo</span>
                 </button>
                 <iframe
-                  src={`https://www.youtube.com/embed/${youtubeId}`}
+                  src="about:blank"
+                  data-src={`https://www.youtube.com/embed/${youtubeId}`}
                   frameborder="0"
-                  allow="autoplay; fullscreen; picture-in-picture"
+                  loading="lazy"
+                  width="560"
+                  height="315"
+                  title="YouTube video"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowfullscreen
                 />
               </>
@@ -168,8 +173,13 @@ const extraClasses = extraParts.join(' ');
                   <span class="txt">Lire la vidéo</span>
                 </button>
                 <iframe
-                  src={`https://player.vimeo.com/video/${vimeoId}`}
+                  src="about:blank"
+                  data-src={`https://player.vimeo.com/video/${vimeoId}`}
                   frameborder="0"
+                  loading="lazy"
+                  width="560"
+                  height="315"
+                  title="Vimeo video"
                   allow="autoplay; fullscreen; picture-in-picture"
                   allowfullscreen
                 />
@@ -184,7 +194,12 @@ const extraClasses = extraParts.join(' ');
                   <span class="txt">Lire la vidéo</span>
                 </button>
                 <iframe
-                  src={`https://geo.dailymotion.com/player.html?video=${dailymotionId}`}
+                  src="about:blank"
+                  data-src={`https://geo.dailymotion.com/player.html?video=${dailymotionId}`}
+                  loading="lazy"
+                  width="560"
+                  height="315"
+                  title="Dailymotion video"
                   allowfullscreen
                   allow="encrypted-media; fullscreen; picture-in-picture; web-share;"
                 />
@@ -220,3 +235,29 @@ const extraClasses = extraParts.join(' ');
     </div>
   </div>
 </NicklModuleWrapper>
+
+<script>
+  document.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('.js_btn-video') as HTMLElement | null;
+    if (!btn) return;
+    const wrapper = btn.closest('.video-wrapper') || btn.closest('.video');
+    if (!wrapper) return;
+    const iframe = wrapper.querySelector('iframe');
+    if (!iframe) return;
+
+    const ytId = btn.dataset.src;
+    const vimeoId = btn.dataset.srcVimeo;
+    const dmId = btn.dataset.srcDailymotion;
+
+    const baseSrc = iframe.dataset.src || '';
+    if (ytId) {
+      iframe.src = `${baseSrc || 'https://www.youtube.com/embed/' + ytId}?autoplay=1`;
+    } else if (vimeoId) {
+      iframe.src = `${baseSrc || 'https://player.vimeo.com/video/' + vimeoId}?autoplay=1`;
+    } else if (dmId) {
+      iframe.src = `${baseSrc || 'https://geo.dailymotion.com/player.html?video=' + dmId}&autoplay=1`;
+    }
+
+    wrapper.classList.add('active');
+  });
+</script>

@@ -10,7 +10,7 @@ interface Props {
   styleSettings?: Record<string, string>;
 }
 
-const THEME_COLORS: Record<string, Record<string, string>> = {
+const BUILTIN_THEME_COLORS: Record<string, Record<string, string>> = {
   default: { accent: '#2337ff', accentDark: '#000d8a', black: '15, 18, 25', gray: '96, 115, 159', grayLight: '229, 233, 240', grayDark: '34, 41, 57' },
   dark: { accent: '#00d4ff', accentDark: '#0088cc', black: '255, 255, 255', gray: '160, 175, 199', grayLight: '30, 33, 40', grayDark: '220, 225, 232' },
   minimal: { accent: '#000000', accentDark: '#333333', black: '0, 0, 0', gray: '100, 100, 100', grayLight: '240, 240, 240', grayDark: '50, 50, 50' },
@@ -41,7 +41,7 @@ const settings = Astro.props.styleSettings || await getStyleSettings();
 // Theme colors
 const useChildTheme = settings.theme_use_child === '1';
 const activeTheme = settings.active_theme || 'default';
-const themeColors = useChildTheme ? THEME_COLORS[activeTheme] : null;
+const themeColors = useChildTheme ? loadChildThemeColors(activeTheme) : null;
 const isDark = useChildTheme && activeTheme === 'dark';
 
 // Nickl colors
@@ -65,9 +65,23 @@ const fontGeneral = customFontGeneral || FONT_GENERALS[fontGeneralKey] || 'Plus 
 // Logo
 const logoHeight = parseInt(settings.logo_height || '100', 10);
 
-// Google Fonts — fetch at build time, download woff2 files locally, rewrite URLs
+// Child theme — load colors from theme.json if exists in public/themes/{activeTheme}/
 import fs from 'node:fs';
 import path from 'node:path';
+
+function loadChildThemeColors(theme: string): Record<string, string> | null {
+  if (BUILTIN_THEME_COLORS[theme]) return BUILTIN_THEME_COLORS[theme];
+  try {
+    const themeJsonPath = path.join(process.cwd(), 'public', 'themes', theme, 'theme.json');
+    if (fs.existsSync(themeJsonPath)) {
+      const manifest = JSON.parse(fs.readFileSync(themeJsonPath, 'utf-8'));
+      return manifest.colors || null;
+    }
+  } catch {}
+  return null;
+}
+
+// Google Fonts — fetch at build time, download woff2 files locally, rewrite URLs
 
 const fontsToLoad = new Set<string>();
 if (fontTitle) fontsToLoad.add(fontTitle);
@@ -182,3 +196,4 @@ if (!isNaN(logoHeight)) cssVars.push(`--logo-height:${logoHeight}px`);
 ) : googleFontsUrl ? (
   <link rel="stylesheet" href={googleFontsUrl} media="print" onload="this.media='all'" />
 ) : null}
+

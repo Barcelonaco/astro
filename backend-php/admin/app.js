@@ -71,15 +71,44 @@ const ADMIN_THEMES = {
   nature: { primary: '#2ecc71', primaryDark: '#27ae60', dark: false }
 };
 
-function applyAdminTheme(useChildTheme, activeTheme) {
+async function applyAdminTheme(useChildTheme, activeTheme) {
   const root = document.documentElement;
   if (!useChildTheme) {
     root.style.removeProperty('--primary');
     root.style.removeProperty('--primary-dark');
     root.removeAttribute('data-admin-theme');
+    const oldLink = document.getElementById('child-theme-admin-css');
+    if (oldLink) oldLink.remove();
     return;
   }
-  const theme = ADMIN_THEMES[activeTheme];
+  let theme = ADMIN_THEMES[activeTheme];
+  if (!theme) {
+    // Custom theme — fetch colors from theme.json
+    try {
+      const res = await fetch(`/themes/${activeTheme}/theme.json`);
+      if (res.ok) {
+        const manifest = await res.json();
+        if (manifest.colors) {
+          theme = { primary: manifest.colors.accent, primaryDark: manifest.colors.accentDark, dark: false };
+        }
+      }
+    } catch {}
+  }
+  // Inject child theme admin.css if it exists
+  const existingLink = document.getElementById('child-theme-admin-css');
+  if (existingLink) existingLink.remove();
+  const cssUrl = `/themes/${activeTheme}/admin.css`;
+  try {
+    const cssCheck = await fetch(cssUrl, { method: 'HEAD' });
+    if (cssCheck.ok) {
+      const link = document.createElement('link');
+      link.id = 'child-theme-admin-css';
+      link.rel = 'stylesheet';
+      link.href = cssUrl;
+      document.head.appendChild(link);
+    }
+  } catch {}
+
   if (!theme) return;
   root.style.setProperty('--primary', theme.primary);
   root.style.setProperty('--primary-dark', theme.primaryDark);
@@ -1279,25 +1308,16 @@ async function renderCPTEditPage(ptDef, itemId) {
         const fnEsc = escapeHtml(field.name);
         return `<div class="form-group"${w}>
           <label class="form-label">${escapeHtml(field.label)}</label>
-          <div class="form-row" style="display:grid;grid-template-columns:1fr 2fr 1fr auto;gap:8px;">
-            <div class="form-group" style="margin:0;">
-              <select class="form-input cpt-link-page-select" data-target="cf_${fnEsc}_url">
-                <option value="">— Page du site —</option>
-                ${allPages.filter(p => p.status === 'published').map(p => `<option value="/${escapeHtml(p.slug)}" ${lObj.url === '/' + p.slug ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
-              </select>
+          <div class="link-field" data-field="cf_${fnEsc}">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" class="form-input link-field-url" name="cf_${fnEsc}_url" value="${escapeHtml(lObj.url || '')}" placeholder="URL" style="flex:1">
+              <button type="button" class="btn-link-picker" onclick="openLinkPickerForField(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Parcourir</button>
             </div>
-            <div class="form-group" style="margin:0;">
-              <input type="text" class="form-input" name="cf_${fnEsc}_url" value="${escapeHtml(lObj.url || '')}" placeholder="URL (ou choisir une page)">
-            </div>
-            <div class="form-group" style="margin:0;">
-              <input type="text" class="form-input" name="cf_${fnEsc}_title" value="${escapeHtml(lObj.title || '')}" placeholder="Titre du lien">
-            </div>
-            <div class="form-group" style="margin:0;">
-              <select class="form-input" name="cf_${fnEsc}_target">
-                <option value="_self" ${lObj.target !== '_blank' ? 'selected' : ''}>Même fenêtre</option>
-                <option value="_blank" ${lObj.target === '_blank' ? 'selected' : ''}>Nouvel onglet</option>
-              </select>
-            </div>
+            <input type="text" class="form-input link-field-title" name="cf_${fnEsc}_title" value="${escapeHtml(lObj.title || '')}" placeholder="Titre du lien">
+            <select class="form-input" name="cf_${fnEsc}_target">
+              <option value="_self" ${lObj.target !== '_blank' ? 'selected' : ''}>Même fenêtre</option>
+              <option value="_blank" ${lObj.target === '_blank' ? 'selected' : ''}>Nouvel onglet</option>
+            </select>
           </div>
         </div>`;
       }
@@ -1608,16 +1628,6 @@ function attachCPTFormEvents(ptDef) {
       const target = document.querySelector(`.cpt-tab-content[data-tab="${tab.dataset.tab}"]`);
       if (target) target.style.display = '';
     });
-  });
-
-  // Link page selectors → URL sync (generic, supports multiple link fields)
-  document.querySelectorAll('.cpt-link-page-select').forEach(sel => {
-    const targetName = sel.dataset.target;
-    if (!targetName) return;
-    const urlInput = document.querySelector(`input[name="${targetName}"]`);
-    if (urlInput) {
-      sel.addEventListener('change', () => { if (sel.value) urlInput.value = sel.value; });
-    }
   });
 
   // TrueFalse toggle slider sync
@@ -3353,16 +3363,17 @@ async function renderPageBuilder() {
           const fnEsc = escapeHtml(field.name);
           return `<div class="form-group" style="margin-bottom:12px;">
             <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">${escapeHtml(field.label)}</label>
-            <select class="form-input cpt-link-page-select" data-target="cptBf_${fnEsc}_url" style="font-size:12px;margin-bottom:4px;">
-              <option value="">— Page du site —</option>
-              ${allPages.filter(p => p.status === 'published').map(p => `<option value="/${escapeHtml(p.slug)}" ${lObj.url === '/' + p.slug ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
-            </select>
-            <input type="text" class="form-input" id="cptBf_${fnEsc}_url" value="${escapeHtml(lObj.url || '')}" placeholder="URL" style="font-size:12px;margin-bottom:4px;">
-            <input type="text" class="form-input" id="cptBf_${fnEsc}_title" value="${escapeHtml(lObj.title || '')}" placeholder="Titre du lien" style="font-size:12px;margin-bottom:4px;">
-            <select class="form-input" id="cptBf_${fnEsc}_target" style="font-size:12px;">
-              <option value="_self" ${lObj.target !== '_blank' ? 'selected' : ''}>Même fenêtre</option>
-              <option value="_blank" ${lObj.target === '_blank' ? 'selected' : ''}>Nouvel onglet</option>
-            </select>
+            <div class="link-field" data-field="cptBf_${fnEsc}" style="font-size:12px;">
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input type="text" class="form-input link-field-url" id="cptBf_${fnEsc}_url" value="${escapeHtml(lObj.url || '')}" placeholder="URL" style="font-size:12px;flex:1">
+                <button type="button" class="btn-link-picker" onclick="openLinkPickerForField(this)" style="font-size:11px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Parcourir</button>
+              </div>
+              <input type="text" class="form-input link-field-title" id="cptBf_${fnEsc}_title" value="${escapeHtml(lObj.title || '')}" placeholder="Titre du lien" style="font-size:12px;">
+              <select class="form-input" id="cptBf_${fnEsc}_target" style="font-size:12px;">
+                <option value="_self" ${lObj.target !== '_blank' ? 'selected' : ''}>Même fenêtre</option>
+                <option value="_blank" ${lObj.target === '_blank' ? 'selected' : ''}>Nouvel onglet</option>
+              </select>
+            </div>
           </div>`;
         }
 
@@ -3755,6 +3766,7 @@ async function renderPageBuilder() {
           <div class="builder-settings" id="builderSettings" style="${selectedBlockId ? '' : 'display:none'}">
             ${renderBuilderSettingsPanel()}
           </div>
+          <div class="builder-sidebar-resize" id="builderSidebarResize"></div>
         </aside>
         ${cptDef?.hasModules === false ? '' : `<main class="builder-canvas" id="builderCanvas" data-drop-zone="true">
           <div class="builder-canvas-toolbar" id="builderToolbar" style="${pageBuilderState.blocks.length ? '' : 'display:none'}">
@@ -4008,7 +4020,8 @@ function renderColumnsTabPreviewHtml(data) {
       try { subHtml = replaceEmptyImages(renderBlockPreviewHtml(subBlock)); } catch (e) { console.warn('Sub-module render error:', layout, e); }
       // If template rendering produced empty/whitespace-only output (no text
       // AND no images), show a meaningful fallback so the column isn't invisible.
-      if (!subHtml || (!subHtml.replace(/<[^>]*>/g, '').trim() && !/<img\s/i.test(subHtml) && !/<video\s/i.test(subHtml))) {
+      const isVisualOnly = layout === 'separator' || layout === 'Separator';
+      if (!isVisualOnly && (!subHtml || (!subHtml.replace(/<[^>]*>/g, '').trim() && !/<img\s/i.test(subHtml) && !/<video\s/i.test(subHtml)))) {
         subHtml = renderSubModuleFallback(layout, subModule);
       }
       return `<div class="module-in-column" style="width:100%">${subHtml}</div>`;
@@ -4130,6 +4143,30 @@ function renderBlockPreviewHtml(block) {
     // Ensure CSS is loaded
     if (!moduleTemplateCache['news-slider']) queueModuleTemplateLoad('news-slider');
     return `<div class="module module-news-slider ${escapeHtml(nsExtraCls)}" style="position:relative">${nsBgHtml}<div class="container-large">${nsTitleHtml}<div class="slider-wrapper"><div class="swiper slider js_news-slider columns-${escapeHtml(nsCols)}"><div class="swiper-wrapper" id="${nsId}"><p style="text-align:center;opacity:.5">Chargement des actualités…</p></div></div></div>${nsLinkHtml}</div></div>`;
+  }
+  // Separator — custom preview (Blade uses $width top-level var not in ctx)
+  if (block.type === 'separator' || block.type === 'Separator') {
+    const sepStyle = d.separator_style || 'style-3';
+    const sepWidth = d.width || 80;
+    const sepHeight = d.height || 2;
+    const sepText = d.text || '';
+    const sepCls = [d.bloc_color || '', d.padding_top || '', d.padding_bottom || ''].filter(Boolean).join(' ');
+    const withTextCls = sepText ? ' separator-with-text' : '';
+    let sepInner = '';
+    if (sepStyle === 'style-1') {
+      sepInner = `<span class="points-wrapper"><span class="point point-1"></span><span class="point point-2"></span><span class="point point-3"></span></span>`;
+      if (sepText) sepInner += `<span class="title title-section-3">${escapeHtml(sepText)}</span><span class="points-wrapper"><span class="point point-1"></span><span class="point point-2"></span><span class="point point-3"></span></span>`;
+    } else if (sepStyle === 'style-2') {
+      sepInner = `<hr class="default">`;
+      if (sepText) sepInner += `<span class="title title-section-3">${escapeHtml(sepText)}</span><hr class="default">`;
+    } else if (sepStyle === 'style-3') {
+      const hrStyle = `width:${sepWidth}%;height:${sepHeight}px;`;
+      sepInner = `<hr class="custom" style="${hrStyle}">`;
+      if (sepText) sepInner += `<span class="title title-section-3">${escapeHtml(sepText)}</span><hr class="custom" style="${hrStyle}">`;
+    }
+    // style-0 = no visual separator
+    if (!moduleTemplateCache['separator']) queueModuleTemplateLoad('separator');
+    return `<div class="module module-separator ${escapeHtml(sepCls)}${withTextCls}">${sepInner}</div>`;
   }
   // Accordion — empty state: render add button directly
   if ((block.type === 'accordion' || block.type === 'Accordion') && (!Array.isArray(d.accordions) || d.accordions.length === 0)) {
@@ -6021,6 +6058,68 @@ function attachPageBuilderListeners() {
   updateBuilderPlaceholder();
   renderBlockSettings();
   initPreviewScaling();
+  initBuilderSidebarResize();
+}
+
+// ── Resizable builder sidebar ───────────────────────────────────────────────
+function initBuilderSidebarResize() {
+  const handle = document.getElementById('builderSidebarResize');
+  const sidebar = handle?.closest('.builder-sidebar');
+  if (!handle || !sidebar) return;
+
+  const MIN_W = 280;
+  const MAX_W = 700;
+  const saved = localStorage.getItem('builderSidebarWidth');
+  if (saved) {
+    const w = Math.min(MAX_W, Math.max(MIN_W, parseInt(saved, 10)));
+    sidebar.style.setProperty('--builder-sidebar-width', w + 'px');
+  }
+
+  let startX = 0, startW = 0;
+
+  function onMove(e) {
+    const dx = (e.clientX || e.touches?.[0]?.clientX || 0) - startX;
+    const w = Math.min(MAX_W, Math.max(MIN_W, startW + dx));
+    sidebar.style.setProperty('--builder-sidebar-width', w + 'px');
+  }
+
+  function onUp() {
+    document.body.classList.remove('builder-resizing');
+    handle.classList.remove('is-dragging');
+    const w = parseInt(getComputedStyle(sidebar).width, 10);
+    localStorage.setItem('builderSidebarWidth', w);
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onUp);
+    applyPreviewScaling();
+  }
+
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = sidebar.getBoundingClientRect().width;
+    document.body.classList.add('builder-resizing');
+    handle.classList.add('is-dragging');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  handle.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startW = sidebar.getBoundingClientRect().width;
+    document.body.classList.add('builder-resizing');
+    handle.classList.add('is-dragging');
+    document.addEventListener('touchmove', onMove, { passive: true });
+    document.addEventListener('touchend', onUp);
+  }, { passive: true });
+
+  // Double-click → reset to default
+  handle.addEventListener('dblclick', () => {
+    sidebar.style.removeProperty('--builder-sidebar-width');
+    localStorage.removeItem('builderSidebarWidth');
+    applyPreviewScaling();
+  });
 }
 
 // ── Preview scaling ─────────────────────────────────────────────────────────
@@ -8272,7 +8371,11 @@ function switchBlockTab(tabBtn) {
   // Activate clicked tab and its target section
   tabBtn.classList.add('is-active');
   const target = form.querySelector(tabBtn.getAttribute('data-target'));
-  if (target) target.classList.add('is-active');
+  if (target) {
+    target.classList.add('is-active');
+    // Initialize deferred Quill editors now that the section is visible
+    initWysiwygEditors(target);
+  }
 }
 
 function normalizeBoolVal(val) {
@@ -8284,19 +8387,28 @@ function normalizeBoolVal(val) {
 // rowCtx = { parentName, rowIndex } when rendering inside a Repeater row or Group
 function renderSchemaField(field, value, blockId, allData, rowCtx = null) {
   const html = _renderSchemaFieldHTML(field, value, blockId, rowCtx);
-  const cond = field.conditional;
-  if (!cond) return html;
-  // Look up conditional field value: first in current scope (allData), then fallback to block-level data
-  let condFieldVal = allData?.[cond.field];
-  if (condFieldVal === undefined && rowCtx) {
-    const block = pageBuilderState.blocks.find(b => b.id === blockId);
-    const blockData = block?.data && typeof block.data === 'object' ? block.data : {};
-    condFieldVal = blockData[cond.field];
+  const rawCond = field.conditional;
+  if (!rawCond) return html;
+  // Support single conditional object or array of conditionals (AND logic)
+  const conds = Array.isArray(rawCond) ? rawCond : [rawCond];
+  let show = true;
+  for (const cond of conds) {
+    let condFieldVal = allData?.[cond.field];
+    if (condFieldVal === undefined && rowCtx) {
+      const block = pageBuilderState.blocks.find(b => b.id === blockId);
+      const blockData = block?.data && typeof block.data === 'object' ? block.data : {};
+      condFieldVal = blockData[cond.field];
+    }
+    condFieldVal = normalizeBoolVal(condFieldVal);
+    const isEmpty = cond.operator === '!=empty' || (cond.operator === '!=' && (cond.value === '' || cond.value === null || cond.value === 'null'));
+    const match = isEmpty ? condFieldVal !== '' : (cond.operator === '==' ? condFieldVal === String(cond.value ?? '') : condFieldVal !== String(cond.value ?? ''));
+    if (!match) { show = false; break; }
   }
-  condFieldVal = normalizeBoolVal(condFieldVal);
-  const isEmpty = cond.operator === '!=empty' || (cond.operator === '!=' && (cond.value === '' || cond.value === null || cond.value === 'null'));
-  const show = isEmpty ? condFieldVal !== '' : (cond.operator === '==' ? condFieldVal === String(cond.value ?? '') : condFieldVal !== String(cond.value ?? ''));
-  return `<div class="schema-cond-field" data-cond-field="${escapeHtml(cond.field)}" data-cond-op="${escapeHtml(cond.operator)}" data-cond-val="${escapeHtml(cond.value || '')}"${show ? '' : ' style="display:none"'}>${html}</div>`;
+  const condData = conds.map((c, i) => {
+    const suffix = i === 0 ? '' : `-${i}`;
+    return `data-cond-field${suffix}="${escapeHtml(c.field)}" data-cond-op${suffix}="${escapeHtml(c.operator)}" data-cond-val${suffix}="${escapeHtml(c.value || '')}"`;
+  }).join(' ');
+  return `<div class="schema-cond-field" data-cond-count="${conds.length}" ${condData}${show ? '' : ' style="display:none"'}>${html}</div>`;
 }
 
 function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
@@ -8591,8 +8703,11 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
       <div class="form-group link-field-group">
         <label class="form-label">${escapeHtml(label)}</label>
         <div class="link-field" data-field="${escapeHtml(inputName)}">
-          <input type="url" class="form-input" name="${escapeHtml(inputName)}__url" placeholder="URL"${rfieldAttr} value="${escapeHtml(linkObj.url || '')}">
-          <input type="text" class="form-input" name="${escapeHtml(inputName)}__title" placeholder="Titre du lien" value="${escapeHtml(linkObj.title || '')}">
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="url" class="form-input link-field-url" name="${escapeHtml(inputName)}__url" placeholder="URL"${rfieldAttr} value="${escapeHtml(linkObj.url || '')}" style="flex:1">
+            <button type="button" class="btn-link-picker" onclick="openLinkPickerForField(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Parcourir</button>
+          </div>
+          <input type="text" class="form-input link-field-title" name="${escapeHtml(inputName)}__title" placeholder="Titre du lien" value="${escapeHtml(linkObj.title || '')}">
           <select class="form-select" name="${escapeHtml(inputName)}__target" style="max-width:180px">
             <option value="_self"${linkObj.target !== '_blank' ? ' selected' : ''}>Même fenêtre</option>
             <option value="_blank"${linkObj.target === '_blank' ? ' selected' : ''}>Nouvel onglet</option>
@@ -8614,7 +8729,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
       <div class="form-group">
         <label class="form-label">${escapeHtml(label)}</label>
         <div class="media-field" data-field="${escapeHtml(inputName)}">
-          <div class="media-preview">
+          <div class="media-preview" style="cursor:pointer" onclick="openMediaPicker('${pickerType}', '${blockId}', '${escapeHtml(inputName)}', { trigger: this })">
             ${url ? (isPdf ? `<div class="media-preview-icon" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f8f9fa;border-radius:8px;padding:1rem;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg></div>` : isVideo ? `<div class="media-preview-icon">🎬</div>` : `<img src="${escapeHtml(getOptimizedUrl(url, 400, 70))}" alt="${escapeHtml(meta)}">`) : ''}
           </div>
           <div class="media-preview-meta">${escapeHtml(meta)}</div>
@@ -8907,6 +9022,13 @@ function renderFlexibleContentItemHTML(item, index, blockId, fcCompoundName) {
   const skipFields = new Set(['title_bloc', 'title_style', 'title_align', 'bloc_color', 'padding_top', 'padding_bottom', 'is_visible', 'bg_img', 'bg_opacity', 'bg_parallax']);
   const itemFields = schemaFields.filter(f => !skipFields.has(f.name));
 
+  // Seed missing fields with defaults so conditionals evaluate correctly on new sub-modules
+  for (const sf of schemaFields) {
+    if (item[sf.name] === undefined && sf.defaultValue !== undefined) {
+      item[sf.name] = sf.defaultValue;
+    }
+  }
+
   const rowCtx = { parentName: `${fcCompoundName}::${index}`, rowIndex: null };
   const bodyHtml = itemFields.map(f => {
     const val = item[f.name] !== undefined ? item[f.name] : f.defaultValue;
@@ -9167,6 +9289,8 @@ function toggleRepeaterRow(header) {
   const open = body.style.display !== 'none';
   body.style.display = open ? 'none' : '';
   row.classList.toggle('is-open', !open);
+  // Initialize deferred Quill editors now that the container is visible
+  if (!open) initWysiwygEditors(body);
   if (typeof updateBuilderBreadcrumb === 'function') updateBuilderBreadcrumb();
 }
 
@@ -9373,6 +9497,9 @@ function switchColsTab(tabBtn) {
   const idx = tabBtn.dataset.tabIndex;
   wrapper.dataset.activeTab = idx;
   wrapper.querySelectorAll(':scope > .cols-vtabs-rail > .cols-vtab').forEach(b => b.classList.toggle('is-active', b.dataset.tabIndex === idx));
+  // Initialize deferred Quill editors in the newly visible column
+  const activeRow = wrapper.querySelector(`.cols-vtabs-content > .repeater-row[data-row-index="${idx}"]`);
+  if (activeRow) initWysiwygEditors(activeRow);
   if (typeof updateBuilderBreadcrumb === 'function') updateBuilderBreadcrumb();
 }
 
@@ -9641,34 +9768,40 @@ function saveSchemaData(blockId, event) {
 
 function updateSchemaConditionals(form) {
   form.querySelectorAll('.schema-cond-field').forEach(wrapper => {
-    const condField = wrapper.dataset.condField;
-    const condOp = wrapper.dataset.condOp;
-    const condVal = wrapper.dataset.condVal;
+    const count = parseInt(wrapper.dataset.condCount || '1', 10);
     // Inside a repeater row or group body, scope the lookup to that container
     const containerBody = wrapper.closest('.repeater-row-body, .group-field-body');
-    let input;
-    if (containerBody) {
-      // Sub-field inputs have data-rfield for row-scoped lookup
-      input = containerBody.querySelector(`[data-rfield="${CSS.escape(condField)}"]`);
-      // Fallback to form-level if the field is not inside the repeater (cross-scope conditional)
-      if (!input) input = form.querySelector(`[name="${CSS.escape(condField)}"]`);
-    } else {
-      input = form.querySelector(`[name="${CSS.escape(condField)}"]`);
-    }
-    // For radio buttons, find the checked input, not just the first one
-    let currentVal = '';
-    if (input) {
-      if (input.type === 'checkbox') {
-        currentVal = input.checked ? '1' : '0';
-      } else if (input.type === 'radio') {
-        const checked = form.querySelector(`[name="${CSS.escape(condField)}"]:checked`);
-        currentVal = checked ? checked.value : '';
+    let show = true;
+    for (let i = 0; i < count; i++) {
+      const suffix = i === 0 ? '' : `-${i}`;
+      const condField = wrapper.getAttribute(`data-cond-field${suffix}`);
+      const condOp = wrapper.getAttribute(`data-cond-op${suffix}`);
+      const condVal = wrapper.getAttribute(`data-cond-val${suffix}`);
+      if (!condField) continue;
+      let input;
+      if (containerBody) {
+        input = containerBody.querySelector(`[data-rfield="${CSS.escape(condField)}"]`);
+        if (!input) input = form.querySelector(`[name="${CSS.escape(condField)}"]`);
       } else {
-        currentVal = input.value ?? '';
+        input = form.querySelector(`[name="${CSS.escape(condField)}"]`);
       }
+      let currentVal = '';
+      if (input) {
+        if (input.type === 'checkbox') {
+          currentVal = input.checked ? '1' : '0';
+        } else if (input.type === 'radio') {
+          const actualName = input.getAttribute('name') || condField;
+          const scope = containerBody || form;
+          const checked = scope.querySelector(`[name="${CSS.escape(actualName)}"]:checked`);
+          currentVal = checked ? checked.value : '';
+        } else {
+          currentVal = input.value ?? '';
+        }
+      }
+      const isEmpty = condOp === '!=empty' || (condOp === '!=' && (condVal === '' || condVal === 'null'));
+      const match = isEmpty ? currentVal !== '' : (condOp === '==' ? currentVal === condVal : currentVal !== condVal);
+      if (!match) { show = false; break; }
     }
-    const isEmpty = condOp === '!=empty' || (condOp === '!=' && (condVal === '' || condVal === 'null'));
-    const show = isEmpty ? currentVal !== '' : (condOp === '==' ? currentVal === condVal : currentVal !== condVal);
     wrapper.style.display = show ? '' : 'none';
   });
 }
@@ -9719,6 +9852,11 @@ function initWysiwygEditors(container) {
   if (typeof Quill === 'undefined') return;
   container.querySelectorAll('.wysiwyg-editor').forEach(el => {
     if (_quillInstances.has(el.id)) return;
+    // Defer init for editors inside hidden containers (display:none ancestors).
+    // Quill toolbar/alignment/code-view break when initialized while hidden.
+    // These editors will be initialized when their container becomes visible
+    // (toggleRepeaterRow, switchBlockTab, switchColsTab).
+    if (!el.offsetParent) return;
     const textarea = el.parentElement.querySelector('.wysiwyg-source');
     const quill = new Quill(el, {
       theme: 'snow',
@@ -10250,8 +10388,8 @@ function _createInlineToolbar() {
     if (btn) {
       const cmd = btn.dataset.cmd;
       if (cmd === 'createLink') {
-        const url = prompt('URL du lien :', 'https://');
-        if (url) document.execCommand('createLink', false, url);
+        _showInlineLinkDialog();
+        return; // don't _updateToolbarState yet — dialog handles it
       } else if (cmd === 'formatBlock') {
         document.execCommand('formatBlock', false, btn.dataset.value);
       } else if (cmd === 'indent') {
@@ -10275,6 +10413,131 @@ function _createInlineToolbar() {
 
   _inlineToolbar = bar;
   return bar;
+}
+
+let _inlineLinkDialog = null;
+let _savedSelection = null;
+
+function _saveSelection() {
+  const sel = window.getSelection();
+  if (sel.rangeCount > 0) {
+    _savedSelection = sel.getRangeAt(0).cloneRange();
+  }
+}
+
+function _restoreSelection() {
+  if (_savedSelection) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(_savedSelection);
+    _savedSelection = null;
+  }
+}
+
+function _showInlineLinkDialog() {
+  _saveSelection();
+  // Check if selection is inside an existing link
+  const sel = window.getSelection();
+  let existingUrl = '';
+  let existingLink = null;
+  if (sel.rangeCount > 0) {
+    let node = sel.anchorNode;
+    while (node && node !== _inlineEditingElement) {
+      if (node.nodeType === 1 && node.tagName === 'A') {
+        existingLink = node;
+        existingUrl = node.getAttribute('href') || '';
+        break;
+      }
+      node = node.parentNode;
+    }
+  }
+
+  _closeInlineLinkDialog();
+  const dialog = document.createElement('div');
+  dialog.className = 'inline-link-dialog';
+  dialog.innerHTML = `
+    <input type="text" class="link-url-input" placeholder="https://..." value="${existingUrl.replace(/"/g, '&quot;')}">
+    <button type="button" class="link-save-btn">OK</button>
+    ${existingLink ? '<button type="button" class="link-remove-btn">Supprimer</button>' : ''}
+    <button type="button" class="link-cancel-btn">Annuler</button>
+  `;
+  document.body.appendChild(dialog);
+  _inlineLinkDialog = dialog;
+
+  // Position below toolbar
+  if (_inlineToolbar) {
+    const tbRect = _inlineToolbar.getBoundingClientRect();
+    dialog.style.left = tbRect.left + 'px';
+    dialog.style.top = (tbRect.bottom + 4) + 'px';
+    requestAnimationFrame(() => {
+      const dRect = dialog.getBoundingClientRect();
+      if (dRect.right > window.innerWidth - 4) {
+        dialog.style.left = (window.innerWidth - dRect.width - 4) + 'px';
+      }
+      if (dRect.left < 4) dialog.style.left = '4px';
+    });
+  }
+
+  const input = dialog.querySelector('.link-url-input');
+  input.focus();
+  input.select();
+
+  const applyLink = () => {
+    const url = input.value.trim();
+    _restoreSelection();
+    if (url) {
+      document.execCommand('createLink', false, url);
+    }
+    _closeInlineLinkDialog();
+    _updateToolbarState();
+    if (_inlineEditingElement) {
+      _syncInlineContentToBlockData(_inlineEditingElement);
+      _inlineEditingElement.focus();
+    }
+  };
+
+  dialog.querySelector('.link-save-btn').addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    applyLink();
+  });
+
+  if (existingLink) {
+    dialog.querySelector('.link-remove-btn').addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      _restoreSelection();
+      document.execCommand('unlink', false, null);
+      _closeInlineLinkDialog();
+      _updateToolbarState();
+      if (_inlineEditingElement) {
+        _syncInlineContentToBlockData(_inlineEditingElement);
+        _inlineEditingElement.focus();
+      }
+    });
+  }
+
+  dialog.querySelector('.link-cancel-btn').addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    _closeInlineLinkDialog();
+    _restoreSelection();
+    if (_inlineEditingElement) _inlineEditingElement.focus();
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); applyLink(); }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      _closeInlineLinkDialog();
+      _restoreSelection();
+      if (_inlineEditingElement) _inlineEditingElement.focus();
+    }
+  });
+}
+
+function _closeInlineLinkDialog() {
+  if (_inlineLinkDialog) {
+    _inlineLinkDialog.remove();
+    _inlineLinkDialog = null;
+  }
 }
 
 function _showInlineToolbar(card, txtEditor) {
@@ -10313,6 +10576,11 @@ function _updateToolbarState() {
     if (['bold', 'italic', 'underline', 'strikeThrough', 'insertOrderedList', 'insertUnorderedList'].includes(cmd)) {
       btn.classList.toggle('active', document.queryCommandState(cmd));
     }
+  });
+  // Update alignment active state
+  ['justifyLeft', 'justifyCenter', 'justifyRight'].forEach(cmd => {
+    const btn = _inlineToolbar.querySelector(`button[data-cmd="${cmd}"]`);
+    if (btn) btn.classList.toggle('active', document.queryCommandState(cmd));
   });
   // Update heading select
   const select = _inlineToolbar.querySelector('.inline-toolbar-select');
@@ -10374,6 +10642,7 @@ function enableInlineEditing(blockId, targetTxtEditor, dataRef, fieldName) {
 
 function disableInlineEditing() {
   if (!_inlineEditingBlockId) return;
+  _closeInlineLinkDialog();
 
   // If in HTML source mode, sync textarea content back into the contenteditable first
   if (_inlineSourceTextarea && _inlineEditingElement) {
@@ -10436,6 +10705,8 @@ function _handleInlineBlur() {
     if (_inlineEditingElement && (_inlineEditingElement === active || _inlineEditingElement.contains(active))) return;
     // If focus moved to the HTML source textarea, don't disable
     if (_inlineSourceTextarea && _inlineSourceTextarea === active) return;
+    // If focus moved to the link dialog, don't disable
+    if (_inlineLinkDialog && _inlineLinkDialog.contains(active)) return;
     // Focus left the editing zone — disable inline editing
     disableInlineEditing();
   }, 150);
@@ -10531,19 +10802,56 @@ function _syncInlineContentToBlockData(txtEditorEl) {
   dataObj[_inlineEditingFieldName] = txtEditorEl.innerHTML;
 }
 
+function _findSubModuleQuillId(block, dataRef, fieldName) {
+  const columnsList = block.data?.columns_list;
+  if (!Array.isArray(columnsList)) return null;
+  for (let ci = 0; ci < columnsList.length; ci++) {
+    const subModules = columnsList[ci]?.columns_module;
+    if (!Array.isArray(subModules)) continue;
+    for (let si = 0; si < subModules.length; si++) {
+      if (subModules[si] === dataRef) {
+        const compoundName = `columns_list::${ci}::columns_module::${si}::${fieldName}`;
+        return `wysiwyg-${block.id}-${compoundName}`.replace(/[^a-zA-Z0-9_-]/g, '-');
+      }
+    }
+  }
+  return null;
+}
+
 function _syncInlineToSettingsPanelQuill() {
   if (!_inlineEditingBlockId || !_inlineEditingFieldName) return;
   const block = pageBuilderState.blocks.find(b => b.id === _inlineEditingBlockId);
   if (!block) return;
 
-  const editorId = `wysiwyg-${block.id}-${_inlineEditingFieldName}`.replace(/[^a-zA-Z0-9_-]/g, '-');
-  const quill = _quillInstances.get(editorId);
-  if (!quill) return;
+  let editorId = `wysiwyg-${block.id}-${_inlineEditingFieldName}`.replace(/[^a-zA-Z0-9_-]/g, '-');
+  let quill = _quillInstances.get(editorId);
+  // Sub-module inside columns → Quill ID uses compound name
+  if (!quill && _inlineEditingDataRef && _inlineEditingDataRef !== block.data) {
+    const subId = _findSubModuleQuillId(block, _inlineEditingDataRef, _inlineEditingFieldName);
+    if (subId) {
+      editorId = subId;
+      quill = _quillInstances.get(subId);
+    }
+  }
+  const dataRef = _inlineEditingDataRef || block.data;
+  const html = dataRef[_inlineEditingFieldName] || '';
+
+  if (!quill) {
+    // Quill not initialized yet (lazy init) — update DOM directly so
+    // Quill picks up the correct content when it initializes later.
+    const el = document.getElementById(editorId);
+    if (el) el.innerHTML = html;
+    const textarea = el?.parentElement?.querySelector('.wysiwyg-source');
+    if (textarea) textarea.value = html;
+    return;
+  }
 
   // Prevent circular update
   quill._syncingFromInline = true;
-  const html = block.data[_inlineEditingFieldName] || '';
-  quill.clipboard.dangerouslyPasteHTML(html);
+  // Set innerHTML directly — dangerouslyPasteHTML goes through clipboard
+  // matchers that strip bold/italic/color, causing formatting loss.
+  quill.root.innerHTML = html || '<p><br></p>';
+  quill.update('silent');
 
   // Also update the hidden textarea
   const el = document.getElementById(editorId);
@@ -11193,6 +11501,7 @@ async function renderReusableBlocBuilder() {
           <div class="builder-settings" id="builderSettings" style="${selectedBlockId ? '' : 'display:none'}">
             ${renderBuilderSettingsPanel()}
           </div>
+          <div class="builder-sidebar-resize" id="builderSidebarResize"></div>
         </aside>
         <main class="builder-canvas" id="builderCanvas" data-drop-zone="true">
           <div class="builder-canvas-inner" id="builderCanvasInner" style="${buildColorOverrideStyle()}">
@@ -14747,18 +15056,13 @@ function initFontPreview() {
 }
 
 // ========== THÈME ==========
-const THEME_OPTIONS = [
-  { id: 'default', name: 'Thème par défaut' },
-  { id: 'dark', name: 'Thème sombre' },
-  { id: 'minimal', name: 'Thème minimaliste' },
-  { id: 'colorful', name: 'Thème coloré' },
-  { id: 'nature', name: 'Thème nature' }
-];
-
 async function renderTheme() {
   showLoading();
   try {
-    const settings = await apiFetch('/settings');
+    const [settings, themeOptions] = await Promise.all([
+      apiFetch('/settings'),
+      apiFetch('/themes'),
+    ]);
     const useChildTheme = settings.theme_use_child === '1';
     const activeTheme = settings.active_theme || 'default';
 
@@ -14783,7 +15087,7 @@ async function renderTheme() {
           <div class="form-group" id="themeChildGroup">
             <label class="form-label">Thème enfant</label>
             <select class="form-select" id="activeTheme" name="active_theme">
-              ${THEME_OPTIONS.map(t => `
+              ${themeOptions.map(t => `
                 <option value="${t.id}" ${activeTheme === t.id ? 'selected' : ''}>${t.name}</option>
               `).join('')}
             </select>
@@ -16744,34 +17048,148 @@ function attachFormBuilderEvents() {
     const dragItem = items[idx];
     if (!dragItem) return;
 
-    dragItem.style.opacity = '0.5';
+    dragItem.classList.add('is-dragging');
+    document.body.classList.add('form-field-dragging');
     let currentIdx = idx;
+    let changed = false;
+
+    // Find the column partner of a 50% field (adjacent 50% field on same visual row)
+    const findColumnPartner = (fieldIdx) => {
+      const f = _formBuilderFields[fieldIdx];
+      const w = f?.settings?.width || '100';
+      if (w !== '50') return -1;
+      // Check previous neighbor
+      if (fieldIdx > 0 && (_formBuilderFields[fieldIdx - 1]?.settings?.width || '100') === '50') return fieldIdx - 1;
+      // Check next neighbor
+      if (fieldIdx < _formBuilderFields.length - 1 && (_formBuilderFields[fieldIdx + 1]?.settings?.width || '100') === '50') return fieldIdx + 1;
+      return -1;
+    };
+
+    const clearDropIndicators = () => {
+      canvas.querySelectorAll('.form-field-item').forEach(item => {
+        item.classList.remove('drop-before', 'drop-after', 'drop-left', 'drop-right');
+      });
+    };
 
     const onMove = (ev) => {
+      clearDropIndicators();
       const currentItems = canvas.querySelectorAll('.form-field-item');
+      let acted = false;
       currentItems.forEach((item, i) => {
-        if (i === currentIdx) return;
+        if (i === currentIdx || acted) return;
         const rect = item.getBoundingClientRect();
         const midY = rect.top + rect.height / 2;
+        const midX = rect.left + rect.width / 2;
+        const inVerticalBand = ev.clientY >= rect.top && ev.clientY <= rect.bottom;
+
+        // Side drop: cursor inside a field → show column indicator
+        if (inVerticalBand && ev.clientX >= rect.left && ev.clientX <= rect.right) {
+          const targetW = _formBuilderFields[i]?.settings?.width || '100';
+          // Allow side-drop on 100% fields OR on 50% fields (to swap within row)
+          if (targetW === '100') {
+            item.classList.add(ev.clientX < midX ? 'drop-left' : 'drop-right');
+            acted = true;
+            return;
+          }
+        }
+
+        // Vertical reorder
         if (ev.clientY < midY && i < currentIdx) {
           const moved = _formBuilderFields.splice(currentIdx, 1)[0];
           _formBuilderFields.splice(i, 0, moved);
           if (_formBuilderSelectedIdx === currentIdx) _formBuilderSelectedIdx = i;
           currentIdx = i;
+          changed = true;
           refreshFormFieldsCanvas();
+          const newItems = canvas.querySelectorAll('.form-field-item');
+          if (newItems[currentIdx]) newItems[currentIdx].classList.add('is-dragging');
+          acted = true;
         } else if (ev.clientY > midY && i > currentIdx) {
           const moved = _formBuilderFields.splice(currentIdx, 1)[0];
           _formBuilderFields.splice(i, 0, moved);
           if (_formBuilderSelectedIdx === currentIdx) _formBuilderSelectedIdx = i;
           currentIdx = i;
+          changed = true;
           refreshFormFieldsCanvas();
+          const newItems = canvas.querySelectorAll('.form-field-item');
+          if (newItems[currentIdx]) newItems[currentIdx].classList.add('is-dragging');
+          acted = true;
+        } else if (ev.clientY < midY && i > currentIdx) {
+          item.classList.add('drop-before');
+        } else if (ev.clientY >= midY && i < currentIdx) {
+          item.classList.add('drop-after');
         }
       });
     };
 
     const onUp = () => {
+      const dropLeft = canvas.querySelector('.form-field-item.drop-left');
+      const dropRight = canvas.querySelector('.form-field-item.drop-right');
+      const dropTarget = dropLeft || dropRight;
+
+      if (dropTarget) {
+        // Side-drop → pair as columns
+        const targetIdx = parseInt(dropTarget.dataset.idx);
+        const draggedField = _formBuilderFields[currentIdx];
+        const targetField = _formBuilderFields[targetIdx];
+        if (draggedField && targetField) {
+          // Orphan the old partner → 100%
+          const partnerIdx = findColumnPartner(currentIdx);
+          if (partnerIdx !== -1 && partnerIdx !== targetIdx) {
+            const partner = _formBuilderFields[partnerIdx];
+            if (partner?.settings) partner.settings.width = '100';
+          }
+          // Remove dragged from current position
+          _formBuilderFields.splice(currentIdx, 1);
+          let newTargetIdx = targetIdx > currentIdx ? targetIdx - 1 : targetIdx;
+          if (dropLeft) {
+            _formBuilderFields.splice(newTargetIdx, 0, draggedField);
+          } else {
+            _formBuilderFields.splice(newTargetIdx + 1, 0, draggedField);
+          }
+          if (!draggedField.settings) draggedField.settings = {};
+          if (!targetField.settings) targetField.settings = {};
+          draggedField.settings.width = '50';
+          targetField.settings.width = '50';
+          changed = true;
+          const newDragIdx = _formBuilderFields.indexOf(draggedField);
+          if (_formBuilderSelectedIdx === currentIdx) _formBuilderSelectedIdx = newDragIdx;
+        }
+      } else if (changed) {
+        // Vertical reorder happened — check if dragged field left a column pair
+        const draggedField = _formBuilderFields[currentIdx];
+        const draggedW = draggedField?.settings?.width || '100';
+        if (draggedW === '50') {
+          // Find if it still has an adjacent 50% partner at new position
+          const newPartner = findColumnPartner(currentIdx);
+          if (newPartner === -1) {
+            // No partner at new position → reset to 100%
+            if (draggedField.settings) draggedField.settings.width = '100';
+          }
+        }
+        // Reset any orphaned 50% fields (no adjacent 50% neighbor)
+        _formBuilderFields.forEach((f, i) => {
+          if ((f.settings?.width || '100') === '50' && findColumnPartner(i) === -1) {
+            f.settings.width = '100';
+          }
+        });
+      }
+
+      clearDropIndicators();
+      document.body.classList.remove('form-field-dragging');
+      const finalItems = canvas.querySelectorAll('.form-field-item');
+      finalItems.forEach(item => item.classList.remove('is-dragging'));
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      if (changed || dropTarget) {
+        refreshFormFieldsCanvas();
+        if (_formBuilderData?.id) {
+          apiFetch(`/forms/${_formBuilderData.id}/reorder-fields`, {
+            method: 'PUT',
+            body: JSON.stringify({ fields: _formBuilderFields }),
+          }).catch(() => {});
+        }
+      }
     };
 
     document.addEventListener('mousemove', onMove);
@@ -17422,4 +17840,117 @@ async function loadAiUsagePage(page) {
       ${usageLog.pages > 1 ? `<div style="margin-top:12px;text-align:center">${renderAiPagination(usageLog.page, usageLog.pages)}</div>` : ''}
     `;
   } catch (e) { showToast('Erreur : ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Link Picker Modal — search across pages, posts & CPTs
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _linkPickerCallback = null;
+let _linkPickerDebounce = null;
+
+const LINK_PICKER_TYPE_LABELS = {
+  page: 'Page',
+  post: 'Article',
+  actualites: 'Actualite',
+  evenements: 'Evenement',
+  references: 'Reference',
+  portfolio: 'Portfolio',
+  products: 'Produit',
+};
+
+function getLinkPickerTypeLabel(resultType) {
+  return LINK_PICKER_TYPE_LABELS[resultType] || resultType.replace(/^cpt_/, '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function ensureLinkPickerModal() {
+  if (document.getElementById('linkPickerModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'linkPickerModal';
+  modal.className = 'link-picker-modal';
+  modal.innerHTML = `
+    <div class="link-picker-backdrop" onclick="closeLinkPicker()"></div>
+    <div class="link-picker-panel">
+      <div class="link-picker-header">
+        <div class="link-picker-title">Choisir un lien</div>
+        <button style="background:none;border:none;cursor:pointer;padding:4px;color:var(--gray-400)" onclick="closeLinkPicker()" aria-label="Fermer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="link-picker-search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:30px;top:50%;transform:translateY(-50%);color:var(--gray-400)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="form-input" id="linkPickerSearchInput" placeholder="Rechercher un contenu..." style="padding-left:36px" oninput="handleLinkPickerSearch(this.value)">
+      </div>
+      <div class="link-picker-results" id="linkPickerResults">
+        <div class="link-picker-loading">Chargement...</div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+async function openLinkPicker(callback) {
+  _linkPickerCallback = callback;
+  ensureLinkPickerModal();
+  document.getElementById('linkPickerSearchInput').value = '';
+  document.getElementById('linkPickerModal').classList.add('is-open');
+  document.getElementById('linkPickerResults').innerHTML = '<div class="link-picker-loading">Chargement...</div>';
+  try {
+    const data = await apiFetch('/search?limit=100');
+    renderLinkPickerResults(data.results || []);
+  } catch (e) {
+    document.getElementById('linkPickerResults').innerHTML = '<div class="link-picker-empty">Erreur de chargement</div>';
+  }
+  setTimeout(() => document.getElementById('linkPickerSearchInput').focus(), 100);
+}
+
+function closeLinkPicker() {
+  _linkPickerCallback = null;
+  const modal = document.getElementById('linkPickerModal');
+  if (modal) modal.classList.remove('is-open');
+}
+
+function handleLinkPickerSearch(q) {
+  clearTimeout(_linkPickerDebounce);
+  _linkPickerDebounce = setTimeout(async () => {
+    const container = document.getElementById('linkPickerResults');
+    container.innerHTML = '<div class="link-picker-loading">Recherche...</div>';
+    try {
+      const data = await apiFetch(`/search?q=${encodeURIComponent(q)}&limit=50`);
+      renderLinkPickerResults(data.results || []);
+    } catch (e) {
+      container.innerHTML = '<div class="link-picker-empty">Erreur de recherche</div>';
+    }
+  }, 250);
+}
+
+function renderLinkPickerResults(results) {
+  const container = document.getElementById('linkPickerResults');
+  if (!results.length) {
+    container.innerHTML = '<div class="link-picker-empty">Aucun resultat</div>';
+    return;
+  }
+  container.innerHTML = results.map(r => {
+    const url = (r.base_url || '/') + (r.slug || '');
+    const typeLabel = getLinkPickerTypeLabel(r.result_type);
+    const safeTitle = (r.title || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return `<button type="button" class="link-picker-item" onclick="selectLinkPickerItem('${escapeHtml(url)}', '${safeTitle}')">
+      <span class="link-picker-item-title">${escapeHtml(r.title)}</span>
+      <span class="link-picker-item-type">${escapeHtml(typeLabel)}</span>
+    </button>`;
+  }).join('');
+}
+
+function selectLinkPickerItem(url, title) {
+  if (_linkPickerCallback) _linkPickerCallback(url, title);
+  closeLinkPicker();
+}
+
+function openLinkPickerForField(btn) {
+  const field = btn.closest('.link-field');
+  if (!field) return;
+  openLinkPicker((url, title) => {
+    const urlInput = field.querySelector('.link-field-url') || field.querySelector('input[name$="__url"]') || field.querySelector('input[placeholder="URL"]');
+    const titleInput = field.querySelector('.link-field-title') || field.querySelector('input[name$="__title"]') || field.querySelector('input[placeholder*="itre"]');
+    if (urlInput) { urlInput.value = url; urlInput.dispatchEvent(new Event('input', { bubbles: true })); }
+    if (titleInput) { titleInput.value = title; titleInput.dispatchEvent(new Event('input', { bubbles: true })); }
+  });
 }

@@ -101,7 +101,7 @@ const justify = prevItem && nextItem ? 'space-between' : !prevItem && nextItem ?
           {/* Flexible content modules */}
           {blocks && blocks.length > 0 && (
             <div class="content content-blocks">
-              <BlockRenderer blocks={blocks} />
+              <BlockRenderer blocks={blocks} pageTitle={item.title} />
             </div>
           )}
 

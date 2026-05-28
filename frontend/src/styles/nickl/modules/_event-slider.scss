@@ -373,3 +373,22 @@
         }
     }
 }
+
+@media only screen and (max-width: 600px) {
+    .module-event-slider {
+        .slider .item {
+            .title {
+                font-size: rem(22px);
+            }
+            .desc {
+                padding: rem(10px);
+            }
+        }
+        .slider-wrapper .slider-navigation {
+            top: calc((100vw - 40px) * .575 / 2);
+        }
+        .btn-more-wrapper {
+            margin-top: rem(30px);
+        }
+    }
+}

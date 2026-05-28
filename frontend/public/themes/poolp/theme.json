@@ -1,0 +1,12 @@
+{
+  "name": "Poolp Theme",
+  "description": "Theme enfant Poolp avec CSS et JS custom",
+  "colors": {
+    "accent": "#e74c3c",
+    "accentDark": "#c0392b",
+    "black": "30, 30, 30",
+    "gray": "120, 120, 120",
+    "grayLight": "245, 245, 245",
+    "grayDark": "60, 60, 60"
+  }
+}

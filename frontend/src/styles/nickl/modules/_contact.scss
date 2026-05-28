@@ -342,6 +342,26 @@
 
 
 
+@media only screen and (max-width: 600px) {
+    .module-contact {
+        .address {
+            font-size: rem(16px);
+        }
+        .phone {
+            font-size: rem(28px);
+        }
+        .phone-wrapper {
+            font-size: rem(16px);
+        }
+        .mail-wrapper a {
+            font-size: rem(16px);
+        }
+        .map-wrapper::before {
+            padding-top: 100%;
+        }
+    }
+}
+
 @media only screen and (max-width: 480px) {
     .module-contact {
         text-align: left;

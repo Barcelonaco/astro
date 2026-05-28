@@ -23,3 +23,11 @@
     }
   }
 }
+
+@media only screen and (max-width: 600px) {
+  .module-plansite {
+    .list {
+      gap: rem(24px);
+    }
+  }
+}

@@ -130,7 +130,9 @@ const bodyClasses = [
 
         } catch (err: any) {
           if (err?.status === 401) { window.location.href = '/compte/connexion'; return }
-          loading.textContent = 'Erreur de chargement.'
+          loading.style.display = 'none'
+          content.style.display = ''
+          content.innerHTML = `<p class="account-empty">Aucun telechargement.</p>`
         }
       }
 

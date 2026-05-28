@@ -36,3 +36,24 @@
         }
     }
 }
+
+
+/* MEDIA QUERIES
+---------------------------------------- */
+@media only screen and (max-width: 600px) {
+    .page-account {
+        table.woocommerce-orders-table {
+            display: block;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            font-size: rem(14px);
+            th, td {
+                padding: rem(8px) rem(10px);
+                white-space: nowrap;
+            }
+        }
+        .woocommerce-order-details, .woocommerce-customer-details {
+            margin-top: rem(30px);
+        }
+    }
+}

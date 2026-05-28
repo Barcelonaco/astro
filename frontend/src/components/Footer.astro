@@ -92,13 +92,23 @@ if (footerCustomBloc && footerCustomBlocLocation !== 'none') {
   } catch {}
 }
 
-// Credit menu (fetched from menu system)
+// Footer + credit menus (fetched from menu system)
+let footerLinks: { url: string; title: string }[] = [];
 let creditLinks: { url: string; title: string }[] = [];
 try {
   const API_URL = import.meta.env.BUILD_API_URL || import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api';
-  const res = await fetch(`${API_URL}/menus/navigation/credit`);
-  if (res.ok) {
-    const items = await res.json();
+  const [footerRes, creditRes] = await Promise.all([
+    fetch(`${API_URL}/menus/navigation/footer`),
+    fetch(`${API_URL}/menus/navigation/credit`),
+  ]);
+  if (footerRes.ok) {
+    const items = await footerRes.json();
+    if (Array.isArray(items)) {
+      footerLinks = items.map((item: any) => ({ url: item.url || `/${item.slug}/`, title: item.title }));
+    }
+  }
+  if (creditRes.ok) {
+    const items = await creditRes.json();
     if (Array.isArray(items)) {
       creditLinks = items.map((item: any) => ({ url: item.url || `/${item.slug}/`, title: item.title }));
     }
@@ -151,6 +161,18 @@ const today = new Date();
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {footerLinks.length > 0 && (
+        <div class="col col-2">
+          <ul class="footer-menu">
+            {footerLinks.map(link => (
+              <li class="footer-menu-item">
+                <a href={link.url}>{link.title}</a>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

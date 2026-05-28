@@ -87,3 +87,19 @@
         }
     }
 }
+
+@media only screen and (max-width: 600px) {
+    .page-single-news {
+        .head {
+            .title {
+                font-size: rem(36px);
+            }
+            .author {
+                font-size: rem(18px);
+            }
+            .illus {
+                aspect-ratio: 1 / 0.5;
+            }
+        }
+    }
+}
