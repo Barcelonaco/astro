@@ -184,7 +184,7 @@ class SettingsController {
             'bg_img_alert', 'bg_opacity_alert', 'alert_text',
             'alert_cta_url', 'alert_cta_text', 'alert_cta2_url', 'alert_cta2_text',
             'show_btn', 'floating_btn_link', 'floating_btn_link_title', 'floating_btn_img',
-            'is_maintenance', 'text_maintenance', 'show_infos', 'show_rs',
+            'is_maintenance', 'title_maintenance','text_maintenance', 'show_infos', 'show_rs',
             'ga_code', 'aw_code', 'gtm_code', 'meta_pixel_code',
             'recaptcha_site_key', 'recaptcha_secret_key',
             'cookie_enabled', 'cookie_title', 'cookie_description',

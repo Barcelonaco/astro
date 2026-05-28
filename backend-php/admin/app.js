@@ -96,7 +96,7 @@ async function loadAdminTheme() {
     if (!res.ok) return;
     const data = await res.json();
     applyAdminTheme(data.useChildTheme, data.activeTheme || 'default');
-  } catch (e) {}
+  } catch (e) { }
 }
 
 async function init() {
@@ -170,7 +170,7 @@ async function init() {
   } catch (error) {
     console.error('Init error (not auth):', error);
     // Fallback to dashboard instead of logging out
-    try { loadSection('dashboard'); } catch(e) { /* ignore */ }
+    try { loadSection('dashboard'); } catch (e) { /* ignore */ }
   }
 }
 
@@ -319,7 +319,7 @@ async function loadSection(section) {
     navigateTo('dashboard'); return;
   }
 
-  switch(section) {
+  switch (section) {
     case 'dashboard':
       content.innerHTML = await renderDashboard();
       break;
@@ -995,7 +995,7 @@ async function renderCPTList(ptDef) {
     _cptListStockMap = {};
     // Fetch stock summary for products CPT
     if (ptDef.slug === 'products') {
-      try { _cptListStockMap = await apiFetch('/admin/products/stock-summary'); } catch {}
+      try { _cptListStockMap = await apiFetch('/admin/products/stock-summary'); } catch { }
     }
     hideLoading();
 
@@ -1111,8 +1111,8 @@ function renderCPTListRows() {
       thumbHtml = hex
         ? '<div style="width:48px;height:48px;border-radius:50%;background:' + escapeHtml(hex) + ';flex-shrink:0;box-shadow:0 1px 2px rgba(0,0,0,0.08);"></div>'
         : '<div style="width:48px;height:48px;border-radius:50%;border:1px dashed var(--gray-300,#d1d5db);flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#fff;">'
-          + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gray-400,#9ca3af)"><circle cx="12" cy="12" r="10"/><line x1="5" y1="19" x2="19" y2="5"/></svg>'
-          + '</div>';
+        + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gray-400,#9ca3af)"><circle cx="12" cy="12" r="10"/><line x1="5" y1="19" x2="19" y2="5"/></svg>'
+        + '</div>';
     } else if (thumbUrl) {
       thumbHtml = '<img src="' + escapeHtml(thumbUrl) + '" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;">';
     } else {
@@ -1142,30 +1142,30 @@ function renderCPTListRows() {
 
     return '<div class="page-item">'
       + '<div class="page-item__info" style="cursor:pointer" onclick="loadSection(\'cpt-edit:' + escapeHtml(ptDef.slug) + ':' + item.id + '\')">'
-      +   '<div style="display:flex;align-items:center;gap:12px;min-width:0;">'
-      +     thumbHtml
-      +     '<div style="min-width:0;overflow:hidden;">'
-      +       '<div class="page-item__title">' + escapeHtml(item.title) + '</div>'
-      +       ((ptDef.supports || ['title','slug','featured_image','content','status']).includes('slug')
-              ? '<div class="page-item__slug">/' + escapeHtml(ptDef.slug) + '/' + escapeHtml(item.slug) + '</div>'
-              : '')
-      +     '</div>'
-      +   '</div>'
+      + '<div style="display:flex;align-items:center;gap:12px;min-width:0;">'
+      + thumbHtml
+      + '<div style="min-width:0;overflow:hidden;">'
+      + '<div class="page-item__title">' + escapeHtml(item.title) + '</div>'
+      + ((ptDef.supports || ['title', 'slug', 'featured_image', 'content', 'status']).includes('slug')
+        ? '<div class="page-item__slug">/' + escapeHtml(ptDef.slug) + '/' + escapeHtml(item.slug) + '</div>'
+        : '')
+      + '</div>'
+      + '</div>'
       + '</div>'
       + '<div class="page-item__parent">' + (cats || '<span style="color:var(--gray-400);">—</span>') + '</div>'
       + stockHtml
       + '<div class="page-item__meta"><span class="page-item__date">' + dateStr + '</span></div>'
       + '<div class="page-item__badges">'
-      +   '<span class="badge ' + (item.status === 'published' ? 'badge-success' : 'badge-warning') + '">'
-      +     (item.status === 'published' ? 'Publié' : 'Brouillon')
-      +   '</span>'
+      + '<span class="badge ' + (item.status === 'published' ? 'badge-success' : 'badge-warning') + '">'
+      + (item.status === 'published' ? 'Publié' : 'Brouillon')
+      + '</span>'
       + '</div>'
       + '<div class="page-item__actions">'
-      +   '<button class="btn-icon-action" onclick="loadSection(\'cpt-edit:' + escapeHtml(ptDef.slug) + ':' + item.id + '\')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
-      +   '<button class="btn-icon-action" onclick="duplicateCPTItem(\'' + escapeHtml(ptDef.slug) + '\', ' + item.id + ')" title="Dupliquer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
-      +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteCPTItemUI(\'' + escapeHtml(ptDef.slug) + '\', ' + item.id + ', \'' + safeTitle + '\')" title="Supprimer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
+      + '<button class="btn-icon-action" onclick="loadSection(\'cpt-edit:' + escapeHtml(ptDef.slug) + ':' + item.id + '\')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+      + '<button class="btn-icon-action" onclick="duplicateCPTItem(\'' + escapeHtml(ptDef.slug) + '\', ' + item.id + ')" title="Dupliquer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+      + '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteCPTItemUI(\'' + escapeHtml(ptDef.slug) + '\', ' + item.id + ', \'' + safeTitle + '\')" title="Supprimer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
       + '</div>'
-    + '</div>';
+      + '</div>';
   }).join('');
 
   container.innerHTML = `
@@ -1568,8 +1568,8 @@ async function renderCPTEditPage(ptDef, itemId) {
             <div id="cptLivePreview" style="border:1px solid var(--border,#e5e7eb);border-radius:8px;overflow:hidden;background:#fff;" data-preview-type="${escapeHtml(ptDef.previewType || '')}" data-preview-color-field="${escapeHtml(ptDef.previewColorField || '')}">
               <div id="cptPreviewImage" style="${ptDef.previewType === 'color_swatch' ? 'padding:24px 12px;display:flex;align-items:center;justify-content:center;background:#fff;' : 'width:100%;height:140px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;overflow:hidden;'}">
                 ${ptDef.previewType === 'color_swatch'
-                  ? `<div id="cptPreviewSwatch" style="width:80px;height:80px;border-radius:50%;background:${escapeHtml(cf[ptDef.previewColorField] || '#ddd')};box-shadow:0 1px 3px rgba(0,0,0,0.08);"></div>`
-                  : (fi ? `<img src="${escapeHtml(getOptimizedUrl(fi.sizes?.medium || fi.url || '', 400, 70))}" style="width:100%;height:100%;object-fit:cover;">` : 'Aucune image')}
+        ? `<div id="cptPreviewSwatch" style="width:80px;height:80px;border-radius:50%;background:${escapeHtml(cf[ptDef.previewColorField] || '#ddd')};box-shadow:0 1px 3px rgba(0,0,0,0.08);"></div>`
+        : (fi ? `<img src="${escapeHtml(getOptimizedUrl(fi.sizes?.medium || fi.url || '', 400, 70))}" style="width:100%;height:100%;object-fit:cover;">` : 'Aucune image')}
               </div>
               <div style="padding:12px;${ptDef.previewType === 'color_swatch' ? 'text-align:center;' : ''}">
                 <div id="cptPreviewBadges" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;min-height:0;"></div>
@@ -1960,7 +1960,7 @@ function clearCPTCfImage(fieldName) {
  *
  * Exposé sur `window` pour être appelable depuis un iframe via `parent.openExternalMediaPicker(...)`.
  */
-window.openExternalMediaPicker = function(callback, type) {
+window.openExternalMediaPicker = function (callback, type) {
   const pickerType = type === 'video' ? 'video' : type === 'all' || type === 'any' ? 'all' : 'image';
   mediaPickerState = {
     isOpen: true,
@@ -1988,7 +1988,7 @@ window.openExternalMediaPicker = function(callback, type) {
     .catch(() => hideLoading());
 };
 
-window.openExternalMediaPickerMultiple = function(callback, type) {
+window.openExternalMediaPickerMultiple = function (callback, type) {
   const pickerType = type === 'video' ? 'video' : type === 'all' || type === 'any' ? 'all' : 'image';
   mediaPickerState = {
     isOpen: true,
@@ -2320,14 +2320,14 @@ async function renderCPTCategoriesPage(ptDef) {
       const safeName = escapeHtml(cat.name).replace(/'/g, "\\'");
       return '<div class="page-item">'
         + '<div class="page-item__info" style="cursor:pointer" onclick="editCPTCategory(\'' + escapeHtml(ptDef.slug) + '\', ' + cat.id + ', \'' + safeName + '\')">'
-        +   '<div class="page-item__title">' + escapeHtml(cat.name) + '</div>'
+        + '<div class="page-item__title">' + escapeHtml(cat.name) + '</div>'
         + '</div>'
         + '<div class="page-item__parent"><span class="page-item__slug" style="display:inline">' + escapeHtml(cat.slug) + '</span></div>'
         + '<div class="page-item__actions">'
-        +   '<button class="btn-icon-action" onclick="editCPTCategory(\'' + escapeHtml(ptDef.slug) + '\', ' + cat.id + ', \'' + safeName + '\')" title="Modifier">' + _svgEdit + '</button>'
-        +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteCPTCategory(\'' + escapeHtml(ptDef.slug) + '\', ' + cat.id + ', \'' + safeName + '\')" title="Supprimer">' + _svgDelete + '</button>'
+        + '<button class="btn-icon-action" onclick="editCPTCategory(\'' + escapeHtml(ptDef.slug) + '\', ' + cat.id + ', \'' + safeName + '\')" title="Modifier">' + _svgEdit + '</button>'
+        + '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteCPTCategory(\'' + escapeHtml(ptDef.slug) + '\', ' + cat.id + ', \'' + safeName + '\')" title="Supprimer">' + _svgDelete + '</button>'
         + '</div>'
-      + '</div>';
+        + '</div>';
     }).join('');
 
     return `
@@ -2416,7 +2416,7 @@ function editCPTCategory(postTypeSlug, catId, currentName) {
   if (input) { input.focus(); input.select(); }
 
   // Close on overlay click
-  document.getElementById('cptCatModal').addEventListener('click', function(e) {
+  document.getElementById('cptCatModal').addEventListener('click', function (e) {
     if (e.target === this) closeCPTCatModal();
   });
 }
@@ -2462,7 +2462,7 @@ function deleteCPTCategory(postTypeSlug, catId, name) {
     </div>
   `);
 
-  document.getElementById('cptCatModal').addEventListener('click', function(e) {
+  document.getElementById('cptCatModal').addEventListener('click', function (e) {
     if (e.target === this) closeCPTCatModal();
   });
 }
@@ -3040,7 +3040,7 @@ async function openCPTBuilder(ptDef, itemId, opts = {}) {
   } else {
     // New item — load categories
     if (ptDef.hasCategories) {
-      try { pageBuilderState.cptCategories = await apiFetch(`/cpt/${ptDef.slug}/categories`) || []; } catch {}
+      try { pageBuilderState.cptCategories = await apiFetch(`/cpt/${ptDef.slug}/categories`) || []; } catch { }
     }
   }
 
@@ -3127,7 +3127,7 @@ async function saveCPTBuilder() {
   // Read featured image
   const fiInput = document.getElementById('cptBuilderFeaturedInput');
   let featured_image = null;
-  try { if (fiInput?.value) featured_image = JSON.parse(fiInput.value); } catch {}
+  try { if (fiInput?.value) featured_image = JSON.parse(fiInput.value); } catch { }
 
   // Read categories
   const categories = [];
@@ -3244,15 +3244,15 @@ async function openPageBuilder(pageId) {
         try {
           const co = page.color_overrides ? JSON.parse(page.color_overrides) : null;
           if (co) pageBuilderState.colorOverrides = { enabled: !!co.enabled, primary_color: co.primary_color || '', secondary_color: co.secondary_color || '', tertiary_color: co.tertiary_color || '', text_color: co.text_color || '', background_color: co.background_color || '', bg_form_field: co.bg_form_field || '' };
-        } catch (e) {}
+        } catch (e) { }
         // Load SEO meta
         try {
           const seo = page.seo_meta ? JSON.parse(page.seo_meta) : null;
           if (seo) pageBuilderState.seoMeta = { enabled: true, meta_title: seo.meta_title || '', meta_description: seo.meta_description || '', schema_org: seo.schema_org || '' };
-        } catch (e) {}
+        } catch (e) { }
       }
       pageBuilderState.pageMenus = pageMenus?.menus || [];
-    } catch (e) {}
+    } catch (e) { }
     hideLoading();
   } else {
     // New page — load menus with empty state
@@ -3262,7 +3262,7 @@ async function openPageBuilder(pageId) {
         id: m.id, name: m.name, location: m.location,
         enabled: false, parent_id: null, menu_order: 0, items: [],
       }));
-    } catch (e) {}
+    } catch (e) { }
   }
   document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
   const pagesNav = document.querySelector('.nav-item[data-section="pages"]');
@@ -3349,7 +3349,7 @@ async function renderPageBuilder() {
 
         if (ftype === 'link') {
           let lObj = { url: '', title: '', target: '_self' };
-          try { if (val) lObj = typeof val === 'string' ? JSON.parse(val) : val; } catch {}
+          try { if (val) lObj = typeof val === 'string' ? JSON.parse(val) : val; } catch { }
           const fnEsc = escapeHtml(field.name);
           return `<div class="form-group" style="margin-bottom:12px;">
             <label class="form-label" style="font-weight:600;font-size:13px;margin-bottom:6px;display:block;">${escapeHtml(field.label)}</label>
@@ -3392,7 +3392,7 @@ async function renderPageBuilder() {
         // Address (Mapbox geocoding + mini-map)
         if (ftype === 'address') {
           let addr = { address: '', city: '', post_code: '', street_name: '', street_number: '', lat: '', lng: '' };
-          try { if (val) addr = typeof val === 'string' ? JSON.parse(val) : val; } catch {}
+          try { if (val) addr = typeof val === 'string' ? JSON.parse(val) : val; } catch { }
           const fnEsc = escapeHtml(field.name);
           const uid = `cptBAddress_${fnEsc}_${Date.now()}`;
           return `<div class="form-group" style="margin-bottom:12px;">
@@ -3496,7 +3496,7 @@ async function renderPageBuilder() {
                 <option value="schedule" ${m.published_date && new Date(m.published_date) > new Date() ? 'selected' : ''}>Planifier</option>
                 <option value="backdate" ${m.published_date && new Date(m.published_date) <= new Date() && m.published_date !== 'now' ? 'selected' : ''}>Antérieur</option>
               </select>
-              <input type="datetime-local" class="form-input builder-publish-date" data-field="published_date" value="${m.published_date && m.published_date !== 'now' ? m.published_date.slice(0,16) : ''}" style="display:${m.published_date && m.published_date !== 'now' && new Date(m.published_date).getTime() !== new Date(m.created_at).getTime() ? '' : 'none'};width:auto">
+              <input type="datetime-local" class="form-input builder-publish-date" data-field="published_date" value="${m.published_date && m.published_date !== 'now' ? m.published_date.slice(0, 16) : ''}" style="display:${m.published_date && m.published_date !== 'now' && new Date(m.published_date).getTime() !== new Date(m.created_at).getTime() ? '' : 'none'};width:auto">
             </div>
           </div>
         </div>
@@ -3652,14 +3652,14 @@ async function renderPageBuilder() {
                   </div>
                   <div class="builder-module-category-items">
                     ${category.modules.map(name => {
-                      const type = toKebabCase(name);
-                      const def = BLOCK_TYPES[type] || { label: MODULE_LABELS[name] || humanizeModuleName(name), icon: category.icon || '▦' };
-                      return `
+    const type = toKebabCase(name);
+    const def = BLOCK_TYPES[type] || { label: MODULE_LABELS[name] || humanizeModuleName(name), icon: category.icon || '▦' };
+    return `
                         <div class="builder-module-item" draggable="true" data-block-type="${type}" onclick="addBlockByClick('${type}')" title="Glisser ici ou cliquer pour ajouter">
                           <span>${def.label}</span>
                         </div>
                       `;
-                    }).join('')}
+  }).join('')}
                   </div>
                 </div>
               `).join('')}
@@ -3787,14 +3787,14 @@ function renderBlockCard(block, visibleNum) {
   const blockNum = typeof visibleNum === 'number'
     ? visibleNum
     : (() => {
-        let n = 0;
-        for (const b of pageBuilderState.blocks) {
-          if (INACTIVE_PLUGIN_TYPES.has(b.type)) continue;
-          n++;
-          if (b === block) return n;
-        }
-        return '';
-      })();
+      let n = 0;
+      for (const b of pageBuilderState.blocks) {
+        if (INACTIVE_PLUGIN_TYPES.has(b.type)) continue;
+        n++;
+        if (b === block) return n;
+      }
+      return '';
+    })();
   const isHidden = block.data?.is_visible === 'no';
   const hiddenIcon = isHidden
     ? '<svg class="builder-block-hidden-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
@@ -4193,7 +4193,7 @@ function renderBlockPreviewHtml(block) {
   }
   // Contact — custom preview (Blade template uses @php blocks that JS engine strips)
   const _socialSvg = {
-    instagram: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><path d="M7.64,25.92a9.47,9.47,0,0,1-3.16-.6,6.5,6.5,0,0,1-2.3-1.5,6.41,6.41,0,0,1-1.5-2.3,9.73,9.73,0,0,1-.6-3.16C0,17,0,16.52,0,13S0,9,.08,7.64a9.73,9.73,0,0,1,.6-3.16A6.66,6.66,0,0,1,4.48.68,9.73,9.73,0,0,1,7.64.08C9,0,9.48,0,13,0s4,0,5.36.08a9.78,9.78,0,0,1,3.16.6,6.66,6.66,0,0,1,3.8,3.8,10,10,0,0,1,.6,3.16C26,9,26,9.46,26,13s0,4-.08,5.36a9.52,9.52,0,0,1-.6,3.16,6.65,6.65,0,0,1-3.8,3.8,10,10,0,0,1-3.15.6C17,26,16.54,26,13,26S9,26,7.64,25.92Zm.11-23.5a7.15,7.15,0,0,0-2.42.45,4.09,4.09,0,0,0-1.49,1,4.07,4.07,0,0,0-1,1.5,7.34,7.34,0,0,0-.44,2.41C2.36,9.12,2.34,9.53,2.34,13s0,3.88.08,5.25a7.15,7.15,0,0,0,.45,2.42,4,4,0,0,0,1,1.49,4,4,0,0,0,1.49,1,7.15,7.15,0,0,0,2.42.45c1.36.07,1.77.08,5.25.08s3.89,0,5.25-.08a7.11,7.11,0,0,0,2.42-.45,4.26,4.26,0,0,0,2.46-2.46,7.15,7.15,0,0,0,.45-2.42c.07-1.36.08-1.77.08-5.25s0-3.89-.08-5.25a7.15,7.15,0,0,0-.45-2.42,4,4,0,0,0-1-1.49,4.11,4.11,0,0,0-1.49-1,7.4,7.4,0,0,0-2.42-.44c-1.37-.06-1.79-.08-5.25-.08s-3.88,0-5.25.08ZM6.32,13A6.68,6.68,0,1,1,13,19.67,6.68,6.68,0,0,1,6.32,13Zm2.35,0A4.33,4.33,0,1,0,13,8.67h0A4.33,4.33,0,0,0,8.67,13Zm9.71-6.94a1.56,1.56,0,1,1,1.56,1.56h0A1.56,1.56,0,0,1,18.38,6.06Z"/></svg>',
+    am: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><path d="M7.64,25.92a9.47,9.47,0,0,1-3.16-.6,6.5,6.5,0,0,1-2.3-1.5,6.41,6.41,0,0,1-1.5-2.3,9.73,9.73,0,0,1-.6-3.16C0,17,0,16.52,0,13S0,9,.08,7.64a9.73,9.73,0,0,1,.6-3.16A6.66,6.66,0,0,1,4.48.68,9.73,9.73,0,0,1,7.64.08C9,0,9.48,0,13,0s4,0,5.36.08a9.78,9.78,0,0,1,3.16.6,6.66,6.66,0,0,1,3.8,3.8,10,10,0,0,1,.6,3.16C26,9,26,9.46,26,13s0,4-.08,5.36a9.52,9.52,0,0,1-.6,3.16,6.65,6.65,0,0,1-3.8,3.8,10,10,0,0,1-3.15.6C17,26,16.54,26,13,26S9,26,7.64,25.92Zm.11-23.5a7.15,7.15,0,0,0-2.42.45,4.09,4.09,0,0,0-1.49,1,4.07,4.07,0,0,0-1,1.5,7.34,7.34,0,0,0-.44,2.41C2.36,9.12,2.34,9.53,2.34,13s0,3.88.08,5.25a7.15,7.15,0,0,0,.45,2.42,4,4,0,0,0,1,1.49,4,4,0,0,0,1.49,1,7.15,7.15,0,0,0,2.42.45c1.36.07,1.77.08,5.25.08s3.89,0,5.25-.08a7.11,7.11,0,0,0,2.42-.45,4.26,4.26,0,0,0,2.46-2.46,7.15,7.15,0,0,0,.45-2.42c.07-1.36.08-1.77.08-5.25s0-3.89-.08-5.25a7.15,7.15,0,0,0-.45-2.42,4,4,0,0,0-1-1.49,4.11,4.11,0,0,0-1.49-1,7.4,7.4,0,0,0-2.42-.44c-1.37-.06-1.79-.08-5.25-.08s-3.88,0-5.25.08ZM6.32,13A6.68,6.68,0,1,1,13,19.67,6.68,6.68,0,0,1,6.32,13Zm2.35,0A4.33,4.33,0,1,0,13,8.67h0A4.33,4.33,0,0,0,8.67,13Zm9.71-6.94a1.56,1.56,0,1,1,1.56,1.56h0A1.56,1.56,0,0,1,18.38,6.06Z"/></svg>',
     facebook: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 25.73 25.74"><path d="M24.31,0H1.42A1.43,1.43,0,0,0,0,1.42H0V24.31a1.42,1.42,0,0,0,1.42,1.42H13.75v-10H10.4v-3.9h3.35V9c0-3.32,2-5.13,5-5.13a24.85,24.85,0,0,1,3,.15V7.51h-2c-1.61,0-1.93.76-1.93,1.89v2.48h3.86l-.5,3.9H17.75v10h6.56a1.42,1.42,0,0,0,1.42-1.42h0V1.42A1.42,1.42,0,0,0,24.31,0Z"/></svg>',
     threads: '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><path d="M18.9,11.9c.1,0,.2.1.3.2,1.6.8,2.7,1.9,3.3,3.3.9,2,.9,5.2-1.6,7.8-2,2-4.3,2.8-7.7,2.9h0c-3.8,0-6.7-1.3-8.7-3.8-1.7-2.2-2.6-5.3-2.7-9.2h0c0-3.9.9-7,2.7-9.2C6.5,1.3,9.4,0,13.2,0h0c3.8,0,6.8,1.3,8.8,3.8,1,1.2,1.7,2.7,2.2,4.4l-2.2.6c-.4-1.4-1-2.6-1.7-3.5-1.6-1.9-4-2.9-7.1-3-3.1,0-5.4,1-6.9,2.9-1.4,1.8-2.2,4.4-2.2,7.8,0,3.3.8,6,2.2,7.8,1.5,1.9,3.9,2.9,6.9,2.9,2.8,0,4.6-.7,6.2-2.2,1.7-1.7,1.7-3.9,1.2-5.2-.3-.8-.9-1.4-1.7-1.9-.2,1.5-.6,2.6-1.3,3.5-.9,1.2-2.2,1.8-3.9,1.9-1.3,0-2.5-.2-3.5-.9-1.1-.7-1.8-1.9-1.9-3.2-.1-2.6,1.9-4.5,5.2-4.7,1.1,0,2.2,0,3.2.2-.1-.8-.4-1.4-.8-1.9-.5-.6-1.4-1-2.5-1h0c-.9,0-2.1.2-2.9,1.4l-1.9-1.3c1-1.6,2.7-2.4,4.8-2.4h0c3.4,0,5.4,2.1,5.6,5.8h0s0,0,0,0ZM10.4,15.6c0,1.4,1.5,2,3,1.9,1.4,0,3-.6,3.2-4-.7-.2-1.5-.2-2.4-.2s-.5,0-.8,0c-2.3.1-3.1,1.3-3,2.3h0s0,0,0,0Z"/></svg>',
     tiktok: '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="26" viewBox="0 0 25.152 29.022"><path d="M22.02,6.207a6.609,6.609,0,0,1-.571-.333,8.033,8.033,0,0,1-1.467-1.247,6.921,6.921,0,0,1-1.653-3.412h.006A4.2,4.2,0,0,1,18.268,0H13.284V19.273c0,.259,0,.515-.011.767,0,.031,0,.06,0,.094a.206.206,0,0,1,0,.043v.011a4.232,4.232,0,0,1-2.129,3.359,4.159,4.159,0,0,1-2.062.544,4.232,4.232,0,0,1,0-8.464,4.164,4.164,0,0,1,1.294.2l.006-5.075A9.258,9.258,0,0,0,3.24,12.845a9.782,9.782,0,0,0-2.134,2.632,9.121,9.121,0,0,0-1.1,4.186,9.88,9.88,0,0,0,.535,3.309v.012a9.74,9.74,0,0,0,1.353,2.468,10.129,10.129,0,0,0,2.159,2.037v-.012l.012.012a9.326,9.326,0,0,0,5.088,1.532,9.007,9.007,0,0,0,3.776-.835A9.477,9.477,0,0,0,16,25.881,9.58,9.58,0,0,0,17.667,23.1a10.4,10.4,0,0,0,.6-3.176V9.7c.06.036.866.569.866.569A11.527,11.527,0,0,0,22.1,11.5a17.1,17.1,0,0,0,3.048.417V6.969a6.463,6.463,0,0,1-3.132-.762"/></svg>',
@@ -4258,7 +4258,7 @@ function renderBlockPreviewHtml(block) {
       if (contact.phone) h += `<p class="phone-wrapper">Tel. <a href="tel:${escapeHtml(String(contact.phone).replace(/\s/g, ''))}" class="phone">${escapeHtml(contact.phone)}</a></p>`;
       if (contact.mail) h += `<div class="mail-wrapper"><a href="mailto:${escapeHtml(contact.mail)}">${escapeHtml(contact.mail)}</a></div>`;
       if (contact.schedule) h += `<div class="editor txt"><p><b>Horaires d\u2019ouverture</b></p><p>${escapeHtml(contact.schedule).replace(/\n/g, '<br>')}</p></div>`;
-      const socialKeys = ['instagram','facebook','threads','tiktok','linkedin','twitter','tripadvisor','pinterest','youtube'];
+      const socialKeys = ['instagram', 'facebook', 'threads', 'tiktok', 'linkedin', 'twitter', 'tripadvisor', 'pinterest', 'youtube'];
       const socials = socialKeys.filter(k => contact[k]);
       if (socials.length > 0) {
         h += '<ul class="social-networks">' + socials.map(k => {
@@ -4865,9 +4865,9 @@ function buildTemplateContext(block) {
     ctx.number = data.id_bloc || 'section_0';
     // $fields est défini dans @php (strippé), on le reconstitue ici
     ctx.fields = {
-      hero_banner_align:   data.hero_banner_align   || 'left',
-      h1_in_header:        data.h1_in_header        || 'yes',
-      hero_banner_height:  data.hero_banner_height  || false,
+      hero_banner_align: data.hero_banner_align || 'left',
+      h1_in_header: data.h1_in_header || 'yes',
+      hero_banner_height: data.hero_banner_height || false,
       hero_banner_marquise: data.hero_banner_marquise || false,
     };
   }
@@ -5028,7 +5028,7 @@ function buildTemplateContext(block) {
   // ImagesSlider : images normalisées, full-width
   if (block.type === 'images-slider' || block.type === 'ImagesSlider') {
     const rawSliders = Array.isArray(data.sliders || moduleData.sliders) ? (data.sliders || moduleData.sliders) : [];
-    ctx.images = rawSliders.map(function(slide) {
+    ctx.images = rawSliders.map(function (slide) {
       const img = slide.image || {};
       const imgUrl = typeof img === 'string' ? img : (img.url || '');
       const imgAlt = typeof img === 'object' ? (img.alt || '') : '';
@@ -5040,10 +5040,10 @@ function buildTemplateContext(block) {
       const link2Url = typeof link2Raw === 'string' ? link2Raw : ((link2Raw && link2Raw.url) || '');
       const link2 = link2Url
         ? {
-            url: link2Url,
-            title: (typeof link2Raw === 'object' && link2Raw && link2Raw.title) || 'En savoir plus',
-            target: (typeof link2Raw === 'object' && link2Raw && link2Raw.target) || '_self',
-          }
+          url: link2Url,
+          title: (typeof link2Raw === 'object' && link2Raw && link2Raw.title) || 'En savoir plus',
+          target: (typeof link2Raw === 'object' && link2Raw && link2Raw.target) || '_self',
+        }
         : null;
       return {
         image_url: imgUrl,
@@ -5759,7 +5759,7 @@ function handleBuilderDrop(e) {
       rebuildBuilderBlocksDOM();
       reattachBlockCardListeners();
     }
-  } catch (err) {}
+  } catch (err) { }
 }
 
 function handleBuilderDragover(e) {
@@ -6691,7 +6691,7 @@ async function generateSchemaOrg() {
         if (cf.start_time) event.startDate = (event.startDate || '') + 'T' + cf.start_time;
         if (cf.location_name) event.location = { '@type': 'Place', 'name': stripHtml(cf.location_name) };
         if (cf.location) {
-          const loc = typeof cf.location === 'string' ? (() => { try { return JSON.parse(cf.location); } catch(e) { return {}; } })() : cf.location;
+          const loc = typeof cf.location === 'string' ? (() => { try { return JSON.parse(cf.location); } catch (e) { return {}; } })() : cf.location;
           if (loc.city || loc.address) {
             if (!event.location) event.location = { '@type': 'Place', 'name': stripHtml(cf.location_name || loc.city || '') };
             event.location.address = { '@type': 'PostalAddress', 'addressLocality': loc.city || '', 'streetAddress': loc.address || '' };
@@ -7181,7 +7181,7 @@ async function executeBulkAiGeneration() {
                   </div>`;
               }
               if (statusEl) statusEl.textContent = 'Formulaire créé, génération des pages...';
-            } catch (e) {}
+            } catch (e) { }
           } else if (currentEvent === 'page_saved') {
             try {
               const page = JSON.parse(data);
@@ -7192,7 +7192,7 @@ async function executeBulkAiGeneration() {
                   </div>`;
               }
               if (statusEl) statusEl.textContent = `Page ${page.index}/${page.total} sauvegardée...`;
-            } catch (e) {}
+            } catch (e) { }
           } else if (currentEvent === 'done') {
             resolved = true;
             try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('JSON invalide')); }
@@ -7782,7 +7782,7 @@ function reattachBlockCardListeners() {
           markBuilderDirty();
           rebuildBuilderBlocksDOM();
         }
-      } catch (err) {}
+      } catch (err) { }
     });
 
     card.addEventListener('click', e => {
@@ -7910,7 +7910,7 @@ function reattachBlockCardListeners() {
           markBuilderDirty();
           rebuildBuilderBlocksDOM();
         }
-      } catch (err) {}
+      } catch (err) { }
     });
   });
   updateSelectedBlockCard();
@@ -8306,8 +8306,8 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
   // Compute the compound input name for nested fields
   const inputName = rowCtx
     ? (rowCtx.rowIndex !== null
-        ? `${rowCtx.parentName}::${rowCtx.rowIndex}::${name}`
-        : `${rowCtx.parentName}::${name}`)
+      ? `${rowCtx.parentName}::${rowCtx.rowIndex}::${name}`
+      : `${rowCtx.parentName}::${name}`)
     : name;
   // data-rfield attribute for row-scoped conditional logic lookup
   const rfieldAttr = rowCtx ? ` data-rfield="${escapeHtml(name)}"` : '';
@@ -8330,7 +8330,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
             const l = it[ds.labelKey] || v;
             return `<option value="${escapeHtml(String(v))}" ${String(value ?? '') === String(v) ? 'selected' : ''}>${escapeHtml(String(l))}</option>`;
           }).join('');
-      } catch (e) {}
+      } catch (e) { }
     }, 0);
     return `
       <div class="form-group">
@@ -8353,7 +8353,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
           (forms || []).filter(f => f.status === 'active').map(f =>
             `<option value="${f.id}" ${String(value ?? '') === String(f.id) ? 'selected' : ''}>${escapeHtml(f.title)}</option>`
           ).join('');
-      } catch (e) {}
+      } catch (e) { }
     }, 0);
     return `
       <div class="form-group">
@@ -8377,7 +8377,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
           (blocs || []).filter(b => b.status === 'published').map(b =>
             `<option value="${b.id}" ${String(value ?? '') === String(b.id) ? 'selected' : ''}>${escapeHtml(b.title)}</option>`
           ).join('');
-      } catch (e) {}
+      } catch (e) { }
     }, 0);
     return `
       <div class="form-group">
@@ -8400,7 +8400,7 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
           (menus || []).map(m =>
             `<option value="${m.id}" ${String(value ?? '') === String(m.id) ? 'selected' : ''}>${escapeHtml(m.name)}</option>`
           ).join('');
-      } catch (e) {}
+      } catch (e) { }
     }, 0);
     return `
       <div class="form-group">
@@ -8472,10 +8472,10 @@ function _renderSchemaFieldHTML(field, value, blockId, rowCtx = null) {
   if ((type === 'ButtonGroup' || type === 'RadioButton') && choices && choices.length > 0 && COLOR_FIELDS.includes(name)) {
     const resolvedColors = getResolvedColorMap();
     const COLOR_MAP = {
-      'has-background-primary':   { label: 'Primaire',   color: resolvedColors['has-background-primary']   },
+      'has-background-primary': { label: 'Primaire', color: resolvedColors['has-background-primary'] },
       'has-background-secondary': { label: 'Secondaire', color: resolvedColors['has-background-secondary'] },
-      'has-background-tertiary':  { label: 'Tertiaire',  color: resolvedColors['has-background-tertiary']  },
-      'no-background-color':      { label: 'Aucune',     color: null },
+      'has-background-tertiary': { label: 'Tertiaire', color: resolvedColors['has-background-tertiary'] },
+      'no-background-color': { label: 'Aucune', color: null },
     };
     const options = choices.map((choice, idx) => {
       const id = `${inputName}_${idx}`;
@@ -9696,7 +9696,7 @@ function _quillCleanPasteMatchers() {
     // the trailing newline, where block formats belong); custom-handling them
     // here previously put the attr on inline text, which Quill drops, causing
     // h1-h6 to silently downgrade to paragraphs on init/paste.
-    [Node.ELEMENT_NODE, function(node, delta) {
+    [Node.ELEMENT_NODE, function (node, delta) {
       // Strip all inline formatting attributes (color, font, size, background, etc.)
       const ops = delta.ops.map(op => {
         if (op.attributes) {
@@ -9766,7 +9766,7 @@ function attachHtmlSourceToggle(quill, { getHtml, onSync } = {}) {
   const editorRoot = quill.root;
   const qlContainer = editorRoot.parentNode;
   let textarea = null;
-  toolbar.addHandler('html', function() {
+  toolbar.addHandler('html', function () {
     const btn = toolbar.container && toolbar.container.querySelector('button.ql-html');
     if (!textarea) {
       const html = typeof getHtml === 'function' ? getHtml() : editorRoot.innerHTML;
@@ -9833,72 +9833,72 @@ function liveUpdateFromSettingsForm(form) {
     const name = field.name;
     const type = field.type || 'Text';
     try {
-    if (type === 'Repeater') {
-      const rc = form.querySelector(`.repeater-field[data-field-name="${CSS.escape(name)}"]`);
-      if (!rc && data[name] !== undefined) return; // hidden repeater (e.g. Accordion inline) — keep existing data
-      data[name] = collectRepeaterData(form, name, field.subFields || []);
-      return;
-    }
-    if (type === 'FlexibleContent') {
-      data[name] = collectFlexibleContentData(form, name);
-      return;
-    }
-    if (type === 'Group') {
-      data[name] = collectContainerData(form, name, field.subFields || [], null);
-      return;
-    }
-    // Ne jamais toucher aux champs d'image de fond : ils sont gérés
-    // uniquement par la médiathèque. Sinon, bg_img est écrasé à chaque
-    // clic sur un bouton (couleur, padding, etc.) et la photo disparaît.
-    if (name === 'bg_img' || name === 'backgroundImage') return;
-    if (type === 'Image' || type === 'File' || type === 'Video') return;
-    if (type === 'GoogleMap') {
-      const latInput = form.querySelector(`[name="${CSS.escape(name + '__lat')}"]`);
-      const lngInput = form.querySelector(`[name="${CSS.escape(name + '__lng')}"]`);
-      const placeIdInput = form.querySelector(`[name="${CSS.escape(name + '__place_id')}"]`);
-      const searchInput = form.querySelector(`[name="${CSS.escape(name + '__search')}"]`);
-      const lat = latInput ? parseFloat(latInput.value) : 0;
-      const lng = lngInput ? parseFloat(lngInput.value) : 0;
-      const streetNumberInput = form.querySelector(`[name="${CSS.escape(name + '__street_number')}"]`);
-      const streetNameInput = form.querySelector(`[name="${CSS.escape(name + '__street_name')}"]`);
-      const streetNameShortInput = form.querySelector(`[name="${CSS.escape(name + '__street_name_short')}"]`);
-      const postCodeInput = form.querySelector(`[name="${CSS.escape(name + '__post_code')}"]`);
-      const cityInput = form.querySelector(`[name="${CSS.escape(name + '__city')}"]`);
-      const nameInput = form.querySelector(`[name="${CSS.escape(name + '__name')}"]`);
-      data[name] = (lat || lng) ? {
-        lat: lat || 0, lng: lng || 0,
-        place_id: placeIdInput ? placeIdInput.value : '',
-        address: searchInput ? searchInput.value : '',
-        name: nameInput ? nameInput.value : (searchInput ? searchInput.value : ''),
-        street_number: streetNumberInput ? streetNumberInput.value : '',
-        street_name: streetNameInput ? streetNameInput.value : '',
-        street_name_short: streetNameShortInput ? streetNameShortInput.value : '',
-        post_code: postCodeInput ? postCodeInput.value : '',
-        city: cityInput ? cityInput.value : '',
-      } : null;
-      return;
-    }
-    if (type === 'URL' || type === 'Url' || type === 'Link') {
-      const urlInput = form.querySelector(`[name="${CSS.escape(name + '__url')}"]`);
-      const titleInput = form.querySelector(`[name="${CSS.escape(name + '__title')}"]`);
-      const targetInput = form.querySelector(`[name="${CSS.escape(name + '__target')}"]`);
-      const url = urlInput ? urlInput.value : '';
-      data[name] = url ? { url, title: titleInput ? titleInput.value : '', target: targetInput ? targetInput.value : '_self' } : '';
-      return;
-    }
-    const input = form.querySelector(`[name="${CSS.escape(name)}"]`);
-    if (!input) return;
-    if (type === 'TrueFalse') {
-      data[name] = !!input.checked;
-    } else if (type === 'Number' || type === 'Range') {
-      const raw = input.value;
-      data[name] = raw === '' ? '' : Number(raw);
-    } else if (type === 'ButtonGroup' || type === 'RadioButton') {
-      const checked = form.querySelector(`[name="${CSS.escape(name)}"]:checked`);
-      data[name] = checked ? checked.value : '';
-    } else {
-      data[name] = input.value;
-    }
+      if (type === 'Repeater') {
+        const rc = form.querySelector(`.repeater-field[data-field-name="${CSS.escape(name)}"]`);
+        if (!rc && data[name] !== undefined) return; // hidden repeater (e.g. Accordion inline) — keep existing data
+        data[name] = collectRepeaterData(form, name, field.subFields || []);
+        return;
+      }
+      if (type === 'FlexibleContent') {
+        data[name] = collectFlexibleContentData(form, name);
+        return;
+      }
+      if (type === 'Group') {
+        data[name] = collectContainerData(form, name, field.subFields || [], null);
+        return;
+      }
+      // Ne jamais toucher aux champs d'image de fond : ils sont gérés
+      // uniquement par la médiathèque. Sinon, bg_img est écrasé à chaque
+      // clic sur un bouton (couleur, padding, etc.) et la photo disparaît.
+      if (name === 'bg_img' || name === 'backgroundImage') return;
+      if (type === 'Image' || type === 'File' || type === 'Video') return;
+      if (type === 'GoogleMap') {
+        const latInput = form.querySelector(`[name="${CSS.escape(name + '__lat')}"]`);
+        const lngInput = form.querySelector(`[name="${CSS.escape(name + '__lng')}"]`);
+        const placeIdInput = form.querySelector(`[name="${CSS.escape(name + '__place_id')}"]`);
+        const searchInput = form.querySelector(`[name="${CSS.escape(name + '__search')}"]`);
+        const lat = latInput ? parseFloat(latInput.value) : 0;
+        const lng = lngInput ? parseFloat(lngInput.value) : 0;
+        const streetNumberInput = form.querySelector(`[name="${CSS.escape(name + '__street_number')}"]`);
+        const streetNameInput = form.querySelector(`[name="${CSS.escape(name + '__street_name')}"]`);
+        const streetNameShortInput = form.querySelector(`[name="${CSS.escape(name + '__street_name_short')}"]`);
+        const postCodeInput = form.querySelector(`[name="${CSS.escape(name + '__post_code')}"]`);
+        const cityInput = form.querySelector(`[name="${CSS.escape(name + '__city')}"]`);
+        const nameInput = form.querySelector(`[name="${CSS.escape(name + '__name')}"]`);
+        data[name] = (lat || lng) ? {
+          lat: lat || 0, lng: lng || 0,
+          place_id: placeIdInput ? placeIdInput.value : '',
+          address: searchInput ? searchInput.value : '',
+          name: nameInput ? nameInput.value : (searchInput ? searchInput.value : ''),
+          street_number: streetNumberInput ? streetNumberInput.value : '',
+          street_name: streetNameInput ? streetNameInput.value : '',
+          street_name_short: streetNameShortInput ? streetNameShortInput.value : '',
+          post_code: postCodeInput ? postCodeInput.value : '',
+          city: cityInput ? cityInput.value : '',
+        } : null;
+        return;
+      }
+      if (type === 'URL' || type === 'Url' || type === 'Link') {
+        const urlInput = form.querySelector(`[name="${CSS.escape(name + '__url')}"]`);
+        const titleInput = form.querySelector(`[name="${CSS.escape(name + '__title')}"]`);
+        const targetInput = form.querySelector(`[name="${CSS.escape(name + '__target')}"]`);
+        const url = urlInput ? urlInput.value : '';
+        data[name] = url ? { url, title: titleInput ? titleInput.value : '', target: targetInput ? targetInput.value : '_self' } : '';
+        return;
+      }
+      const input = form.querySelector(`[name="${CSS.escape(name)}"]`);
+      if (!input) return;
+      if (type === 'TrueFalse') {
+        data[name] = !!input.checked;
+      } else if (type === 'Number' || type === 'Range') {
+        const raw = input.value;
+        data[name] = raw === '' ? '' : Number(raw);
+      } else if (type === 'ButtonGroup' || type === 'RadioButton') {
+        const checked = form.querySelector(`[name="${CSS.escape(name)}"]:checked`);
+        data[name] = checked ? checked.value : '';
+      } else {
+        data[name] = input.value;
+      }
     } catch (err) {
       console.warn(`[liveUpdate] Error collecting field "${name}" (${type}):`, err);
     }
@@ -10053,7 +10053,7 @@ function updateBlockCardPreview(blockId) {
 // ── ImagesSlider: Swiper init in preview ────────────────────────────────────
 function initPreviewImagesSlider(richEl) {
   if (typeof window.Swiper === 'undefined') return;
-  richEl.querySelectorAll('.js_images-slider').forEach(function(el, i) {
+  richEl.querySelectorAll('.js_images-slider').forEach(function (el, i) {
     // Destroy previous instance if re-rendering
     if (el.swiper) el.swiper.destroy(true, true);
     var slideCount = el.querySelectorAll('.swiper-slide').length;
@@ -10078,7 +10078,7 @@ function initPreviewImagesSlider(richEl) {
 // ── LogosSlider: Swiper init in preview ──────────────────────────────────────
 function initPreviewLogosSlider(richEl) {
   if (typeof window.Swiper === 'undefined') return;
-  richEl.querySelectorAll('.js_logos-slider').forEach(function(el) {
+  richEl.querySelectorAll('.js_logos-slider').forEach(function (el) {
     if (el.swiper) el.swiper.destroy(true, true);
     var slideCount = el.querySelectorAll('.swiper-slide').length;
     var ww = window.innerWidth;
@@ -10616,7 +10616,7 @@ async function savePageBuilder() {
               '<p class="text-muted" style="font-size:0.85rem">Aucun menu créé. <a href="#" onclick="loadSection(\'menus\');return false">Créer un menu</a></p>';
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // Update "Voir la page" link with current slug
@@ -10730,34 +10730,34 @@ function renderMenuHierarchyTable(menuId) {
         <span class="page-item__actions" style="opacity:1">Actions</span>
       </div>
       ${hierarchy.map(item => {
-        const page = item.page_id ? _pagesCache.find(p => p.id === item.page_id) : null;
-        const title = item.title || (page ? page.title : 'Sans titre');
-        const slug = page ? page.slug : (item.url || '');
-        const indent = item._depth * 28;
-        const isChild = item._depth > 0;
-        const safeTitle = title.replace(/'/g, "\\'");
-        return '<div class="page-item" style="padding-left: ' + (20 + indent) + 'px">'
-          + '<div class="page-item__info">'
-          +   '<div class="page-item__title">'
-          +     (isChild ? '<span class="page-item__child-icon">↳</span>' : '') + escapeHtml(title)
-          +   '</div>'
-          +   '<div class="page-item__slug">/' + escapeHtml(slug) + '</div>'
-          + '</div>'
-          + '<div class="page-item__meta">'
-          +   (page && page.author?.name ? '<span class="page-item__author">' + escapeHtml(page.author.name) + '</span>' : '')
-          +   (page ? '<span class="page-item__date">' + new Date(page.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span>' : '')
-          + '</div>'
-          + '<div class="page-item__badges">'
-          +   (page ? '<span class="badge ' + (page.status === 'published' ? 'badge-success' : 'badge-warning') + '">' + (page.status === 'published' ? 'Publié' : 'Brouillon') + '</span>' : '<span class="badge badge-muted">Lien externe</span>')
-          + '</div>'
-          + '<div class="page-item__actions">'
-          +   (page ? '<button class="btn-icon-action" onclick="editPage(' + page.id + ')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
-          +     '<button class="btn-icon-action" onclick="duplicatePage(' + page.id + ')" title="Dupliquer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
-          +     '<button class="btn-icon-action btn-icon-action--danger" onclick="deletePage(' + page.id + ', \'' + safeTitle + '\')" title="Supprimer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
-          :   '')
-          + '</div>'
-        + '</div>';
-      }).join('')}
+    const page = item.page_id ? _pagesCache.find(p => p.id === item.page_id) : null;
+    const title = item.title || (page ? page.title : 'Sans titre');
+    const slug = page ? page.slug : (item.url || '');
+    const indent = item._depth * 28;
+    const isChild = item._depth > 0;
+    const safeTitle = title.replace(/'/g, "\\'");
+    return '<div class="page-item" style="padding-left: ' + (20 + indent) + 'px">'
+      + '<div class="page-item__info">'
+      + '<div class="page-item__title">'
+      + (isChild ? '<span class="page-item__child-icon">↳</span>' : '') + escapeHtml(title)
+      + '</div>'
+      + '<div class="page-item__slug">/' + escapeHtml(slug) + '</div>'
+      + '</div>'
+      + '<div class="page-item__meta">'
+      + (page && page.author?.name ? '<span class="page-item__author">' + escapeHtml(page.author.name) + '</span>' : '')
+      + (page ? '<span class="page-item__date">' + new Date(page.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span>' : '')
+      + '</div>'
+      + '<div class="page-item__badges">'
+      + (page ? '<span class="badge ' + (page.status === 'published' ? 'badge-success' : 'badge-warning') + '">' + (page.status === 'published' ? 'Publié' : 'Brouillon') + '</span>' : '<span class="badge badge-muted">Lien externe</span>')
+      + '</div>'
+      + '<div class="page-item__actions">'
+      + (page ? '<button class="btn-icon-action" onclick="editPage(' + page.id + ')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+        + '<button class="btn-icon-action" onclick="duplicatePage(' + page.id + ')" title="Dupliquer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+        + '<button class="btn-icon-action btn-icon-action--danger" onclick="deletePage(' + page.id + ', \'' + safeTitle + '\')" title="Supprimer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
+        : '')
+      + '</div>'
+      + '</div>';
+  }).join('')}
     </div>
   `;
 }
@@ -10808,9 +10808,11 @@ function renderPagesView() {
     <div class="page-header">
       <h1>Pages</h1>
       <div class="page-header-actions">
-        ${(() => { const a = aiButtonAttrs(); return `<button class="btn btn-ai" onclick="openBulkAiModal()" title="${a.title}"${a.disabled ? ' disabled' : ''}>
+        ${(() => {
+      const a = aiButtonAttrs(); return `<button class="btn btn-ai" onclick="openBulkAiModal()" title="${a.title}"${a.disabled ? ' disabled' : ''}>
           <i class="fa-solid fa-wand-magic-sparkles"></i> Générer par IA
-        </button>`; })()}
+        </button>`;
+    })()}
         <button class="btn btn-primary" onclick="openPageBuilder(null)">
           <i class="fa-solid fa-plus"></i> Nouvelle page
         </button>
@@ -11049,27 +11051,27 @@ function renderReusableBlocsTable(blocs) {
   return `
     <div class="pages-list">
       ${blocs.map(bloc => {
-        const safeTitle = bloc.title.replace(/'/g, "\\'");
-        return '<div class="page-item">'
-          + '<div class="page-item__info">'
-          +   '<div class="page-item__title">' + escapeHtml(bloc.title) + '</div>'
-          + '</div>'
-          + '<div class="page-item__meta">'
-          +   (bloc.author?.name ? '<span class="page-item__author">' + escapeHtml(bloc.author.name) + '</span>' : '')
-          +   '<span class="page-item__date">' + new Date(bloc.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span>'
-          + '</div>'
-          + '<div class="page-item__badges">'
-          +   '<span class="badge ' + (bloc.status === 'published' ? 'badge-success' : 'badge-warning') + '">'
-          +     (bloc.status === 'published' ? 'Publié' : 'Brouillon')
-          +   '</span>'
-          + '</div>'
-          + '<div class="page-item__actions">'
-          +   '<button class="btn-icon-action" onclick="editReusableBloc(' + bloc.id + ')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
-          +   '<button class="btn-icon-action" onclick="duplicateReusableBloc(' + bloc.id + ')" title="Dupliquer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
-          +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteReusableBloc(' + bloc.id + ', \'' + safeTitle + '\')" title="Supprimer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
-          + '</div>'
-        + '</div>';
-      }).join('')}
+    const safeTitle = bloc.title.replace(/'/g, "\\'");
+    return '<div class="page-item">'
+      + '<div class="page-item__info">'
+      + '<div class="page-item__title">' + escapeHtml(bloc.title) + '</div>'
+      + '</div>'
+      + '<div class="page-item__meta">'
+      + (bloc.author?.name ? '<span class="page-item__author">' + escapeHtml(bloc.author.name) + '</span>' : '')
+      + '<span class="page-item__date">' + new Date(bloc.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span>'
+      + '</div>'
+      + '<div class="page-item__badges">'
+      + '<span class="badge ' + (bloc.status === 'published' ? 'badge-success' : 'badge-warning') + '">'
+      + (bloc.status === 'published' ? 'Publié' : 'Brouillon')
+      + '</span>'
+      + '</div>'
+      + '<div class="page-item__actions">'
+      + '<button class="btn-icon-action" onclick="editReusableBloc(' + bloc.id + ')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+      + '<button class="btn-icon-action" onclick="duplicateReusableBloc(' + bloc.id + ')" title="Dupliquer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+      + '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteReusableBloc(' + bloc.id + ', \'' + safeTitle + '\')" title="Supprimer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
+      + '</div>'
+      + '</div>';
+  }).join('')}
     </div>
   `;
 }
@@ -11123,7 +11125,7 @@ async function openReusableBlocBuilder(blocId) {
         pageBuilderState.blocks = parsePageContent(bloc.content);
         pageBuilderState.meta = { title: bloc.title, slug: '', status: bloc.status || 'published', show_in_menu: false, menu_order: 0, parent_id: null };
       }
-    } catch (e) {}
+    } catch (e) { }
     hideLoading();
   }
   document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
@@ -11175,14 +11177,14 @@ async function renderReusableBlocBuilder() {
                   </div>
                   <div class="builder-module-category-items">
                     ${category.modules.map(name => {
-                      const type = toKebabCase(name);
-                      const def = BLOCK_TYPES[type] || { label: MODULE_LABELS[name] || humanizeModuleName(name), icon: category.icon || '▦' };
-                      return `
+    const type = toKebabCase(name);
+    const def = BLOCK_TYPES[type] || { label: MODULE_LABELS[name] || humanizeModuleName(name), icon: category.icon || '▦' };
+    return `
                         <div class="builder-module-item" draggable="true" data-block-type="${type}" onclick="addBlockByClick('${type}')" title="Glisser ici ou cliquer pour ajouter">
                           <span>${def.label}</span>
                         </div>
                       `;
-                    }).join('')}
+  }).join('')}
                   </div>
                 </div>
               `).join('')}
@@ -11405,18 +11407,18 @@ async function renderMediaLibrary() {
             </button>
           </div>
           <div class="media-sort-group" role="group" aria-label="Trier">
-            ${['date','name','type'].map(key => {
-              const active = mediaState.sort.startsWith(key + '_');
-              const asc = mediaState.sort === key + '_asc';
-              const next = active ? (asc ? key + '_desc' : key + '_asc') : (key === 'date' ? key + '_desc' : key + '_asc');
-              const label = key === 'date' ? 'Date' : key === 'name' ? 'Nom' : 'Type';
-              return `
+            ${['date', 'name', 'type'].map(key => {
+    const active = mediaState.sort.startsWith(key + '_');
+    const asc = mediaState.sort === key + '_asc';
+    const next = active ? (asc ? key + '_desc' : key + '_asc') : (key === 'date' ? key + '_desc' : key + '_asc');
+    const label = key === 'date' ? 'Date' : key === 'name' ? 'Nom' : 'Type';
+    return `
                 <button type="button" class="media-sort-btn ${active ? 'is-active' : ''}" onclick="handleMediaSort('${next}')" title="Trier par ${label}">
                   <span>${label}</span>
                   <svg class="media-sort-arrow ${active && asc ? 'is-asc' : ''}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
                 </button>
               `;
-            }).join('')}
+  }).join('')}
           </div>
         </div>
         <button class="media-folder-item media-folder-all ${currentFolder === null ? 'is-active' : ''}" onclick="selectMediaFolder(null)" ondragover="onFolderDragOver(event)" ondragleave="onFolderDragLeave(event)" ondrop="onFolderDrop(event, null)">
@@ -11433,10 +11435,10 @@ async function renderMediaLibrary() {
       </aside>
       <section class="media-grid">
         ${mediaState.items.length === 0
-          ? (mediaState.search
-            ? renderEmptyState('🔍', 'Aucun résultat', `Aucun média ne correspond à « ${escapeHtml(mediaState.search)} ».`)
-            : renderEmptyState('🗂️', 'Aucun média', 'Importez des images ou vidéos pour commencer.'))
-          : ''}
+      ? (mediaState.search
+        ? renderEmptyState('🔍', 'Aucun résultat', `Aucun média ne correspond à « ${escapeHtml(mediaState.search)} ».`)
+        : renderEmptyState('🗂️', 'Aucun média', 'Importez des images ou vidéos pour commencer.'))
+      : ''}
         ${mediaState.items.map(item => renderMediaCard(item)).join('')}
       </section>
     </div>
@@ -11480,8 +11482,8 @@ function renderMediaCard(item, forPicker = false) {
   const thumb = isImage
     ? `<img src="${escapeHtml(thumbUrl)}" alt="${escapeHtml(item.original_name)}" loading="lazy">`
     : isDocument
-    ? `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f8f9fa;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg></div>`
-    : `<video src="${escapeHtml(item.url)}#t=0.5" preload="metadata" muted></video>`;
+      ? `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f8f9fa;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg></div>`
+      : `<video src="${escapeHtml(item.url)}#t=0.5" preload="metadata" muted></video>`;
   const typeLabel = isImage ? 'Image' : isDocument ? 'PDF' : 'Vidéo';
   const meta = typeLabel;
   const folderSelect = forPicker ? '' : `
@@ -11969,14 +11971,14 @@ function openMediaDetail(mediaId) {
       </div>
       <div class="media-detail-preview">
         ${isImage
-          ? `<img src="${escapeHtml(previewUrl)}" alt="${escapeHtml(item.alt || item.original_name)}">`
-          : isDocument
-          ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;gap:1rem;background:#f8f9fa;border-radius:8px;min-height:200px;">
+      ? `<img src="${escapeHtml(previewUrl)}" alt="${escapeHtml(item.alt || item.original_name)}">`
+      : isDocument
+        ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;gap:1rem;background:#f8f9fa;border-radius:8px;min-height:200px;">
               <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg>
               <span style="font-weight:500">${escapeHtml(item.original_name)}</span>
               <a href="${escapeHtml(item.url)}" target="_blank" class="btn btn-sm btn-primary" onclick="event.stopPropagation()">Ouvrir le PDF</a>
             </div>`
-          : `<video src="${escapeHtml(item.url)}" controls></video>`}
+        : `<video src="${escapeHtml(item.url)}" controls></video>`}
       </div>
       <div class="media-detail-infos">
         <span>${escapeHtml(item.mime_type)}</span>
@@ -12683,8 +12685,8 @@ function applyMediaSelection(blockId, fieldName, item) {
       preview.innerHTML = item.type === 'image'
         ? `<img src="${escapeHtml(getOptimizedUrl(item.url, 400, 70))}" alt="${escapeHtml(item.original_name)}">`
         : isPdfItem
-        ? `<div class="media-preview-icon" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f8f9fa;border-radius:8px;padding:1rem;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg></div>`
-        : `<div class="media-preview-icon">🎬</div>`;
+          ? `<div class="media-preview-icon" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f8f9fa;border-radius:8px;padding:1rem;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg></div>`
+          : `<div class="media-preview-icon">🎬</div>`;
     }
     const meta = wrapper.querySelector('.media-preview-meta');
     if (meta) meta.textContent = item.original_name || item.url;
@@ -12929,7 +12931,7 @@ function initGoogleMapField(uid) {
 
   async function showMiniMap(lat, lng) {
     // Destroy previous map instance to avoid WebGL context leaks
-    if (miniMap) { try { miniMap.remove(); } catch(e) {} miniMap = null; miniMarker = null; }
+    if (miniMap) { try { miniMap.remove(); } catch (e) { } miniMap = null; miniMarker = null; }
     previewEl.innerHTML = '';
     previewEl.style.height = '200px';
     await ensureMapboxGL();
@@ -13238,11 +13240,13 @@ function promptModal(message, defaultValue = '', title = 'Saisie') {
       `,
       actions: [
         { label: 'Annuler', variant: 'btn-outline', onClick: () => { closeUiModal(); resolve(''); } },
-        { label: 'Valider', variant: 'btn-primary', onClick: () => {
-          const value = document.getElementById(inputId)?.value?.trim() || '';
-          closeUiModal();
-          resolve(value);
-        } }
+        {
+          label: 'Valider', variant: 'btn-primary', onClick: () => {
+            const value = document.getElementById(inputId)?.value?.trim() || '';
+            closeUiModal();
+            resolve(value);
+          }
+        }
       ]
     });
     setTimeout(() => document.getElementById(inputId)?.focus(), 0);
@@ -13328,32 +13332,32 @@ function renderPagesTable(pages) {
         <span class="page-item__actions" style="opacity:1">Actions</span>
       </div>
       ${pages.map(page => {
-        const safeTitle = page.title.replace(/'/g, "\\'");
-        const checked = _pagesSelected.has(page.id);
-        return '<div class="page-item' + (checked ? ' page-item--selected' : '') + '">'
-          + '<label class="page-item__checkbox"><input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="togglePageSelect(' + page.id + ', this.checked)"></label>'
-          + '<div class="page-item__info">'
-          +   '<div class="page-item__title">' + escapeHtml(page.title) + '</div>'
-          +   '<div class="page-item__slug">/' + escapeHtml(page.slug) + '</div>'
-          + '</div>'
-          + '<div class="page-item__meta">'
-          +   (page.author?.name ? '<span class="page-item__author">' + escapeHtml(page.author.name) + '</span>' : '')
-          +   '<span class="page-item__date">' + new Date(page.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span>'
-          + '</div>'
-          + '<div class="page-item__badges">'
-          +   renderPageMenuBadges(page.id)
-          +   '<span class="badge ' + (page.status === 'published' ? 'badge-success' : page.status === 'private' ? 'badge-info' : 'badge-warning') + '">'
-          +     (page.status === 'published' ? 'Publié' : page.status === 'private' ? 'Privé' : 'Brouillon')
-          +   '</span>'
-          +   (page.published_date && new Date(page.published_date) > new Date() ? '<span class="badge badge-outline" title="Planifié le ' + new Date(page.published_date).toLocaleDateString('fr-FR') + '">⏱</span>' : '')
-          + '</div>'
-          + '<div class="page-item__actions">'
-          +   '<button class="btn-icon-action" onclick="editPage(' + page.id + ')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
-          +   '<button class="btn-icon-action" onclick="duplicatePage(' + page.id + ')" title="Dupliquer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
-          +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deletePage(' + page.id + ', \'' + safeTitle + '\')" title="Supprimer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
-          + '</div>'
-        + '</div>';
-      }).join('')}
+    const safeTitle = page.title.replace(/'/g, "\\'");
+    const checked = _pagesSelected.has(page.id);
+    return '<div class="page-item' + (checked ? ' page-item--selected' : '') + '">'
+      + '<label class="page-item__checkbox"><input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="togglePageSelect(' + page.id + ', this.checked)"></label>'
+      + '<div class="page-item__info">'
+      + '<div class="page-item__title">' + escapeHtml(page.title) + '</div>'
+      + '<div class="page-item__slug">/' + escapeHtml(page.slug) + '</div>'
+      + '</div>'
+      + '<div class="page-item__meta">'
+      + (page.author?.name ? '<span class="page-item__author">' + escapeHtml(page.author.name) + '</span>' : '')
+      + '<span class="page-item__date">' + new Date(page.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span>'
+      + '</div>'
+      + '<div class="page-item__badges">'
+      + renderPageMenuBadges(page.id)
+      + '<span class="badge ' + (page.status === 'published' ? 'badge-success' : page.status === 'private' ? 'badge-info' : 'badge-warning') + '">'
+      + (page.status === 'published' ? 'Publié' : page.status === 'private' ? 'Privé' : 'Brouillon')
+      + '</span>'
+      + (page.published_date && new Date(page.published_date) > new Date() ? '<span class="badge badge-outline" title="Planifié le ' + new Date(page.published_date).toLocaleDateString('fr-FR') + '">⏱</span>' : '')
+      + '</div>'
+      + '<div class="page-item__actions">'
+      + '<button class="btn-icon-action" onclick="editPage(' + page.id + ')" title="Modifier"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+      + '<button class="btn-icon-action" onclick="duplicatePage(' + page.id + ')" title="Dupliquer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+      + '<button class="btn-icon-action btn-icon-action--danger" onclick="deletePage(' + page.id + ', \'' + safeTitle + '\')" title="Supprimer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
+      + '</div>'
+      + '</div>';
+  }).join('')}
     </div>
   `;
 }
@@ -13431,7 +13435,7 @@ async function showPageForm(pageId = null) {
             </div>
             <div class="form-group" id="pagePublishDate" style="display:${page?.published_date ? '' : 'none'}">
               <label class="form-label">Date de publication</label>
-              <input type="datetime-local" class="form-input" name="published_date" value="${page?.published_date ? page.published_date.slice(0,16) : ''}">
+              <input type="datetime-local" class="form-input" name="published_date" value="${page?.published_date ? page.published_date.slice(0, 16) : ''}">
             </div>
           </div>
 
@@ -13693,6 +13697,7 @@ async function renderSiteSettings() {
 
     // Maintenance
     const isMaintenance = settings.is_maintenance === '1';
+    const titleMaintenance = settings.title_maintenance || '';
     const textMaintenance = settings.text_maintenance || '';
     const showInfos = settings.show_infos === '1';
     const showRs = settings.show_rs === '1';
@@ -13880,28 +13885,29 @@ async function renderSiteSettings() {
               <label class="form-label">Police des titres</label>
               <select class="form-select" name="font_title">
                 ${[
-                  ['anek-odia', 'Anek Odia'],
-                  ['crimson-pro', 'Crimson Pro'],
-                  ['dm-serif', 'DM Serif Display'],
-                  ['encode', 'Encode Sans Expanded'],
-                  ['inter', 'Inter'],
-                  ['jakarta', 'Plus Jakarta Sans'],
-                  ['jost', 'Jost'],
-                  ['kanit', 'Kanit'],
-                  ['lilita-one', 'Lilita One'],
-                  ['lora', 'Lora'],
-                  ['montserrat', 'Montserrat'],
-                  ['onest', 'Onest'],
-                  ['open-sans', 'Open Sans'],
-                  ['oswald', 'Oswald'],
-                  ['playfair-display', 'Playfair Display'],
-                  ['poppins', 'Poppins'],
-                  ['prompt', 'Prompt'],
-                  ['raleway', 'Raleway'],
-                  ['rubik', 'Rubik'],
-                  ['ubuntu', 'Ubuntu'],
-                  ['zilla-slab', 'Zilla Slab']
-                ].map(([val, label]) => `
+        ['anek-odia', 'Anek Odia'],
+        ['cormorant-garamond', 'Cormorant Garamond'],
+        ['crimson-pro', 'Crimson Pro'],
+        ['dm-serif', 'DM Serif Display'],
+        ['encode', 'Encode Sans Expanded'],
+        ['inter', 'Inter'],
+        ['jakarta', 'Plus Jakarta Sans'],
+        ['jost', 'Jost'],
+        ['kanit', 'Kanit'],
+        ['lilita-one', 'Lilita One'],
+        ['lora', 'Lora'],
+        ['montserrat', 'Montserrat'],
+        ['onest', 'Onest'],
+        ['open-sans', 'Open Sans'],
+        ['oswald', 'Oswald'],
+        ['playfair-display', 'Playfair Display'],
+        ['poppins', 'Poppins'],
+        ['prompt', 'Prompt'],
+        ['raleway', 'Raleway'],
+        ['rubik', 'Rubik'],
+        ['ubuntu', 'Ubuntu'],
+        ['zilla-slab', 'Zilla Slab']
+      ].map(([val, label]) => `
                   <option value="${val}" ${fontTitle === val ? 'selected' : ''}>${label}</option>
                 `).join('')}
               </select>
@@ -13910,22 +13916,22 @@ async function renderSiteSettings() {
               <label class="form-label">Police du texte</label>
               <select class="form-select" name="font_general">
                 ${[
-                  ['barlow', 'Barlow'],
-                  ['bitter', 'Bitter'],
-                  ['cormorant-garamond', 'Cormorant Garamond'],
-                  ['encode', 'Encode Sans Expanded'],
-                  ['exo', 'Exo'],
-                  ['inter', 'Inter'],
-                  ['jakarta', 'Plus Jakarta Sans'],
-                  ['jost', 'Jost'],
-                  ['kanit', 'Kanit'],
-                  ['lora', 'Lora'],
-                  ['montserrat', 'Montserrat'],
-                  ['onest', 'Onest'],
-                  ['open-sans', 'Open Sans'],
-                  ['roboto', 'Roboto'],
-                  ['rubik', 'Rubik']
-                ].map(([val, label]) => `
+        ['barlow', 'Barlow'],
+        ['bitter', 'Bitter'],
+        ['cormorant-garamond', 'Cormorant Garamond'],
+        ['encode', 'Encode Sans Expanded'],
+        ['exo', 'Exo'],
+        ['inter', 'Inter'],
+        ['jakarta', 'Plus Jakarta Sans'],
+        ['jost', 'Jost'],
+        ['kanit', 'Kanit'],
+        ['lora', 'Lora'],
+        ['montserrat', 'Montserrat'],
+        ['onest', 'Onest'],
+        ['open-sans', 'Open Sans'],
+        ['roboto', 'Roboto'],
+        ['rubik', 'Rubik']
+      ].map(([val, label]) => `
                   <option value="${val}" ${fontGeneral === val ? 'selected' : ''}>${label}</option>
                 `).join('')}
               </select>
@@ -14076,21 +14082,21 @@ async function renderSiteSettings() {
             <label class="form-label">Couleur de fond du footer</label>
             <div class="radio-pill-group">
               ${[
-                { value: 'no-background-color', label: 'Aucune', color: null },
-                { value: 'has-background-primary', label: 'Primaire', color: settings.primary_color || null },
-                { value: 'has-background-secondary', label: 'Secondaire', color: settings.secondary_color || null },
-                { value: 'has-background-dark', label: 'Sombre', color: settings.default_color || '#224f5a' },
-              ].map((opt, i) => {
-                const checked = footerColor === opt.value ? 'checked' : '';
-                const swatch = opt.color
-                  ? '<span class="color-swatch" style="background:' + escapeHtml(opt.color) + '"></span>'
-                  : '<span class="color-swatch color-swatch--none"></span>';
-                return '<label class="radio-pill radio-pill--color" for="footer_color_' + i + '">'
-                  + '<input type="radio" id="footer_color_' + i + '" name="footer_color" value="' + escapeHtml(opt.value) + '" ' + checked + '>'
-                  + swatch
-                  + '<span class="color-label">' + escapeHtml(opt.label) + '</span>'
-                  + '</label>';
-              }).join('')}
+        { value: 'no-background-color', label: 'Aucune', color: null },
+        { value: 'has-background-primary', label: 'Primaire', color: settings.primary_color || null },
+        { value: 'has-background-secondary', label: 'Secondaire', color: settings.secondary_color || null },
+        { value: 'has-background-dark', label: 'Sombre', color: settings.default_color || '#224f5a' },
+      ].map((opt, i) => {
+        const checked = footerColor === opt.value ? 'checked' : '';
+        const swatch = opt.color
+          ? '<span class="color-swatch" style="background:' + escapeHtml(opt.color) + '"></span>'
+          : '<span class="color-swatch color-swatch--none"></span>';
+        return '<label class="radio-pill radio-pill--color" for="footer_color_' + i + '">'
+          + '<input type="radio" id="footer_color_' + i + '" name="footer_color" value="' + escapeHtml(opt.value) + '" ' + checked + '>'
+          + swatch
+          + '<span class="color-label">' + escapeHtml(opt.label) + '</span>'
+          + '</label>';
+      }).join('')}
             </div>
           </div>
           <div class="form-row" style="align-items:end;">
@@ -14382,6 +14388,10 @@ async function renderSiteSettings() {
             <div class="toggle-field" style="display:flex;align-items:center;gap:10px;"><label class="toggle-switch"><input type="checkbox" name="is_maintenance" ${isMaintenance ? 'checked' : ''}><span class="toggle-slider"></span></label><span class="toggle-label">Activer le mode maintenance</span></div>
           </div>
           <div class="form-group">
+            <label class="form-label">Titre</label>
+            <input type="text" class="form-input" name="title_maintenance" value="${escapeHtml(titleMaintenance)}">
+          </div>
+          <div class="form-group">
             <label class="form-label">Texte de la page maintenance</label>
             <textarea class="form-textarea" name="text_maintenance" rows="3">${escapeHtml(textMaintenance)}</textarea>
           </div>
@@ -14601,6 +14611,7 @@ async function saveSiteSettings(event) {
     floating_btn_link_title: formData.get('floating_btn_link_title') || '',
     floating_btn_img: formData.get('floating_btn_img') || '',
     is_maintenance: formData.get('is_maintenance') ? '1' : '0',
+    title_maintenance: formData.get('title_maintenance') || '',
     text_maintenance: formData.get('text_maintenance') || '',
     show_infos: formData.get('show_infos') ? '1' : '0',
     show_rs: formData.get('show_rs') ? '1' : '0',
@@ -15203,24 +15214,24 @@ async function renderUsers() {
             </thead>
             <tbody>
               ${[
-                ['Tableau de bord', true, true, true, true],
-                ['Pages / Articles / CPT', true, true, true, false],
-                ['Médiathèque', true, true, true, false],
-                ['Blocs réutilisables', true, true, true, false],
-                ['Menus', true, true, false, false],
-                ['Paramètres du site', true, true, false, false],
-                ['Formulaires', true, true, false, false],
-                ['Thème', true, true, false, false],
-                ['Rebuild', true, true, false, false],
-                ['Utilisateurs', true, false, false, false],
-                ['Plugins', true, false, false, false],
-                ['Crédits IA', true, false, false, false],
-              ].map(([label, ...perms]) =>
-                '<tr style="border-bottom:1px solid var(--border-color,#e5e7eb)">'
-                + '<td style="padding:8px 12px;font-weight:500">' + label + '</td>'
-                + perms.map(ok => '<td style="padding:8px 12px;text-align:center">' + (ok ? '<span style="color:var(--success,#22c55e)">✓</span>' : '<span style="color:var(--danger,#ef4444);opacity:.4">✗</span>') + '</td>').join('')
-                + '</tr>'
-              ).join('')}
+        ['Tableau de bord', true, true, true, true],
+        ['Pages / Articles / CPT', true, true, true, false],
+        ['Médiathèque', true, true, true, false],
+        ['Blocs réutilisables', true, true, true, false],
+        ['Menus', true, true, false, false],
+        ['Paramètres du site', true, true, false, false],
+        ['Formulaires', true, true, false, false],
+        ['Thème', true, true, false, false],
+        ['Rebuild', true, true, false, false],
+        ['Utilisateurs', true, false, false, false],
+        ['Plugins', true, false, false, false],
+        ['Crédits IA', true, false, false, false],
+      ].map(([label, ...perms]) =>
+        '<tr style="border-bottom:1px solid var(--border-color,#e5e7eb)">'
+        + '<td style="padding:8px 12px;font-weight:500">' + label + '</td>'
+        + perms.map(ok => '<td style="padding:8px 12px;text-align:center">' + (ok ? '<span style="color:var(--success,#22c55e)">✓</span>' : '<span style="color:var(--danger,#ef4444);opacity:.4">✗</span>') + '</td>').join('')
+        + '</tr>'
+      ).join('')}
             </tbody>
           </table>
         </div>
@@ -15254,22 +15265,22 @@ function renderUsersTable(users) {
         <span class="page-item__actions" style="opacity:1">Actions</span>
       </div>
       ${users.map(user => {
-        const safeName = escapeHtml(user.name).replace(/'/g, "\\'");
-        const dateStr = new Date(user.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
-        return '<div class="page-item">'
-          + '<div class="user-avatar ' + avatarClass(user.role) + '">' + getInitials(user.name) + '</div>'
-          + '<div class="page-item__info" style="cursor:pointer" onclick="showUserForm(' + user.id + ')">'
-          +   '<div class="page-item__title">' + escapeHtml(user.name) + (user.id === currentUser.id ? ' <span class="badge badge-info" style="font-size:10px">Vous</span>' : '') + '</div>'
-          +   '<div class="page-item__slug">' + escapeHtml(user.email) + (user.username ? ' · @' + escapeHtml(user.username) : '') + '</div>'
-          + '</div>'
-          + '<div class="page-item__meta"><span class="page-item__date">' + dateStr + '</span></div>'
-          + '<div class="page-item__badges"><span class="badge ' + roleBadge(user.role) + '">' + roleLabel(user.role) + '</span></div>'
-          + '<div class="page-item__actions">'
-          +   '<button class="btn-icon-action" onclick="showUserForm(' + user.id + ')" title="Modifier">' + _svgEdit + '</button>'
-          +   (user.id !== currentUser.id ? '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteUser(' + user.id + ', \'' + safeName + '\')" title="Supprimer">' + _svgDelete + '</button>' : '')
-          + '</div>'
-        + '</div>';
-      }).join('')}
+    const safeName = escapeHtml(user.name).replace(/'/g, "\\'");
+    const dateStr = new Date(user.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+    return '<div class="page-item">'
+      + '<div class="user-avatar ' + avatarClass(user.role) + '">' + getInitials(user.name) + '</div>'
+      + '<div class="page-item__info" style="cursor:pointer" onclick="showUserForm(' + user.id + ')">'
+      + '<div class="page-item__title">' + escapeHtml(user.name) + (user.id === currentUser.id ? ' <span class="badge badge-info" style="font-size:10px">Vous</span>' : '') + '</div>'
+      + '<div class="page-item__slug">' + escapeHtml(user.email) + (user.username ? ' · @' + escapeHtml(user.username) : '') + '</div>'
+      + '</div>'
+      + '<div class="page-item__meta"><span class="page-item__date">' + dateStr + '</span></div>'
+      + '<div class="page-item__badges"><span class="badge ' + roleBadge(user.role) + '">' + roleLabel(user.role) + '</span></div>'
+      + '<div class="page-item__actions">'
+      + '<button class="btn-icon-action" onclick="showUserForm(' + user.id + ')" title="Modifier">' + _svgEdit + '</button>'
+      + (user.id !== currentUser.id ? '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteUser(' + user.id + ', \'' + safeName + '\')" title="Supprimer">' + _svgDelete + '</button>' : '')
+      + '</div>'
+      + '</div>';
+  }).join('')}
     </div>
   `;
 }
@@ -15410,19 +15421,19 @@ function renderMenusList() {
             <span class="page-item__actions" style="opacity:1">Actions</span>
           </div>
           ${_menusCache.map(m => {
-            const safeName = escapeHtml(m.name).replace(/'/g, "\\'");
-            const loc = m.location ? (MENU_LOCATIONS.find(l => l.value === m.location)?.label || m.location) : '<em style="color:var(--gray-400);">Non assigné</em>';
-            return '<div class="page-item">'
-              + '<div class="page-item__info" style="cursor:pointer" onclick="openMenuEditor(' + m.id + ')">'
-              +   '<div class="page-item__title">' + escapeHtml(m.name) + '</div>'
-              + '</div>'
-              + '<div class="page-item__parent">' + loc + '</div>'
-              + '<div class="page-item__actions">'
-              +   '<button class="btn-icon-action" onclick="openMenuEditor(' + m.id + ')" title="Modifier">' + _svgEdit + '</button>'
-              +   '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteMenu(' + m.id + ', \'' + safeName + '\')" title="Supprimer">' + _svgDelete + '</button>'
-              + '</div>'
-            + '</div>';
-          }).join('')}
+    const safeName = escapeHtml(m.name).replace(/'/g, "\\'");
+    const loc = m.location ? (MENU_LOCATIONS.find(l => l.value === m.location)?.label || m.location) : '<em style="color:var(--gray-400);">Non assigné</em>';
+    return '<div class="page-item">'
+      + '<div class="page-item__info" style="cursor:pointer" onclick="openMenuEditor(' + m.id + ')">'
+      + '<div class="page-item__title">' + escapeHtml(m.name) + '</div>'
+      + '</div>'
+      + '<div class="page-item__parent">' + loc + '</div>'
+      + '<div class="page-item__actions">'
+      + '<button class="btn-icon-action" onclick="openMenuEditor(' + m.id + ')" title="Modifier">' + _svgEdit + '</button>'
+      + '<button class="btn-icon-action btn-icon-action--danger" onclick="deleteMenu(' + m.id + ', \'' + safeName + '\')" title="Supprimer">' + _svgDelete + '</button>'
+      + '</div>'
+      + '</div>';
+  }).join('')}
         </div>
       ` : renderEmptyState('📋', 'Aucun menu', 'Créez votre premier menu de navigation')}
     </div>
@@ -15920,7 +15931,7 @@ function attachMenuEditorEvents() {
   let currentDepth = 0;
   let placeholder = null;
 
-  list.addEventListener('mousedown', function(e) {
+  list.addEventListener('mousedown', function (e) {
     const handle = e.target.closest('.menu-item-drag');
     if (!handle) return;
     e.preventDefault();
@@ -16209,9 +16220,9 @@ function renderFormsTable() {
         <span style="text-align:right">Actions</span>
       </div>
       ${_formsCache.map(f => {
-        const safeName = escapeHtml(f.title).replace(/'/g, "\\'");
-        const checked = _formsSelected.has(f.id);
-        return `
+    const safeName = escapeHtml(f.title).replace(/'/g, "\\'");
+    const checked = _formsSelected.has(f.id);
+    return `
         <div class="page-item${checked ? ' page-item--selected' : ''}" style="display:grid; grid-template-columns:${gridCols}; align-items:center;">
           <label class="page-item__checkbox"><input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleFormSelect(${f.id}, this.checked)"></label>
           <div onclick="loadSection('form-edit:${f.id}')" style="cursor:pointer; overflow:hidden;">
@@ -16233,7 +16244,7 @@ function renderFormsTable() {
             <button class="btn-icon-action btn-icon-action--danger" onclick="deleteFormConfirm(${f.id}, '${safeName}')" title="Supprimer">${_svgDelete}</button>
           </div>
         </div>`;
-      }).join('')}
+  }).join('')}
     </div>
   `;
 }
@@ -16391,12 +16402,12 @@ function renderFormFieldsList() {
 
   return `<div class="form-fields-list" style="display:flex;flex-wrap:wrap;gap:6px">
     ${_formBuilderFields.map((f, idx) => {
-      const isSelected = idx === _formBuilderSelectedIdx;
-      const ft = FORM_FIELD_TYPES.find(t => t.type === f.type) || { icon: '?', label: f.type };
-      const w = f.settings?.width || '100';
-      const widthStyle = w === '50' ? 'calc(50% - 3px)' : w === '33' ? 'calc(33.333% - 4px)' : '100%';
-      const widthLabel = w === '50' ? '½' : w === '33' ? '⅓' : '';
-      return `
+    const isSelected = idx === _formBuilderSelectedIdx;
+    const ft = FORM_FIELD_TYPES.find(t => t.type === f.type) || { icon: '?', label: f.type };
+    const w = f.settings?.width || '100';
+    const widthStyle = w === '50' ? 'calc(50% - 3px)' : w === '33' ? 'calc(33.333% - 4px)' : '100%';
+    const widthLabel = w === '50' ? '½' : w === '33' ? '⅓' : '';
+    return `
         <div class="form-field-item ${isSelected ? 'is-selected' : ''}" data-idx="${idx}" onclick="selectFormField(${idx})" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid ${isSelected ? 'var(--primary)' : 'var(--gray-200)'};border-radius:8px;cursor:pointer;background:${isSelected ? 'var(--gray-50)' : 'white'};width:${widthStyle};box-sizing:border-box">
           <span style="cursor:grab;color:var(--gray-400)" class="form-field-drag" data-idx="${idx}">☰</span>
           <span style="width:28px;text-align:center;font-size:14px">${ft.icon}</span>
@@ -16409,7 +16420,7 @@ function renderFormFieldsList() {
             <button class="btn-icon-action btn-icon-action--danger" onclick="event.stopPropagation(); removeFormField(${idx})" title="Supprimer" style="font-size:12px">✕</button>
           </div>
         </div>`;
-    }).join('')}
+  }).join('')}
   </div>`;
 }
 
@@ -16797,10 +16808,10 @@ async function renderFormEntries(formId) {
 
       <div style="display:flex;gap:8px;margin-bottom:16px">
         ${['all', 'unread', 'read', 'starred', 'trash'].map(s => {
-          const labels = { all: 'Toutes', unread: 'Non lues', read: 'Lues', starred: 'Favoris', trash: 'Corbeille' };
-          const count = s === 'all' ? (counts.total - (counts.trash || 0)) : (counts[s] || 0);
-          return `<button class="btn btn-sm ${_formEntriesFilter === s ? 'btn-primary' : 'btn-outline'}" onclick="_formEntriesFilter='${s}';_formEntriesPage=1;loadSection('form-entries:${formId}')">${labels[s]} (${count})</button>`;
-        }).join('')}
+      const labels = { all: 'Toutes', unread: 'Non lues', read: 'Lues', starred: 'Favoris', trash: 'Corbeille' };
+      const count = s === 'all' ? (counts.total - (counts.trash || 0)) : (counts[s] || 0);
+      return `<button class="btn btn-sm ${_formEntriesFilter === s ? 'btn-primary' : 'btn-outline'}" onclick="_formEntriesFilter='${s}';_formEntriesPage=1;loadSection('form-entries:${formId}')">${labels[s]} (${count})</button>`;
+    }).join('')}
       </div>
 
       <div class="card">
@@ -16814,11 +16825,11 @@ async function renderFormEntries(formId) {
               <span style="text-align:right">Actions</span>
             </div>
             ${entries.map(entry => {
-              const summary = (entry.values || []).slice(0, 3).map(v => `${v.field_label}: ${(v.field_value || '').substring(0, 30)}`).join(' | ');
-              const dateStr = new Date(entry.created_at).toLocaleString('fr-FR');
-              const statusBadge = entry.status === 'unread' ? 'badge-warning' : entry.status === 'starred' ? 'badge-success' : 'badge-muted';
-              const statusLabel = { unread: 'Non lu', read: 'Lu', starred: 'Favori', trash: 'Corbeille' }[entry.status];
-              return `
+      const summary = (entry.values || []).slice(0, 3).map(v => `${v.field_label}: ${(v.field_value || '').substring(0, 30)}`).join(' | ');
+      const dateStr = new Date(entry.created_at).toLocaleString('fr-FR');
+      const statusBadge = entry.status === 'unread' ? 'badge-warning' : entry.status === 'starred' ? 'badge-success' : 'badge-muted';
+      const statusLabel = { unread: 'Non lu', read: 'Lu', starred: 'Favori', trash: 'Corbeille' }[entry.status];
+      return `
               <div class="page-item" style="display:grid; grid-template-columns: 50px 1fr 150px 80px 110px; align-items:center;${entry.status === 'unread' ? ' font-weight:600' : ''}">
                 <div onclick="loadSection('form-entry-detail:${formId}:${entry.id}')" style="cursor:pointer">
                   <strong>#${entry.id}</strong>
@@ -16834,7 +16845,7 @@ async function renderFormEntries(formId) {
                   ${entry.status !== 'trash' ? `<button class="btn-icon-action btn-icon-action--danger" onclick="changeEntryStatus(${formId}, ${entry.id}, 'trash')" title="Corbeille">${_svgTrash}</button>` : `<button class="btn-icon-action btn-icon-action--danger" onclick="deleteEntryConfirm(${formId}, ${entry.id})" title="Supprimer définitivement">${_svgX}</button>`}
                 </div>
               </div>`;
-            }).join('')}
+    }).join('')}
           </div>
 
           ${totalPages > 1 ? `
@@ -17145,12 +17156,12 @@ async function renderAiCredits() {
               <button class="btn btn-primary" onclick="saveAiApiKey()">Sauvegarder</button>
             </div>
             ${apiKeyInfo.has_key
-              ? `<div class="ai-key-status ai-key-status--ok">
+        ? `<div class="ai-key-status ai-key-status--ok">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                   <span id="aiKeyDisplay">${apiKeyInfo.masked}</span>
                   <button class="ai-reveal-btn" id="aiRevealBtn" onclick="revealAiApiKey()">Révéler</button>
                 </div>`
-              : '<div class="ai-key-status ai-key-status--warn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Aucune clé configurée</div>'}
+        : '<div class="ai-key-status ai-key-status--warn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Aucune clé configurée</div>'}
           </div>
 
           <div class="ai-config-divider"></div>
