@@ -1,27 +1,19 @@
 {
-  "name": "astro-payload-blog",
+  "name": "cms-astro",
   "version": "1.0.0",
-  "description": "Blog Astro avec Payload CMS - Thème personnalisable",
+  "description": "CMS headless multi-composant avec frontend statique Astro et backend PHP",
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "build": "npm run build:backend && npm run build:frontend",
-    "build:backend": "cd backend && npm run build",
-    "build:frontend": "cd frontend && npm run build",
-    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "preview": "cd frontend && npm run preview"
   },
   "keywords": [
     "astro",
-    "payload",
     "cms",
-    "blog",
-    "multisite"
+    "php",
+    "mysql"
   ],
   "devDependencies": {
     "concurrently": "^9.1.2"
-  },
-  "dependencies": {
-    "mongodb": "^7.0.0"
   }
 }

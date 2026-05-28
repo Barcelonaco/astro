@@ -70,7 +70,7 @@ class ShippingController {
         }
 
         // Rate validity: 7 days from now (CDC §4.2)
-        $validityDays = (int) (PluginController::getPluginOption('ecommerce', 'shipping_rate_validity_days') ?? 7);
+        $validityDays = 7;
         $validUntil = date('Y-m-d\TH:i:s', strtotime("+{$validityDays} days"));
 
         json_response([

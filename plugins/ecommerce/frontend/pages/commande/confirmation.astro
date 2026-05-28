@@ -94,15 +94,15 @@ const bodyClasses = [
             </div>`
           : ''
 
-        const stripeFailed = order.payment_method === 'stripe' && order.payment_status === 'failed'
+        const stripeFailed = (order.payment_method === 'stripe' || order.payment_method === 'paypal') && order.payment_status === 'failed'
           ? `<div class="conf-bank conf-bank-error">
               <h3>Paiement refusé</h3>
-              <p>Votre paiement n'a pas pu être validé. Vous pouvez réessayer ci-dessous.</p>
-              <button type="button" class="btn btn-primary" id="retry-payment">Réessayer le paiement</button>
+              <p>Votre paiement n'a pas pu être validé.${order.payment_method === 'stripe' ? ' Vous pouvez réessayer ci-dessous.' : ''}</p>
+              ${order.payment_method === 'stripe' ? '<button type="button" class="btn btn-primary" id="retry-payment">Réessayer le paiement</button>' : ''}
             </div>`
           : ''
 
-        const stripePending = order.payment_method === 'stripe' && order.payment_status === 'pending'
+        const stripePending = (order.payment_method === 'stripe' || order.payment_method === 'paypal') && order.payment_status === 'pending'
           ? `<div class="conf-bank conf-bank-pending">
               <div class="conf-bank-pending__row">
                 <div class="conf-spinner conf-spinner--sm"></div>
@@ -172,7 +172,7 @@ const bodyClasses = [
         `
 
         // Auto-poll si paiement encore pending → re-render quand confirmé
-        if (order.payment_method === 'stripe' && order.payment_status === 'pending') {
+        if ((order.payment_method === 'stripe' || order.payment_method === 'paypal') && order.payment_status === 'pending') {
           const guest = new URLSearchParams(window.location.search).get('guest_token') || undefined
           ;(async () => {
             const updated = await pollUntilPaid(order.id, guest)
@@ -245,6 +245,17 @@ const bodyClasses = [
         } catch { return null }
       }
 
+      async function paypalCheckStatus(id: number, guest: string | undefined): Promise<string | null> {
+        try {
+          const q = new URLSearchParams({ order_id: String(id) })
+          if (guest) q.set('guest_token', guest)
+          const res = await fetch(`${API_URL}/payments/paypal/check-status?${q}`)
+          if (!res.ok) return null
+          const data = await res.json()
+          return data.payment_status || null
+        } catch { return null }
+      }
+
       // Poll l'order : d'abord via getOrder (webhook), puis fallback Stripe API directe.
       async function pollUntilPaid(id: number, guest: string | undefined): Promise<Order> {
         // Phase 1 : 5 tentatives rapides via webhook (10s)
@@ -253,8 +264,8 @@ const bodyClasses = [
           if (order.payment_status === 'paid' || order.payment_status === 'failed') return order
           await new Promise(r => setTimeout(r, 2000))
         }
-        // Phase 2 : fallback Stripe API directe (si webhook absent, ex: dev local)
-        const status = await stripeCheckStatus(id, guest)
+        // Phase 2 : fallback API directe (si webhook absent, ex: dev local)
+        const status = await stripeCheckStatus(id, guest) || await paypalCheckStatus(id, guest)
         if (status === 'paid' || status === 'failed') {
           return await getOrder(id, guest)
         }
@@ -273,13 +284,33 @@ const bodyClasses = [
         const guest = params.get('guest_token') || undefined
         // Stripe redirect → ?payment_intent=pi_xxx&redirect_status=succeeded|requires_payment_method
         const redirectStatus = params.get('redirect_status')
+        // PayPal redirect → ?paypal=capture&pp_order=PAYPAL_ORDER_ID
+        const paypalAction = params.get('paypal')
         if (!id) {
           root.innerHTML = `<div class="conf-loading"><p>Aucune commande spécifiée.</p><a class="btn" href="/">Retour à l'accueil</a></div>`
           return
         }
         try {
           let order: Order
-          if (redirectStatus === 'succeeded' || redirectStatus === 'processing') {
+          if (paypalAction === 'capture') {
+            root.innerHTML = `<div class="conf-loading"><div class="conf-spinner"></div><p>Validation du paiement PayPal en cours…</p><p class="conf-loading-sub">Merci de patienter quelques instants.</p></div>`
+            // Capture the PayPal order
+            try {
+              const { capturePayPalOrder } = await import('../../lib/stripe-api')
+              // Find the PayPal order ID from payment_intents via check-status or from URL
+              const ppOrderId = params.get('token') || '' // PayPal passes token= for approval
+              if (ppOrderId) {
+                await capturePayPalOrder(ppOrderId, id, guest)
+              }
+            } catch (captureErr) {
+              // Capture may fail if already captured by webhook — continue to display order
+              console.warn('PayPal capture:', captureErr)
+            }
+            // Poll until paid (webhook or capture may have resolved it)
+            order = await pollUntilPaid(id, guest)
+          } else if (paypalAction === 'cancel') {
+            order = await getOrder(id, guest)
+          } else if (redirectStatus === 'succeeded' || redirectStatus === 'processing') {
             root.innerHTML = `<div class="conf-loading"><div class="conf-spinner"></div><p>Validation du paiement en cours…</p><p class="conf-loading-sub">Merci de patienter quelques instants.</p></div>`
             order = await pollUntilPaid(id, guest)
           } else if (redirectStatus === 'requires_payment_method' || redirectStatus === 'failed') {

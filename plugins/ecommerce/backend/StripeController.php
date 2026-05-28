@@ -26,7 +26,7 @@ class StripeController {
     /** Expose le pk + mode pour Stripe.js. Aucun secret. */
     public static function publicConfig(): void {
         $db = Database::getInstance();
-        $keys = ['stripe_mode', 'shop_payment_methods', 'shop_currency', 'ecommerce_enabled'];
+        $keys = ['stripe_mode', 'shop_payment_methods', 'shop_currency', 'ecommerce_enabled', 'paypal_client_id', 'paypal_mode'];
         $stmt = $db->prepare('SELECT setting_key, setting_value FROM settings WHERE setting_key IN (' . implode(',', array_fill(0, count($keys), '?')) . ')');
         $stmt->execute($keys);
         $map = [];
@@ -36,6 +36,9 @@ class StripeController {
         $mode = $map['stripe_mode'] ?? 'test';
         $pk = EcommerceSettingsController::getStripeKey('pk', $mode);
 
+        $paypalMode = $map['paypal_mode'] ?? 'sandbox';
+        $paypalClientId = $map['paypal_client_id'] ?? '';
+
         json_response([
             'enabled' => ($map['ecommerce_enabled'] ?? '0') === '1',
             'currency' => $map['shop_currency'] ?? 'EUR',
@@ -44,6 +47,11 @@ class StripeController {
                 'enabled' => in_array('stripe', $methods, true),
                 'pk' => $pk,
                 'mode' => $mode,
+            ],
+            'paypal' => [
+                'enabled' => in_array('paypal', $methods, true) && $paypalClientId !== '',
+                'client_id' => $paypalClientId,
+                'mode' => $paypalMode,
             ],
         ]);
     }
@@ -221,7 +229,7 @@ class StripeController {
                 ],
                 'description' => 'Commande ' . $order['order_number'],
                 'receipt_email' => $order['email'] ?: null,
-                'payment_method_types' => ['card'],
+                'automatic_payment_methods' => ['enabled' => true],
             ]);
         } catch (\Stripe\Exception\ApiErrorException $e) {
             error_log('Stripe createPaymentIntent failed: ' . $e->getMessage());

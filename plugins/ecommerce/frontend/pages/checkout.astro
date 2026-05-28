@@ -74,6 +74,7 @@ const bodyClasses = [
         getPaymentConfig,
         createPaymentIntent,
         loadStripe,
+        createPayPalOrder,
         type PaymentConfig,
       } from '@plugins/ecommerce/frontend/lib/stripe-api'
       import {
@@ -499,6 +500,8 @@ const bodyClasses = [
 
           if (state.paymentMethod === 'stripe') {
             await initStripePayment(order)
+          } else if (state.paymentMethod === 'paypal') {
+            await initPayPalPayment(order)
           } else {
             // Virement / on_invoice → confirmation directe
             const guest = order.guest_token ? `&guest_token=${encodeURIComponent(order.guest_token)}` : ''
@@ -526,6 +529,23 @@ const bodyClasses = [
           renderStripePayment()
         } catch (err) {
           state.error = err instanceof Error ? err.message : 'Initialisation Stripe échouée.'
+          state.submitting = false
+          renderStep4()
+        }
+      }
+
+      async function initPayPalPayment(order: Order): Promise<void> {
+        try {
+          const ppOrder = await createPayPalOrder(order.id, order.guest_token || undefined)
+          if (ppOrder.approval_url) {
+            window.location.href = ppOrder.approval_url
+          } else {
+            state.error = 'Impossible d\'obtenir le lien PayPal.'
+            state.submitting = false
+            renderStep4()
+          }
+        } catch (err) {
+          state.error = err instanceof Error ? err.message : 'Initialisation PayPal echouee.'
           state.submitting = false
           renderStep4()
         }

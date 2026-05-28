@@ -43,6 +43,7 @@ require_once __DIR__ . '/OrderAdminController.php';
 require_once __DIR__ . '/OrderMailer.php';
 require_once __DIR__ . '/CustomerAdminController.php';
 require_once __DIR__ . '/StripeController.php';
+require_once __DIR__ . '/PayPalController.php';
 require_once __DIR__ . '/SEPAController.php';
 require_once __DIR__ . '/ProTierService.php';
 require_once __DIR__ . '/InvoiceController.php';
@@ -185,6 +186,20 @@ register_plugin_route('ecommerce', function (string $method, string $path) use (
     }
     if ($method === 'POST' && $path === '/payments/stripe/webhook') {
         StripeController::webhook(); return true;
+    }
+
+    // ── Payments : PayPal ──
+    if ($method === 'POST' && $path === '/payments/paypal/create-order') {
+        PayPalController::createOrder(); return true;
+    }
+    if ($method === 'POST' && $path === '/payments/paypal/capture') {
+        PayPalController::capture(); return true;
+    }
+    if ($method === 'GET' && $path === '/payments/paypal/check-status') {
+        PayPalController::checkStatus(); return true;
+    }
+    if ($method === 'POST' && $path === '/payments/paypal/webhook') {
+        PayPalController::webhook(); return true;
     }
 
     // ── Payments : SEPA ──

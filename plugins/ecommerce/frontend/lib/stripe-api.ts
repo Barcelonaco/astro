@@ -13,6 +13,7 @@ export interface PaymentConfig {
   currency: string
   payment_methods: string[]
   stripe: { enabled: boolean; pk: string; mode: 'test' | 'live' }
+  paypal?: { enabled: boolean; client_id: string; mode: 'sandbox' | 'live' }
 }
 
 export interface PaymentIntentResponse {
@@ -52,6 +53,52 @@ export async function createPaymentIntent(orderId: number, guestToken?: string):
   }
   return await res.json()
 }
+
+// ── PayPal ────────────────────────────────────────────────────────────────
+
+export interface PayPalOrderResponse {
+  paypal_order_id: string
+  approval_url: string
+}
+
+export interface PayPalCaptureResponse {
+  status: string
+  payment_status: string
+}
+
+export async function createPayPalOrder(orderId: number, guestToken?: string): Promise<PayPalOrderResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const auth = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null
+  if (auth) headers['Authorization'] = `Bearer ${auth}`
+  const res = await fetch(`${API_URL}/payments/paypal/create-order`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ order_id: orderId, guest_token: guestToken || null }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+    throw new Error(err.error || 'Echec de la creation PayPal')
+  }
+  return await res.json()
+}
+
+export async function capturePayPalOrder(ppOrderId: string, orderId: number, guestToken?: string): Promise<PayPalCaptureResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const auth = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null
+  if (auth) headers['Authorization'] = `Bearer ${auth}`
+  const res = await fetch(`${API_URL}/payments/paypal/capture`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ paypal_order_id: ppOrderId, order_id: orderId, guest_token: guestToken || null }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+    throw new Error(err.error || 'Echec de la capture PayPal')
+  }
+  return await res.json()
+}
+
+// ── Stripe.js loader ──────────────────────────────────────────────────────
 
 let stripeJsPromise: Promise<any> | null = null
 
