@@ -223,10 +223,7 @@ const blocks = rawBlocks.filter(b => !inactiveSet.has(b.type));
       // Plugins
       case 'before-after':
         return <BeforeAfter data={data} />;
-      case 'poolp-box-hero':
-        return <PoolpBoxHero data={data} />;
-      case 'poolp-box-finitions':
-        return <PoolpBoxFinitions data={data} />;
+      // poolp-box-hero and poolp-box-finitions handled by dynamic plugin loader in default case
 
       default: {
         // Dynamic plugin component if available, otherwise server-side render

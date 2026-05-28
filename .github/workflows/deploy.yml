@@ -15,7 +15,6 @@ on:
           - atempora
           - audition-confiance
           - masaiges
-          - darcy
           - darcy-prod
           - poolp
         default: all
@@ -34,7 +33,7 @@ jobs:
         run: |
           SITE='${{ github.event.inputs.site }}'
           if [ -z "$SITE" ] || [ "$SITE" = "all" ]; then
-            echo 'matrix=["alp","astro","atempora","audition-confiance","masaiges","darcy","darcy-prod","poolp"]' >> $GITHUB_OUTPUT
+            echo 'matrix=["alp","astro","atempora","audition-confiance","masaiges","darcy-prod","poolp"]' >> $GITHUB_OUTPUT
           else
             echo "matrix=[\"$SITE\"]" >> $GITHUB_OUTPUT
           fi
