@@ -6,7 +6,7 @@
 
 3. Créer le certificat SSL pour le nouveau domaine.
 
-4. Créer la base de donnée lié au site.
+4. Créer (ou migrer) la base de donnée lié au site.
 
 5. Créer les dossiers "httpdocs" puis dedans "backend-php" sur le serveur, dedans ajouter le fichier .env en se basant sur le .env.example du dossier "backend-php".
 
@@ -62,13 +62,11 @@ gzip_types text/css application/javascript application/json image/svg+xml text/x
 gzip_min_length 256;
 ```
 
-8. Ajouter dans .github/workflows/ les informations pour le nouveau site, dans le fichier deploy-server[NUMERO_SERVER].yml.
+8. Ajouter dans .github/workflows/ les informations pour le nouveau site, dans le fichier deploy.yml.
 
 **Note :**
 
-- server 1 correspond au serveur 192.19.56.20 à l'abonnement bcnco.site
-- server 2 correspond au serveur 192.19.56.20 à l'abonnement poolp
-- Pour chaque site ayant leur propre abonnement Plesk, il faut créer un fichier deploy-server[NUMERO_SERVER].yml.
+- Ajouter nom du site dans les options
 
 9. Ajouter les variables d'environnements dans les secrets Github du dépôt.
 
@@ -76,12 +74,15 @@ gzip_min_length 256;
 
 - NOMDUSITE_SSH_USER : Utilisateur ssh
 - NOMDUSITE_SSH_HOST : Adresse ip
-- NOMDUSITE_API_URL : https://nom-du-site.com/api
+- NOMDUSITE_API_SSH_PATH : Chemin vers le dossier httpdocs (ex: /var/www/vhosts/bcnco.site/[URLSITE]/httpdocs)
+- NOMDUSITE_SSH_PASS : Mot de passe SSH
 
 10. Vérifier que le nouveau workflow existe : `gh workflow list`
 
-11. Lancer le workflow : `gh workflow run deploy-server[NUMERO_SERVER].yml site=[URLSITE]`
+11. Lancer le workflow : `gh workflow run deploy.yml site=[URLSITE]`
 
 12. Vérifier que le workflow s'est bien déroulé : `gh run list`
 
 13. Modifier le fichier .env du dossier frontend.
+
+14. OPTIONNEL - Migrer le dossier uploads si migration d'un site
