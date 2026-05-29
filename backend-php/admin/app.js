@@ -9178,7 +9178,10 @@ function addFlexibleContentItem(button, blockId, fcCompoundName) {
   const lastItem = items[items.length - 1];
   if (lastItem) {
     const body = lastItem.querySelector('.repeater-row-body');
-    if (body) body.style.display = '';
+    if (body) {
+      body.style.display = '';
+      initWysiwygEditors(body);
+    }
     lastItem.classList.add('is-open');
   }
 }
