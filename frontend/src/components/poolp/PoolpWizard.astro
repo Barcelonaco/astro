@@ -103,6 +103,65 @@ const initialState = initialProject?.state || null;
   ];
   const STEP_KEYS: Array<1 | 3 | 4 | 5 | 6 | 7> = [1, 3, 4, 5, 6, 7];
 
+  /** Validate required fields for current step before navigating forward. */
+  function validateCurrentStep(
+    root: HTMLElement | null,
+    step: 1 | 3 | 4 | 5 | 6 | 7,
+  ): boolean {
+    if (!root) return true;
+    // Clear previous errors
+    root
+      .querySelectorAll(".field-error")
+      .forEach((el) => el.classList.remove("field-error"));
+    root.querySelectorAll(".poolp-validation-msg").forEach((el) => el.remove());
+
+    const errors: string[] = [];
+
+    if (step === 1) {
+      const fields = ["longueur", "largeur", "hauteur"] as const;
+      for (const name of fields) {
+        const el = root.querySelector<HTMLInputElement>(
+          `input[name="${name}"]`,
+        );
+        const v = parseFloat((el?.value || "").replace(",", "."));
+        if (!el || isNaN(v) || v <= 0) {
+          el?.classList.add("field-error");
+          errors.push(name);
+        }
+      }
+      if (errors.length) {
+        const nav = root.querySelector(".poolp-nav-btns");
+        if (nav)
+          nav.insertAdjacentHTML(
+            "beforebegin",
+            '<div class="poolp-validation-msg">Veuillez remplir tous les champs obligatoires (*).</div>',
+          );
+      }
+    }
+
+    if (step === 6) {
+      const cpEl = root.querySelector<HTMLInputElement>(
+        'input[name="code_postal"]',
+      );
+      const cp = (cpEl?.value || "").trim();
+      if (!cp || !/^\d{5}$/.test(cp)) {
+        const el = root.querySelector<HTMLInputElement>(
+          'input[name="code_postal"]',
+        );
+        el?.classList.add("field-error");
+        const nav = root.querySelector(".poolp-nav-btns");
+        if (nav)
+          nav.insertAdjacentHTML(
+            "beforebegin",
+            '<div class="poolp-validation-msg">Veuillez saisir un code postal valide.</div>',
+          );
+        return false;
+      }
+    }
+
+    return errors.length === 0;
+  }
+
   function escapeHtml(s: unknown): string {
     return String(s ?? "").replace(
       /[&<>"']/g,
@@ -127,6 +186,10 @@ const initialState = initialProject?.state || null;
   function fmtVol(v: number): string {
     return Number.isFinite(v) ? `${v.toFixed(0)} m³` : "—";
   }
+  /** Format number with comma as decimal separator (French locale). */
+  function fmtNum(v: number): string {
+    return String(v).replace(".", ",");
+  }
 
   // Récap bassin — données saisies à l'étape 1 + grandeurs hydrauliques calculées
   function bassinItems(
@@ -140,13 +203,15 @@ const initialState = initialProject?.state || null;
     const items: Array<[string, string]> = [
       [
         "Dimensions",
-        `${input.longueur} × ${input.largeur} × ${String(input.hauteur).replace(".", ",")} m`,
+        `${fmtNum(input.longueur)} × ${fmtNum(input.largeur)} × ${fmtNum(input.hauteur)} m`,
       ],
       ["Volume", vol],
     ];
     if (c?.hydraulic) {
       items.push(["Débit requis", `${c.hydraulic.debit.toFixed(0)} m³/h`]);
       items.push(["Skimmers", String(c.hydraulic.nb_skimmers)]);
+      items.push(["Bondes de fond", String(c.hydraulic.nb_bondes)]);
+      items.push(["Refoulements", String(c.hydraulic.nb_refoulements)]);
     }
     items.push(["Volet immergé", input.volet_immerge ? "Oui" : "Non"]);
     items.push(["Prise balai", input.prise_balai ? "Oui" : "Non"]);
@@ -195,6 +260,11 @@ const initialState = initialProject?.state || null;
         updateInput(proj.state as Partial<PoolpInput>);
         setProjectToken(token);
         setStep(1);
+        // If logged in, claim this project (link to customer account)
+        if (isLoggedIn()) {
+          const auth = localStorage.getItem("customer_token") || undefined;
+          await updateProject(token, { state: proj.state }, auth);
+        }
       }
     } else {
       // Fresh wizard — full reset, no leftover data
@@ -222,9 +292,15 @@ const initialState = initialProject?.state || null;
     root
       .querySelectorAll<HTMLButtonElement>("[data-go-step]")
       .forEach((btn) => {
-        btn.addEventListener("click", () =>
-          setStep(Number(btn.dataset.goStep) as 1 | 3 | 4 | 5 | 6 | 7),
-        );
+        btn.addEventListener("click", () => {
+          const target = Number(btn.dataset.goStep) as 1 | 3 | 4 | 5 | 6 | 7;
+          const current = getState().step;
+          if (target > current) {
+            const contentRoot = document.getElementById("poolp-step-content");
+            if (!validateCurrentStep(contentRoot, current)) return;
+          }
+          setStep(target);
+        });
       });
   }
 
@@ -383,45 +459,25 @@ const initialState = initialProject?.state || null;
     const root = document.getElementById("poolp-step-content");
     if (!root) return;
 
-    // Preserve text-input focus & cursor position across innerHTML replace
-    // (otherwise typing in an input loses focus on every keystroke since the
-    // store's `notify()` triggers a full re-render).
-    const active = document.activeElement as
-      | HTMLInputElement
-      | HTMLTextAreaElement
-      | null;
-    const isTextInput =
-      !!active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
-    const focusedName = isTextInput ? (active as HTMLInputElement).name : null;
-    const selStart = isTextInput
-      ? (active as HTMLInputElement).selectionStart
-      : null;
-    const selEnd = isTextInput
-      ? (active as HTMLInputElement).selectionEnd
-      : null;
+    // If user is typing in a dimension input (step 1), skip the full
+    // innerHTML rebuild to preserve cursor position (inputmode="decimal"
+    // inputs lose cursor on re-render). Other inputs (code_postal etc.)
+    // need the rebuild to update dependent UI (zone, frais…).
+    const active = document.activeElement as HTMLInputElement | null;
+    const isTypingDimension =
+      !!active &&
+      root.contains(active) &&
+      active.tagName === "INPUT" &&
+      active.getAttribute("inputmode") === "decimal";
 
-    if (s.step === 1) root.innerHTML = stepBassin(s.input);
-    else if (s.step === 3) root.innerHTML = stepEquipements(s);
-    else if (s.step === 4) root.innerHTML = stepBoxResult(s);
-    else if (s.step === 5) root.innerHTML = stepFinitions(s);
-    else if (s.step === 6) root.innerHTML = stepLivraison(s);
-    else if (s.step === 7) root.innerHTML = stepRecap(s);
-    bindStepEvents();
-
-    // Restore focus & selection (must happen AFTER innerHTML + bindStepEvents)
-    if (focusedName) {
-      const newInput = root.querySelector<HTMLInputElement>(
-        `input[name="${focusedName}"], textarea[name="${focusedName}"]`,
-      );
-      if (newInput) {
-        newInput.focus();
-        try {
-          if (selStart != null)
-            newInput.setSelectionRange(selStart, selEnd ?? selStart);
-        } catch {
-          /* setSelectionRange not supported on this input type */
-        }
-      }
+    if (!isTypingDimension) {
+      if (s.step === 1) root.innerHTML = stepBassin(s.input);
+      else if (s.step === 3) root.innerHTML = stepEquipements(s);
+      else if (s.step === 4) root.innerHTML = stepBoxResult(s);
+      else if (s.step === 5) root.innerHTML = stepFinitions(s);
+      else if (s.step === 6) root.innerHTML = stepLivraison(s);
+      else if (s.step === 7) root.innerHTML = stepRecap(s);
+      bindStepEvents();
     }
   }
 
@@ -437,22 +493,22 @@ const initialState = initialProject?.state || null;
       <div class="poolp-grid-3">
         <div class="poolp-field-group">
           <div class="poolp-field-label"><strong>Longueur (m)</strong> *</div>
-          <input class="poolp-field-input" type="number" min="2" max="25" step="0.1" name="longueur" value="${input.longueur}">
+          <input class="poolp-field-input" type="text" inputmode="decimal" name="longueur" value="${fmtNum(input.longueur)}">
         </div>
         <div class="poolp-field-group">
           <div class="poolp-field-label"><strong>Largeur (m)</strong> *</div>
-          <input class="poolp-field-input" type="number" min="1" max="15" step="0.1" name="largeur" value="${input.largeur}">
+          <input class="poolp-field-input" type="text" inputmode="decimal" name="largeur" value="${fmtNum(input.largeur)}">
         </div>
         <div class="poolp-field-group">
           <div class="poolp-field-label">
             <strong>Hauteur moyenne eau (m)</strong> *
             <span class="poolp-info-btn" tabindex="0">i<span class="poolp-tooltip">La hauteur moyenne correspond à la profondeur moyenne du bassin. Ex : bassin plat à 1,5 m → saisir 1,5 m.</span></span>
           </div>
-          <input class="poolp-field-input" type="number" min="0.5" max="3" step="0.1" name="hauteur" value="${input.hauteur}">
+          <input class="poolp-field-input" type="text" inputmode="decimal" name="hauteur" value="${fmtNum(input.hauteur)}">
         </div>
       </div>
 
-      <div class="poolp-calc-box"><strong>Volume calculé : ${vol} m³</strong><em>(${input.longueur} × ${input.largeur} × ${String(input.hauteur).replace(".", ",")})</em></div>
+      <div class="poolp-calc-box"><strong>Volume calculé : ${vol} m³</strong><em>(${fmtNum(input.longueur)} × ${fmtNum(input.largeur)} × ${fmtNum(input.hauteur)})</em></div>
 
       <div class="poolp-field-label" style="margin-bottom:10px"><strong>Options du bassin</strong></div>
       <div class="poolp-toggle-list">
@@ -621,10 +677,7 @@ const initialState = initialProject?.state || null;
   }): string {
     const c = s.computed;
     if (!c || c.error || !c.box) {
-      const msg =
-        c?.error === "volume_hors_gamme"
-          ? "Volume hors gamme — votre bassin dépasse la capacité maximale (75 m³). Contactez l'équipe pour un devis adapté."
-          : "Calcul en cours…";
+      const msg = "Calcul en cours…";
       return `<div class="poolp-step-title">Étape 3 — Votre box</div>
         <div class="poolp-error">${escapeHtml(msg)}</div>
         <div class="poolp-nav-btns"><button class="poolp-btn sec" data-go-step="3" type="button">← Étape précédente</button></div>`;
@@ -696,11 +749,9 @@ const initialState = initialProject?.state || null;
       }
     }
 
-    const boxSelector =
-      available.length > 1
-        ? `<div class="poolp-field-group" style="margin-top:24px">
+    const boxSelector = `<div class="poolp-field-group" style="margin-top:24px">
           <div class="poolp-field-label"><strong>Taille de la box</strong> <span class="poolp-info-btn" tabindex="0">i<span class="poolp-tooltip">La taille recommandee est selectionnee automatiquement. Vous pouvez choisir une taille superieure pour plus d'espace de rangement (robot, bidons…).</span></span></div>
-          <div class="poolp-equip-grid" style="grid-template-columns: repeat(${available.length}, 1fr)">
+          <div class="poolp-equip-grid" style="grid-template-columns: repeat(${available.length}, minmax(0, 280px))">
             ${available
               .map((b) => {
                 const isSel = b.code === currentCode;
@@ -724,8 +775,7 @@ const initialState = initialProject?.state || null;
               .join("")}
           </div>
           ${excluded.length > 0 ? `<div style="font-size:12px;color:var(--color-text-muted,#6b6b67);margin-top:6px">Box ${excluded.join(" et ")} non disponible${excluded.length > 1 ? "s" : ""} pour votre configuration.</div>` : ""}
-        </div>`
-        : "";
+        </div>`;
 
     return `
       <div class="poolp-step-title">Étape 3 — Votre box configurée</div>
@@ -745,6 +795,11 @@ const initialState = initialProject?.state || null;
 
   // ── Step 5 : Finitions ────────────────────────────────────────────────
   function stepFinitions(s: { input: PoolpInput }): string {
+    // Auto-select first finition if none selected
+    if (!s.input.finition_id && finitions.length > 0) {
+      updateInput({ finition_id: finitions[0].id } as Partial<PoolpInput>);
+      s = { input: { ...s.input, finition_id: finitions[0].id } };
+    }
     const swatches =
       (
         finitions as Array<{
@@ -811,7 +866,7 @@ const initialState = initialProject?.state || null;
         <div class="poolp-zone-row">
           <span><span style="color:var(--p-text2)">Zone : </span><strong>${escapeHtml(c.livraison.zone_label)}</strong></span>
           <span><span style="color:var(--p-text2)">Délai : </span><strong>${escapeHtml(c.livraison.delay_label || "—")}</strong></span>
-          <span><span style="color:var(--p-text2)">Frais : </span><strong>${money(c.livraison.fee_ttc)}</strong></span>
+          <span><span style="color:var(--p-text2)">Frais : </span><strong>${money(c.livraison.fee_ttc)}</strong> <em style="font-size:11px;color:var(--p-text3)">— Tarif garanti pendant 7 jours</em></span>
         </div>
       </div>`
       : '<div class="poolp-zone-box"><div class="poolp-empty-note">Saisissez un code postal pour calculer la zone.</div></div>';
@@ -829,16 +884,6 @@ const initialState = initialProject?.state || null;
 
       <div style="font-size:13px;font-weight:600;margin-bottom:14px">Mode de livraison</div>
       <div class="poolp-delivery-grid">
-        <button class="poolp-delivery-card ${s.input.mode_livraison === "kit" ? "sel" : ""}" data-set-mode="kit" type="button">
-          <div class="poolp-delivery-img">${ICONS.delivery_kit}Photo box en kit / palette</div>
-          <div class="poolp-delivery-body">
-            <div class="poolp-delivery-header">
-              <div class="poolp-delivery-name">Box en kit</div>
-              <div class="poolp-radio ${s.input.mode_livraison === "kit" ? "sel" : ""}"></div>
-            </div>
-            <div class="poolp-delivery-desc">Livrée démontée sur palette — montage sur site avec notice incluse</div>
-          </div>
-        </button>
         <button class="poolp-delivery-card ${s.input.mode_livraison === "montee" ? "sel" : ""}" data-set-mode="montee" type="button">
           <div class="poolp-delivery-img">${ICONS.delivery_assembled}Photo box montée livrée</div>
           <div class="poolp-delivery-body">
@@ -847,6 +892,16 @@ const initialState = initialProject?.state || null;
               <div class="poolp-radio ${s.input.mode_livraison === "montee" ? "sel" : ""}"></div>
             </div>
             <div class="poolp-delivery-desc">Livrée assemblée — prête à raccorder sur site</div>
+          </div>
+        </button>
+        <button class="poolp-delivery-card ${s.input.mode_livraison === "kit" ? "sel" : ""}" data-set-mode="kit" type="button">
+          <div class="poolp-delivery-img">${ICONS.delivery_kit}Photo box en kit / palette</div>
+          <div class="poolp-delivery-body">
+            <div class="poolp-delivery-header">
+              <div class="poolp-delivery-name">Box en kit</div>
+              <div class="poolp-radio ${s.input.mode_livraison === "kit" ? "sel" : ""}"></div>
+            </div>
+            <div class="poolp-delivery-desc">Livrée démontée sur palette — montage sur site avec notice incluse</div>
           </div>
         </button>
       </div>
@@ -903,7 +958,7 @@ const initialState = initialProject?.state || null;
         <div class="poolp-recap-table-header"><span>Équipement</span><span>${c.is_pro ? "Prix HT pro" : "Prix TTC"}</span></div>
         <div class="poolp-recap-table-row"><span>${escapeHtml(eqLabel)}</span><span>${c.is_pro ? money(Object.values(c.equipements || {}).reduce((sum, eq) => sum + (eq?.prix_pro_ht || 0), 0) + (c.box.prix_base_pro_ht || 0)) : money(eqPrice)}</span></div>
         ${fin && fin.title ? `<div class="poolp-recap-table-row"><span>Finition ${escapeHtml(fin.title)}</span><span>${c.is_pro ? money((fin.custom_fields as any)?.prix_supplement_pro_ht ?? 0) : money((fin.custom_fields as any)?.prix_supplement_ttc ?? 0)}</span></div>` : ""}
-        ${c.livraison ? `<div class="poolp-recap-table-row"><span>Livraison ${escapeHtml(c.livraison.zone_label)} (${s.input.mode_livraison})</span><span>${c.is_pro ? money(c.livraison.fee_pro_ht ?? 0) : money(c.livraison.fee_ttc)}</span></div>` : ""}
+        ${c.livraison ? `<div class="poolp-recap-table-row"><span>Livraison ${escapeHtml(c.livraison.zone_label)} (${s.input.mode_livraison === "montee" ? "montée" : "kit"}) <em style="font-weight:400;font-size:11px;color:var(--p-text3)">— Tarif garanti pendant 7 jours</em></span><span>${c.is_pro ? money(c.livraison.fee_pro_ht ?? 0) : money(c.livraison.fee_ttc)}</span></div>` : ""}
         ${
           c.is_pro && c.totaux.discount_rate > 0
             ? `
@@ -922,40 +977,19 @@ const initialState = initialProject?.state || null;
       </div>
 
       ${
-        c.warnings?.includes("triphase")
-          ? `
-        <div class="poolp-warn-block poolp-warn-triphase">
-          <div class="poolp-warn-icon"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-          <div class="poolp-warn-content">
-            <div class="poolp-warn-title">Installation triphase detectee</div>
-            <p>Votre configuration necessite une alimentation electrique triphase. L'installation doit etre realisee par un electricien qualifie. Des equipements supplementaires peuvent etre necessaires.</p>
-            <a href="/contact" class="poolp-warn-cta">Contactez notre equipe pour un devis adapte</a>
-          </div>
-        </div>`
-          : ""
-      }
-      ${
-        c.warnings?.includes("erp")
-          ? `
-        <div class="poolp-warn-block poolp-warn-erp">
-          <div class="poolp-warn-icon"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
-          <div class="poolp-warn-content">
-            <div class="poolp-warn-title">Etablissement Recevant du Public (ERP)</div>
-            <p>Pour une installation en ERP, des normes specifiques s'appliquent (securite, accessibilite, signalisation). Un devis sur mesure est necessaire.</p>
-            <a href="/contact" class="poolp-warn-cta">Demander un devis ERP</a>
-          </div>
-        </div>`
+        c.warnings?.includes("triphase") || c.warnings?.includes("erp")
+          ? `<div class="poolp-warn-block">Installation triphasée ou ERP ? <a href="/contact" class="poolp-warn-cta">Contactez-nous pour un devis adapté.</a></div>`
           : ""
       }
 
       ${
-        !isLoggedIn()
+        !c.is_pro
           ? `<div class="poolp-pro-prompt">
-        <div class="poolp-pro-prompt-title">Vous etes professionnel ?</div>
-        <p class="poolp-pro-prompt-desc">Connectez-vous ou creez un compte pro pour acceder a vos tarifs revendeurs HT.</p>
+        <div class="poolp-pro-prompt-title">Vous êtes professionnel ?</div>
+        <p class="poolp-pro-prompt-desc">${isLoggedIn() ? "Passez a un compte pro pour acceder a vos tarifs revendeurs HT." : "Connectez-vous ou creez un compte pro pour acceder a vos tarifs revendeurs HT."}</p>
         <div style="display:flex;gap:10px">
-          <a class="poolp-btn sec" href="/compte/connexion" style="font-size:12px;padding:7px 14px">Me connecter</a>
-          <a class="poolp-btn sec" href="/inscription-pro" style="font-size:12px;padding:7px 14px">Creer un compte pro</a>
+          ${!isLoggedIn() ? '<a class="poolp-btn sec" href="/compte/connexion" style="font-size:12px;padding:7px 14px">Me connecter</a>' : ""}
+          <a class="poolp-btn sec" href="/inscription-pro" style="font-size:12px;padding:7px 14px">Créer un compte pro</a>
         </div>
       </div>`
           : ""
@@ -980,21 +1014,33 @@ const initialState = initialProject?.state || null;
     const root = document.getElementById("poolp-step-content");
     if (!root) return;
 
+    const DIMENSION_FIELDS = new Set(["longueur", "largeur", "hauteur"]);
     root
-      .querySelectorAll<HTMLInputElement>('input[type="number"]')
+      .querySelectorAll<HTMLInputElement>('input[inputmode="decimal"]')
       .forEach((input) => {
         input.addEventListener("input", () => {
+          // Allow only digits, comma, dot
+          input.value = input.value.replace(/[^0-9.,]/g, "");
           const v = parseFloat(input.value.replace(",", "."));
           if (!isNaN(v))
             updateInput({ [input.name]: v } as Partial<PoolpInput>);
         });
       });
     root
-      .querySelectorAll<HTMLInputElement>('input[type="text"]')
+      .querySelectorAll<HTMLInputElement>('input[type="text"]:not([inputmode])')
       .forEach((input) => {
-        input.addEventListener("input", () =>
-          updateInput({ [input.name]: input.value } as Partial<PoolpInput>),
-        );
+        input.addEventListener("input", () => {
+          // Code postal: only trigger compute when 5 digits entered
+          if (input.name === "code_postal") {
+            const val = input.value.replace(/\D/g, "").slice(0, 5);
+            input.value = val;
+            if (val.length === 5) {
+              updateInput({ code_postal: val } as Partial<PoolpInput>);
+            }
+            return;
+          }
+          updateInput({ [input.name]: input.value } as Partial<PoolpInput>);
+        });
       });
 
     root.querySelectorAll<HTMLButtonElement>("[data-toggle]").forEach((btn) => {
@@ -1008,9 +1054,12 @@ const initialState = initialProject?.state || null;
     root
       .querySelectorAll<HTMLButtonElement>("[data-go-step]")
       .forEach((btn) => {
-        btn.addEventListener("click", () =>
-          setStep(Number(btn.dataset.goStep) as 1 | 3 | 4 | 5 | 6 | 7),
-        );
+        btn.addEventListener("click", () => {
+          const target = Number(btn.dataset.goStep) as 1 | 3 | 4 | 5 | 6 | 7;
+          const current = getState().step;
+          if (target > current && !validateCurrentStep(root, current)) return;
+          setStep(target);
+        });
       });
     root
       .querySelectorAll<HTMLButtonElement>("[data-set-filtre]")
@@ -1083,24 +1132,58 @@ const initialState = initialProject?.state || null;
     return !!localStorage.getItem("customer_token");
   }
 
+  /** Save current project and return token (reuse existing or create new). */
+  async function ensureProjectSaved(): Promise<string | null> {
+    const s = getState();
+    if (s.projectToken) {
+      await updateProject(s.projectToken, { state: s.input });
+      return s.projectToken;
+    }
+    const result = await saveProject(s.input);
+    if (!result) return null;
+    setProjectToken(result.token);
+    return result.token;
+  }
+
   async function showProQualifModal(): Promise<boolean> {
     return new Promise((resolve) => {
       const overlay = document.createElement("div");
       overlay.className = "poolp-modal-overlay";
       overlay.innerHTML = `
         <div class="poolp-modal">
-          <div class="poolp-modal-header">Etes-vous un professionnel ?</div>
-          <p class="poolp-modal-body">Si vous etes un professionnel du batiment ou de la piscine, vous pouvez beneficier de tarifs revendeurs HT et de conditions de paiement adaptees.</p>
-          <div class="poolp-modal-actions">
-            <a href="/inscription-pro" class="poolp-btn cta" style="font-size:13px;padding:8px 16px">Oui, creer un compte pro</a>
-            <button class="poolp-btn sec" data-dismiss="pro-modal" type="button" style="font-size:13px;padding:8px 16px">Non, continuer en tant que particulier</button>
+          <div class="poolp-modal-header">Êtes-vous un professionnel ?</div>
+          <p class="poolp-modal-body">Si vous êtes un professionnel du bâtiment ou de la piscine, vous pouvez bénéficier de tarifs revendeurs HT et de conditions de paiement adaptées.</p>
+          <div class="poolp-modal-actions" style="flex-direction:column;gap:10px">
+            <button class="poolp-btn cta" data-action="go-pro" type="button" style="font-size:13px;padding:8px 16px">Oui, créer un compte pro</button>
+            <button class="poolp-btn sec" data-action="go-login" type="button" style="font-size:13px;padding:8px 16px">Non, continuer en tant que particulier</button>
+            <button class="poolp-btn sec" data-action="send-recap-email" type="button" style="font-size:13px;padding:8px 16px">Non, envoyez-moi un récapitulatif par mail</button>
           </div>
         </div>`;
       document.body.appendChild(overlay);
+
+      async function saveAndRedirect(basePath: string): Promise<void> {
+        const token = await ensureProjectSaved();
+        const redirect = token ? `/configurateur?p=${token}` : "/configurateur";
+        window.location.href = `${basePath}?redirect=${encodeURIComponent(redirect)}`;
+      }
+
       overlay
-        .querySelector('[data-dismiss="pro-modal"]')
+        .querySelector('[data-action="go-pro"]')
         ?.addEventListener("click", () => {
           overlay.remove();
+          saveAndRedirect("/inscription-pro");
+        });
+      overlay
+        .querySelector('[data-action="go-login"]')
+        ?.addEventListener("click", () => {
+          overlay.remove();
+          saveAndRedirect("/compte/connexion");
+        });
+      overlay
+        .querySelector('[data-action="send-recap-email"]')
+        ?.addEventListener("click", () => {
+          overlay.remove();
+          showRecapEmailModal();
           resolve(true);
         });
       overlay.addEventListener("click", (e) => {
@@ -1112,13 +1195,97 @@ const initialState = initialProject?.state || null;
     });
   }
 
+  function showRecapEmailModal(): void {
+    const overlay = document.createElement("div");
+    overlay.className = "poolp-modal-overlay";
+    overlay.innerHTML = `
+      <div class="poolp-modal">
+        <div class="poolp-modal-header">Recevoir le récapitulatif par mail</div>
+        <p class="poolp-modal-body">Saisissez votre adresse e-mail pour recevoir le récapitulatif de votre configuration.</p>
+        <div class="poolp-field-group" style="margin-bottom:16px">
+          <input class="poolp-field-input" type="email" name="recap_email" placeholder="votre@email.com" style="width:100%">
+        </div>
+        <div id="recap-email-status" style="font-size:12px;min-height:1.2em;margin-bottom:10px"></div>
+        <div class="poolp-modal-actions">
+          <button class="poolp-btn cta" data-action="confirm-send" type="button" style="font-size:13px;padding:8px 16px">Envoyer</button>
+          <button class="poolp-btn sec" data-dismiss="email-modal" type="button" style="font-size:13px;padding:8px 16px">Annuler</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const emailInput = overlay.querySelector<HTMLInputElement>(
+      'input[name="recap_email"]',
+    )!;
+    const statusEl = overlay.querySelector("#recap-email-status")!;
+    const sendBtn = overlay.querySelector<HTMLButtonElement>(
+      '[data-action="confirm-send"]',
+    )!;
+
+    sendBtn.addEventListener("click", async () => {
+      const email = emailInput.value.trim();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        statusEl.textContent = "Veuillez saisir une adresse e-mail valide.";
+        statusEl.setAttribute(
+          "style",
+          "font-size:12px;min-height:1.2em;margin-bottom:10px;color:#d32f2f",
+        );
+        emailInput.classList.add("field-error");
+        return;
+      }
+      sendBtn.disabled = true;
+      statusEl.textContent = "Envoi en cours…";
+      statusEl.setAttribute(
+        "style",
+        "font-size:12px;min-height:1.2em;margin-bottom:10px;color:var(--p-text3)",
+      );
+      try {
+        const res = await fetch(
+          API_URL.replace(/\/api\/?$/, "") + "/api/poolp/send-recap",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, state: getState().input }),
+          },
+        );
+        if (res.ok) {
+          statusEl.textContent = "Récapitulatif envoyé !";
+          statusEl.setAttribute(
+            "style",
+            "font-size:12px;min-height:1.2em;margin-bottom:10px;color:#2e7d32",
+          );
+          setTimeout(() => overlay.remove(), 1500);
+        } else {
+          const data = await res.json().catch(() => ({}));
+          statusEl.textContent = data.error || "Erreur lors de l'envoi.";
+          statusEl.setAttribute(
+            "style",
+            "font-size:12px;min-height:1.2em;margin-bottom:10px;color:#d32f2f",
+          );
+          sendBtn.disabled = false;
+        }
+      } catch {
+        statusEl.textContent = "Erreur réseau.";
+        statusEl.setAttribute(
+          "style",
+          "font-size:12px;min-height:1.2em;margin-bottom:10px;color:#d32f2f",
+        );
+        sendBtn.disabled = false;
+      }
+    });
+
+    overlay
+      .querySelector('[data-dismiss="email-modal"]')
+      ?.addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    emailInput.focus();
+  }
+
   async function maybeAskProQualif(): Promise<void> {
     if (isLoggedIn()) return;
-    const s = getState();
-    if (s.input && (s.input as any).qualif_pro_asked) return;
     await showProQualifModal();
-    updateInput({ qualif_pro_asked: 1 } as any);
-    if (s.projectToken) {
+    if (getState().projectToken) {
       const { qualifyProject } = await import("@frontend/lib/poolp-api");
       qualifyProject(s.projectToken, true);
     }

@@ -198,6 +198,22 @@ class OrderMailer {
     // ── Shared helpers ────────────────────────────────────────────────────
 
     private static function send(string $to, string $subject, string $html): void {
+        // SMTP override : si configuré et activé, utiliser SMTP au lieu de Resend
+        if (class_exists('AdminSettingsController')) {
+            $smtpConfig = AdminSettingsController::getSmtpConfig();
+            if ($smtpConfig) {
+                try {
+                    require_once __DIR__ . '/../../../backend-php/helpers/smtp-mailer.php';
+                    smtp_send_mail($smtpConfig, $to, $subject, $html);
+                    return;
+                } catch (\Throwable $e) {
+                    error_log("OrderMailer: SMTP echoue, fallback Resend — " . $e->getMessage());
+                    // Fallback vers Resend ci-dessous
+                }
+            }
+        }
+
+        // Resend (par defaut)
         $apiKey = $_ENV['RESEND_API_KEY'] ?? '';
         $from = self::getFromAddress();
         if (!$apiKey || !$from) {

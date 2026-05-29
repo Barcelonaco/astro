@@ -13,12 +13,37 @@
  *   $ctx = TaxResolver::resolve($billingCountry, $isPro, $vatNumber);
  *   // $ctx = ['rate_modifier' => 1.0|0.0, 'mention' => '...', 'reason' => '...']
  */
-class TaxResolver {
+class TaxResolver
+{
 
     /** Codes ISO 3166-1 alpha-2 des pays UE (2026). */
     private const EU_COUNTRIES = [
-        'AT','BE','BG','HR','CY','CZ','DK','EE','FI','DE','GR','HU','IE','IT',
-        'LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE',
+        'AT',
+        'BE',
+        'BG',
+        'HR',
+        'CY',
+        'CZ',
+        'DK',
+        'EE',
+        'FI',
+        'DE',
+        'GR',
+        'HU',
+        'IE',
+        'IT',
+        'LV',
+        'LT',
+        'LU',
+        'MT',
+        'NL',
+        'PL',
+        'PT',
+        'RO',
+        'SK',
+        'SI',
+        'ES',
+        'SE',
         // FR exclu : traite comme cas domestique
     ];
 
@@ -26,11 +51,12 @@ class TaxResolver {
      * Resout le contexte TVA.
      *
      * @param string      $billingCountry  Code pays ISO facturation (ex: 'FR', 'DE', 'US')
-     * @param bool        $isPro           Client professionnel approuve ?
+     * @param bool        $isPro           Client professionnel approuvé ?
      * @param string|null $vatNumber       Numero TVA intracommunautaire (ex: 'FR12345678901')
      * @return array{rate_modifier: float, mention: string, reason: string, exempt: bool}
      */
-    public static function resolve(string $billingCountry, bool $isPro, ?string $vatNumber = null): array {
+    public static function resolve(string $billingCountry, bool $isPro, ?string $vatNumber = null): array
+    {
         $country = strtoupper(trim($billingCountry));
 
         // Franchise micro-entreprise : check setting
@@ -77,7 +103,8 @@ class TaxResolver {
     }
 
     /** TVA normale (pas d'exoneration). */
-    private static function normalTax(): array {
+    private static function normalTax(): array
+    {
         return [
             'rate_modifier' => 1.0,
             'exempt' => false,
@@ -87,15 +114,18 @@ class TaxResolver {
     }
 
     /** Verifie basiquement qu'un n° TVA intracommunautaire est fourni et non vide. */
-    private static function isValidEuVat(?string $vat): bool {
-        if (!$vat) return false;
+    private static function isValidEuVat(?string $vat): bool
+    {
+        if (!$vat)
+            return false;
         $vat = preg_replace('/[\s\-.]/', '', $vat);
         // Format minimal : 2 lettres + 2-13 chiffres/lettres
         return (bool) preg_match('/^[A-Z]{2}[0-9A-Z]{2,13}$/i', $vat);
     }
 
     /** Verifie si le shop est en franchise de base (micro-entreprise). */
-    private static function isFranchise(): bool {
+    private static function isFranchise(): bool
+    {
         try {
             $db = Database::getInstance();
             $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'shop_franchise_tva' LIMIT 1");
@@ -112,7 +142,8 @@ class TaxResolver {
      * Si exempt → TVA = 0, montant inchange (considere HT = TTC).
      * Si normal → extrait la TVA du TTC comme avant.
      */
-    public static function computeTax(int $ttcCents, float $nominalRate, array $taxContext): array {
+    public static function computeTax(int $ttcCents, float $nominalRate, array $taxContext): array
+    {
         if ($taxContext['exempt']) {
             // Exonere : prix = HT, pas de TVA
             return ['ht' => $ttcCents, 'tax' => 0, 'total' => $ttcCents, 'effective_rate' => 0.0];

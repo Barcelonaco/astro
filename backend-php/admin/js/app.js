@@ -31,6 +31,7 @@ import './users.js';
 import './forms.js';
 import './ai-credits.js';
 import './reusable-blocs.js';
+import './admin-settings.js';
 
 // ── Boot ──────────────────────────────────────────────────────────────────
 

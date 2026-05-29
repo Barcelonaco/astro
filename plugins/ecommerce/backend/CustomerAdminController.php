@@ -7,10 +7,12 @@
  *   GET  /admin/customers/:id          (détail + adresses + commandes récentes)
  *   PUT  /admin/customers/:id          { pro_status?, discount_rate?, discount_override?, note? }
  */
-class CustomerAdminController {
+class CustomerAdminController
+{
 
     /** Liste paginée + filtrable des clients. */
-    public static function listAll(): void {
+    public static function listAll(): void
+    {
         $db = Database::getInstance();
 
         $where = ['1 = 1'];
@@ -29,6 +31,13 @@ class CustomerAdminController {
             $where[] = 'c.is_pro = ?';
             $params[] = (int) $_GET['is_pro'];
         }
+        if (isset($_GET['anonymized'])) {
+            if ($_GET['anonymized'] === '1') {
+                $where[] = 'c.anonymized_at IS NOT NULL';
+            } else {
+                $where[] = 'c.anonymized_at IS NULL';
+            }
+        }
 
         $whereStr = implode(' AND ', $where);
 
@@ -43,8 +52,9 @@ class CustomerAdminController {
         $offset = ($page - 1) * $perPage;
 
         $sort = $_GET['sort'] ?? 'created_at';
-        $allowedSort = ['created_at', 'email', 'last_name', 'last_login_at'];
-        if (!in_array($sort, $allowedSort, true)) $sort = 'created_at';
+        $allowedSort = ['id', 'created_at', 'email', 'last_name', 'last_login_at', 'company', 'pro_status', 'discount_rate', 'order_count', 'total_spent_cents'];
+        if (!in_array($sort, $allowedSort, true))
+            $sort = 'created_at';
         $dir = strtoupper($_GET['dir'] ?? 'DESC') === 'ASC' ? 'ASC' : 'DESC';
 
         $stmt = $db->prepare("
@@ -55,7 +65,7 @@ class CustomerAdminController {
                    (SELECT COALESCE(SUM(total_cents), 0) FROM orders WHERE customer_id = c.id AND payment_status IN ('paid', 'partially_refunded')) AS total_spent_cents
             FROM customers c
             WHERE {$whereStr}
-            ORDER BY c.{$sort} {$dir}
+            ORDER BY {$sort} {$dir}
             LIMIT {$perPage} OFFSET {$offset}
         ");
         $stmt->execute($params);
@@ -71,11 +81,13 @@ class CustomerAdminController {
     }
 
     /** Détail client + adresses + commandes récentes. */
-    public static function getById(int $id): void {
+    public static function getById(int $id): void
+    {
         $db = Database::getInstance();
 
         $customer = CustomerModel::findById($id);
-        if (!$customer) error_response('Client introuvable', 404);
+        if (!$customer)
+            error_response('Client introuvable', 404);
 
         // Adresses
         $addresses = CustomerAddressModel::findByCustomer($id);
@@ -99,12 +111,14 @@ class CustomerAdminController {
     }
 
     /** MAJ pro_status, discount_rate, discount_override. */
-    public static function update(int $id): void {
+    public static function update(int $id): void
+    {
         $db = Database::getInstance();
         $body = get_json_body();
 
         $customer = CustomerModel::findById($id);
-        if (!$customer) error_response('Client introuvable', 404);
+        if (!$customer)
+            error_response('Client introuvable', 404);
 
         $data = [];
         if (isset($body['pro_status'])) {
@@ -150,7 +164,15 @@ class CustomerAdminController {
         }
 
         if (!empty($data)) {
+            // Detect pro approval transition
+            $wasApproved = isset($data['pro_status']) && $data['pro_status'] === 'approved' && ($customer['pro_status'] ?? '') !== 'approved';
+
             CustomerModel::updateProfile($id, $data);
+
+            // Send approval email
+            if ($wasApproved && !empty($customer['email'])) {
+                self::sendProApprovalEmail($customer);
+            }
         }
 
         // Note admin → audit_log
@@ -165,16 +187,81 @@ class CustomerAdminController {
     }
 
     /** Stats rapides. */
-    public static function stats(): void {
+    public static function stats(): void
+    {
         $db = Database::getInstance();
         $rows = $db->query("
             SELECT
-                COUNT(*) AS total,
-                SUM(CASE WHEN pro_status = 'pending' THEN 1 ELSE 0 END) AS pending_pro,
-                SUM(CASE WHEN pro_status = 'approved' THEN 1 ELSE 0 END) AS approved_pro,
-                SUM(CASE WHEN is_pro = 1 THEN 1 ELSE 0 END) AS active_pro
+                SUM(CASE WHEN anonymized_at IS NULL THEN 1 ELSE 0 END) AS total_active,
+                SUM(CASE WHEN anonymized_at IS NULL AND pro_status = 'none' THEN 1 ELSE 0 END) AS particulier,
+                SUM(CASE WHEN anonymized_at IS NULL AND pro_status IN ('approved','pending','rejected') THEN 1 ELSE 0 END) AS pro,
+                SUM(CASE WHEN anonymized_at IS NULL AND pro_status = 'pending' THEN 1 ELSE 0 END) AS pending_pro
             FROM customers
         ")->fetch();
         json_response($rows);
+    }
+
+    /** Email de notification d'approbation pro. */
+    private static function sendProApprovalEmail(array $customer): void
+    {
+        $name = htmlspecialchars(trim(($customer['first_name'] ?? '') . ' ' . ($customer['last_name'] ?? '')) ?: 'Bonjour');
+        $company = htmlspecialchars($customer['company'] ?? '');
+        $frontend = rtrim($_ENV['FRONTEND_URL'] ?? '', '/');
+        $loginUrl = $frontend . '/compte/connexion';
+
+        $html = "
+            <div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px'>
+                <h2 style='color:#222;margin:0 0 16px'>Votre compte professionnel a été approuvé !</h2>
+                <p>Bonjour {$name},</p>
+                <p>Nous avons le plaisir de vous informer que votre demande de compte professionnel" . ($company ? " pour <strong>{$company}</strong>" : '') . " a été validée par notre équipe.</p>
+                <p>Vous bénéficiez désormais de :</p>
+                <ul style='padding-left:20px;line-height:1.8'>
+                    <li>Tarifs revendeurs HT sur l'ensemble du catalogue</li>
+                    <li>Programme de remise sur chiffre d'affaires cumulé</li>
+                    <li>Conditions de paiement adaptées</li>
+                </ul>
+                <p style='margin-top:20px'>
+                    <a href='{$loginUrl}' style='display:inline-block;padding:12px 24px;background:#222;color:#fff;text-decoration:none;border-radius:6px;font-weight:600'>Accéder à mon espace pro</a>
+                </p>
+                <p style='margin-top:24px;font-size:13px;color:#666'>À bientôt</p>
+            </div>
+        ";
+
+        CustomerAuthController::sendResendEmail($customer['email'], 'Votre compte professionnel a été approuvé', $html);
+    }
+
+    /** Suppression admin (anonymisation RGPD). */
+    public static function delete(int $id): void
+    {
+        $db = Database::getInstance();
+        $customer = CustomerModel::findById($id, true);
+        if (!$customer)
+            error_response('Client introuvable', 404);
+
+        $anonEmail = 'anonymized_' . $id . '@deleted.local';
+        $db->prepare("UPDATE customers SET
+            email = ?,
+            password_hash = '',
+            first_name = 'Compte',
+            last_name = 'Supprime',
+            phone = NULL,
+            company = NULL,
+            vat_number = NULL,
+            siret = NULL,
+            activity = NULL,
+            anonymized_at = NOW(),
+            anonymization_reason = 'admin_manual'
+            WHERE id = ?")
+            ->execute([$anonEmail, $id]);
+
+        $db->prepare('DELETE FROM customer_addresses WHERE customer_id = ?')->execute([$id]);
+
+        $emailHash = hash('sha256', $customer['email'] ?? '');
+        $erasedFields = json_encode(['email', 'password_hash', 'phone', 'company', 'vat_number', 'siret', 'activity']);
+        $user = authenticate_token();
+        $db->prepare("INSERT INTO gdpr_erasure_log (customer_id, customer_email_hash, reason, requested_by_type, requested_by_id, performed_at, fields_erased, notes) VALUES (?, ?, 'admin_manual', 'admin', ?, NOW(), ?, ?)")
+            ->execute([$id, $emailHash, $user['id'] ?? null, $erasedFields, 'Suppression admin']);
+
+        json_response(['message' => 'Client supprime et anonymise']);
     }
 }

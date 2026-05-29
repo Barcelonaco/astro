@@ -23,6 +23,7 @@ class OrderController {
 
     public static function create(): void {
         $body = get_json_body();
+        verify_recaptcha($body['_recaptcha_token'] ?? null);
 
         $cart = self::resolveCart();
         if (!$cart) error_response('Panier introuvable', 404);

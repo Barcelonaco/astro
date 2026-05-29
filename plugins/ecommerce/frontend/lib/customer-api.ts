@@ -79,19 +79,30 @@ export interface RegisterResult {
   message: string
 }
 
+/** Get reCAPTCHA v3 token if available. */
+export async function getRecaptchaToken(action = 'submit'): Promise<string | null> {
+  const key = document.body.dataset.recaptchaKey
+  if (!key || !(window as any).grecaptcha) return null
+  try {
+    return await (window as any).grecaptcha.execute(key, { action })
+  } catch { return null }
+}
+
 export async function login(email: string, password: string): Promise<LoginResult> {
+  const _recaptcha_token = await getRecaptchaToken('login')
   const data = await apiFetch<LoginResult>('/customer/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, ...(_recaptcha_token ? { _recaptcha_token } : {}) }),
   })
   if (data.token) setToken(data.token)
   return data
 }
 
 export async function register(body: Record<string, any>): Promise<RegisterResult> {
+  const _recaptcha_token = await getRecaptchaToken('register')
   const data = await apiFetch<RegisterResult>('/customer/auth/register', {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, ...(_recaptcha_token ? { _recaptcha_token } : {}) }),
   })
   if (data.token) setToken(data.token)
   return data
@@ -111,7 +122,8 @@ export async function updateProfile(body: Record<string, any>): Promise<{ custom
 }
 
 export async function forgotPassword(email: string): Promise<{ message: string }> {
-  return apiFetch('/customer/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) })
+  const _recaptcha_token = await getRecaptchaToken('forgot_password')
+  return apiFetch('/customer/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email, ...(_recaptcha_token ? { _recaptcha_token } : {}) }) })
 }
 
 export async function resetPassword(token: string, password: string): Promise<{ message: string }> {

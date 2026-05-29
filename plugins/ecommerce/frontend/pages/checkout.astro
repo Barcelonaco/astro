@@ -38,8 +38,9 @@ const bodyClasses = [
 <html lang="fr">
   <head>
     <BaseHead title={`Commande — ${siteName}`} description="Finalisez votre commande" styleSettings={styleSettings} siteSettings={siteSettings} />
+    {siteSettings.recaptcha_site_key && <script is:inline src={`https://www.google.com/recaptcha/api.js?render=${siteSettings.recaptcha_site_key}`}></script>}
   </head>
-  <body class={bodyClasses || undefined}>
+  <body class={bodyClasses || undefined} data-recaptcha-key={siteSettings.recaptcha_site_key || ''}>
     <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
 
     <main class="main-page checkout-wrap">

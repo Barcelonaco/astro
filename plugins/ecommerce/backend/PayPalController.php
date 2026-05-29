@@ -13,9 +13,11 @@
  *
  * Clés : paypal_client_id (plain), paypal_secret (encrypted), paypal_mode (sandbox|live).
  */
-class PayPalController {
+class PayPalController
+{
 
-    private static function getBaseUrl(): string {
+    private static function getBaseUrl(): string
+    {
         $mode = EcommerceSettingsController::getPlain('paypal_mode') ?: 'sandbox';
         return $mode === 'live'
             ? 'https://api-m.paypal.com'
@@ -23,7 +25,8 @@ class PayPalController {
     }
 
     /** Obtient un access token via client_credentials. */
-    private static function getAccessToken(): string {
+    private static function getAccessToken(): string
+    {
         $clientId = EcommerceSettingsController::getPlain('paypal_client_id');
         $secret = EcommerceSettingsController::getSecret('paypal_secret');
         if (!$clientId || !$secret) {
@@ -56,17 +59,20 @@ class PayPalController {
      * Crée un PayPal order et retourne l'URL d'approbation.
      * POST /payments/paypal/create-order { order_id, guest_token? }
      */
-    public static function createOrder(): void {
+    public static function createOrder(): void
+    {
         require_ecommerce_enabled();
         $body = get_json_body();
         $orderId = (int) ($body['order_id'] ?? 0);
-        if ($orderId <= 0) error_response('order_id requis', 400);
+        if ($orderId <= 0)
+            error_response('order_id requis', 400);
 
         $db = Database::getInstance();
         $stmt = $db->prepare('SELECT * FROM orders WHERE id = ?');
         $stmt->execute([$orderId]);
         $order = $stmt->fetch();
-        if (!$order) error_response('Commande introuvable', 404);
+        if (!$order)
+            error_response('Commande introuvable', 404);
 
         self::authorizeOrder($order, $body['guest_token'] ?? null);
 
@@ -85,7 +91,10 @@ class PayPalController {
             $raw = json_decode($existing['raw_response'] ?? '{}', true);
             $approvalUrl = '';
             foreach (($raw['links'] ?? []) as $link) {
-                if ($link['rel'] === 'approve') { $approvalUrl = $link['href']; break; }
+                if ($link['rel'] === 'approve') {
+                    $approvalUrl = $link['href'];
+                    break;
+                }
             }
             if ($approvalUrl) {
                 json_response([
@@ -107,15 +116,17 @@ class PayPalController {
 
         $payload = [
             'intent' => 'CAPTURE',
-            'purchase_units' => [[
-                'reference_id' => (string) $order['id'],
-                'description' => 'Commande ' . $order['order_number'],
-                'custom_id' => (string) $order['id'],
-                'amount' => [
-                    'currency_code' => $currency,
-                    'value' => $total,
-                ],
-            ]],
+            'purchase_units' => [
+                [
+                    'reference_id' => (string) $order['id'],
+                    'description' => 'Commande ' . $order['order_number'],
+                    'custom_id' => (string) $order['id'],
+                    'amount' => [
+                        'currency_code' => $currency,
+                        'value' => $total,
+                    ],
+                ]
+            ],
             'payment_source' => [
                 'paypal' => [
                     'experience_context' => [
@@ -156,11 +167,17 @@ class PayPalController {
         $ppOrderId = $ppOrder['id'] ?? '';
         $approvalUrl = '';
         foreach (($ppOrder['links'] ?? []) as $link) {
-            if ($link['rel'] === 'payer-action') { $approvalUrl = $link['href']; break; }
+            if ($link['rel'] === 'payer-action') {
+                $approvalUrl = $link['href'];
+                break;
+            }
         }
         if (!$approvalUrl) {
             foreach (($ppOrder['links'] ?? []) as $link) {
-                if ($link['rel'] === 'approve') { $approvalUrl = $link['href']; break; }
+                if ($link['rel'] === 'approve') {
+                    $approvalUrl = $link['href'];
+                    break;
+                }
             }
         }
 
@@ -191,18 +208,21 @@ class PayPalController {
      * Capture un PayPal order apres approbation du client.
      * POST /payments/paypal/capture { paypal_order_id, order_id, guest_token? }
      */
-    public static function capture(): void {
+    public static function capture(): void
+    {
         require_ecommerce_enabled();
         $body = get_json_body();
         $ppOrderId = trim((string) ($body['paypal_order_id'] ?? ''));
         $orderId = (int) ($body['order_id'] ?? 0);
-        if (!$ppOrderId || !$orderId) error_response('paypal_order_id et order_id requis', 400);
+        if (!$ppOrderId || !$orderId)
+            error_response('paypal_order_id et order_id requis', 400);
 
         $db = Database::getInstance();
         $stmt = $db->prepare('SELECT * FROM orders WHERE id = ?');
         $stmt->execute([$orderId]);
         $order = $stmt->fetch();
-        if (!$order) error_response('Commande introuvable', 404);
+        if (!$order)
+            error_response('Commande introuvable', 404);
 
         self::authorizeOrder($order, $body['guest_token'] ?? null);
 
@@ -258,7 +278,8 @@ class PayPalController {
      * Webhook PayPal — backup pour capture missed ou refunds.
      * POST /payments/paypal/webhook
      */
-    public static function webhook(): void {
+    public static function webhook(): void
+    {
         $payload = file_get_contents('php://input') ?: '';
         $headers = self::getWebhookHeaders();
         $webhookId = EcommerceSettingsController::getPlain('paypal_webhook_id');
@@ -388,16 +409,19 @@ class PayPalController {
      * GET /payments/paypal/check-status?order_id=X&guest_token=Y
      * Fallback polling quand le webhook n'est pas encore arrive.
      */
-    public static function checkStatus(): void {
+    public static function checkStatus(): void
+    {
         require_ecommerce_enabled();
         $orderId = (int) ($_GET['order_id'] ?? 0);
-        if (!$orderId) error_response('order_id requis', 400);
+        if (!$orderId)
+            error_response('order_id requis', 400);
 
         $db = Database::getInstance();
         $stmt = $db->prepare('SELECT * FROM orders WHERE id = ?');
         $stmt->execute([$orderId]);
         $order = $stmt->fetch();
-        if (!$order) error_response('Commande introuvable', 404);
+        if (!$order)
+            error_response('Commande introuvable', 404);
 
         // Already resolved
         if (in_array($order['payment_status'], ['paid', 'failed', 'refunded'], true)) {
@@ -450,7 +474,8 @@ class PayPalController {
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
-    private static function handlePaymentSuccess(PDO $db, int $orderId, string $ppOrderId, array $captureData): void {
+    private static function handlePaymentSuccess(PDO $db, int $orderId, string $ppOrderId, array $captureData): void
+    {
         $stmt = $db->prepare("SELECT payment_status FROM orders WHERE id = ?");
         $stmt->execute([$orderId]);
         $current = $stmt->fetchColumn();
@@ -482,14 +507,16 @@ class PayPalController {
                 $stmt2 = $db->prepare('SELECT customer_id FROM orders WHERE id = ?');
                 $stmt2->execute([$orderId]);
                 $cid = $stmt2->fetchColumn();
-                if ($cid) ProTierService::recalculateForCustomer((int) $cid);
+                if ($cid)
+                    ProTierService::recalculateForCustomer((int) $cid);
             } catch (\Throwable $e) {
                 error_log('ProTierService recalc error (PayPal): ' . $e->getMessage());
             }
         }
     }
 
-    private static function autoCaptureFromWebhook(string $ppOrderId, int $orderId): void {
+    private static function autoCaptureFromWebhook(string $ppOrderId, int $orderId): void
+    {
         try {
             $accessToken = self::getAccessToken();
             $ch = curl_init(self::getBaseUrl() . '/v2/checkout/orders/' . $ppOrderId . '/capture');
@@ -517,31 +544,37 @@ class PayPalController {
         }
     }
 
-    private static function authorizeOrder(array $order, ?string $guestToken): void {
+    private static function authorizeOrder(array $order, ?string $guestToken): void
+    {
         $token = get_bearer_token();
         if ($token) {
             try {
                 $decoded = \Firebase\JWT\JWT::decode($token, new \Firebase\JWT\Key(customer_jwt_secret(), 'HS256'));
                 $claims = (array) $decoded;
-                if (($claims['type'] ?? '') === 'customer'
-                    && (int) ($claims['id'] ?? 0) === (int) ($order['customer_id'] ?? 0)) {
+                if (
+                    ($claims['type'] ?? '') === 'customer'
+                    && (int) ($claims['id'] ?? 0) === (int) ($order['customer_id'] ?? 0)
+                ) {
                     return;
                 }
-            } catch (\Throwable $e) { /* fallthrough */ }
+            } catch (\Throwable $e) { /* fallthrough */
+            }
         }
         if (!empty($guestToken) && hash_equals((string) ($order['guest_token'] ?? ''), (string) $guestToken)) {
             return;
         }
-        error_response('Acces refuse', 403);
+        error_response('Acces refusé', 403);
     }
 
-    private static function getSiteName(): string {
+    private static function getSiteName(): string
+    {
         $stmt = Database::getInstance()->prepare("SELECT setting_value FROM settings WHERE setting_key = 'site_name' LIMIT 1");
         $stmt->execute();
         return $stmt->fetchColumn() ?: 'Boutique';
     }
 
-    private static function getWebhookHeaders(): array {
+    private static function getWebhookHeaders(): array
+    {
         return [
             'PAYPAL-TRANSMISSION-ID' => $_SERVER['HTTP_PAYPAL_TRANSMISSION_ID'] ?? '',
             'PAYPAL-TRANSMISSION-TIME' => $_SERVER['HTTP_PAYPAL_TRANSMISSION_TIME'] ?? '',
@@ -551,7 +584,8 @@ class PayPalController {
         ];
     }
 
-    private static function verifyWebhookSignature(string $payload, array $headers, string $webhookId): bool {
+    private static function verifyWebhookSignature(string $payload, array $headers, string $webhookId): bool
+    {
         try {
             $accessToken = self::getAccessToken();
             $verifyPayload = [

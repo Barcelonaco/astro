@@ -13,8 +13,8 @@ const fmtDate = (s) => s ? new Date(s).toLocaleDateString('fr-FR', { day: '2-dig
 const PRO_LABELS = {
   none: 'Particulier',
   pending: 'En attente',
-  approved: 'Approuve',
-  rejected: 'Refuse',
+  approved: 'Approuvé',
+  rejected: 'Refusé',
 };
 
 export class CustomersTableView extends BaseView {
@@ -29,6 +29,10 @@ export class CustomersTableView extends BaseView {
 
     delegate(this.tbody, 'click', '[data-view]', (e, btn) => {
       this.handlers.onView?.(+btn.dataset.view);
+    });
+    delegate(this.tbody, 'click', '[data-delete]', (e, btn) => {
+      e.stopPropagation();
+      this.handlers.onDelete?.(+btn.dataset.delete);
     });
     delegate(this.tbody, 'click', 'tr', (e) => {
       if (e.target.closest('button')) return;
@@ -69,9 +73,10 @@ export class CustomersTableView extends BaseView {
   renderStats(stats) {
     if (!stats || !this.statsEl) return;
     const pills = [
-      { label: 'Total', value: stats.total },
+      { label: 'Total', value: stats.total_active },
+      { label: 'Particulier', value: stats.particulier },
+      { label: 'Pro', value: stats.pro },
       { label: 'Pro en attente', value: stats.pending_pro, cls: stats.pending_pro > 0 ? 'highlight' : '' },
-      { label: 'Pro actifs', value: stats.approved_pro, cls: 'success' },
     ];
     this.statsEl.innerHTML = pills.map(p =>
       `<span class="stat-pill ${p.cls || ''}">${p.label} : ${p.value}</span>`
@@ -99,6 +104,7 @@ export class CustomersTableView extends BaseView {
 
   _fillRow(tr, c) {
     tr.dataset.id = c.id;
+    qs('.cell-id', tr).textContent = c.id;
     qs('.cell-name', tr).textContent = `${c.first_name || ''} ${c.last_name || ''}`.trim() || '-';
     qs('.cell-email', tr).textContent = c.email || '';
     qs('.cell-company', tr).textContent = c.company || '-';
@@ -108,6 +114,7 @@ export class CustomersTableView extends BaseView {
     qs('.cell-revenue', tr).textContent = fmtMoney(c.total_spent_cents);
     qs('.cell-date', tr).textContent = fmtDate(c.created_at);
     qs('[data-view]', tr).dataset.view = c.id;
+    qs('[data-delete]', tr).dataset.delete = c.id;
   }
 
   _renderPagination(state) {

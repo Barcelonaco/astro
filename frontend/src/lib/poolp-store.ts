@@ -36,7 +36,7 @@ const defaultInput: PoolpInput = {
   bypass_pac: false,
   finition_id: 0,
   code_postal: '',
-  mode_livraison: 'kit',
+  mode_livraison: 'montee',
   is_erp: false,
 }
 

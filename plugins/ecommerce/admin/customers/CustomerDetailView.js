@@ -46,7 +46,7 @@ export class CustomerDetailView extends BaseView {
       <div class="detail-field"><strong>Commandes</strong> ${customer.order_count || 0}</div>
       <div class="detail-field"><strong>CA Payé</strong> ${fmtMoney(customer.total_spent_cents)}</div>
       <div class="detail-field"><strong>Remise actuelle</strong> ${customer.discount_rate != null ? customer.discount_rate + '%' : 'Aucune'}</div>
-      <div class="detail-field"><strong>Paiement</strong> ${{ immediate: 'Comptant', net15: 'Net 15j', net30: 'Net 30j', net45: 'Net 45j', net60: 'Net 60j' }[customer.payment_terms] || 'Comptant'}</div>
+      <div class="detail-field"><strong>Paiement</strong> ${{ immediate: 'Comptant', net15: '15j après facturation', net30: '30j apres facturation', net45: 'Net 45j', net60: 'Net 60j' }[customer.payment_terms] || 'Comptant'}</div>
       <div class="detail-field"><strong>Marketing</strong> ${customer.accepts_marketing ? 'Opt-in' : 'Opt-out'}</div>
     </div>`;
     html += '</div>';
@@ -85,7 +85,7 @@ export class CustomerDetailView extends BaseView {
     }
 
     // Edit form
-    const PAYMENT_TERMS = { immediate: 'Comptant', net15: 'Net 15j', net30: 'Net 30j', net45: 'Net 45j', net60: 'Net 60j' };
+    const PAYMENT_TERMS = { immediate: 'Comptant', net15: '15j après facturation', net30: '30j après facturation', net45: '45j après facturation', net60: '60j après facturation' };
     html += `<div class="edit-form" id="customer-edit-form">
       <div class="form-group">
         <label>Statut pro</label>
@@ -107,11 +107,15 @@ export class CustomerDetailView extends BaseView {
           ).join('')}
         </select>
       </div>
-      <div class="form-group" style="flex:2">
-        <label>Note interne</label>
-        <input type="text" class="form-input" id="detail-note" placeholder="Note visible uniquement par l'equipe" style="height:36px">
       </div>
-      <button class="btn btn-primary" id="detail-save-btn" style="height:36px">Enregistrer</button>
+      <div class="form-group" style="width:100%">
+        <label>Note interne</label>
+        <textarea class="form-input" id="detail-note" placeholder="Note visible uniquement par l'equipe" rows="3" style="resize:vertical">${escape(customer.admin_note || '')}</textarea>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;width:100%">
+        <button class="btn btn-primary" id="detail-save-btn" style="height:36px">Enregistrer</button>
+        <button class="btn btn-danger" id="detail-delete-btn" type="button" style="height:36px;margin-left:auto">Supprimer le client</button>
+      </div>
     </div>`;
 
     html += '</div>';

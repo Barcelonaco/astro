@@ -210,7 +210,7 @@ async function loadSection(section) {
   const sectionMinRoles = {
     pages: 'editor', 'reusable-blocs': 'editor', media: 'editor',
     menus: 'admin_site', forms: 'admin_site', 'site-settings': 'admin_site', theme: 'admin_site',
-    users: 'super_admin', plugins: 'super_admin', 'ai-credits': 'super_admin',
+    users: 'super_admin', plugins: 'super_admin', 'ai-credits': 'super_admin', 'admin-settings': 'super_admin',
   };
   const aliasMap = { builder: 'pages', 'rb-builder': 'reusable-blocs', 'form-edit': 'forms', 'form-entries': 'forms', 'form-entry-detail': 'forms' };
   let sectionBase = section.split(':')[0];
@@ -261,6 +261,10 @@ async function loadSection(section) {
     case 'ai-credits':
       content.innerHTML = await renderAiCredits();
       attachAiCreditsEvents();
+      break;
+    case 'admin-settings':
+      content.innerHTML = await renderAdminSettings();
+      attachAdminSettingsTabs();
       break;
     default:
       if (section.startsWith('builder:')) {

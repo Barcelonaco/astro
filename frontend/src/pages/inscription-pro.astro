@@ -41,8 +41,9 @@ const bodyClasses = [
       styleSettings={styleSettings}
       siteSettings={siteSettings}
     />
+    {siteSettings.recaptcha_site_key && <script is:inline src={`https://www.google.com/recaptcha/api.js?render=${siteSettings.recaptcha_site_key}`}></script>}
   </head>
-  <body class={bodyClasses || undefined}>
+  <body class={bodyClasses || undefined} data-recaptcha-key={siteSettings.recaptcha_site_key || ''}>
     <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
 
     <main class="main-page signup-pro-wrap">
@@ -52,7 +53,7 @@ const bodyClasses = [
           <!-- Formulaire -->
           <div class="signup-pro-main">
             <nav class="signup-pro-crumb" aria-label="Fil d'Ariane">
-              <a href="/">Accueil</a> / <a href="/espace-pro">Espace pro</a> / Créer un compte
+              <a href="/">Accueil</a> / <a href="/compte">Espace pro</a> / Créer un compte
             </nav>
             <h1 class="signup-pro-title">Créer un compte professionnel</h1>
             <p class="signup-pro-sub">
@@ -306,6 +307,15 @@ const bodyClasses = [
         submit.textContent = 'Création en cours…'
         setStatus('')
 
+        // reCAPTCHA v3 token
+        const rcKey = document.body.dataset.recaptchaKey
+        if (rcKey && (window as any).grecaptcha) {
+          try {
+            const token = await (window as any).grecaptcha.execute(rcKey, { action: 'register' })
+            if (token) (registerBody as any)._recaptcha_token = token
+          } catch {}
+        }
+
         try {
           const res = await fetch(`${API_URL}/customer/auth/register`, {
             method: 'POST',
@@ -352,7 +362,7 @@ const bodyClasses = [
           }
 
           setStatus('Compte créé. Vérification SIRET sous 24h ouvrées. Redirection…', 'success')
-          window.setTimeout(() => { window.location.href = '/espace-pro' }, 1500)
+          window.setTimeout(() => { window.location.href = '/compte' }, 1500)
         } catch {
           setStatus('Connexion au serveur impossible. Réessayez plus tard.', 'error')
           submit.disabled = false

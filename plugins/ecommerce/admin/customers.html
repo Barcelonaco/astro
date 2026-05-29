@@ -19,6 +19,12 @@
     <div id="customers-stats" class="stats-bar"></div>
   </div>
 
+  <!-- Tabs -->
+  <div class="tabs-bar" id="customers-tabs" style="margin-bottom:16px;display:flex;gap:0;border-bottom:2px solid var(--gray-200,#e5e7eb)">
+    <button class="tab-btn active" data-tab="active" style="padding:10px 20px;border:none;background:none;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px">Clients actifs</button>
+    <button class="tab-btn" data-tab="deleted" style="padding:10px 20px;border:none;background:none;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--gray-500,#6b7280)">Comptes supprimés</button>
+  </div>
+
   <!-- Filters -->
   <div class="card filters-card" id="customers-filters">
     <div class="filters-row">
@@ -27,8 +33,8 @@
         <option value="">Tous les statuts</option>
         <option value="none">Particulier</option>
         <option value="pending">Pro en attente</option>
-        <option value="approved">Pro approuve</option>
-        <option value="rejected">Pro refuse</option>
+        <option value="approved">Pro approuvé</option>
+        <option value="rejected">Pro refusé</option>
       </select>
     </div>
   </div>
@@ -39,14 +45,15 @@
     <table class="customers-table">
       <thead>
         <tr>
-          <th>Client</th>
-          <th>Email</th>
-          <th>Entreprise</th>
-          <th>Statut pro</th>
-          <th>Remise</th>
-          <th>Commandes</th>
-          <th>CA Payé</th>
-          <th>Inscription</th>
+          <th class="sortable" data-sort="id">ID</th>
+          <th class="sortable" data-sort="last_name">Client</th>
+          <th class="sortable" data-sort="email">Email</th>
+          <th class="sortable" data-sort="company">Entreprise</th>
+          <th class="sortable" data-sort="pro_status">Statut pro</th>
+          <th class="sortable" data-sort="discount_rate">Remise</th>
+          <th class="sortable" data-sort="order_count">Commandes</th>
+          <th class="sortable" data-sort="total_spent_cents">CA Payé</th>
+          <th class="sortable" data-sort="created_at">Inscription</th>
           <th style="text-align:right">Actions</th>
         </tr>
       </thead>
@@ -56,12 +63,13 @@
   </div>
 
   <div id="customers-empty" class="card empty" style="display:none">
-    <p>Aucun client trouve.</p>
+    <p>Aucun client trouvé.</p>
   </div>
 </div>
 
 <template id="customer-row-tpl">
   <tr>
+    <td class="cell-id" style="font-family:monospace;font-size:11px;color:var(--gray-500)"></td>
     <td class="cell-name"></td>
     <td class="cell-email"></td>
     <td class="cell-company"></td>
@@ -71,9 +79,12 @@
     <td class="cell-revenue"></td>
     <td class="cell-date"></td>
     <td>
-      <div class="row-actions">
+      <div class="row-actions" style="display:flex;gap:4px;justify-content:flex-end">
         <button class="icon-btn" data-view title="Voir la fiche">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <button class="icon-btn" data-delete title="Supprimer" style="color:#b91c1c">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </button>
       </div>
     </td>

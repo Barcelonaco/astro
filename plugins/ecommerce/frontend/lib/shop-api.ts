@@ -420,6 +420,14 @@ export interface CheckoutPayload {
 }
 
 export async function createOrder(payload: CheckoutPayload): Promise<Order> {
+  // reCAPTCHA v3 token
+  const rcKey = document.body.dataset.recaptchaKey
+  if (rcKey && (window as any).grecaptcha) {
+    try {
+      const token = await (window as any).grecaptcha.execute(rcKey, { action: 'checkout' })
+      if (token) (payload as any)._recaptcha_token = token
+    } catch {}
+  }
   const order = await shopRequest<Order>('POST', '/orders', payload)
   setCartToken(null)
   return order!

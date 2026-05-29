@@ -105,11 +105,14 @@ export async function getProject(token: string): Promise<PoolpProject | null> {
 export async function updateProject(
   token: string,
   patch: Partial<{ state: PoolpInput; is_erp: boolean; status: string }>,
+  authToken?: string,
 ): Promise<boolean> {
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`
     const res = await fetch(`${API_URL}/poolp/projects/${token}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(patch),
     })
     return res.ok

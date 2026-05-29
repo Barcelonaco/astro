@@ -30,7 +30,8 @@ body {
   --scrollbar-width: calc(100vw - 100%);
 }
 body .grecaptcha-badge {
-  display: none !important;
+  visibility: visible !important;
+  display: block !important;
 }
 
 /* Image */

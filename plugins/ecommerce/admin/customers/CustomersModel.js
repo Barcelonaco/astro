@@ -3,7 +3,7 @@
  */
 
 import { BaseModel } from '../_lib/Model.js';
-import { apiGet, apiPut } from '../_lib/api.js';
+import { apiGet, apiPut, apiDelete } from '../_lib/api.js';
 
 export class CustomersModel extends BaseModel {
   constructor() {
@@ -16,6 +16,9 @@ export class CustomersModel extends BaseModel {
     if (filters.q) params.set('q', filters.q);
     if (filters.pro_status) params.set('pro_status', filters.pro_status);
     if (filters.page) params.set('page', filters.page);
+    if (filters.sort) params.set('sort', filters.sort);
+    if (filters.dir) params.set('dir', filters.dir);
+    if (filters.anonymized !== undefined) params.set('anonymized', filters.anonymized);
 
     const qs = params.toString();
     const data = await apiGet('/admin/customers' + (qs ? '?' + qs : ''));
@@ -38,6 +41,11 @@ export class CustomersModel extends BaseModel {
     await this.load(this.state.filters);
     this.emit('updated', result);
     return result;
+  }
+
+  async deleteCustomer(id) {
+    await apiDelete(`/admin/customers/${id}`);
+    await this.load(this.state.filters);
   }
 
   async loadStats() {

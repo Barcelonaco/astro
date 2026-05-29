@@ -268,4 +268,14 @@
 .account-form-status[data-kind="error"] { color: #b91c1c; }
 .account-form-status[data-kind="success"] { color: #276022; }
 
+/* Password toggle */
+.auth-pw-wrap { position: relative; }
+.auth-pw-wrap input { padding-right: 42px; }
+.auth-pw-toggle {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: #a0a09c;
+  padding: 4px; display: flex; align-items: center;
+}
+.auth-pw-toggle:hover { color: #1a1a18; }
+
 /* Shop button overrides → see shop-buttons.css (imported per page) */

@@ -5,14 +5,16 @@
  * Toutes les routes exigent le feature flag ecommerce_enabled via require_ecommerce_enabled().
  * Les secrets sont rate-limités pour prévenir bruteforce + enumeration.
  */
-class CustomerAuthController {
+class CustomerAuthController
+{
 
     // ── Inscription ─────────────────────────────────────────────────────────
-    public static function register(): void {
+    public static function register(): void
+    {
         require_ecommerce_enabled();
-        check_rate_limit('customer_register', 5, 3600); // 5 / heure / IP
 
         $body = get_json_body();
+        verify_recaptcha($body['_recaptcha_token'] ?? null);
         $email = trim(strtolower($body['email'] ?? ''));
         $password = $body['password'] ?? '';
         $firstName = trim($body['first_name'] ?? '');
@@ -70,6 +72,11 @@ class CustomerAuthController {
         // Email de bienvenue
         self::sendWelcomeEmail($email, $firstName, $isProRequest);
 
+        // Notification admin pour inscription pro
+        if ($isProRequest) {
+            self::sendProRegistrationAdminNotif($email, $firstName, $lastName, $siret, $activity, trim($body['company'] ?? ''));
+        }
+
         json_response([
             'token' => $token,
             'customer' => $customer,
@@ -78,11 +85,13 @@ class CustomerAuthController {
     }
 
     // ── Connexion ───────────────────────────────────────────────────────────
-    public static function login(): void {
+    public static function login(): void
+    {
         require_ecommerce_enabled();
         check_rate_limit('customer_login', 5, 300); // 5 / 5min / IP
 
         $body = get_json_body();
+        verify_recaptcha($body['_recaptcha_token'] ?? null);
         $email = trim(strtolower($body['email'] ?? ''));
         $password = $body['password'] ?? '';
 
@@ -116,7 +125,8 @@ class CustomerAuthController {
     }
 
     // ── Profil courant ──────────────────────────────────────────────────────
-    public static function me(): void {
+    public static function me(): void
+    {
         require_ecommerce_enabled();
         $auth = authenticate_customer();
         $customer = CustomerModel::findById($auth['id']);
@@ -127,7 +137,8 @@ class CustomerAuthController {
     }
 
     // ── Mise à jour du profil ───────────────────────────────────────────────
-    public static function updateProfile(): void {
+    public static function updateProfile(): void
+    {
         require_ecommerce_enabled();
         $auth = authenticate_customer();
         $body = get_json_body();
@@ -135,8 +146,15 @@ class CustomerAuthController {
         // is_pro retiré : self-promotion impossible. pro_status réservé à l'admin
         // (un futur AdminCustomerController appellera CustomerModel::updateProfile).
         $data = array_intersect_key($body, array_flip([
-            'first_name', 'last_name', 'phone', 'company', 'vat_number',
-            'siret', 'activity', 'accepts_marketing', 'locale'
+            'first_name',
+            'last_name',
+            'phone',
+            'company',
+            'vat_number',
+            'siret',
+            'activity',
+            'accepts_marketing',
+            'locale'
         ]));
         CustomerModel::updateProfile($auth['id'], $data);
 
@@ -163,10 +181,12 @@ class CustomerAuthController {
     }
 
     // ── Mot de passe oublié ─────────────────────────────────────────────────
-    public static function forgotPassword(): void {
+    public static function forgotPassword(): void
+    {
         require_ecommerce_enabled();
 
         $body = get_json_body();
+        verify_recaptcha($body['_recaptcha_token'] ?? null);
         $email = trim(strtolower($body['email'] ?? ''));
 
         // Rate limits combinés : 3/h/email + 10/h/IP
@@ -194,7 +214,8 @@ class CustomerAuthController {
     }
 
     // ── Réinitialisation via token ──────────────────────────────────────────
-    public static function resetPassword(): void {
+    public static function resetPassword(): void
+    {
         require_ecommerce_enabled();
         check_rate_limit('customer_reset', 10, 3600);
 
@@ -224,7 +245,8 @@ class CustomerAuthController {
     }
 
     // ── Logout (stateless — invalide côté client) ───────────────────────────
-    public static function logout(): void {
+    public static function logout(): void
+    {
         require_ecommerce_enabled();
         // JWT stateless : le front supprime le token localement.
         // On pourrait blacklister le jti (v2) si besoin.
@@ -237,7 +259,8 @@ class CustomerAuthController {
      * DELETE /customer/auth/account — suppression du compte client.
      * Anonymise les donnees personnelles, conserve les commandes pour obligations legales.
      */
-    public static function deleteAccount(): void {
+    public static function deleteAccount(): void
+    {
         require_ecommerce_enabled();
         $auth = authenticate_customer();
         $body = get_json_body();
@@ -248,15 +271,13 @@ class CustomerAuthController {
             error_response('Mot de passe requis pour confirmer la suppression', 400);
         }
 
-        $db = Database::getInstance();
-        $stmt = $db->prepare('SELECT password_hash FROM customers WHERE id = ?');
-        $stmt->execute([$auth['id']]);
-        $customer = $stmt->fetch();
-        if (!$customer || !password_verify($password, $customer['password_hash'])) {
+        $customer = CustomerModel::findById((int) $auth['id'], true);
+        if (!$customer || !CustomerModel::verifyPassword($password, $customer['password_hash'] ?? '')) {
             error_response('Mot de passe incorrect', 403);
         }
 
         // Anonymize instead of hard-delete (legal obligation: keep order history)
+        $db = Database::getInstance();
         $anonEmail = 'anonymized_' . $auth['id'] . '@deleted.local';
         $db->prepare("UPDATE customers SET
             email = ?,
@@ -277,8 +298,10 @@ class CustomerAuthController {
         $db->prepare('DELETE FROM customer_addresses WHERE customer_id = ?')->execute([$auth['id']]);
 
         // Log erasure
-        $db->prepare("INSERT INTO gdpr_erasure_log (customer_id, action, details, performed_at) VALUES (?, 'account_deleted', ?, NOW())")
-            ->execute([$auth['id'], json_encode(['method' => 'self_service', 'ip' => $_SERVER['REMOTE_ADDR'] ?? null])]);
+        $emailHash = hash('sha256', $customer['email'] ?? '');
+        $erasedFields = json_encode(['email', 'password_hash', 'phone', 'company', 'vat_number', 'siret', 'activity']);
+        $db->prepare("INSERT INTO gdpr_erasure_log (customer_id, customer_email_hash, reason, requested_by_type, requested_by_id, performed_at, fields_erased, notes) VALUES (?, ?, 'user_request', 'customer', ?, NOW(), ?, ?)")
+            ->execute([$auth['id'], $emailHash, $auth['id'], $erasedFields, json_encode(['method' => 'self_service', 'ip' => $_SERVER['REMOTE_ADDR'] ?? null])]);
 
         json_response(['message' => 'Compte supprime. Vos donnees personnelles ont ete anonymisees.']);
     }
@@ -286,7 +309,8 @@ class CustomerAuthController {
     /**
      * POST /customer/auth/erasure-request — demande de suppression RGPD (file d'attente admin).
      */
-    public static function requestErasure(): void {
+    public static function requestErasure(): void
+    {
         require_ecommerce_enabled();
         $auth = authenticate_customer();
         $body = get_json_body();
@@ -307,27 +331,31 @@ class CustomerAuthController {
     }
 
     // ── CRUD adresses ───────────────────────────────────────────────────────
-    public static function listAddresses(): void {
+    public static function listAddresses(): void
+    {
         require_ecommerce_enabled();
         $auth = authenticate_customer();
         json_response(CustomerAddressModel::findByCustomer($auth['id']));
     }
 
-    public static function createAddress(): void {
+    public static function createAddress(): void
+    {
         require_ecommerce_enabled();
         $auth = authenticate_customer();
         $id = CustomerAddressModel::create($auth['id'], get_json_body());
         json_response(['id' => $id, 'message' => 'Adresse créée'], 201);
     }
 
-    public static function updateAddress(int $id): void {
+    public static function updateAddress(int $id): void
+    {
         require_ecommerce_enabled();
         $auth = authenticate_customer();
         CustomerAddressModel::update($id, $auth['id'], get_json_body());
         json_response(['message' => 'Adresse mise à jour']);
     }
 
-    public static function deleteAddress(int $id): void {
+    public static function deleteAddress(int $id): void
+    {
         require_ecommerce_enabled();
         $auth = authenticate_customer();
         CustomerAddressModel::delete($id, $auth['id']);
@@ -335,7 +363,8 @@ class CustomerAuthController {
     }
 
     // ── Helpers emails (Resend) ─────────────────────────────────────────────
-    private static function sendPasswordResetEmail(string $email, string $firstName, string $token): void {
+    private static function sendPasswordResetEmail(string $email, string $firstName, string $token): void
+    {
         $frontend = rtrim($_ENV['FRONTEND_URL'] ?? 'http://localhost:4321', '/');
         $resetUrl = "{$frontend}/compte/reset-password/{$token}";
         $name = htmlspecialchars($firstName ?: 'Bonjour');
@@ -352,7 +381,8 @@ class CustomerAuthController {
         self::sendResendEmail($email, 'Réinitialisation de votre mot de passe', $html);
     }
 
-    private static function sendPasswordChangedEmail(string $email, string $firstName): void {
+    private static function sendPasswordChangedEmail(string $email, string $firstName): void
+    {
         $name = htmlspecialchars($firstName ?: 'Bonjour');
         $frontend = rtrim($_ENV['FRONTEND_URL'] ?? '', '/');
         $loginUrl = $frontend . '/compte/connexion';
@@ -368,13 +398,20 @@ class CustomerAuthController {
         self::sendResendEmail($email, 'Votre mot de passe a été modifié', $html);
     }
 
-    private static function sendResendEmail(string $to, string $subject, string $html): void {
+    public static function sendResendEmail(string $to, string $subject, string $html): void
+    {
         $apiKey = $_ENV['RESEND_API_KEY'] ?? '';
         if (empty($apiKey)) {
             error_log("Resend API key missing — email not sent ({$subject} to {$to})");
             return;
         }
         $from = $_ENV['ECOMMERCE_EMAILS_FROM'] ?? $_ENV['RESEND_FROM_EMAIL'] ?? 'onboarding@resend.dev';
+        try {
+            $stmt = Database::getInstance()->prepare("SELECT setting_value FROM settings WHERE setting_key = 'ecommerce_emails_from'");
+            $stmt->execute();
+            $row = $stmt->fetch();
+            if ($row && !empty($row['setting_value'])) $from = $row['setting_value'];
+        } catch (\Throwable $e) {}
 
         $ch = curl_init('https://api.resend.com/emails');
         curl_setopt_array($ch, [
@@ -392,9 +429,37 @@ class CustomerAuthController {
                 'html' => $html,
             ]),
         ]);
-        curl_exec($ch);
+        $response = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+
+        // If domain not verified (403), retry with env fallback
+        if ($code === 403) {
+            $envFrom = $_ENV['RESEND_FROM_EMAIL'] ?? '';
+            if ($envFrom && $envFrom !== $from) {
+                error_log("Resend 403 with '{$from}', retrying with env '{$envFrom}'");
+                $ch2 = curl_init('https://api.resend.com/emails');
+                curl_setopt_array($ch2, [
+                    CURLOPT_POST => true,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 10,
+                    CURLOPT_HTTPHEADER => [
+                        'Content-Type: application/json',
+                        'Authorization: Bearer ' . $apiKey,
+                    ],
+                    CURLOPT_POSTFIELDS => json_encode([
+                        'from' => $envFrom,
+                        'to' => [$to],
+                        'subject' => $subject,
+                        'html' => $html,
+                    ]),
+                ]);
+                $response = curl_exec($ch2);
+                $code = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+                curl_close($ch2);
+            }
+        }
+
         if ($code >= 400) {
             error_log("Resend email failed ({$code}) — {$subject} to {$to}");
         }
@@ -404,9 +469,58 @@ class CustomerAuthController {
 
     /**
      * Rattache les commandes passees en guest (customer_id = NULL) au compte
+     * Notification admin : nouveau compte pro en attente de validation.
+     */
+    private static function sendProRegistrationAdminNotif(string $email, string $firstName, string $lastName, ?string $siret, ?string $activity, string $company): void {
+        $adminUrl = rtrim($_ENV['ADMIN_URL'] ?? $_ENV['FRONTEND_URL'] ?? '', '/') . '/admin#clients';
+        $name = htmlspecialchars(trim("$firstName $lastName") ?: $email);
+        $html = "
+            <div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px'>
+                <h2 style='color:#222;margin:0 0 16px'>Nouvelle demande de compte professionnel</h2>
+                <p>Un nouveau client a demandé un compte professionnel :</p>
+                <table style='border-collapse:collapse;width:100%;font-size:14px;margin:16px 0'>
+                    <tr><td style='padding:6px 10px;border:1px solid #ddd;font-weight:600'>Nom</td><td style='padding:6px 10px;border:1px solid #ddd'>{$name}</td></tr>
+                    <tr><td style='padding:6px 10px;border:1px solid #ddd;font-weight:600'>Email</td><td style='padding:6px 10px;border:1px solid #ddd'>" . htmlspecialchars($email) . "</td></tr>
+                    <tr><td style='padding:6px 10px;border:1px solid #ddd;font-weight:600'>Entreprise</td><td style='padding:6px 10px;border:1px solid #ddd'>" . htmlspecialchars($company ?: '-') . "</td></tr>
+                    <tr><td style='padding:6px 10px;border:1px solid #ddd;font-weight:600'>SIRET</td><td style='padding:6px 10px;border:1px solid #ddd'>" . htmlspecialchars($siret ?: '-') . "</td></tr>
+                    <tr><td style='padding:6px 10px;border:1px solid #ddd;font-weight:600'>Activité</td><td style='padding:6px 10px;border:1px solid #ddd'>" . htmlspecialchars($activity ?: '-') . "</td></tr>
+                </table>
+                <p style='margin-top:20px'>
+                    <a href='{$adminUrl}' style='display:inline-block;padding:12px 24px;background:#222;color:#fff;text-decoration:none;border-radius:6px;font-weight:600'>Vérifier et approuver</a>
+                </p>
+            </div>
+        ";
+
+        // Send to admin recipients
+        $recipients = [];
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'ecommerce_notif_recipients'");
+            $stmt->execute();
+            $row = $stmt->fetch();
+            if ($row && !empty($row['setting_value'])) {
+                foreach (explode(',', $row['setting_value']) as $e) {
+                    $e = trim($e);
+                    if ($e !== '') $recipients[] = $e;
+                }
+            }
+            $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'shop_email'");
+            $stmt->execute();
+            $row = $stmt->fetch();
+            if ($row && !empty($row['setting_value'])) $recipients[] = $row['setting_value'];
+        } catch (\Throwable $e) {}
+        $recipients = array_values(array_unique($recipients));
+
+        foreach ($recipients as $to) {
+            self::sendResendEmail($to, 'Nouvelle demande de compte pro — ' . $name, $html);
+        }
+    }
+
+    /**
      * client si l'email correspond. Executee au register + login.
      */
-    private static function claimGuestOrders(int $customerId, string $email): void {
+    private static function claimGuestOrders(int $customerId, string $email): void
+    {
         try {
             $db = Database::getInstance();
             $stmt = $db->prepare('UPDATE orders SET customer_id = ? WHERE customer_id IS NULL AND LOWER(email) = ? AND email != ""');
@@ -421,32 +535,58 @@ class CustomerAuthController {
         }
     }
 
-    private static function sendWelcomeEmail(string $email, string $firstName, bool $isPro): void {
+    private static function sendWelcomeEmail(string $email, string $firstName, bool $isPro): void
+    {
         $name = htmlspecialchars($firstName ?: 'Bonjour');
         $frontend = rtrim($_ENV['FRONTEND_URL'] ?? 'http://localhost:4321', '/');
         $accountUrl = $frontend . '/compte';
 
-        $proNote = $isPro
-            ? "<p style='padding:12px 16px;background:#fff3cd;border-radius:6px;font-size:14px;color:#856404;margin:20px 0'>Votre demande de compte professionnel est en cours de verification. Vous recevrez un email des validation (sous 24h ouvrees).</p>"
-            : '';
+        if ($isPro) {
+            // Contact email from settings
+            $contactEmail = '';
+            try {
+                $stmtC = Database::getInstance()->prepare("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('email', 'shop_email')");
+                $stmtC->execute();
+                $emailSettings = [];
+                foreach ($stmtC->fetchAll() as $r) $emailSettings[$r['setting_key']] = $r['setting_value'];
+                $contactEmail = $emailSettings['email'] ?? $emailSettings['shop_email'] ?? '';
+            } catch (\Throwable $e) {}
+            $contactLine = $contactEmail
+                ? "<p style='margin-top:20px;font-size:14px;color:#555'>Une question ? Contactez-nous a <a href='mailto:{$contactEmail}' style='color:#222;font-weight:600'>{$contactEmail}</a> ou via la page <a href='{$frontend}/contact' style='color:#222;font-weight:600'>Contact</a>.</p>"
+                : "<p style='margin-top:20px;font-size:14px;color:#555'>Une question ? Rendez-vous sur notre page <a href='{$frontend}/contact' style='color:#222;font-weight:600'>Contact</a>.</p>";
 
-        $html = "
-            <div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px'>
-                <h2 style='color:#222;margin:0 0 16px'>Bienvenue {$name} !</h2>
-                <p>Votre compte a ete cree avec succes sur notre boutique.</p>
-                {$proNote}
-                <p>Depuis votre espace client, vous pouvez :</p>
-                <ul style='color:#555;font-size:14px;line-height:1.8'>
-                    <li>Suivre vos commandes</li>
-                    <li>Gerer vos adresses de livraison et facturation</li>
-                    <li>Modifier vos informations personnelles</li>
-                </ul>
-                <p style='margin-top:24px'>
-                    <a href='{$accountUrl}' style='display:inline-block;padding:12px 24px;background:#0f62fe;color:white;text-decoration:none;border-radius:6px;font-weight:600'>Acceder a mon compte</a>
-                </p>
-                <p style='color:#999;font-size:12px;margin-top:40px'>Si vous n'avez pas cree ce compte, vous pouvez ignorer ce message.</p>
-            </div>
-        ";
-        self::sendResendEmail($email, 'Bienvenue — votre compte a ete cree', $html);
+            $html = "
+                <div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px'>
+                    <h2 style='color:#222;margin:0 0 16px'>Demande de compte professionnel bien recue</h2>
+                    <p>Merci pour votre inscription. Votre demande a bien ete enregistree et est en cours de traitement par notre equipe.</p>
+                    <p>Votre compte professionnel sera active sous 24 a 48 heures ouvrees, apres verification de vos informations. Vous recevrez un email de confirmation des que votre acces sera ouvert.</p>
+                    <p>En attendant, vous pouvez continuer a utiliser le configurateur et parcourir la boutique. Votre panier et vos configurations sont conserves.</p>
+                    {$contactLine}
+                    <p style='margin-top:24px'>
+                        <a href='{$accountUrl}' style='display:inline-block;padding:12px 24px;background:#222;color:#fff;text-decoration:none;border-radius:6px;font-weight:600'>Acceder a mon espace</a>
+                    </p>
+                    <p style='color:#999;font-size:12px;margin-top:40px'>Si vous n'avez pas cree ce compte, vous pouvez ignorer ce message.</p>
+                </div>
+            ";
+            self::sendResendEmail($email, 'Demande de compte professionnel bien recue', $html);
+        } else {
+            $html = "
+                <div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px'>
+                    <h2 style='color:#222;margin:0 0 16px'>Bienvenue {$name} !</h2>
+                    <p>Votre compte a été créé avec succès sur notre boutique.</p>
+                    <p>Depuis votre espace client, vous pouvez :</p>
+                    <ul style='color:#555;font-size:14px;line-height:1.8'>
+                        <li>Suivre vos commandes</li>
+                        <li>Gérer vos adresses de livraison et facturation</li>
+                        <li>Modifier vos informations personnelles</li>
+                    </ul>
+                    <p style='margin-top:24px'>
+                        <a href='{$accountUrl}' style='display:inline-block;padding:12px 24px;background:#222;color:#fff;text-decoration:none;border-radius:6px;font-weight:600'>Accéder à mon compte</a>
+                    </p>
+                    <p style='color:#999;font-size:12px;margin-top:40px'>Si vous n'avez pas créé ce compte, vous pouvez ignorer ce message.</p>
+                </div>
+            ";
+            self::sendResendEmail($email, 'Bienvenue — votre compte a été créé', $html);
+        }
     }
 }

@@ -147,7 +147,8 @@ class SettingsController {
             'is_onepage', 'is_activate_schemas', 'custom_balise', 'google_api_key',
             // E-commerce (public-safe uniquement, aucun secret)
             'shop_currency', 'shop_country', 'shop_payment_methods',
-            'checkout_guest_enabled'
+            'checkout_guest_enabled',
+            'recaptcha_site_key'
         ];
         $siteSettings = [];
         foreach ($frontendKeys as $k) {

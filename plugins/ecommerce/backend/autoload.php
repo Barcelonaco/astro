@@ -477,6 +477,12 @@ register_plugin_route('ecommerce', function (string $method, string $path) use (
         CustomerAdminController::update((int) $params['id']);
         return true;
     }
+    if ($method === 'DELETE' && $ecommerce_match('/admin/customers/:id', $path, $params)) {
+        $u = authenticate_token(); require_admin($u);
+        require_ecommerce_enabled();
+        CustomerAdminController::delete((int) $params['id']);
+        return true;
+    }
 
     if ($method === 'POST' && $path === '/admin/product-categories') {
         $u = authenticate_token(); require_min_role($u, 'editor');

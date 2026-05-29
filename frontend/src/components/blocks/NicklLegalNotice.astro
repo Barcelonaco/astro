@@ -1,5 +1,5 @@
 ---
-import NicklModuleWrapper from './NicklModuleWrapper.astro';
+import NicklModuleWrapper from "./NicklModuleWrapper.astro";
 
 interface Props {
   data: Record<string, any>;
@@ -7,21 +7,21 @@ interface Props {
 
 const { data } = Astro.props;
 
-const siteName = (data.site_name as string) || '';
-const siteUrl = (data.site_url as string) || '';
-const ownerName = (data.owner_name as string) || '';
-const ownerCapital = (data.owner_capital as string) || '';
-const ownerVat = (data.owner_vat as string) || '';
-const ownerAddress = (data.owner_address as string) || '';
-const pubManager = (data.publication_manager as string) || '';
-const pubEmail = (data.publication_email as string) || '';
-const webmasterName = (data.webmaster_name as string) || '';
-const webmasterEmail = (data.webmaster_email as string) || '';
-const hostName = (data.host_name as string) || '';
-const hostAddress = (data.host_address as string) || '';
-const dpoName = (data.dpo_name as string) || '';
-const dpoEmail = (data.dpo_email as string) || '';
-const jurisdiction = (data.jurisdiction as string) || '';
+const siteName = (data.site_name as string) || "";
+const siteUrl = (data.site_url as string) || "";
+const ownerName = (data.owner_name as string) || "";
+const ownerCapital = (data.owner_capital as string) || "";
+const ownerVat = (data.owner_vat as string) || "";
+const ownerAddress = (data.owner_address as string) || "";
+const pubManager = (data.publication_manager as string) || "";
+const pubEmail = (data.publication_email as string) || "";
+const webmasterName = (data.webmaster_name as string) || "";
+const webmasterEmail = (data.webmaster_email as string) || "";
+const hostName = (data.host_name as string) || "";
+const hostAddress = (data.host_address as string) || "";
+const dpoName = (data.dpo_name as string) || "";
+const dpoEmail = (data.dpo_email as string) || "";
+const jurisdiction = (data.jurisdiction as string) || "";
 
 const siteLink = siteUrl ? `<a href="${siteUrl}">${siteUrl}</a>` : siteName;
 ---
@@ -31,121 +31,615 @@ const siteLink = siteUrl ? `<a href="${siteUrl}">${siteUrl}</a>` : siteName;
     <h2>Mentions L&eacute;gales</h2>
 
     <h3>D&eacute;finitions</h3>
-    <p><strong>Client</strong> : tout professionnel ou personne physique capable au sens des articles 1123 et suivants du Code civil, ou personne morale, qui visite le Site objet des pr&eacute;sentes conditions g&eacute;n&eacute;rales.</p>
-    <p><strong>Prestations et Services</strong> : <Fragment set:html={siteLink} /> met &agrave; disposition des Clients :</p>
-    <p><strong>Contenu</strong> : Ensemble des &eacute;l&eacute;ments constituants l'information pr&eacute;sente sur le Site, notamment textes &ndash; images &ndash; vid&eacute;os.</p>
-    <p><strong>Informations clients</strong> : Ci apr&egrave;s d&eacute;nomm&eacute; &laquo; Information (s) &raquo; qui correspondent &agrave; l'ensemble des donn&eacute;es personnelles susceptibles d'&ecirc;tre d&eacute;tenues par <Fragment set:html={siteLink} /> pour la gestion de votre compte, de la gestion de la relation client et &agrave; des fins d'analyses et de statistiques.</p>
-    <p><strong>Utilisateur</strong> : Internaute se connectant, utilisant le site susnom&eacute;.</p>
-    <p><strong>Informations personnelles</strong> : &laquo; Les informations qui permettent, sous quelque forme que ce soit, directement ou non, l'identification des personnes physiques auxquelles elles s'appliquent &raquo; (article 4 de la loi n&deg; 78-17 du 6 janvier 1978).</p>
-    <p>Les termes &laquo; donn&eacute;es &agrave; caract&egrave;re personnel &raquo;, &laquo; personne concern&eacute;e &raquo;, &laquo; sous traitant &raquo; et &laquo; donn&eacute;es sensibles &raquo; ont le sens d&eacute;fini par le R&egrave;glement G&eacute;n&eacute;ral sur la Protection des Donn&eacute;es (RGPD : n&deg; 2016-679)</p>
+    <p>
+      <strong>Client</strong> : tout professionnel ou personne physique capable au
+      sens des articles 1123 et suivants du Code civil, ou personne morale, qui visite
+      le Site objet des pr&eacute;sentes conditions g&eacute;n&eacute;rales.
+    </p>
+    <p>
+      <strong>Prestations et Services</strong> : <Fragment
+        set:html={siteLink}
+      /> met &agrave; disposition des Clients :
+    </p>
+    <p>
+      <strong>Contenu</strong> : Ensemble des &eacute;l&eacute;ments constituants
+      l'information pr&eacute;sente sur le Site, notamment textes &ndash; images &ndash;
+      vid&eacute;os.
+    </p>
+    <p>
+      <strong>Informations clients</strong> : Ci apr&egrave;s d&eacute;nomm&eacute;
+      &laquo; Information (s) &raquo; qui correspondent &agrave; l'ensemble des donn&eacute;es
+      personnelles susceptibles d'&ecirc;tre d&eacute;tenues par <Fragment
+        set:html={siteLink}
+      /> pour la gestion de votre compte, de la gestion de la relation client et &agrave;
+      des fins d'analyses et de statistiques.
+    </p>
+    <p>
+      <strong>Utilisateur</strong> : Internaute se connectant, utilisant le site susnom&eacute;.
+    </p>
+    <p>
+      <strong>Informations personnelles</strong> : &laquo; Les informations qui permettent,
+      sous quelque forme que ce soit, directement ou non, l'identification des personnes
+      physiques auxquelles elles s'appliquent &raquo; (article 4 de la loi n&deg;
+      78-17 du 6 janvier 1978).
+    </p>
+    <p>
+      Les termes &laquo; donn&eacute;es &agrave; caract&egrave;re personnel
+      &raquo;, &laquo; personne concern&eacute;e &raquo;, &laquo; sous traitant
+      &raquo; et &laquo; donn&eacute;es sensibles &raquo; ont le sens
+      d&eacute;fini par le R&egrave;glement G&eacute;n&eacute;ral sur la
+      Protection des Donn&eacute;es (RGPD : n&deg; 2016-679)
+    </p>
 
     <h3>1. Pr&eacute;sentation du site internet.</h3>
-    <p>En vertu de l'article 6 de la loi n&deg; 2004-575 du 21 juin 2004 pour la confiance dans l'&eacute;conomie num&eacute;rique, il est pr&eacute;cis&eacute; aux utilisateurs du site internet <Fragment set:html={siteLink} /> l'identit&eacute; des diff&eacute;rents intervenants dans le cadre de sa r&eacute;alisation et de son suivi:</p>
-    <p><strong>Propri&eacute;taire</strong> : {ownerName} {ownerCapital && `Capital social de ${ownerCapital}`} {ownerVat && `Num&eacute;ro de TVA: ${ownerVat}`} &ndash; {ownerAddress}</p>
-    <p><strong>Responsable publication</strong> : {pubManager} &ndash; <a href={`mailto:${pubEmail}`}>{pubEmail}</a><br/>
-    Le responsable publication est une personne physique ou une personne morale.</p>
-    <p><strong>Webmaster</strong> : {webmasterName} &ndash; <a href={`mailto:${webmasterEmail}`}>{webmasterEmail}</a></p>
+    <p>
+      En vertu de l'article 6 de la loi n&deg; 2004-575 du 21 juin 2004 pour la
+      confiance dans l'&eacute;conomie num&eacute;rique, il est
+      pr&eacute;cis&eacute; aux utilisateurs du site internet <Fragment
+        set:html={siteLink}
+      /> l'identit&eacute; des diff&eacute;rents intervenants dans le cadre de sa
+      r&eacute;alisation et de son suivi:
+    </p>
+    <p>
+      <strong>Propri&eacute;taire</strong> : {ownerName}
+      {ownerCapital && `Capital social de ${ownerCapital}`}
+      {ownerVat && `Num&eacute;ro de TVA: ${ownerVat}`} &ndash; {ownerAddress}
+    </p>
+    <p>
+      <strong>Responsable publication</strong> : {pubManager} &ndash; <a
+        href={`mailto:${pubEmail}`}>{pubEmail}</a
+      ><br />
+      Le responsable publication est une personne physique ou une personne morale.
+    </p>
+    <p>
+      <strong>Webmaster</strong> : {webmasterName} &ndash; <a
+        href={`mailto:${webmasterEmail}`}>{webmasterEmail}</a>
+    </p>
     <p><strong>H&eacute;bergeur</strong> : {hostName} &ndash; {hostAddress}</p>
-    <p><strong>D&eacute;l&eacute;gu&eacute; &agrave; la protection des donn&eacute;es</strong> : {dpoName} &ndash; <a href={`mailto:${dpoEmail}`}>{dpoEmail}</a></p>
+    <p>
+      <strong
+        >D&eacute;l&eacute;gu&eacute; &agrave; la protection des donn&eacute;es</strong
+      > : {dpoName} &ndash; <a href={`mailto:${dpoEmail}`}>{dpoEmail}</a>
+    </p>
 
-    <h3>2. Conditions g&eacute;n&eacute;rales d'utilisation du site et des services propos&eacute;s.</h3>
-    <p>Le Site constitue une &oelig;uvre de l'esprit prot&eacute;g&eacute;e par les dispositions du Code de la Propri&eacute;t&eacute; Intellectuelle et des R&eacute;glementations Internationales applicables. Le Client ne peut en aucune mani&egrave;re r&eacute;utiliser, c&eacute;der ou exploiter pour son propre compte tout ou partie des &eacute;l&eacute;ments ou travaux du Site.</p>
-    <p>L'utilisation du site <Fragment set:html={siteLink} /> implique l'acceptation pleine et enti&egrave;re des conditions g&eacute;n&eacute;rales d'utilisation ci-apr&egrave;s d&eacute;crites. Ces conditions d'utilisation sont susceptibles d'&ecirc;tre modifi&eacute;es ou compl&eacute;t&eacute;es &agrave; tout moment, les utilisateurs du site <Fragment set:html={siteLink} /> sont donc invit&eacute;s &agrave; les consulter de mani&egrave;re r&eacute;guli&egrave;re.</p>
-    <p>Ce site internet est normalement accessible &agrave; tout moment aux utilisateurs. Une interruption pour raison de maintenance technique peut &ecirc;tre toutefois d&eacute;cid&eacute;e par <Fragment set:html={siteLink} />, qui s'efforcera alors de communiquer pr&eacute;alablement aux utilisateurs les dates et heures de l'intervention. Le site web <Fragment set:html={siteLink} /> est mis &agrave; jour r&eacute;guli&egrave;rement par <Fragment set:html={siteLink} /> responsable. De la m&ecirc;me fa&ccedil;on, les mentions l&eacute;gales peuvent &ecirc;tre modifi&eacute;es &agrave; tout moment : elles s'imposent n&eacute;anmoins &agrave; l'utilisateur qui est invit&eacute; &agrave; s'y r&eacute;f&eacute;rer le plus souvent possible afin d'en prendre connaissance.</p>
+    <h3>
+      2. Conditions g&eacute;n&eacute;rales d'utilisation du site et des
+      services propos&eacute;s.
+    </h3>
+    <p>
+      Le Site constitue une &oelig;uvre de l'esprit prot&eacute;g&eacute;e par
+      les dispositions du Code de la Propri&eacute;t&eacute; Intellectuelle et
+      des R&eacute;glementations Internationales applicables. Le Client ne peut
+      en aucune mani&egrave;re r&eacute;utiliser, c&eacute;der ou exploiter pour
+      son propre compte tout ou partie des &eacute;l&eacute;ments ou travaux du
+      Site.
+    </p>
+    <p>
+      L'utilisation du site <Fragment set:html={siteLink} /> implique l'acceptation
+      pleine et enti&egrave;re des conditions g&eacute;n&eacute;rales d'utilisation
+      ci-apr&egrave;s d&eacute;crites. Ces conditions d'utilisation sont susceptibles
+      d'&ecirc;tre modifi&eacute;es ou compl&eacute;t&eacute;es &agrave; tout moment,
+      les utilisateurs du site <Fragment set:html={siteLink} /> sont donc invit&eacute;s
+      &agrave; les consulter de mani&egrave;re r&eacute;guli&egrave;re.
+    </p>
+    <p>
+      Ce site internet est normalement accessible &agrave; tout moment aux
+      utilisateurs. Une interruption pour raison de maintenance technique peut
+      &ecirc;tre toutefois d&eacute;cid&eacute;e par <Fragment
+        set:html={siteLink}
+      />, qui s'efforcera alors de communiquer pr&eacute;alablement aux
+      utilisateurs les dates et heures de l'intervention. Le site web <Fragment
+        set:html={siteLink}
+      /> est mis &agrave; jour r&eacute;guli&egrave;rement par <Fragment
+        set:html={siteLink}
+      /> responsable. De la m&ecirc;me fa&ccedil;on, les mentions l&eacute;gales peuvent
+      &ecirc;tre modifi&eacute;es &agrave; tout moment : elles s'imposent n&eacute;anmoins
+      &agrave; l'utilisateur qui est invit&eacute; &agrave; s'y r&eacute;f&eacute;rer
+      le plus souvent possible afin d'en prendre connaissance.
+    </p>
 
     <h3>3. Description des services fournis.</h3>
-    <p>Le site internet <Fragment set:html={siteLink} /> a pour objet de fournir une information concernant l'ensemble des activit&eacute;s de la soci&eacute;t&eacute;. <Fragment set:html={siteLink} /> s'efforce de fournir sur le site <Fragment set:html={siteLink} /> des informations aussi pr&eacute;cises que possible. Toutefois, il ne pourra &ecirc;tre tenu responsable des oublis, des inexactitudes et des carences dans la mise &agrave; jour, qu'elles soient de son fait ou du fait des tiers partenaires qui lui fournissent ces informations.</p>
-    <p>Toutes les informations indiqu&eacute;es sur le site <Fragment set:html={siteLink} /> sont donn&eacute;es &agrave; titre indicatif, et sont susceptibles d'&eacute;voluer. Par ailleurs, les renseignements figurant sur le site <Fragment set:html={siteLink} /> ne sont pas exhaustifs. Ils sont donn&eacute;s sous r&eacute;serve de modifications ayant &eacute;t&eacute; apport&eacute;es depuis leur mise en ligne.</p>
+    <p>
+      Le site internet <Fragment set:html={siteLink} /> a pour objet de fournir une
+      information concernant l'ensemble des activit&eacute;s de la soci&eacute;t&eacute;.
+      <Fragment set:html={siteLink} /> s'efforce de fournir sur le site <Fragment
+        set:html={siteLink}
+      /> des informations aussi pr&eacute;cises que possible. Toutefois, il ne pourra
+      &ecirc;tre tenu responsable des oublis, des inexactitudes et des carences dans
+      la mise &agrave; jour, qu'elles soient de son fait ou du fait des tiers partenaires
+      qui lui fournissent ces informations.
+    </p>
+    <p>
+      Toutes les informations indiqu&eacute;es sur le site <Fragment
+        set:html={siteLink}
+      /> sont donn&eacute;es &agrave; titre indicatif, et sont susceptibles d'&eacute;voluer.
+      Par ailleurs, les renseignements figurant sur le site <Fragment
+        set:html={siteLink}
+      /> ne sont pas exhaustifs. Ils sont donn&eacute;s sous r&eacute;serve de modifications
+      ayant &eacute;t&eacute; apport&eacute;es depuis leur mise en ligne.
+    </p>
 
     <h3>4. Limitations contractuelles sur les donn&eacute;es techniques.</h3>
-    <p>Le site utilise la technologie JavaScript. Le site Internet ne pourra &ecirc;tre tenu responsable de dommages mat&eacute;riels li&eacute;s &agrave; l'utilisation du site. De plus, l'utilisateur du site s'engage &agrave; acc&eacute;der au site en utilisant un mat&eacute;riel r&eacute;cent, ne contenant pas de virus et avec un navigateur de derni&egrave;re g&eacute;n&eacute;ration mis-&agrave;-jour. Le site <Fragment set:html={siteLink} /> est h&eacute;berg&eacute; chez un prestataire sur le territoire de l'Union Europ&eacute;enne conform&eacute;ment aux dispositions du R&egrave;glement G&eacute;n&eacute;ral sur la Protection des Donn&eacute;es (RGPD : n&deg; 2016-679)</p>
-    <p>L'objectif est d'apporter une prestation qui assure le meilleur taux d'accessibilit&eacute;. L'h&eacute;bergeur assure la continuit&eacute; de son service 24 Heures sur 24, tous les jours de l'ann&eacute;e. Il se r&eacute;serve n&eacute;anmoins la possibilit&eacute; d'interrompre le service d'h&eacute;bergement pour les dur&eacute;es les plus courtes possibles notamment &agrave; des fins de maintenance, d'am&eacute;lioration de ses infrastructures, de d&eacute;faillance de ses infrastructures ou si les Prestations et Services g&eacute;n&egrave;rent un trafic r&eacute;put&eacute; anormal.</p>
-    <p><Fragment set:html={siteLink} /> et l'h&eacute;bergeur ne pourront &ecirc;tre tenus responsables en cas de dysfonctionnement du r&eacute;seau Internet, des lignes t&eacute;l&eacute;phoniques ou du mat&eacute;riel informatique et de t&eacute;l&eacute;phonie li&eacute; notamment &agrave; l'encombrement du r&eacute;seau emp&ecirc;chant l'acc&egrave;s au serveur.</p>
+    <p>
+      Le site utilise la technologie JavaScript. Le site Internet ne pourra
+      &ecirc;tre tenu responsable de dommages mat&eacute;riels li&eacute;s
+      &agrave; l'utilisation du site. De plus, l'utilisateur du site s'engage
+      &agrave; acc&eacute;der au site en utilisant un mat&eacute;riel
+      r&eacute;cent, ne contenant pas de virus et avec un navigateur de
+      derni&egrave;re g&eacute;n&eacute;ration mis-&agrave;-jour. Le site <Fragment
+        set:html={siteLink}
+      /> est h&eacute;berg&eacute; chez un prestataire sur le territoire de l'Union
+      Europ&eacute;enne conform&eacute;ment aux dispositions du R&egrave;glement G&eacute;n&eacute;ral
+      sur la Protection des Donn&eacute;es (RGPD : n&deg; 2016-679)
+    </p>
+    <p>
+      L'objectif est d'apporter une prestation qui assure le meilleur taux
+      d'accessibilit&eacute;. L'h&eacute;bergeur assure la continuit&eacute; de
+      son service 24 Heures sur 24, tous les jours de l'ann&eacute;e. Il se
+      r&eacute;serve n&eacute;anmoins la possibilit&eacute; d'interrompre le
+      service d'h&eacute;bergement pour les dur&eacute;es les plus courtes
+      possibles notamment &agrave; des fins de maintenance,
+      d'am&eacute;lioration de ses infrastructures, de d&eacute;faillance de ses
+      infrastructures ou si les Prestations et Services g&eacute;n&egrave;rent
+      un trafic r&eacute;put&eacute; anormal.
+    </p>
+    <p>
+      <Fragment set:html={siteLink} /> et l'h&eacute;bergeur ne pourront &ecirc;tre
+      tenus responsables en cas de dysfonctionnement du r&eacute;seau Internet, des
+      lignes t&eacute;l&eacute;phoniques ou du mat&eacute;riel informatique et de
+      t&eacute;l&eacute;phonie li&eacute; notamment &agrave; l'encombrement du r&eacute;seau
+      emp&ecirc;chant l'acc&egrave;s au serveur.
+    </p>
 
     <h3>5. Propri&eacute;t&eacute; intellectuelle et contrefa&ccedil;ons.</h3>
-    <p><Fragment set:html={siteLink} /> est propri&eacute;taire des droits de propri&eacute;t&eacute; intellectuelle et d&eacute;tient les droits d'usage sur tous les &eacute;l&eacute;ments accessibles sur le site internet, notamment les textes, images, graphismes, logos, vid&eacute;os, ic&ocirc;nes et sons. Toute reproduction, repr&eacute;sentation, modification, publication, adaptation de tout ou partie des &eacute;l&eacute;ments du site, quel que soit le moyen ou le proc&eacute;d&eacute; utilis&eacute;, est interdite, sauf autorisation &eacute;crite pr&eacute;alable de : <Fragment set:html={siteLink} />.</p>
-    <p>Toute exploitation non autoris&eacute;e du site ou de l'un quelconque des &eacute;l&eacute;ments qu'il contient sera consid&eacute;r&eacute;e comme constitutive d'une contrefa&ccedil;on et poursuivie conform&eacute;ment aux dispositions des articles L.335-2 et suivants du Code de Propri&eacute;t&eacute; Intellectuelle.</p>
+    <p>
+      <Fragment set:html={siteLink} /> est propri&eacute;taire des droits de propri&eacute;t&eacute;
+      intellectuelle et d&eacute;tient les droits d'usage sur tous les &eacute;l&eacute;ments
+      accessibles sur le site internet, notamment les textes, images, graphismes,
+      logos, vid&eacute;os, ic&ocirc;nes et sons. Toute reproduction, repr&eacute;sentation,
+      modification, publication, adaptation de tout ou partie des &eacute;l&eacute;ments
+      du site, quel que soit le moyen ou le proc&eacute;d&eacute; utilis&eacute;,
+      est interdite, sauf autorisation &eacute;crite pr&eacute;alable de : <Fragment
+        set:html={siteLink}
+      />.
+    </p>
+    <p>
+      Toute exploitation non autoris&eacute;e du site ou de l'un quelconque des
+      &eacute;l&eacute;ments qu'il contient sera consid&eacute;r&eacute;e comme
+      constitutive d'une contrefa&ccedil;on et poursuivie conform&eacute;ment
+      aux dispositions des articles L.335-2 et suivants du Code de
+      Propri&eacute;t&eacute; Intellectuelle.
+    </p>
 
     <h3>6. Limitations de responsabilit&eacute;.</h3>
-    <p><Fragment set:html={siteLink} /> agit en tant qu'&eacute;diteur du site. <Fragment set:html={siteLink} /> est responsable de la qualit&eacute; et de la v&eacute;racit&eacute; du Contenu qu'il publie.</p>
-    <p><Fragment set:html={siteLink} /> ne pourra &ecirc;tre tenu responsable des dommages directs et indirects caus&eacute;s au mat&eacute;riel de l'utilisateur, lors de l'acc&egrave;s au site internet <Fragment set:html={siteLink} />, et r&eacute;sultant soit de l'utilisation d'un mat&eacute;riel ne r&eacute;pondant pas aux sp&eacute;cifications indiqu&eacute;es au point 4, soit de l'apparition d'un bug ou d'une incompatibilit&eacute;.</p>
-    <p><Fragment set:html={siteLink} /> ne pourra &eacute;galement &ecirc;tre tenu responsable des dommages indirects (tels par exemple qu'une perte de march&eacute; ou perte d'une chance) cons&eacute;cutifs &agrave; l'utilisation du site <Fragment set:html={siteLink} />. Des espaces interactifs (possibilit&eacute; de poser des questions dans l'espace contact) sont &agrave; la disposition des utilisateurs. <Fragment set:html={siteLink} /> se r&eacute;serve le droit de supprimer, sans mise en demeure pr&eacute;alable, tout contenu d&eacute;pos&eacute; dans cet espace qui contreviendrait &agrave; la l&eacute;gislation applicable en France, en particulier aux dispositions relatives &agrave; la protection des donn&eacute;es. Le cas &eacute;ch&eacute;ant, <Fragment set:html={siteLink} /> se r&eacute;serve &eacute;galement la possibilit&eacute; de mettre en cause la responsabilit&eacute; civile et/ou p&eacute;nale de l'utilisateur, notamment en cas de message &agrave; caract&egrave;re raciste, injurieux, diffamant, ou pornographique, quel que soit le support utilis&eacute; (texte, photographie&hellip;).</p>
+    <p>
+      <Fragment set:html={siteLink} /> agit en tant qu'&eacute;diteur du site. <Fragment
+        set:html={siteLink}
+      /> est responsable de la qualit&eacute; et de la v&eacute;racit&eacute; du Contenu
+      qu'il publie.
+    </p>
+    <p>
+      <Fragment set:html={siteLink} /> ne pourra &ecirc;tre tenu responsable des dommages
+      directs et indirects caus&eacute;s au mat&eacute;riel de l'utilisateur, lors
+      de l'acc&egrave;s au site internet <Fragment set:html={siteLink} />, et
+      r&eacute;sultant soit de l'utilisation d'un mat&eacute;riel ne
+      r&eacute;pondant pas aux sp&eacute;cifications indiqu&eacute;es au point
+      4, soit de l'apparition d'un bug ou d'une incompatibilit&eacute;.
+    </p>
+    <p>
+      <Fragment set:html={siteLink} /> ne pourra &eacute;galement &ecirc;tre tenu
+      responsable des dommages indirects (tels par exemple qu'une perte de march&eacute;
+      ou perte d'une chance) cons&eacute;cutifs &agrave; l'utilisation du site <Fragment
+        set:html={siteLink}
+      />. Des espaces interactifs (possibilit&eacute; de poser des questions
+      dans l'espace contact) sont &agrave; la disposition des utilisateurs. <Fragment
+        set:html={siteLink}
+      /> se r&eacute;serve le droit de supprimer, sans mise en demeure pr&eacute;alable,
+      tout contenu d&eacute;pos&eacute; dans cet espace qui contreviendrait &agrave;
+      la l&eacute;gislation applicable en France, en particulier aux dispositions
+      relatives &agrave; la protection des donn&eacute;es. Le cas &eacute;ch&eacute;ant,
+      <Fragment set:html={siteLink} /> se r&eacute;serve &eacute;galement la possibilit&eacute;
+      de mettre en cause la responsabilit&eacute; civile et/ou p&eacute;nale de l'utilisateur,
+      notamment en cas de message &agrave; caract&egrave;re raciste, injurieux, diffamant,
+      ou pornographique, quel que soit le support utilis&eacute; (texte, photographie&hellip;).
+    </p>
 
     <h3>7. Gestion des donn&eacute;es personnelles.</h3>
-    <p>Le Client est inform&eacute; des r&eacute;glementations concernant la communication marketing, la loi du 21 Juin 2014 pour la confiance dans l'Economie Num&eacute;rique, la Loi Informatique et Libert&eacute; du 06 Ao&ucirc;t 2004 ainsi que du R&egrave;glement G&eacute;n&eacute;ral sur la Protection des Donn&eacute;es (RGPD : n&deg; 2016-679).</p>
+    <p>
+      Le Client est inform&eacute; des r&eacute;glementations concernant la
+      communication marketing, la loi du 21 Juin 2014 pour la confiance dans
+      l'Economie Num&eacute;rique, la Loi Informatique et Libert&eacute; du 06
+      Ao&ucirc;t 2004 ainsi que du R&egrave;glement G&eacute;n&eacute;ral sur la
+      Protection des Donn&eacute;es (RGPD : n&deg; 2016-679).
+    </p>
 
     <h4>7.1 Responsables de la collecte des donn&eacute;es personnelles</h4>
-    <p>Pour les Donn&eacute;es Personnelles collect&eacute;es dans le cadre de la cr&eacute;ation du compte personnel de l'Utilisateur et de sa navigation sur le Site, le responsable du traitement des Donn&eacute;es Personnelles est : {ownerName}. <Fragment set:html={siteLink} /> est repr&eacute;sent&eacute; par {pubManager}, son repr&eacute;sentant l&eacute;gal</p>
-    <p>En tant que responsable du traitement des donn&eacute;es qu'il collecte, <Fragment set:html={siteLink} /> s'engage &agrave; respecter le cadre des dispositions l&eacute;gales en vigueur. Il lui appartient notamment au Client d'&eacute;tablir les finalit&eacute;s de ses traitements de donn&eacute;es, de fournir &agrave; ses prospects et clients, &agrave; partir de la collecte de leurs consentements, une information compl&egrave;te sur le traitement de leurs donn&eacute;es personnelles et de maintenir un registre des traitements conforme &agrave; la r&eacute;alit&eacute;. Chaque fois que <Fragment set:html={siteLink} /> traite des Donn&eacute;es Personnelles, <Fragment set:html={siteLink} /> prend toutes les mesures raisonnables pour s'assurer de l'exactitude et de la pertinence des Donn&eacute;es Personnelles au regard des finalit&eacute;s pour lesquelles <Fragment set:html={siteLink} /> les traite.</p>
+    <p>
+      Pour les Donn&eacute;es Personnelles collect&eacute;es dans le cadre de la
+      cr&eacute;ation du compte personnel de l'Utilisateur et de sa navigation
+      sur le Site, le responsable du traitement des Donn&eacute;es Personnelles
+      est : {ownerName}. <Fragment set:html={siteLink} /> est repr&eacute;sent&eacute;
+      par {pubManager}, son repr&eacute;sentant l&eacute;gal
+    </p>
+    <p>
+      En tant que responsable du traitement des donn&eacute;es qu'il collecte, <Fragment
+        set:html={siteLink}
+      /> s'engage &agrave; respecter le cadre des dispositions l&eacute;gales en vigueur.
+      Il lui appartient notamment au Client d'&eacute;tablir les finalit&eacute;s
+      de ses traitements de donn&eacute;es, de fournir &agrave; ses prospects et clients,
+      &agrave; partir de la collecte de leurs consentements, une information compl&egrave;te
+      sur le traitement de leurs donn&eacute;es personnelles et de maintenir un registre
+      des traitements conforme &agrave; la r&eacute;alit&eacute;. Chaque fois que
+      <Fragment set:html={siteLink} /> traite des Donn&eacute;es Personnelles, <Fragment
+        set:html={siteLink}
+      /> prend toutes les mesures raisonnables pour s'assurer de l'exactitude et de
+      la pertinence des Donn&eacute;es Personnelles au regard des finalit&eacute;s
+      pour lesquelles <Fragment set:html={siteLink} /> les traite.
+    </p>
 
     <h4>7.2 Finalit&eacute; des donn&eacute;es collect&eacute;es</h4>
-    <p><Fragment set:html={siteLink} /> est susceptible de traiter tout ou partie des donn&eacute;es :</p>
+    <p>
+      <Fragment set:html={siteLink} /> est susceptible de traiter tout ou partie des
+      donn&eacute;es :
+    </p>
     <ul>
-      <li>pour permettre la navigation sur le Site et la gestion et la tra&ccedil;abilit&eacute; des prestations et services command&eacute;s par l'utilisateur : donn&eacute;es de connexion et d'utilisation du Site, facturation, historique des commandes, etc.</li>
-      <li>pour pr&eacute;venir et lutter contre la fraude informatique (spamming, hacking&hellip;) : mat&eacute;riel informatique utilis&eacute; pour la navigation, l'adresse IP, le mot de passe (hash&eacute;)</li>
-      <li>pour am&eacute;liorer la navigation sur le Site : donn&eacute;es de connexion et d'utilisation</li>
-      <li>pour mener des enqu&ecirc;tes de satisfaction facultatives sur <Fragment set:html={siteLink} /> : adresse email</li>
-      <li>pour mener des campagnes de communication (sms, mail) : num&eacute;ro de t&eacute;l&eacute;phone, adresse email</li>
+      <li>
+        pour permettre la navigation sur le Site et la gestion et la
+        tra&ccedil;abilit&eacute; des prestations et services command&eacute;s
+        par l'utilisateur : donn&eacute;es de connexion et d'utilisation du
+        Site, facturation, historique des commandes, etc.
+      </li>
+      <li>
+        pour pr&eacute;venir et lutter contre la fraude informatique (spamming,
+        hacking&hellip;) : mat&eacute;riel informatique utilis&eacute; pour la
+        navigation, l'adresse IP, le mot de passe (hash&eacute;)
+      </li>
+      <li>
+        pour am&eacute;liorer la navigation sur le Site : donn&eacute;es de
+        connexion et d'utilisation
+      </li>
+      <li>
+        pour mener des enqu&ecirc;tes de satisfaction facultatives sur <Fragment
+          set:html={siteLink}
+        /> : adresse email
+      </li>
+      <li>
+        pour mener des campagnes de communication (sms, mail) : num&eacute;ro de
+        t&eacute;l&eacute;phone, adresse email
+      </li>
     </ul>
-    <p><Fragment set:html={siteLink} /> ne commercialise pas vos donn&eacute;es personnelles qui sont donc uniquement utilis&eacute;es par n&eacute;cessit&eacute; ou &agrave; des fins statistiques et d'analyses.</p>
+    <p>
+      <Fragment set:html={siteLink} /> ne commercialise pas vos donn&eacute;es personnelles
+      qui sont donc uniquement utilis&eacute;es par n&eacute;cessit&eacute; ou &agrave;
+      des fins statistiques et d'analyses.
+    </p>
 
     <h4>7.3 Droit d'acc&egrave;s, de rectification et d'opposition</h4>
-    <p>Conform&eacute;ment &agrave; la r&eacute;glementation europ&eacute;enne en vigueur, les Utilisateurs de <Fragment set:html={siteLink} /> disposent des droits suivants :</p>
+    <p>
+      Conform&eacute;ment &agrave; la r&eacute;glementation europ&eacute;enne en
+      vigueur, les Utilisateurs de <Fragment set:html={siteLink} /> disposent des
+      droits suivants :
+    </p>
     <ul>
-      <li>droit d'acc&egrave;s (article 15 RGPD) et de rectification (article 16 RGPD), de mise &agrave; jour, de compl&eacute;tude des donn&eacute;es des Utilisateurs</li>
-      <li>droit de verrouillage ou d'effacement des donn&eacute;es des Utilisateurs &agrave; caract&egrave;re personnel (article 17 du RGPD), lorsqu'elles sont inexactes, incompl&egrave;tes, &eacute;quivoques, p&eacute;rim&eacute;es, ou dont la collecte, l'utilisation, la communication ou la conservation est interdite</li>
-      <li>droit de retirer &agrave; tout moment un consentement (article 13-2c RGPD)</li>
-      <li>droit &agrave; la limitation du traitement des donn&eacute;es des Utilisateurs (article 18 RGPD)</li>
-      <li>droit d'opposition au traitement des donn&eacute;es des Utilisateurs (article 21 RGPD)</li>
-      <li>droit &agrave; la portabilit&eacute; des donn&eacute;es que les Utilisateurs auront fournies, lorsque ces donn&eacute;es font l'objet de traitements automatis&eacute;s fond&eacute;s sur leur consentement ou sur un contrat (article 20 RGPD)</li>
-      <li>droit de d&eacute;finir le sort des donn&eacute;es des Utilisateurs apr&egrave;s leur mort et de choisir &agrave; qui <Fragment set:html={siteLink} /> devra communiquer (ou non) ses donn&eacute;es &agrave; un tiers qu'ils aura pr&eacute;alablement d&eacute;sign&eacute;</li>
+      <li>
+        droit d'acc&egrave;s (article 15 RGPD) et de rectification (article 16
+        RGPD), de mise &agrave; jour, de compl&eacute;tude des donn&eacute;es
+        des Utilisateurs
+      </li>
+      <li>
+        droit de verrouillage ou d'effacement des donn&eacute;es des
+        Utilisateurs &agrave; caract&egrave;re personnel (article 17 du RGPD),
+        lorsqu'elles sont inexactes, incompl&egrave;tes, &eacute;quivoques,
+        p&eacute;rim&eacute;es, ou dont la collecte, l'utilisation, la
+        communication ou la conservation est interdite
+      </li>
+      <li>
+        droit de retirer &agrave; tout moment un consentement (article 13-2c
+        RGPD)
+      </li>
+      <li>
+        droit &agrave; la limitation du traitement des donn&eacute;es des
+        Utilisateurs (article 18 RGPD)
+      </li>
+      <li>
+        droit d'opposition au traitement des donn&eacute;es des Utilisateurs
+        (article 21 RGPD)
+      </li>
+      <li>
+        droit &agrave; la portabilit&eacute; des donn&eacute;es que les
+        Utilisateurs auront fournies, lorsque ces donn&eacute;es font l'objet de
+        traitements automatis&eacute;s fond&eacute;s sur leur consentement ou
+        sur un contrat (article 20 RGPD)
+      </li>
+      <li>
+        droit de d&eacute;finir le sort des donn&eacute;es des Utilisateurs
+        apr&egrave;s leur mort et de choisir &agrave; qui <Fragment
+          set:html={siteLink}
+        /> devra communiquer (ou non) ses donn&eacute;es &agrave; un tiers qu'ils
+        aura pr&eacute;alablement d&eacute;sign&eacute;
+      </li>
     </ul>
-    <p>D&egrave;s que <Fragment set:html={siteLink} /> a connaissance du d&eacute;c&egrave;s d'un Utilisateur et &agrave; d&eacute;faut d'instructions de sa part, <Fragment set:html={siteLink} /> s'engage &agrave; d&eacute;truire ses donn&eacute;es, sauf si leur conservation s'av&egrave;re n&eacute;cessaire &agrave; des fins probatoires ou pour r&eacute;pondre &agrave; une obligation l&eacute;gale.</p>
-    <p>Si l'Utilisateur souhaite savoir comment <Fragment set:html={siteLink} /> utilise ses Donn&eacute;es Personnelles, demander &agrave; les rectifier ou s'oppose &agrave; leur traitement, l'Utilisateur peut contacter <Fragment set:html={siteLink} /> par &eacute;crit &agrave; l'adresse suivante :</p>
-    <p>{ownerName} &ndash; DPO, {dpoName}<br/>{ownerAddress}.</p>
-    <p>Dans ce cas, l'Utilisateur doit indiquer les Donn&eacute;es Personnelles qu'il souhaiterait que <Fragment set:html={siteLink} /> corrige, mette &agrave; jour ou supprime, en s'identifiant pr&eacute;cis&eacute;ment avec une copie d'une pi&egrave;ce d'identit&eacute; (carte d'identit&eacute; ou passeport).</p>
-    <p>Les demandes de suppression de Donn&eacute;es Personnelles seront soumises aux obligations qui sont impos&eacute;es &agrave; <Fragment set:html={siteLink} /> par la loi, notamment en mati&egrave;re de conservation ou d'archivage des documents. Enfin, les Utilisateurs de <Fragment set:html={siteLink} /> peuvent d&eacute;poser une r&eacute;clamation aupr&egrave;s des autorit&eacute;s de contr&ocirc;le, et notamment de la CNIL (https://www.cnil.fr/fr/plaintes).</p>
+    <p>
+      D&egrave;s que <Fragment set:html={siteLink} /> a connaissance du d&eacute;c&egrave;s
+      d'un Utilisateur et &agrave; d&eacute;faut d'instructions de sa part, <Fragment
+        set:html={siteLink}
+      /> s'engage &agrave; d&eacute;truire ses donn&eacute;es, sauf si leur conservation
+      s'av&egrave;re n&eacute;cessaire &agrave; des fins probatoires ou pour r&eacute;pondre
+      &agrave; une obligation l&eacute;gale.
+    </p>
+    <p>
+      Si l'Utilisateur souhaite savoir comment <Fragment set:html={siteLink} /> utilise
+      ses Donn&eacute;es Personnelles, demander &agrave; les rectifier ou s'oppose
+      &agrave; leur traitement, l'Utilisateur peut contacter <Fragment
+        set:html={siteLink}
+      /> par &eacute;crit &agrave; l'adresse suivante :
+    </p>
+    <p>{ownerName} &ndash; DPO, {dpoName}<br />{ownerAddress}.</p>
+    <p>
+      Dans ce cas, l'Utilisateur doit indiquer les Donn&eacute;es Personnelles
+      qu'il souhaiterait que <Fragment set:html={siteLink} /> corrige, mette &agrave;
+      jour ou supprime, en s'identifiant pr&eacute;cis&eacute;ment avec une copie
+      d'une pi&egrave;ce d'identit&eacute; (carte d'identit&eacute; ou passeport).
+    </p>
+    <p>
+      Les demandes de suppression de Donn&eacute;es Personnelles seront soumises
+      aux obligations qui sont impos&eacute;es &agrave; <Fragment
+        set:html={siteLink}
+      /> par la loi, notamment en mati&egrave;re de conservation ou d'archivage des
+      documents. Enfin, les Utilisateurs de <Fragment set:html={siteLink} /> peuvent
+      d&eacute;poser une r&eacute;clamation aupr&egrave;s des autorit&eacute;s de
+      contr&ocirc;le, et notamment de la CNIL (https://www.cnil.fr/fr/plaintes).
+    </p>
 
     <h4>7.4 Non-communication des donn&eacute;es personnelles</h4>
-    <p><Fragment set:html={siteLink} /> s'interdit de traiter, h&eacute;berger ou transf&eacute;rer les Informations collect&eacute;es sur ses Clients vers un pays situ&eacute; en dehors de l'Union europ&eacute;enne ou reconnu comme &laquo; non ad&eacute;quat &raquo; par la Commission europ&eacute;enne sans en informer pr&eacute;alablement le client. Pour autant, <Fragment set:html={siteLink} /> reste libre du choix de ses sous-traitants techniques et commerciaux &agrave; la condition qu'il pr&eacute;sentent les garanties suffisantes au regard des exigences du R&egrave;glement G&eacute;n&eacute;ral sur la Protection des Donn&eacute;es (RGPD : n&deg; 2016-679).</p>
-    <p><Fragment set:html={siteLink} /> s'engage &agrave; prendre toutes les pr&eacute;cautions n&eacute;cessaires afin de pr&eacute;server la s&eacute;curit&eacute; des Informations et notamment qu'elles ne soient pas communiqu&eacute;es &agrave; des personnes non autoris&eacute;es. Cependant, si un incident impactant l'int&eacute;grit&eacute; ou la confidentialit&eacute; des Informations du Client est port&eacute;e &agrave; la connaissance de <Fragment set:html={siteLink} />, celle-ci devra dans les meilleurs d&eacute;lais informer le Client et lui communiquer les mesures de corrections prises. Par ailleurs <Fragment set:html={siteLink} /> ne collecte aucune &laquo; donn&eacute;es sensibles &raquo;.</p>
-    <p>Les Donn&eacute;es Personnelles de l'Utilisateur peuvent &ecirc;tre trait&eacute;es par des filiales de <Fragment set:html={siteLink} /> et des sous-traitants (prestataires de services), exclusivement afin de r&eacute;aliser les finalit&eacute;s de la pr&eacute;sente politique.</p>
-    <p>Dans la limite de leurs attributions respectives et pour les finalit&eacute;s rappel&eacute;es ci-dessus, les principales personnes susceptibles d'avoir acc&egrave;s aux donn&eacute;es des Utilisateurs de <Fragment set:html={siteLink} /> sont principalement les agents de notre service client.</p>
+    <p>
+      <Fragment set:html={siteLink} /> s'interdit de traiter, h&eacute;berger ou transf&eacute;rer
+      les Informations collect&eacute;es sur ses Clients vers un pays situ&eacute;
+      en dehors de l'Union europ&eacute;enne ou reconnu comme &laquo; non ad&eacute;quat
+      &raquo; par la Commission europ&eacute;enne sans en informer pr&eacute;alablement
+      le client. Pour autant, <Fragment set:html={siteLink} /> reste libre du choix
+      de ses sous-traitants techniques et commerciaux &agrave; la condition qu'il
+      pr&eacute;sentent les garanties suffisantes au regard des exigences du R&egrave;glement
+      G&eacute;n&eacute;ral sur la Protection des Donn&eacute;es (RGPD : n&deg; 2016-679).
+    </p>
+    <p>
+      <Fragment set:html={siteLink} /> s'engage &agrave; prendre toutes les pr&eacute;cautions
+      n&eacute;cessaires afin de pr&eacute;server la s&eacute;curit&eacute; des Informations
+      et notamment qu'elles ne soient pas communiqu&eacute;es &agrave; des personnes
+      non autoris&eacute;es. Cependant, si un incident impactant l'int&eacute;grit&eacute;
+      ou la confidentialit&eacute; des Informations du Client est port&eacute;e &agrave;
+      la connaissance de <Fragment set:html={siteLink} />, celle-ci devra dans
+      les meilleurs d&eacute;lais informer le Client et lui communiquer les
+      mesures de corrections prises. Par ailleurs <Fragment
+        set:html={siteLink}
+      /> ne collecte aucune &laquo; donn&eacute;es sensibles &raquo;.
+    </p>
+    <p>
+      Les Donn&eacute;es Personnelles de l'Utilisateur peuvent &ecirc;tre
+      trait&eacute;es par des filiales de <Fragment set:html={siteLink} /> et des
+      sous-traitants (prestataires de services), exclusivement afin de r&eacute;aliser
+      les finalit&eacute;s de la pr&eacute;sente politique.
+    </p>
+    <p>
+      Dans la limite de leurs attributions respectives et pour les
+      finalit&eacute;s rappel&eacute;es ci-dessus, les principales personnes
+      susceptibles d'avoir acc&egrave;s aux donn&eacute;es des Utilisateurs de <Fragment
+        set:html={siteLink}
+      /> sont principalement les agents de notre service client.
+    </p>
 
     <h4>7.5 Types de donn&eacute;es collect&eacute;es</h4>
-    <p>Concernant les utilisateurs d'un Site <Fragment set:html={siteLink} />, nous collectons les donn&eacute;es suivantes qui sont indispensables au fonctionnement du service, et qui seront conserv&eacute;es pendant une p&eacute;riode maximale de 72 mois apr&egrave;s la fin de la relation contractuelle.</p>
-    <p><Fragment set:html={siteLink} /> collecte en outre des informations qui permettent d'am&eacute;liorer l'exp&eacute;rience utilisateur et de proposer des conseils contextualis&eacute;s.</p>
-    <p>Ces donn&eacute;es sont conserv&eacute;es pour une p&eacute;riode maximale de 72 mois apr&egrave;s la fin de la relation contractuelle.</p>
+    <p>
+      Concernant les utilisateurs d'un Site <Fragment set:html={siteLink} />,
+      nous collectons les donn&eacute;es suivantes qui sont indispensables au
+      fonctionnement du service, et qui seront conserv&eacute;es pendant une
+      p&eacute;riode maximale de 72 mois apr&egrave;s la fin de la relation
+      contractuelle.
+    </p>
+    <p>
+      <Fragment set:html={siteLink} /> collecte en outre des informations qui permettent
+      d'am&eacute;liorer l'exp&eacute;rience utilisateur et de proposer des conseils
+      contextualis&eacute;s.
+    </p>
+    <p>
+      Ces donn&eacute;es sont conserv&eacute;es pour une p&eacute;riode maximale
+      de 72 mois apr&egrave;s la fin de la relation contractuelle.
+    </p>
 
     <h3>8. Notification d'incident</h3>
-    <p>Quels que soient les efforts fournis, aucune m&eacute;thode de transmission sur Internet et aucune m&eacute;thode de stockage &eacute;lectronique n'est compl&egrave;tement s&ucirc;re. Nous ne pouvons en cons&eacute;quence pas garantir une s&eacute;curit&eacute; absolue. Si nous prenions connaissance d'une br&egrave;che de la s&eacute;curit&eacute;, nous avertirions les utilisateurs concern&eacute;s afin qu'ils puissent prendre les mesures appropri&eacute;es. Nos proc&eacute;dures de notification d'incident tiennent compte de nos obligations l&eacute;gales, qu'elles se situent au niveau national ou europ&eacute;en. Nous nous engageons &agrave; informer pleinement nos clients de toutes les questions relevant de la s&eacute;curit&eacute; de leur compte et &agrave; leur fournir toutes les informations n&eacute;cessaires pour les aider &agrave; respecter leurs propres obligations r&eacute;glementaires en mati&egrave;re de reporting.</p>
-    <p>Aucune information personnelle de l'utilisateur du site <Fragment set:html={siteLink} /> n'est publi&eacute;e &agrave; l'insu de l'utilisateur, &eacute;chang&eacute;e, transf&eacute;r&eacute;e, c&eacute;d&eacute;e ou vendue sur un support quelconque &agrave; des tiers. Seule l'hypoth&egrave;se du rachat de <Fragment set:html={siteLink} /> et de ses droits permettrait la transmission des dites informations &agrave; l'&eacute;ventuel acqu&eacute;reur qui serait &agrave; son tour tenu de la m&ecirc;me obligation de conservation et de modification des donn&eacute;es vis &agrave; vis de l'utilisateur du site <Fragment set:html={siteLink} />.</p>
+    <p>
+      Quels que soient les efforts fournis, aucune m&eacute;thode de
+      transmission sur Internet et aucune m&eacute;thode de stockage
+      &eacute;lectronique n'est compl&egrave;tement s&ucirc;re. Nous ne pouvons
+      en cons&eacute;quence pas garantir une s&eacute;curit&eacute; absolue. Si
+      nous prenions connaissance d'une br&egrave;che de la
+      s&eacute;curit&eacute;, nous avertirions les utilisateurs concern&eacute;s
+      afin qu'ils puissent prendre les mesures appropri&eacute;es. Nos
+      proc&eacute;dures de notification d'incident tiennent compte de nos
+      obligations l&eacute;gales, qu'elles se situent au niveau national ou
+      europ&eacute;en. Nous nous engageons &agrave; informer pleinement nos
+      clients de toutes les questions relevant de la s&eacute;curit&eacute; de
+      leur compte et &agrave; leur fournir toutes les informations
+      n&eacute;cessaires pour les aider &agrave; respecter leurs propres
+      obligations r&eacute;glementaires en mati&egrave;re de reporting.
+    </p>
+    <p>
+      Aucune information personnelle de l'utilisateur du site <Fragment
+        set:html={siteLink}
+      /> n'est publi&eacute;e &agrave; l'insu de l'utilisateur, &eacute;chang&eacute;e,
+      transf&eacute;r&eacute;e, c&eacute;d&eacute;e ou vendue sur un support quelconque
+      &agrave; des tiers. Seule l'hypoth&egrave;se du rachat de <Fragment
+        set:html={siteLink}
+      /> et de ses droits permettrait la transmission des dites informations &agrave;
+      l'&eacute;ventuel acqu&eacute;reur qui serait &agrave; son tour tenu de la m&ecirc;me
+      obligation de conservation et de modification des donn&eacute;es vis &agrave;
+      vis de l'utilisateur du site <Fragment set:html={siteLink} />.
+    </p>
     <p><strong>S&eacute;curit&eacute;</strong></p>
-    <p>Pour assurer la s&eacute;curit&eacute; et la confidentialit&eacute; des Donn&eacute;es Personnelles et des Donn&eacute;es Personnelles de Sant&eacute;, <Fragment set:html={siteLink} /> utilise des r&eacute;seaux prot&eacute;g&eacute;s par des dispositifs standards tels que par pare-feu, la pseudonymisation, l'encryption et mot de passe.</p>
-    <p>Lors du traitement des Donn&eacute;es Personnelles, <Fragment set:html={siteLink} /> prend toutes les mesures raisonnables visant &agrave; les prot&eacute;ger contre toute perte, utilisation d&eacute;tourn&eacute;e, acc&egrave;s non autoris&eacute;, divulgation, alt&eacute;ration ou destruction.</p>
+    <p>
+      Pour assurer la s&eacute;curit&eacute; et la confidentialit&eacute; des
+      Donn&eacute;es Personnelles et des Donn&eacute;es Personnelles de
+      Sant&eacute;, <Fragment set:html={siteLink} /> utilise des r&eacute;seaux prot&eacute;g&eacute;s
+      par des dispositifs standards tels que par pare-feu, la pseudonymisation, l'encryption
+      et mot de passe.
+    </p>
+    <p>
+      Lors du traitement des Donn&eacute;es Personnelles, <Fragment
+        set:html={siteLink}
+      /> prend toutes les mesures raisonnables visant &agrave; les prot&eacute;ger
+      contre toute perte, utilisation d&eacute;tourn&eacute;e, acc&egrave;s non autoris&eacute;,
+      divulgation, alt&eacute;ration ou destruction.
+    </p>
 
-    <h3>9. Liens hypertextes &laquo; cookies &raquo; et balises (&quot;tags&quot;) internet</h3>
-    <p>Le site <Fragment set:html={siteLink} /> contient un certain nombre de liens hypertextes vers d'autres sites, mis en place avec l'autorisation de <Fragment set:html={siteLink} />. Cependant, <Fragment set:html={siteLink} /> n'a pas la possibilit&eacute; de v&eacute;rifier le contenu des sites ainsi visit&eacute;s, et n'assumera en cons&eacute;quence aucune responsabilit&eacute; de ce fait.</p>
-    <p>Sauf si vous d&eacute;cidez de d&eacute;sactiver les cookies, vous acceptez que le site puisse les utiliser. Vous pouvez &agrave; tout moment d&eacute;sactiver ces cookies et ce gratuitement &agrave; partir des possibilit&eacute;s de d&eacute;sactivation qui vous sont offertes et rappel&eacute;es ci-apr&egrave;s, sachant que cela peut r&eacute;duire ou emp&ecirc;cher l'accessibilit&eacute; &agrave; tout ou partie des Services propos&eacute;s par le site.</p>
+    <h3>
+      9. Liens hypertextes &laquo; cookies &raquo; et balises (&quot;tags&quot;)
+      internet
+    </h3>
+    <p>
+      Le site <Fragment set:html={siteLink} /> contient un certain nombre de liens
+      hypertextes vers d'autres sites, mis en place avec l'autorisation de <Fragment
+        set:html={siteLink}
+      />. Cependant, <Fragment set:html={siteLink} /> n'a pas la possibilit&eacute;
+      de v&eacute;rifier le contenu des sites ainsi visit&eacute;s, et n'assumera
+      en cons&eacute;quence aucune responsabilit&eacute; de ce fait.
+    </p>
+    <p>
+      Sauf si vous d&eacute;cidez de d&eacute;sactiver les cookies, vous
+      acceptez que le site puisse les utiliser. Vous pouvez &agrave; tout moment
+      d&eacute;sactiver ces cookies et ce gratuitement &agrave; partir des
+      possibilit&eacute;s de d&eacute;sactivation qui vous sont offertes et
+      rappel&eacute;es ci-apr&egrave;s, sachant que cela peut r&eacute;duire ou
+      emp&ecirc;cher l'accessibilit&eacute; &agrave; tout ou partie des Services
+      propos&eacute;s par le site.
+    </p>
 
     <h4>9.1. &laquo; COOKIES &raquo;</h4>
-    <p>Un &laquo; cookie &raquo; est un petit fichier d'information envoy&eacute; sur le navigateur de l'Utilisateur et enregistr&eacute; au sein du terminal de l'Utilisateur (ex : ordinateur, smartphone), (ci-apr&egrave;s &laquo; Cookies &raquo;). Ce fichier comprend des informations telles que le nom de domaine de l'Utilisateur, le fournisseur d'acc&egrave;s Internet de l'Utilisateur, le syst&egrave;me d'exploitation de l'Utilisateur, ainsi que la date et l'heure d'acc&egrave;s. Les Cookies ne risquent en aucun cas d'endommager le terminal de l'Utilisateur.</p>
-    <p><Fragment set:html={siteLink} /> est susceptible de traiter les informations de l'Utilisateur concernant sa visite du Site, telles que les pages consult&eacute;es, les recherches effectu&eacute;es. Ces informations permettent &agrave; <Fragment set:html={siteLink} /> d'am&eacute;liorer le contenu du Site, de la navigation de l'Utilisateur.</p>
-    <p>Les Cookies facilitant la navigation et/ou la fourniture des services propos&eacute;s par le Site, l'Utilisateur peut configurer son navigateur pour qu'il lui permette de d&eacute;cider s'il souhaite ou non les accepter de mani&egrave;re &agrave; ce que des Cookies soient enregistr&eacute;s dans le terminal ou, au contraire, qu'ils soient rejet&eacute;s, soit syst&eacute;matiquement, soit selon leur &eacute;metteur. L'Utilisateur peut &eacute;galement configurer son logiciel de navigation de mani&egrave;re &agrave; ce que l'acceptation ou le refus des Cookies lui soient propos&eacute;s ponctuellement, avant qu'un Cookie soit susceptible d'&ecirc;tre enregistr&eacute; dans son terminal. <Fragment set:html={siteLink} /> informe l'Utilisateur que, dans ce cas, il se peut que les fonctionnalit&eacute;s de son logiciel de navigation ne soient pas toutes disponibles.</p>
-    <p>Si l'Utilisateur refuse l'enregistrement de Cookies dans son terminal ou son navigateur, ou si l'Utilisateur supprime ceux qui y sont enregistr&eacute;s, l'Utilisateur est inform&eacute; que sa navigation et son exp&eacute;rience sur le Site peuvent &ecirc;tre limit&eacute;es. Cela pourrait &eacute;galement &ecirc;tre le cas lorsque <Fragment set:html={siteLink} /> ou l'un de ses prestataires ne peut pas reconna&icirc;tre, &agrave; des fins de compatibilit&eacute; technique, le type de navigateur utilis&eacute; par le terminal, les param&egrave;tres de langue et d'affichage ou le pays depuis lequel le terminal semble connect&eacute; &agrave; Internet.</p>
-    <p>Le cas &eacute;ch&eacute;ant, <Fragment set:html={siteLink} /> d&eacute;cline toute responsabilit&eacute; pour les cons&eacute;quences li&eacute;es au fonctionnement d&eacute;grad&eacute; du Site et des services &eacute;ventuellement propos&eacute;s par <Fragment set:html={siteLink} />, r&eacute;sultant (i) du refus de Cookies par l'Utilisateur (ii) de l'impossibilit&eacute; pour <Fragment set:html={siteLink} /> d'enregistrer ou de consulter les Cookies n&eacute;cessaires &agrave; leur fonctionnement du fait du choix de l'Utilisateur. Pour la gestion des Cookies et des choix de l'Utilisateur, la configuration de chaque navigateur est diff&eacute;rente. Elle est d&eacute;crite dans le menu d'aide du navigateur, qui permettra de savoir de quelle mani&egrave;re l'Utilisateur peut modifier ses souhaits en mati&egrave;re de Cookies.</p>
-    <p>&Agrave; tout moment, l'Utilisateur peut faire le choix d'exprimer et de modifier ses souhaits en mati&egrave;re de Cookies. <Fragment set:html={siteLink} /> pourra en outre faire appel aux services de prestataires externes pour l'aider &agrave; recueillir et traiter les informations d&eacute;crites dans cette section.</p>
-    <p>Enfin, en cliquant sur les ic&ocirc;nes d&eacute;di&eacute;es aux r&eacute;seaux sociaux Twitter, Facebook, Linkedin et Google Plus figurant sur le Site de <Fragment set:html={siteLink} /> ou dans son application mobile et si l'Utilisateur a accept&eacute; le d&eacute;p&ocirc;t de cookies en poursuivant sa navigation sur le Site Internet ou l'application mobile de <Fragment set:html={siteLink} />, Twitter, Facebook, Linkedin et Google Plus peuvent &eacute;galement d&eacute;poser des cookies sur vos terminaux (ordinateur, tablette, t&eacute;l&eacute;phone portable).</p>
-    <p>Ces types de cookies ne sont d&eacute;pos&eacute;s sur vos terminaux qu'&agrave; condition que vous y consentiez, en continuant votre navigation sur le Site Internet ou l'application mobile de <Fragment set:html={siteLink} />. &Agrave; tout moment, l'Utilisateur peut n&eacute;anmoins revenir sur son consentement &agrave; ce que <Fragment set:html={siteLink} /> d&eacute;pose ce type de cookies.</p>
+    <p>
+      Un &laquo; cookie &raquo; est un petit fichier d'information envoy&eacute;
+      sur le navigateur de l'Utilisateur et enregistr&eacute; au sein du
+      terminal de l'Utilisateur (ex : ordinateur, smartphone), (ci-apr&egrave;s
+      &laquo; Cookies &raquo;). Ce fichier comprend des informations telles que
+      le nom de domaine de l'Utilisateur, le fournisseur d'acc&egrave;s Internet
+      de l'Utilisateur, le syst&egrave;me d'exploitation de l'Utilisateur, ainsi
+      que la date et l'heure d'acc&egrave;s. Les Cookies ne risquent en aucun
+      cas d'endommager le terminal de l'Utilisateur.
+    </p>
+    <p>
+      <Fragment set:html={siteLink} /> est susceptible de traiter les informations
+      de l'Utilisateur concernant sa visite du Site, telles que les pages consult&eacute;es,
+      les recherches effectu&eacute;es. Ces informations permettent &agrave; <Fragment
+        set:html={siteLink}
+      /> d'am&eacute;liorer le contenu du Site, de la navigation de l'Utilisateur.
+    </p>
+    <p>
+      Les Cookies facilitant la navigation et/ou la fourniture des services
+      propos&eacute;s par le Site, l'Utilisateur peut configurer son navigateur
+      pour qu'il lui permette de d&eacute;cider s'il souhaite ou non les
+      accepter de mani&egrave;re &agrave; ce que des Cookies soient
+      enregistr&eacute;s dans le terminal ou, au contraire, qu'ils soient
+      rejet&eacute;s, soit syst&eacute;matiquement, soit selon leur
+      &eacute;metteur. L'Utilisateur peut &eacute;galement configurer son
+      logiciel de navigation de mani&egrave;re &agrave; ce que l'acceptation ou
+      le refus des Cookies lui soient propos&eacute;s ponctuellement, avant
+      qu'un Cookie soit susceptible d'&ecirc;tre enregistr&eacute; dans son
+      terminal. <Fragment set:html={siteLink} /> informe l'Utilisateur que, dans ce
+      cas, il se peut que les fonctionnalit&eacute;s de son logiciel de navigation
+      ne soient pas toutes disponibles.
+    </p>
+    <p>
+      Si l'Utilisateur refusé l'enregistrement de Cookies dans son terminal ou
+      son navigateur, ou si l'Utilisateur supprime ceux qui y sont
+      enregistr&eacute;s, l'Utilisateur est inform&eacute; que sa navigation et
+      son exp&eacute;rience sur le Site peuvent &ecirc;tre limit&eacute;es. Cela
+      pourrait &eacute;galement &ecirc;tre le cas lorsque <Fragment
+        set:html={siteLink}
+      /> ou l'un de ses prestataires ne peut pas reconna&icirc;tre, &agrave; des fins
+      de compatibilit&eacute; technique, le type de navigateur utilis&eacute; par
+      le terminal, les param&egrave;tres de langue et d'affichage ou le pays depuis
+      lequel le terminal semble connect&eacute; &agrave; Internet.
+    </p>
+    <p>
+      Le cas &eacute;ch&eacute;ant, <Fragment set:html={siteLink} /> d&eacute;cline
+      toute responsabilit&eacute; pour les cons&eacute;quences li&eacute;es au fonctionnement
+      d&eacute;grad&eacute; du Site et des services &eacute;ventuellement propos&eacute;s
+      par <Fragment set:html={siteLink} />, r&eacute;sultant (i) du refus de
+      Cookies par l'Utilisateur (ii) de l'impossibilit&eacute; pour <Fragment
+        set:html={siteLink}
+      /> d'enregistrer ou de consulter les Cookies n&eacute;cessaires &agrave; leur
+      fonctionnement du fait du choix de l'Utilisateur. Pour la gestion des Cookies
+      et des choix de l'Utilisateur, la configuration de chaque navigateur est diff&eacute;rente.
+      Elle est d&eacute;crite dans le menu d'aide du navigateur, qui permettra de
+      savoir de quelle mani&egrave;re l'Utilisateur peut modifier ses souhaits en
+      mati&egrave;re de Cookies.
+    </p>
+    <p>
+      &Agrave; tout moment, l'Utilisateur peut faire le choix d'exprimer et de
+      modifier ses souhaits en mati&egrave;re de Cookies. <Fragment
+        set:html={siteLink}
+      /> pourra en outre faire appel aux services de prestataires externes pour l'aider
+      &agrave; recueillir et traiter les informations d&eacute;crites dans cette section.
+    </p>
+    <p>
+      Enfin, en cliquant sur les ic&ocirc;nes d&eacute;di&eacute;es aux
+      r&eacute;seaux sociaux Twitter, Facebook, Linkedin et Google Plus figurant
+      sur le Site de <Fragment set:html={siteLink} /> ou dans son application mobile
+      et si l'Utilisateur a accept&eacute; le d&eacute;p&ocirc;t de cookies en poursuivant
+      sa navigation sur le Site Internet ou l'application mobile de <Fragment
+        set:html={siteLink}
+      />, Twitter, Facebook, Linkedin et Google Plus peuvent &eacute;galement
+      d&eacute;poser des cookies sur vos terminaux (ordinateur, tablette,
+      t&eacute;l&eacute;phone portable).
+    </p>
+    <p>
+      Ces types de cookies ne sont d&eacute;pos&eacute;s sur vos terminaux
+      qu'&agrave; condition que vous y consentiez, en continuant votre
+      navigation sur le Site Internet ou l'application mobile de <Fragment
+        set:html={siteLink}
+      />. &Agrave; tout moment, l'Utilisateur peut n&eacute;anmoins revenir sur
+      son consentement &agrave; ce que <Fragment set:html={siteLink} /> d&eacute;pose
+      ce type de cookies.
+    </p>
 
     <h4>Article 9.2. BALISES (&quot;TAGS&quot;) INTERNET</h4>
-    <p><Fragment set:html={siteLink} /> peut employer occasionnellement des balises Internet (&eacute;galement appel&eacute;es &laquo; tags &raquo;, ou balises d'action, GIF &agrave; un pixel, GIF transparents, GIF invisibles et GIF un &agrave; un) et les d&eacute;ployer par l'interm&eacute;diaire d'un partenaire sp&eacute;cialiste d'analyses Web susceptible de se trouver (et donc de stocker les informations correspondantes, y compris l'adresse IP de l'Utilisateur) dans un pays &eacute;tranger.</p>
-    <p>Ces balises sont plac&eacute;es &agrave; la fois dans les publicit&eacute;s en ligne permettant aux internautes d'acc&eacute;der au Site, et sur les diff&eacute;rentes pages de celui-ci.</p>
-    <p>Cette technologie permet &agrave; <Fragment set:html={siteLink} /> d'&eacute;valuer les r&eacute;ponses des visiteurs face au Site et l'efficacit&eacute; de ses actions (par exemple, le nombre de fois o&ugrave; une page est ouverte et les informations consult&eacute;es), ainsi que l'utilisation de ce Site par l'Utilisateur.</p>
-    <p>Le prestataire externe pourra &eacute;ventuellement recueillir des informations sur les visiteurs du Site et d'autres sites Internet gr&acirc;ce &agrave; ces balises, constituer des rapports sur l'activit&eacute; du Site &agrave; l'attention de <Fragment set:html={siteLink} />, et fournir d'autres services relatifs &agrave; l'utilisation de celui-ci et d'Internet.</p>
+    <p>
+      <Fragment set:html={siteLink} /> peut employer occasionnellement des balises
+      Internet (&eacute;galement appel&eacute;es &laquo; tags &raquo;, ou balises
+      d'action, GIF &agrave; un pixel, GIF transparents, GIF invisibles et GIF un
+      &agrave; un) et les d&eacute;ployer par l'interm&eacute;diaire d'un partenaire
+      sp&eacute;cialiste d'analyses Web susceptible de se trouver (et donc de stocker
+      les informations correspondantes, y compris l'adresse IP de l'Utilisateur) dans
+      un pays &eacute;tranger.
+    </p>
+    <p>
+      Ces balises sont plac&eacute;es &agrave; la fois dans les
+      publicit&eacute;s en ligne permettant aux internautes d'acc&eacute;der au
+      Site, et sur les diff&eacute;rentes pages de celui-ci.
+    </p>
+    <p>
+      Cette technologie permet &agrave; <Fragment set:html={siteLink} /> d'&eacute;valuer
+      les r&eacute;ponses des visiteurs face au Site et l'efficacit&eacute; de ses
+      actions (par exemple, le nombre de fois o&ugrave; une page est ouverte et les
+      informations consult&eacute;es), ainsi que l'utilisation de ce Site par l'Utilisateur.
+    </p>
+    <p>
+      Le prestataire externe pourra &eacute;ventuellement recueillir des
+      informations sur les visiteurs du Site et d'autres sites Internet
+      gr&acirc;ce &agrave; ces balises, constituer des rapports sur
+      l'activit&eacute; du Site &agrave; l'attention de <Fragment
+        set:html={siteLink}
+      />, et fournir d'autres services relatifs &agrave; l'utilisation de
+      celui-ci et d'Internet.
+    </p>
 
     <h3>10. Droit applicable et attribution de juridiction.</h3>
-    <p>Tout litige en relation avec l'utilisation du site <Fragment set:html={siteLink} /> est soumis au droit fran&ccedil;ais.{jurisdiction && ` En dehors des cas o\u00F9 la loi ne le permet pas, il est fait attribution exclusive de juridiction aux tribunaux comp\u00E9tents de ${jurisdiction}.`}</p>
+    <p>
+      Tout litige en relation avec l'utilisation du site <Fragment
+        set:html={siteLink}
+      /> est soumis au droit fran&ccedil;ais.{
+        jurisdiction &&
+          ` En dehors des cas o\u00F9 la loi ne le permet pas, il est fait attribution exclusive de juridiction aux tribunaux comp\u00E9tents de ${jurisdiction}.`
+      }
+    </p>
   </div>
 </NicklModuleWrapper>
 

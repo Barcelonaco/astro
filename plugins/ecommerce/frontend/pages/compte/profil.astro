@@ -2,34 +2,53 @@
 /**
  * /compte/profil — edit profile + change password.
  */
-import BaseHead from '@frontend/components/BaseHead.astro'
-import Header from '@frontend/components/Header.astro'
-import Footer from '@frontend/components/Footer.astro'
-import SiteOverlays from '@frontend/components/SiteOverlays.astro'
-import DeferredLoader from '@frontend/components/DeferredLoader.astro'
-import AccountNav from '@plugins/ecommerce/frontend/components/AccountNav.astro'
-import { SITE_TITLE } from '@frontend/consts'
-import { getFrontendBootstrap } from '@frontend/lib/api'
-import { setDefaultImageUrl } from '@frontend/lib/module-helpers'
-import '@plugins/ecommerce/frontend/styles/account.css'
+import BaseHead from "@frontend/components/BaseHead.astro";
+import Header from "@frontend/components/Header.astro";
+import Footer from "@frontend/components/Footer.astro";
+import SiteOverlays from "@frontend/components/SiteOverlays.astro";
+import DeferredLoader from "@frontend/components/DeferredLoader.astro";
+import AccountNav from "@plugins/ecommerce/frontend/components/AccountNav.astro";
+import { SITE_TITLE } from "@frontend/consts";
+import { getFrontendBootstrap } from "@frontend/lib/api";
+import { setDefaultImageUrl } from "@frontend/lib/module-helpers";
+import "@plugins/ecommerce/frontend/styles/account.css";
 
-const { siteInfo, styleSettings, siteSettings, navigation, secondaryNavigation } = await getFrontendBootstrap()
-const siteName = siteInfo.siteName || SITE_TITLE
-setDefaultImageUrl(siteSettings.replacement_image || '')
+const {
+  siteInfo,
+  styleSettings,
+  siteSettings,
+  navigation,
+  secondaryNavigation,
+} = await getFrontendBootstrap();
+const siteName = siteInfo.siteName || SITE_TITLE;
+setDefaultImageUrl(siteSettings.replacement_image || "");
 
 const bodyClasses = [
-  siteSettings.rounded === '1' ? 'border-rounded' : '',
-  siteSettings.uppercase === '1' ? 'mode-uppercase' : '',
-].filter(Boolean).join(' ')
+  siteSettings.rounded === "1" ? "border-rounded" : "",
+  siteSettings.uppercase === "1" ? "mode-uppercase" : "",
+]
+  .filter(Boolean)
+  .join(" ");
 ---
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
   <head>
-    <BaseHead title={`Details du compte — ${siteName}`} description="Modifiez vos informations" styleSettings={styleSettings} siteSettings={siteSettings} />
+    <BaseHead
+      title={`Details du compte — ${siteName}`}
+      description="Modifiez vos informations"
+      styleSettings={styleSettings}
+      siteSettings={siteSettings}
+    />
   </head>
   <body class={bodyClasses || undefined}>
-    <Header siteName={siteName} navigation={navigation} secondaryNavigation={secondaryNavigation} siteSettings={siteSettings} styleSettings={styleSettings} />
+    <Header
+      siteName={siteName}
+      navigation={navigation}
+      secondaryNavigation={secondaryNavigation}
+      siteSettings={siteSettings}
+      styleSettings={styleSettings}
+    />
 
     <main class="main-page account-wrap">
       <div class="account-container">
@@ -38,26 +57,211 @@ const bodyClasses = [
           <div class="account-content">
             <h1 class="account-section-title">Details du compte</h1>
 
-            <div id="profile-loading" class="account-loading">Chargement...</div>
+            <div id="profile-loading" class="account-loading">
+              Chargement...
+            </div>
 
-            <form id="profile-form" style="display:none;max-width:520px" novalidate>
+            <form
+              id="profile-form"
+              style="display:none;max-width:520px"
+              novalidate
+            >
               <div class="account-form-row">
-                <div class="account-form-field"><label class="account-form-label">Prenom</label><input class="account-form-input" type="text" name="first_name" /></div>
-                <div class="account-form-field"><label class="account-form-label">Nom</label><input class="account-form-input" type="text" name="last_name" /></div>
+                <div class="account-form-field">
+                  <label class="account-form-label">Prenom</label><input
+                    class="account-form-input"
+                    type="text"
+                    name="first_name"
+                  />
+                </div>
+                <div class="account-form-field">
+                  <label class="account-form-label">Nom</label><input
+                    class="account-form-input"
+                    type="text"
+                    name="last_name"
+                  />
+                </div>
               </div>
-              <div class="account-form-field"><label class="account-form-label">Email</label><input class="account-form-input" type="email" name="email" disabled /></div>
-              <div class="account-form-field"><label class="account-form-label">Telephone</label><input class="account-form-input" type="tel" name="phone" /></div>
-              <div class="account-form-field"><label class="account-form-label">Entreprise</label><input class="account-form-input" type="text" name="company" /></div>
-              <div class="account-form-field"><label class="account-form-label">N° TVA</label><input class="account-form-input" type="text" name="vat_number" /></div>
+              <div class="account-form-field">
+                <label class="account-form-label">Email</label><input
+                  class="account-form-input"
+                  type="email"
+                  name="email"
+                  disabled
+                />
+              </div>
+              <div class="account-form-field">
+                <label class="account-form-label">Telephone</label><input
+                  class="account-form-input"
+                  type="tel"
+                  name="phone"
+                />
+              </div>
+              <div class="account-form-field">
+                <label class="account-form-label">Entreprise</label><input
+                  class="account-form-input"
+                  type="text"
+                  name="company"
+                />
+              </div>
+              <div class="account-form-field">
+                <label class="account-form-label">N° TVA</label><input
+                  class="account-form-input"
+                  type="text"
+                  name="vat_number"
+                />
+              </div>
 
               <fieldset style="border:none;padding:0;margin:28px 0 0">
-                <legend style="font-size:13px;font-weight:600;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid rgba(0,0,0,0.1);width:100%">Changer le mot de passe</legend>
-                <div class="account-form-field"><label class="account-form-label">Mot de passe actuel</label><input class="account-form-input" type="password" name="current_password" autocomplete="current-password" /></div>
-                <div class="account-form-row">
-                  <div class="account-form-field"><label class="account-form-label">Nouveau mot de passe</label><input class="account-form-input" type="password" name="new_password" autocomplete="new-password" minlength="8" /></div>
-                  <div class="account-form-field"><label class="account-form-label">Confirmer</label><input class="account-form-input" type="password" name="new_password_confirm" autocomplete="new-password" minlength="8" /></div>
+                <legend
+                  style="font-size:13px;font-weight:600;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid rgba(0,0,0,0.1);width:100%"
+                  >Changer le mot de passe</legend
+                >
+                <div class="account-form-field">
+                  <label class="account-form-label">Mot de passe actuel</label
+                  ><div class="auth-pw-wrap">
+                    <input
+                      class="account-form-input"
+                      type="password"
+                      name="current_password"
+                      autocomplete="current-password"
+                    /><button
+                      type="button"
+                      class="auth-pw-toggle"
+                      aria-label="Afficher le mot de passe"
+                      ><svg
+                        class="eye-open"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        ><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                        ></path><circle cx="12" cy="12" r="3"></circle></svg
+                      ><svg
+                        class="eye-closed"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        style="display:none"
+                        ><path
+                          d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
+                        ></path><path
+                          d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"
+                        ></path><line x1="1" y1="1" x2="23" y2="23"></line></svg
+                      ></button
+                    >
+                  </div>
                 </div>
-                <span class="account-form-hint">Laissez vide pour ne pas changer.</span>
+                <div class="account-form-row">
+                  <div class="account-form-field">
+                    <label class="account-form-label"
+                      >Nouveau mot de passe</label
+                    ><div class="auth-pw-wrap">
+                      <input
+                        class="account-form-input"
+                        type="password"
+                        name="new_password"
+                        autocomplete="new-password"
+                        minlength="8"
+                      /><button
+                        type="button"
+                        class="auth-pw-toggle"
+                        aria-label="Afficher le mot de passe"
+                        ><svg
+                          class="eye-open"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          ><path
+                            d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                          ></path><circle cx="12" cy="12" r="3"></circle></svg
+                        ><svg
+                          class="eye-closed"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          style="display:none"
+                          ><path
+                            d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
+                          ></path><path
+                            d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"
+                          ></path><line x1="1" y1="1" x2="23" y2="23"
+                          ></line></svg
+                        ></button
+                      >
+                    </div>
+                  </div>
+                  <div class="account-form-field">
+                    <label class="account-form-label">Confirmer</label><div
+                      class="auth-pw-wrap"
+                    >
+                      <input
+                        class="account-form-input"
+                        type="password"
+                        name="new_password_confirm"
+                        autocomplete="new-password"
+                        minlength="8"
+                      /><button
+                        type="button"
+                        class="auth-pw-toggle"
+                        aria-label="Afficher le mot de passe"
+                        ><svg
+                          class="eye-open"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          ><path
+                            d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                          ></path><circle cx="12" cy="12" r="3"></circle></svg
+                        ><svg
+                          class="eye-closed"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          style="display:none"
+                          ><path
+                            d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
+                          ></path><path
+                            d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"
+                          ></path><line x1="1" y1="1" x2="23" y2="23"
+                          ></line></svg
+                        ></button
+                      >
+                    </div>
+                  </div>
+                </div>
+                <span class="account-form-hint"
+                  >Laissez vide pour ne pas changer.</span
+                >
               </fieldset>
 
               <label class="account-form-check" style="margin-top:16px">
@@ -65,30 +269,176 @@ const bodyClasses = [
                 <span>Recevoir les actualites et offres</span>
               </label>
 
-              <div class="account-form-status" id="profile-status" role="status"></div>
-              <button class="account-btn" type="submit" style="margin-top:16px;width:100%">Enregistrer les modifications</button>
+              <div
+                class="account-form-status"
+                id="profile-status"
+                role="status"
+              >
+              </div>
+              <button
+                class="account-btn"
+                type="submit"
+                style="margin-top:16px;width:100%"
+                >Enregistrer les modifications</button
+              >
             </form>
 
-            <div class="account-danger-zone" style="margin-top:40px;padding-top:24px;border-top:1px solid rgba(0,0,0,0.1)">
-              <h2 style="font-size:16px;font-weight:600;margin:0 0 8px;color:#b91c1c">Suppression du compte</h2>
-              <p style="font-size:13px;color:var(--color-text-muted,#6b6b67);margin-bottom:16px">
-                Conformement au RGPD, vous pouvez demander la suppression de votre compte et de vos donnees personnelles.
-                Vos commandes seront conservees de maniere anonymisee pour des raisons legales.
+            <div
+              id="pro-section"
+              style="display:none;margin-top:32px;padding-top:24px;border-top:1px solid rgba(0,0,0,0.1);max-width:520px"
+            >
+              <h2 style="font-size:16px;font-weight:600;margin:0 0 16px">
+                Compte professionnel
+              </h2>
+              <div
+                style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;font-size:13px;margin-bottom:20px"
+              >
+                <div>
+                  <span style="color:var(--color-text-muted,#6b6b67)"
+                    >Statut</span
+                  ><div
+                    id="pro-status-val"
+                    style="font-weight:600;margin-top:4px"
+                  >
+                    —
+                  </div>
+                </div>
+                <div>
+                  <span style="color:var(--color-text-muted,#6b6b67)"
+                    >Palier</span
+                  ><div
+                    id="pro-tier-val"
+                    style="font-weight:600;margin-top:4px"
+                  >
+                    —
+                  </div>
+                </div>
+                <div>
+                  <span style="color:var(--color-text-muted,#6b6b67)"
+                    >Conditions de paiement</span
+                  ><div
+                    id="pro-payment-val"
+                    style="font-weight:600;margin-top:4px"
+                  >
+                    —
+                  </div>
+                </div>
+              </div>
+              <form id="pro-form" style="max-width:520px" novalidate>
+                <div class="account-form-row">
+                  <div class="account-form-field">
+                    <label class="account-form-label">SIRET</label><input
+                      class="account-form-input"
+                      type="text"
+                      name="siret"
+                      maxlength="14"
+                      pattern="\d{14}"
+                    />
+                  </div>
+                  <div class="account-form-field">
+                    <label class="account-form-label">Activite</label>
+                    <select class="account-form-input" name="activity">
+                      <option value="">—</option>
+                      <option value="pisciniste">Pisciniste</option>
+                      <option value="paysagiste">Paysagiste</option>
+                      <option value="batiment">Batiment</option>
+                      <option value="thermique">Thermique</option>
+                      <option value="distributeur">Distributeur</option>
+                      <option value="autre">Autre</option>
+                    </select>
+                  </div>
+                </div>
+                <div
+                  class="account-form-status"
+                  id="pro-form-status"
+                  role="status"
+                >
+                </div>
+                <button
+                  class="account-btn"
+                  type="submit"
+                  style="margin-top:10px;width:100%">Mettre a jour</button
+                >
+              </form>
+            </div>
+
+            <div
+              class="account-danger-zone"
+              style="margin-top:40px;padding-top:24px;border-top:1px solid rgba(0,0,0,0.1)"
+            >
+              <h2
+                style="font-size:16px;font-weight:600;margin:0 0 8px;color:#b91c1c"
+              >
+                Suppression du compte
+              </h2>
+              <p
+                style="font-size:13px;color:var(--color-text-muted,#6b6b67);margin-bottom:16px"
+              >
+                Conformement au RGPD, vous pouvez demander la suppression de
+                votre compte et de vos donnees personnelles. Vos commandes
+                seront conservees de maniere anonymisee pour des raisons
+                legales.
               </p>
-              <button class="account-btn-outline" id="delete-account-btn" style="color:#b91c1c;border-color:#b91c1c" type="button">Supprimer mon compte</button>
-              <div id="delete-confirm" style="display:none;margin-top:16px;padding:16px;background:#fef2f2;border-radius:8px">
-                <p style="font-size:13px;font-weight:600;color:#b91c1c;margin:0 0 12px">Cette action est irreversible. Confirmez avec votre mot de passe :</p>
+              <button
+                class="account-btn-outline"
+                id="delete-account-btn"
+                style="color:#b91c1c;border-color:#b91c1c"
+                type="button">Supprimer mon compte</button
+              >
+              <div
+                id="delete-confirm"
+                style="display:none;margin-top:16px;padding:16px;background:#fef2f2;border-radius:8px"
+              >
+                <p
+                  style="font-size:13px;font-weight:600;color:#b91c1c;margin:0 0 12px"
+                >
+                  Cette action est irreversible. Confirmez avec votre mot de
+                  passe :
+                </p>
                 <div style="position:relative;margin-bottom:12px">
-                  <input class="account-form-input" type="password" id="delete-password" placeholder="Votre mot de passe" style="padding-right:44px" />
-                  <button type="button" id="toggle-delete-pw" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;color:#666" aria-label="Afficher le mot de passe">
-                    <svg id="eye-icon" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <input
+                    class="account-form-input"
+                    type="password"
+                    id="delete-password"
+                    placeholder="Votre mot de passe"
+                    style="padding-right:44px"
+                  />
+                  <button
+                    type="button"
+                    id="toggle-delete-pw"
+                    style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;color:#666"
+                    aria-label="Afficher le mot de passe"
+                  >
+                    <svg
+                      id="eye-icon"
+                      width="20"
+                      height="20"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      viewBox="0 0 24 24"
+                      ><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                      ></path><circle cx="12" cy="12" r="3"></circle></svg
+                    >
                   </button>
                 </div>
                 <div style="display:flex;gap:10px">
-                  <button class="account-btn" id="confirm-delete-btn" style="background:#b91c1c" type="button">Confirmer la suppression</button>
-                  <button class="account-btn-outline" id="cancel-delete-btn" type="button">Annuler</button>
+                  <button
+                    class="account-btn"
+                    id="confirm-delete-btn"
+                    style="background:#b91c1c"
+                    type="button">Confirmer la suppression</button
+                  >
+                  <button
+                    class="account-btn-outline"
+                    id="cancel-delete-btn"
+                    type="button">Annuler</button
+                  >
                 </div>
-                <div id="delete-status" style="font-size:13px;margin-top:8px"></div>
+                <div id="delete-status" style="font-size:13px;margin-top:8px">
+                </div>
               </div>
             </div>
           </div>
@@ -101,119 +451,228 @@ const bodyClasses = [
     <DeferredLoader />
 
     <script>
-      import { getMe, updateProfile, isLoggedIn, deleteAccount, clearToken } from '@plugins/ecommerce/frontend/lib/customer-api'
+      import {
+        getMe,
+        updateProfile,
+        isLoggedIn,
+        deleteAccount,
+        clearToken,
+      } from "@plugins/ecommerce/frontend/lib/customer-api";
 
-      if (!isLoggedIn()) window.location.href = '/compte/connexion?redirect=/compte/profil'
+      if (!isLoggedIn())
+        window.location.href = "/compte/connexion?redirect=/compte/profil";
 
-      const form = document.getElementById('profile-form') as HTMLFormElement
-      const statusEl = document.getElementById('profile-status')!
+      const form = document.getElementById("profile-form") as HTMLFormElement;
+      const statusEl = document.getElementById("profile-status")!;
 
       async function init() {
         try {
-          const c = await getMe()
-          const el = form.elements as any
-          el.first_name.value = c.first_name || ''
-          el.last_name.value = c.last_name || ''
-          el.email.value = c.email || ''
-          el.phone.value = c.phone || ''
-          el.company.value = c.company || ''
-          el.vat_number.value = c.vat_number || ''
-          el.accepts_marketing.checked = !!c.accepts_marketing
+          const c = await getMe();
+          const el = form.elements as any;
+          el.first_name.value = c.first_name || "";
+          el.last_name.value = c.last_name || "";
+          el.email.value = c.email || "";
+          el.phone.value = c.phone || "";
+          el.company.value = c.company || "";
+          el.vat_number.value = c.vat_number || "";
+          el.accepts_marketing.checked = !!c.accepts_marketing;
 
-          document.getElementById('profile-loading')!.style.display = 'none'
-          form.style.display = ''
+          // Pro section
+          if (c.pro_status && c.pro_status !== "none") {
+            const statusLabels: Record<string, string> = {
+              pending: "En attente de verification",
+              approved: "Approuvé",
+              rejected: "Refusé",
+            };
+            const paymentLabels: Record<string, string> = {
+              immediate: "Comptant",
+              net15: "15j apres facturation",
+              net30: "30j apres facturation",
+              net45: "45j apres facturation",
+              net60: "60j apres facturation",
+            };
+            document.getElementById("pro-status-val")!.textContent =
+              statusLabels[c.pro_status] || c.pro_status;
+            document.getElementById("pro-tier-val")!.textContent =
+              c.pro_tier || "Bronze";
+            document.getElementById("pro-payment-val")!.textContent =
+              paymentLabels[c.payment_terms] || c.payment_terms || "Immediat";
+            const proForm = document.getElementById(
+              "pro-form",
+            ) as HTMLFormElement;
+            (proForm.elements as any).siret.value = c.siret || "";
+            (proForm.elements as any).activity.value = c.activity || "";
+            document.getElementById("pro-section")!.style.display = "";
+          }
+
+          document.getElementById("profile-loading")!.style.display = "none";
+          form.style.display = "";
         } catch (err: any) {
-          if (err?.status === 401) { window.location.href = '/compte/connexion'; return }
-          document.getElementById('profile-loading')!.textContent = 'Erreur de chargement.'
+          if (err?.status === 401) {
+            window.location.href = "/compte/connexion";
+            return;
+          }
+          document.getElementById("profile-loading")!.textContent =
+            "Erreur de chargement.";
         }
       }
 
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault()
-        const fd = new FormData(form)
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(form);
         const body: any = {
-          first_name: fd.get('first_name'), last_name: fd.get('last_name'),
-          phone: fd.get('phone'), company: fd.get('company'),
-          vat_number: fd.get('vat_number'), accepts_marketing: !!fd.get('accepts_marketing'),
-        }
+          first_name: fd.get("first_name"),
+          last_name: fd.get("last_name"),
+          phone: fd.get("phone"),
+          company: fd.get("company"),
+          vat_number: fd.get("vat_number"),
+          accepts_marketing: !!fd.get("accepts_marketing"),
+        };
 
-        const newPw = String(fd.get('new_password') || '')
+        const newPw = String(fd.get("new_password") || "");
         if (newPw) {
-          if (newPw !== String(fd.get('new_password_confirm'))) {
-            statusEl.textContent = 'Les mots de passe ne correspondent pas.'
-            statusEl.dataset.kind = 'error'
-            return
+          if (newPw !== String(fd.get("new_password_confirm"))) {
+            statusEl.textContent = "Les mots de passe ne correspondent pas.";
+            statusEl.dataset.kind = "error";
+            return;
           }
           if (newPw.length < 8) {
-            statusEl.textContent = 'Minimum 8 caracteres.'
-            statusEl.dataset.kind = 'error'
-            return
+            statusEl.textContent = "Minimum 8 caracteres.";
+            statusEl.dataset.kind = "error";
+            return;
           }
-          if (!fd.get('current_password')) {
-            statusEl.textContent = 'Mot de passe actuel requis.'
-            statusEl.dataset.kind = 'error'
-            return
+          if (!fd.get("current_password")) {
+            statusEl.textContent = "Mot de passe actuel requis.";
+            statusEl.dataset.kind = "error";
+            return;
           }
-          body.current_password = fd.get('current_password')
-          body.new_password = newPw
+          body.current_password = fd.get("current_password");
+          body.new_password = newPw;
         }
 
-        const btn = form.querySelector('button[type=submit]') as HTMLButtonElement
-        btn.disabled = true
-        statusEl.textContent = ''
+        const btn = form.querySelector(
+          "button[type=submit]",
+        ) as HTMLButtonElement;
+        btn.disabled = true;
+        statusEl.textContent = "";
         try {
-          await updateProfile(body)
-          statusEl.textContent = 'Modifications enregistrees.'
-          statusEl.dataset.kind = 'success'
-          ;(form.elements as any).current_password.value = ''
-          ;(form.elements as any).new_password.value = ''
-          ;(form.elements as any).new_password_confirm.value = ''
+          await updateProfile(body);
+          statusEl.textContent = "Modifications enregistrees.";
+          statusEl.dataset.kind = "success";
+          (form.elements as any).current_password.value = "";
+          (form.elements as any).new_password.value = "";
+          (form.elements as any).new_password_confirm.value = "";
         } catch (err: any) {
-          statusEl.textContent = err?.message || 'Erreur'
-          statusEl.dataset.kind = 'error'
+          statusEl.textContent = err?.message || "Erreur";
+          statusEl.dataset.kind = "error";
         }
-        btn.disabled = false
-      })
+        btn.disabled = false;
+      });
 
-      // ── Password visibility toggle ──────────────────────────────────────
-      document.getElementById('toggle-delete-pw')?.addEventListener('click', () => {
-        const input = document.getElementById('delete-password') as HTMLInputElement
-        const isHidden = input.type === 'password'
-        input.type = isHidden ? 'text' : 'password'
-        const icon = document.getElementById('eye-icon')!
-        icon.innerHTML = isHidden
-          ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
-          : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
-      })
+      // ── Password visibility toggles ─────────────────────────────────────
+      document
+        .querySelectorAll<HTMLButtonElement>(".auth-pw-toggle")
+        .forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const wrap = btn.closest(".auth-pw-wrap")!;
+            const input = wrap.querySelector("input")!;
+            const isVisible = input.type === "text";
+            input.type = isVisible ? "password" : "text";
+            btn.querySelector<SVGElement>(".eye-open")!.style.display =
+              isVisible ? "" : "none";
+            btn.querySelector<SVGElement>(".eye-closed")!.style.display =
+              isVisible ? "none" : "";
+          });
+        });
+      // ── Pro form ──────────────────────────────────────────────────────
+      const proForm = document.getElementById(
+        "pro-form",
+      ) as HTMLFormElement | null;
+      proForm?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(proForm);
+        const proStatus = document.getElementById("pro-form-status")!;
+        const btn = proForm.querySelector(
+          "button[type=submit]",
+        ) as HTMLButtonElement;
+        btn.disabled = true;
+        proStatus.textContent = "";
+        try {
+          await updateProfile({
+            siret: fd.get("siret") as string,
+            activity: fd.get("activity") as string,
+          });
+          proStatus.textContent = "Informations pro mises a jour.";
+          proStatus.dataset.kind = "success";
+        } catch (err: any) {
+          proStatus.textContent = err?.message || "Erreur";
+          proStatus.dataset.kind = "error";
+        }
+        btn.disabled = false;
+      });
+
+      document
+        .getElementById("toggle-delete-pw")
+        ?.addEventListener("click", () => {
+          const input = document.getElementById(
+            "delete-password",
+          ) as HTMLInputElement;
+          const isHidden = input.type === "password";
+          input.type = isHidden ? "text" : "password";
+          const icon = document.getElementById("eye-icon")!;
+          icon.innerHTML = isHidden
+            ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+            : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+        });
 
       // ── Delete account ──────────────────────────────────────────────────
-      document.getElementById('delete-account-btn')?.addEventListener('click', () => {
-        document.getElementById('delete-confirm')!.style.display = ''
-      })
-      document.getElementById('cancel-delete-btn')?.addEventListener('click', () => {
-        document.getElementById('delete-confirm')!.style.display = 'none'
-      })
-      document.getElementById('confirm-delete-btn')?.addEventListener('click', async () => {
-        const pw = (document.getElementById('delete-password') as HTMLInputElement).value
-        const delStatus = document.getElementById('delete-status')!
-        if (!pw) { delStatus.textContent = 'Mot de passe requis.'; delStatus.style.color = '#b91c1c'; return }
-        const btn = document.getElementById('confirm-delete-btn') as HTMLButtonElement
-        btn.disabled = true
-        delStatus.textContent = 'Suppression en cours...'
-        delStatus.style.color = ''
-        try {
-          await deleteAccount(pw)
-          clearToken()
-          localStorage.removeItem('shop_cart_token')
-          window.location.href = '/'
-        } catch (err: any) {
-          delStatus.textContent = err?.message || 'Erreur lors de la suppression.'
-          delStatus.style.color = '#b91c1c'
-          btn.disabled = false
-        }
-      })
+      document
+        .getElementById("delete-account-btn")
+        ?.addEventListener("click", () => {
+          document.getElementById("delete-confirm")!.style.display = "";
+        });
+      document
+        .getElementById("cancel-delete-btn")
+        ?.addEventListener("click", () => {
+          document.getElementById("delete-confirm")!.style.display = "none";
+        });
+      document
+        .getElementById("confirm-delete-btn")
+        ?.addEventListener("click", async () => {
+          const pw = (
+            document.getElementById("delete-password") as HTMLInputElement
+          ).value;
+          const delStatus = document.getElementById("delete-status")!;
+          if (!pw) {
+            delStatus.textContent = "Mot de passe requis.";
+            delStatus.style.color = "#b91c1c";
+            return;
+          }
+          const btn = document.getElementById(
+            "confirm-delete-btn",
+          ) as HTMLButtonElement;
+          btn.disabled = true;
+          delStatus.textContent = "Suppression en cours...";
+          delStatus.style.color = "";
+          try {
+            await deleteAccount(pw);
+            delStatus.textContent = "Compte supprime. Redirection...";
+            delStatus.style.color = "#276022";
+            btn.disabled = true;
+            clearToken();
+            localStorage.removeItem("shop_cart_token");
+            setTimeout(() => {
+              window.location.href = "/";
+            }, 1500);
+          } catch (err: any) {
+            delStatus.textContent =
+              err?.message || "Erreur lors de la suppression.";
+            delStatus.style.color = "#b91c1c";
+            btn.disabled = false;
+          }
+        });
 
-      init()
+      init();
     </script>
   </body>
 </html>

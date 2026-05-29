@@ -14,13 +14,21 @@ const detailView = new CustomerDetailView();
 
 const Swal = window.Swal;
 
-// ── Filters ──
+// ── State ──
+let currentTab = 'active'; // 'active' | 'deleted'
+let currentSort = 'created_at';
+let currentDir = 'DESC';
 let debounceTimer = null;
+
 function collectFilters() {
-  return {
+  const f = {
     q: qs('#filter-q').value.trim(),
     pro_status: qs('#filter-pro-status').value,
+    anonymized: currentTab === 'deleted' ? '1' : '0',
+    sort: currentSort,
+    dir: currentDir,
   };
+  return f;
 }
 
 function reloadFiltered(page) {
@@ -34,6 +42,42 @@ qs('#filter-q').addEventListener('input', () => {
   debounceTimer = setTimeout(() => reloadFiltered(), 300);
 });
 qs('#filter-pro-status').addEventListener('change', () => reloadFiltered());
+
+// ── Tabs ──
+document.querySelectorAll('#customers-tabs .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentTab = btn.dataset.tab;
+    document.querySelectorAll('#customers-tabs .tab-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.tab === currentTab);
+      b.style.color = b.dataset.tab === currentTab ? '' : 'var(--gray-500,#6b7280)';
+      b.style.borderBottomColor = b.dataset.tab === currentTab ? 'var(--primary,#222)' : 'transparent';
+    });
+    reloadFiltered();
+  });
+});
+// Set initial tab style
+qs('#customers-tabs .tab-btn.active').style.borderBottomColor = 'var(--primary,#222)';
+
+// ── Sort ──
+document.querySelectorAll('th.sortable').forEach(th => {
+  th.style.cursor = 'pointer';
+  th.style.userSelect = 'none';
+  th.addEventListener('click', () => {
+    const col = th.dataset.sort;
+    if (currentSort === col) {
+      currentDir = currentDir === 'DESC' ? 'ASC' : 'DESC';
+    } else {
+      currentSort = col;
+      currentDir = 'ASC';
+    }
+    // Update sort indicators
+    document.querySelectorAll('th.sortable').forEach(h => {
+      h.classList.remove('sort-asc', 'sort-desc');
+    });
+    th.classList.add(currentDir === 'ASC' ? 'sort-asc' : 'sort-desc');
+    reloadFiltered();
+  });
+});
 
 // ── View detail modal ──
 async function openDetail(id) {
@@ -68,13 +112,53 @@ async function openDetail(id) {
           } catch (err) { toastError(err?.message || 'Erreur'); }
         });
       }
+      const delBtn = qs('#detail-delete-btn');
+      if (delBtn) {
+        delBtn.addEventListener('click', async () => {
+          const confirm = await Swal.fire({
+            title: 'Supprimer ce client ?',
+            text: 'Cette action est irreversible. Le compte sera anonymisé (RGPD).',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Supprimer',
+            cancelButtonText: 'Annuler',
+            confirmButtonColor: '#b91c1c',
+          });
+          if (!confirm.isConfirmed) return;
+          try {
+            await model.deleteCustomer(id);
+            toastSuccess('Client supprime');
+            Swal.close();
+            reloadFiltered();
+          } catch (err) { toastError(err?.message || 'Erreur'); }
+        });
+      }
     },
   });
 }
 
 // ── Wire table view ──
+async function deleteFromTable(id) {
+  const confirm = await Swal.fire({
+    title: 'Supprimer ce client ?',
+    text: 'Cette action est irreversible. Le compte sera anonymisé (RGPD).',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Supprimer',
+    cancelButtonText: 'Annuler',
+    confirmButtonColor: '#b91c1c',
+  });
+  if (!confirm.isConfirmed) return;
+  try {
+    await model.deleteCustomer(id);
+    toastSuccess('Client supprime');
+    reloadFiltered();
+  } catch (err) { toastError(err?.message || 'Erreur'); }
+}
+
 tableView.mount(document.body).bind({
   onView: withErrorToast(openDetail, 'Erreur chargement client'),
+  onDelete: withErrorToast(deleteFromTable, 'Erreur suppression'),
   onPage: (page) => reloadFiltered(page),
 });
 
@@ -85,5 +169,5 @@ model.addEventListener('change', () => {
 
 // ── Init ──
 withErrorToast(async () => {
-  await Promise.all([model.load(), model.loadStats()]);
+  await Promise.all([model.load({ anonymized: '0', sort: 'created_at', dir: 'DESC' }), model.loadStats()]);
 }, 'Erreur de chargement')();
